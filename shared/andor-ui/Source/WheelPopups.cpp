@@ -9,7 +9,7 @@
 namespace osp::plugin
 {
 
-const char* const pitchBendHelp = "Sets how far notes bend when the pitch wheel moves fully up or down. The wheel returns to the center when released.";
+const char* const pitchBendHelp = "The wheel bends notes up or down by RANGE. It springs back to the centre when released.";
 
 std::vector<VibratoSource> defaultVibratoSources()
 {
@@ -18,7 +18,6 @@ std::vector<VibratoSource> defaultVibratoSources()
 
 namespace
 {
-    constexpr int knobRow = 104;   // the popups' boxed knob cells, at these panels' unit (as Advanced's)
     const juce::Colour wheelAmber { 0xffcd5a1e }, wheelBlue { 0xff4f7290 };
 
     float raw (const InstrumentHost& host, const juce::String& id, float fallback)
@@ -83,23 +82,30 @@ namespace
         InstrumentHost& host;
     };
 
+    /** PITCH BEND, a compact popover (the macro popovers' scale, ShapingPopups' popover::):
+        RANGE beside the picture of the wheel's reach, one line of explanation. */
     class PitchBendPopup final : public MiniPanel
     {
     public:
-        explicit PitchBendPopup (InstrumentHost& h) : MiniPanel ("PITCH BEND", "THE PITCH WHEEL"), host (h), picture (h)
+        static constexpr int width = 280, pictureHeight = 66, helpHeight = 26;
+
+        explicit PitchBendPopup (InstrumentHost& h) : MiniPanel ("PITCH BEND"), host (h), picture (h)
         {
             range = std::make_unique<MiniKnob> (host.apvts(), ids::bendRange, "RANGE", [] (double v) {
                 const int st = juce::roundToInt (v);
                 return st == 0 ? juce::String ("0 st") : juce::String::fromUTF8 ("\xc2\xb1") + juce::String (st) + " st";
             });
-            range->setBoxed (true);
+            range->setArcColour (wheelAmber);
             addAndMakeVisible (*range);
             addAndMakeVisible (picture);
             picture.setInterceptsMouseClicks (false, false);
         }
 
-        float unit() const override { return 0.69f; }
-        juce::Point<int> cardSize() const override { return { 300, headerHeight() + knobRow + 10 + 46 + juce::roundToInt (26.0f * unit()) }; }
+        bool compact() const override { return true; }
+        juce::Point<int> cardSize() const override
+        {
+            return { width, popover::headerTop + pictureHeight + popover::gap + helpHeight + popover::bottom };
+        }
         void refreshContent() override { picture.repaint(); }
         void settleNow() override { picture.repaint(); }
 
@@ -107,19 +113,19 @@ namespace
         {
             MiniPanel::paint (g);
             g.setColour (palette::textDim);
-            g.setFont (fonts::label (10.0f));
-            g.drawFittedText (pitchBendHelp, help, juce::Justification::topLeft, 3, 1.0f);
+            g.setFont (fonts::label (popover::helpFont));
+            g.drawFittedText (pitchBendHelp, help, juce::Justification::topLeft, 2, 1.0f);
         }
 
     private:
         void layoutContent (juce::Rectangle<int> area) override
         {
-            auto row = area.removeFromTop (knobRow);
-            range->setBounds (row.removeFromLeft (110));
-            row.removeFromLeft (8);
-            picture.setBounds (row.reduced (0, 6));
-            area.removeFromTop (10);
-            help = area.removeFromTop (46);
+            auto row = area.removeFromTop (pictureHeight);
+            range->setBounds (row.removeFromLeft (popover::maxCellWidth).withSizeKeepingCentre (popover::maxCellWidth, popover::cellHeight));
+            row.removeFromLeft (popover::gap);
+            picture.setBounds (row);
+            area.removeFromTop (popover::gap);
+            help = area.removeFromTop (helpHeight);
         }
 
         InstrumentHost& host;
@@ -218,20 +224,25 @@ namespace
         std::function<float()> wheel;
     };
 
+    /** MOD WHEEL's VIBRATO, a compact popover (the macro popovers' scale, popover::): ON in
+        the title row, the picture of one note's pitch, DEPTH .. AMOUNT in one row, CONTROL,
+        the sources, one or two lines on what CONTROL does. */
     class ModWheelPopup final : public MiniPanel
     {
     public:
+        static constexpr int width = 340, pictureHeight = 64, helpHeight = 24, captionWidth = 58;
+
         ModWheelPopup (InstrumentHost& h, std::vector<VibratoSource> s, std::function<float()> w)
-            : MiniPanel ("MOD WHEEL", "VIBRATO"), host (h), sourceList (std::move (s)), picture (h, std::move (w))
+            : MiniPanel ("MOD WHEEL"), host (h), sourceList (std::move (s)), picture (h, std::move (w))
         {
             auto& state = host.apvts();
             enable = std::make_unique<SegmentedControl> (*state.getParameter (ids::vibratoEnabled), juce::StringArray { "OFF", "ON" });
             enable->setTooltip ("Vibrato: each note's pitch swings gently, starting after DELAY and growing over RISE");
             enable->onChange = [this] (int) { update(); };
+            binding::tag (*enable, ids::vibratoEnabled);
             addAndMakeVisible (*enable);
             auto add = [this, &state] (const juce::String& id, const char* caption, MiniKnob::Formatter f) {
                 knobs.push_back (std::make_unique<MiniKnob> (state, id, caption, std::move (f)));
-                knobs.back()->setBoxed (true);
                 addAndMakeVisible (*knobs.back());
                 return knobs.back().get();
             };
@@ -243,6 +254,7 @@ namespace
             control = std::make_unique<SegmentedControl> (*state.getParameter (ids::vibratoControl), juce::StringArray { "MOD WHEEL", "ALWAYS ON", "ASSIGNED" });
             control->setTooltip ("What sets how much vibrato plays: the mod wheel, always all of it, or AMOUNT (for macros, LFOs and envelopes)");
             control->onChange = [this] (int) { update(); };
+            binding::tag (*control, ids::vibratoControl);
             addAndMakeVisible (*control);
             for (const auto& source : sourceList)
             {
@@ -259,10 +271,11 @@ namespace
             update();
         }
 
-        float unit() const override { return 0.69f; }
+        bool compact() const override { return true; }
         juce::Point<int> cardSize() const override
         {
-            return { 420, headerHeight() + 24 + 8 + 86 + 8 + knobRow + 8 + 12 + 24 + 8 + 12 + 24 + 8 + 30 + juce::roundToInt (26.0f * unit()) };
+            using namespace popover;
+            return { width, headerTop + pictureHeight + gap + cellHeight + rowGap + tabsHeight + rowGap + tabsHeight + rowGap + helpHeight + bottom };
         }
         void refreshContent() override
         {
@@ -275,11 +288,11 @@ namespace
         {
             MiniPanel::paint (g);
             g.setColour (palette::textDim);
-            g.setFont (fonts::label (9.5f));
-            g.drawText ("VIBRATO", enableCaption, juce::Justification::centredLeft, false);
+            g.setFont (fonts::label (popover::captionFont));
+            g.drawText ("VIBRATO", enableCaption, juce::Justification::centredRight, false);
             g.drawText ("CONTROL", controlCaption, juce::Justification::centredLeft, false);
             g.drawText ("SOURCES", sourcesCaption, juce::Justification::centredLeft, false);
-            g.setFont (fonts::label (9.5f));
+            g.setFont (fonts::label (popover::helpFont));
             g.drawFittedText (helpText(), help, juce::Justification::topLeft, 2, 1.0f);
         }
 
@@ -288,7 +301,7 @@ namespace
             switch (juce::roundToInt (raw (host, ids::vibratoControl, 0.0f)))
             {
                 case 1: return "Every note gets DEPTH; the mod wheel stays free for its own routes.";
-                case 2: return "Silent until something moves AMOUNT: right-click AMOUNT to give it to a macro, or route an LFO or envelope to VIBRATO AMOUNT.";
+                case 2: return "Silent until something moves AMOUNT: give it to a macro (right-click), or route an LFO or envelope to VIBRATO AMOUNT.";
                 default: return "The mod wheel sets how much of DEPTH plays. Each note waits DELAY, then grows over RISE.";
             }
         }
@@ -309,27 +322,31 @@ namespace
 
         void layoutContent (juce::Rectangle<int> area) override
         {
-            auto top = area.removeFromTop (24);
-            enableCaption = top.removeFromLeft (70);
-            enable->setBounds (top.removeFromLeft (120));
-            area.removeFromTop (8);
-            picture.setBounds (area.removeFromTop (86));
-            area.removeFromTop (8);
-            auto row = area.removeFromTop (knobRow);
-            const int cell = row.getWidth() / static_cast<int> (knobs.size());
+            using namespace popover;
+            // The title row: VIBRATO OFF / ON on the right, where a macro popover's mode is.
+            const auto c = card();
+            const auto onOff = juce::Rectangle<int> (c.getRight() - side - 84, c.getY() + 7, 84, 20);
+            enable->setBounds (onOff);
+            enableCaption = onOff.withX (onOff.getX() - 64).withWidth (58);
+            picture.setBounds (area.removeFromTop (pictureHeight));
+            area.removeFromTop (gap);
+            auto row = area.removeFromTop (cellHeight);
+            const int cell = std::min (maxCellWidth, row.getWidth() / static_cast<int> (knobs.size()));
+            row = row.withSizeKeepingCentre (cell * static_cast<int> (knobs.size()), row.getHeight());
             for (auto& k : knobs)
                 k->setBounds (row.removeFromLeft (cell));
-            area.removeFromTop (8);
-            controlCaption = area.removeFromTop (12);
-            control->setBounds (area.removeFromTop (24));
-            area.removeFromTop (8);
-            sourcesCaption = area.removeFromTop (12);
-            auto line = area.removeFromTop (24);
-            const int each = sources.empty() ? 0 : std::min (90, line.getWidth() / static_cast<int> (sources.size()));
+            area.removeFromTop (rowGap);
+            auto line = area.removeFromTop (tabsHeight);
+            controlCaption = line.removeFromLeft (captionWidth);
+            control->setBounds (line);
+            area.removeFromTop (rowGap);
+            line = area.removeFromTop (tabsHeight);
+            sourcesCaption = line.removeFromLeft (captionWidth);
+            const int each = sources.empty() ? 0 : std::min (56, line.getWidth() / static_cast<int> (sources.size()));
             for (auto& b : sources)
                 b->setBounds (line.removeFromLeft (each));
-            area.removeFromTop (8);
-            help = area.removeFromTop (30);
+            area.removeFromTop (rowGap);
+            help = area.removeFromTop (helpHeight);
         }
 
         InstrumentHost& host;

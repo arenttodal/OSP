@@ -1227,7 +1227,7 @@ void ShellEditor::positionPopup()
     if (popupIndex >= 0 && popupIndex < frame::macroCount)
         at = frame::macroPopoverOrigin (macros[static_cast<std::size_t> (popupIndex)].label->getBounds().toFloat(), size);
     else if (popupIndex == advancedPopup)
-        at = frame::advancedPopoverOrigin (advancedButton.getBounds().toFloat(), size);
+        at = frame::advancedPopoverOrigin (advancedButton.getBounds().toFloat(), size, arpButton.getBounds().toFloat());
     else if (isReimaginedPopup (popupIndex))
     {
         // A layer's REIMAGINED popover unfolds above that card's REIMAGINED name (as in ANDOR OSP).

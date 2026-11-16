@@ -215,6 +215,28 @@ private:
 };
 
 /**
+    The compact popovers' shared measures (reference px): the macro popovers (LIFE .. SPACE,
+    REIMAGINED), PITCH BEND, MOD WHEEL and ADVANCED are all built with them, so every popover
+    reads at one scale. A compact MiniPanel's content starts `headerTop` under its card's top,
+    `side` in from each edge, and ends `bottom` above its foot.
+*/
+namespace popover
+{
+    inline constexpr int headerTop = 32;        ///< the title row (13 px title, a selector on the right)
+    inline constexpr int side = 12;
+    inline constexpr int bottom = 10;
+    inline constexpr int gap = 8;               ///< between the picture, a row of tabs and the knobs
+    inline constexpr int rowGap = 6;            ///< between rows of tabs or captions
+    inline constexpr int tabsHeight = 21;       ///< a SegmentedControl, a row of keys
+    inline constexpr int captionHeight = 12;    ///< a small capital caption above a row
+    inline constexpr int cellHeight = 58;       ///< a knob's cell: caption, knob, value
+    inline constexpr int secondaryCellHeight = 46;
+    inline constexpr int maxCellWidth = 80;
+    inline constexpr float captionFont = 9.5f;  ///< the small capitals of a caption
+    inline constexpr float helpFont = 9.5f;     ///< a line of explanation
+}
+
+/**
     The popup shell (macro popups and Advanced): a raised card that floats over the
     instrument with its title, a short subtitle and a close button, then the panel's own
     content (mode, visualisation, compact controls). Changes apply immediately. The

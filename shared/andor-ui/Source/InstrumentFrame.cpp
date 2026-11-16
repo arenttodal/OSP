@@ -499,9 +499,14 @@ juce::Point<float> macroPopoverOrigin (juce::Rectangle<float> label, juce::Point
     return { label.getCentreX() - 0.5f * size.x, label.getY() - 10.0f - size.y };
 }
 
-juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Point<float> size)
+juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Point<float> size, juce::Rectangle<float> clearOf)
 {
-    return { key.getRight() - size.x, key.getY() - 8.0f - size.y };
+    // Above its key, right edges aligned; and clear of what sits above the key (the
+    // arpeggiator's housing: ARP and SUB stay in view and playable).
+    float y = key.getY() - 8.0f - size.y;
+    if (! clearOf.isEmpty())
+        y = std::min (y, clearOf.getY() - 10.0f - size.y);
+    return { key.getRight() - size.x, y };
 }
 
 juce::Point<float> wheelPopoverOrigin (juce::Rectangle<float> wheel, juce::Point<float> size)

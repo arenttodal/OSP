@@ -473,6 +473,35 @@ static Catalog ospCatalog()
     }
     {
         Lesson l;
+        l.id = "osp.vibrato";
+        l.title = "Add vibrato to a recording";
+        l.description = "Let the mod wheel bring in a gentle vibrato as you hold a note.";
+        l.minutes = 3;
+        l.exampleId = "bowed";
+        auto open = step ("open", "osp.wheel.mod", "Open MOD", "Click MOD beneath the modulation wheel to open its settings.",
+                          Completion::action ({ "modwheel.opened" }, Condition::state ("osp.popup.mod.open")).withAlreadyDone (Condition::state ("osp.popup.mod.open"), "Already open"));
+        open.revealOnEnter = false;
+        l.steps.push_back (open);
+        l.steps.push_back (step ("on", "osp.vibrato.enable", "Turn VIBRATO on", "Choose ON beside VIBRATO.", setTo ("vibrato.enabled", 1.0f, "Already on")));
+        l.steps.push_back (step ("control", "osp.vibrato.control", "Let the wheel control it", "Under CONTROL, choose MOD WHEEL: the wheel then sets how much of the vibrato plays.",
+                                 setTo ("vibrato.control", 0.0f, "Already the mod wheel")));
+        l.steps.push_back (step ("depth", "osp.vibrato.depth", "Set a modest DEPTH", "DEPTH is how far the pitch swings, in cents. 15 to 30 cents is a gentle vibrato.", edited ("vibrato.depth")));
+        l.steps.push_back (step ("rate", "osp.vibrato.rate", "Set the RATE", "RATE is how many times a second the pitch swings. Around 5 to 6 Hz sounds natural.", edited ("vibrato.rate")));
+        l.steps.push_back (step ("play", "osp.wheel.mod", "Hold a note and raise the wheel",
+                                 "Hold a note and push the modulation wheel up. The vibrato grows with the wheel; at the bottom there is none.",
+                                 Completion::action ({ "note.played" }, Condition::state ("osp.modwheel.up"))));
+        l.steps.push_back (step ("shape", "osp.vibrato.delay", "Shape how it enters",
+                                 "DELAY waits after each note begins; RISE then fades the vibrato in. Change either and play again.",
+                                 Completion::action ({ param ("vibrato.delay"), param ("vibrato.rise") },
+                                                     Condition::any ({ Condition::changed ("vibrato.delay"), Condition::changed ("vibrato.rise") }))));
+        l.steps.push_back (step ("sources", "osp.vibrato.sources", "Choose the layers",
+                                 "SOURCES sets which layers take the vibrato. Only layers with a pitched recording move."));
+        l.completionText = "The mod wheel now brings in vibrato while it still drives anything else you have routed to it. ALWAYS ON plays it on every note; ASSIGNED lets a macro, an LFO or an envelope move it.";
+        setUp (l, { soundReady() }, "Vibrato is clearest on a held, steady note: use your current sound, or the bowed example.");
+        c.lessons.push_back (l);
+    }
+    {
+        Lesson l;
         l.id = "osp.modulation";
         l.title = "Modulation";
         l.description = "Make a control move by itself.";
@@ -605,7 +634,12 @@ static Catalog ospCatalog()
           "osp.presets");
     help ("osp.header.menu", "Menu", "Add layers, presets and instruments (Export instrument carries the recordings), undo, interface size, Advanced and the tutorials.");
     help ("osp.samples", "Samples", "How each file of a multi-sample sound is used: its role, its root note and its velocity layer. A change is yours and is kept.", "osp.multisample");
-    help ("osp.advanced", "Advanced", "Tuning, bend range, glide, Poly or Mono, PITCH CHARACTER, how touch changes the sound (DYNAMICS), MPE and the variation seed.");
+    help ("osp.advanced", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
+    help ("osp.wheel.pitch", "Pitch Bend", "The pitch wheel bends notes up or down as you move it. Click PITCH beneath the wheel to set how far it bends.");
+    help ("osp.wheel.mod", "Mod Wheel", "The modulation wheel controls assigned parameters while you play. Click MOD beneath the wheel to set up vibrato. The wheel can continue controlling other parameters at the same time.",
+          "osp.vibrato");
+    help ("osp.vibrato", "Vibrato", "Vibrato moves a note's pitch gently up and down. DEPTH sets how far it moves, RATE sets the speed, and DELAY and RISE control how it enters after a note begins.",
+          "osp.vibrato");
     help ("osp.header.mix", "MIX", "With two layers: the balance between A and B.", "osp.layers");
     help ("osp.keyboard", "Keyboard", "Plays the instrument with the mouse, as a MIDI keyboard does. Its keys show the notes you play.");
     return c;
@@ -631,6 +665,33 @@ struct OspLearnTargets
         t.add ({ "osp.source.dropZone", comp (e.dropZone), {}, {}, [&e] { return e.dropZone.isVisible(); } });
         t.add ({ "osp.keyboard", comp (e.keyboard), {}, {}, {}, true });
         t.add ({ "osp.advanced", comp (e.advancedButton), {}, [&e] { e.openPopup (OspAudioProcessorEditor::advancedPopup); return e.popup != nullptr; }, {}, true });
+        // The wheels' captions (their doors), and VIBRATO's controls in MOD's popover.
+        t.add ({ "osp.wheel.pitch", comp (e.pitchWheel), [&e] (juce::Component&) { return e.pitchWheel.captionArea().expanded (3.0f).getSmallestIntegerContainer(); }, {}, {}, true });
+        t.add ({ "osp.wheel.mod", comp (e.modWheel), [&e] (juce::Component&) { return e.modWheel.captionArea().expanded (3.0f).getSmallestIntegerContainer(); }, {}, {}, true });
+        {
+            auto openMod = [&e] { e.openPopup (OspAudioProcessorEditor::modWheelPopup); return e.popupIndex == OspAudioProcessorEditor::modWheelPopup; };
+            auto inMod = [&e] (const juce::String& id) {
+                return Target::Locator ([&e, id] {
+                    return e.popupIndex == OspAudioProcessorEditor::modWheelPopup && e.popup != nullptr ? findTagged (e.popup.get(), id) : nullptr;
+                });
+            };
+            t.add ({ "osp.vibrato", inMod ("vibrato.enabled"), {}, openMod });
+            t.add ({ "osp.vibrato.enable", inMod ("vibrato.enabled"), {}, openMod });
+            t.add ({ "osp.vibrato.control", inMod ("vibrato.control"), {}, openMod });
+            for (const char* name : { "depth", "rate", "delay", "rise", "amount" })
+                t.add ({ juce::String ("osp.vibrato.") + name, inMod (juce::String ("vibrato.") + name), {}, openMod });
+            // SOURCES: the row of layer keys (A, B, C) together.
+            t.add ({ "osp.vibrato.sources",
+                     Target::Locator ([&e] { return e.popupIndex == OspAudioProcessorEditor::modWheelPopup ? e.popup.get() : nullptr; }),
+                     [] (juce::Component& panel) {
+                         juce::Rectangle<int> r;
+                         for (const char* id : { "vibrato.sourceA", "vibrato.sourceB", "vibrato.sourceC" })
+                             if (auto* key = findTagged (&panel, id))
+                                 r = r.isEmpty() ? panel.getLocalArea (key, key->getLocalBounds()) : r.getUnion (panel.getLocalArea (key, key->getLocalBounds()));
+                         return r;
+                     },
+                     openMod });
+        }
 
         // The edited layer's card and its controls (its letter: whichever layer is edited).
         t.add ({ "osp.source.card", [edited] { return static_cast<juce::Component*> (edited()); }, {}, {}, {}, true });
@@ -854,6 +915,8 @@ struct OspLearnTargets
         t.addState ("osp.keydna.enabled", [&p] { return p.keyDnaSettings (p.editLayer()).enabled; });
         t.addState ("osp.arp.panel.open", [&e] { return e.arpShown; });
         t.addState ("osp.popup.sub.open", [&e] { return e.popupIndex == OspAudioProcessorEditor::subPopup; });
+        t.addState ("osp.popup.mod.open", [&e] { return e.popupIndex == OspAudioProcessorEditor::modWheelPopup; });
+        t.addState ("osp.modwheel.up", [&p] { return p.modWheelPosition() > 0.3f; });
         t.addState ("osp.mod.tab.lfo1", [&e] { return e.modPanel.tab() == 2; });
         t.addState ("osp.mod.lfo1.routed", [&p] {
             for (const auto& r : p.modulationRoutes())
@@ -966,6 +1029,18 @@ void OspAudioProcessorEditor::createLearn()
         toggle();
         learnAction (arpShown ? andor::learn::actions::arpPanelOpened : andor::learn::actions::arpPanelClosed, "osp.arp.control");
     };
+    for (auto* wheel : { &pitchWheel, &modWheel })
+    {
+        auto click = wheel->onCaptionClick;
+        wheel->onCaptionClick = [this, click, wheel] {
+            if (click != nullptr)
+                click();
+            if (wheel == &modWheel && popupIndex == modWheelPopup)
+                learnAction ("modwheel.opened", "osp.wheel.mod");
+            if (wheel == &pitchWheel && popupIndex == pitchWheelPopup)
+                learnAction ("pitchwheel.opened", "osp.wheel.pitch");
+        };
+    }
     auto subRow = arpButton.onSecondRow;
     arpButton.onSecondRow = [this, subRow] {
         if (subRow != nullptr)

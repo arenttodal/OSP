@@ -758,7 +758,7 @@ void OspAudioProcessorEditor::positionPopup()
     }
     else
     {
-        const auto at = frame::advancedPopoverOrigin (advancedButton.getBounds().toFloat(), size);
+        const auto at = frame::advancedPopoverOrigin (advancedButton.getBounds().toFloat(), size, arpButton.getBounds().toFloat());
         x = at.x;
         y = at.y;
     }

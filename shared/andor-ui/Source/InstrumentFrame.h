@@ -194,7 +194,7 @@ namespace frame
         10 px above (kept inside the instrument by placePopover). */
     juce::Point<float> macroPopoverOrigin (juce::Rectangle<float> label, juce::Point<float> size);
     /** Advanced unfolds above its key (`key`), right-aligned with it. */
-    juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Point<float> size);
+    juce::Point<float> advancedPopoverOrigin (juce::Rectangle<float> key, juce::Point<float> size, juce::Rectangle<float> clearOf = {});
     /** A wheel's popover (PITCH BEND, MOD WHEEL) unfolds above the wheel (`wheel`: its
         component, caption included, in the content), so the wheel stays in view and playable. */
     juce::Point<float> wheelPopoverOrigin (juce::Rectangle<float> wheel, juce::Point<float> size);

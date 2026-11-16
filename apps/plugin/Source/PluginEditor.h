@@ -169,6 +169,8 @@ public:
     juce::Button& sourceViewToggle() noexcept { return routingKey; }
     ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
     ArpControl& arpControl() noexcept { return arpButton; }
+    Wheel& pitchWheelControl() noexcept { return pitchWheel; }
+    Wheel& modWheelControl() noexcept { return modWheel; }
 
     /** The envelope panel (AMP, ENV 1, ENV 2, LFO 1, LFO 2) and the halos. */
     ModulationPanel& modulationPanel() noexcept { return modPanel; }
