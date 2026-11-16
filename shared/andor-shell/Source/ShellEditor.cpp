@@ -305,7 +305,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     frame::setUpKeyboard (keyboard);
     content.addAndMakeVisible (keyboard);
     frame::setUpStatusLabel (statusLabel);
-    content.addAndMakeVisible (statusLabel);
+    content.addChildComponent (statusLabel);   // no footer (as ANDOR OSP): essential messages go to the notice
     advancedButton.setTitle ("Advanced settings");
     advancedButton.setTooltip ("Tuning, bend range, voices, pitch character, dynamics (how touch changes the sound), MPE, variation seed");
     // ANDOR OSP's Advanced popover (shared): enabled when the engine reads any of it.
@@ -351,7 +351,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
 
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
 
-    content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, macros); };
+    content.onPaint = [this] (juce::Graphics& g) { frame::paint (g, content, shell.product().identity, arpShown, macros, true); };
     addAndMakeVisible (content);
     layoutInstrument();
     setResizable (true, true);
@@ -1128,6 +1128,22 @@ void ShellEditor::updateStatus()
         status << (status.isNotEmpty() ? dot : juce::String()) << engine.statusLine;
     if (statusLabel.getText() != status)
         statusLabel.setText (status, juce::dontSendNotification);
+
+    // No footer (as ANDOR OSP): what the player must know (a file that failed, the host's message,
+    // a diagnostic engine naming itself) appears once in the notice over the keyboard.
+    juce::String essential;
+    if (shell.loadState (shell.editLayer()) == InstrumentHost::LoadState::failed)
+        essential = "Could not load that file";
+    if (const auto message = shell.statusMessage(); message.isNotEmpty())
+        essential << (essential.isNotEmpty() ? dot : juce::String()) << message;
+    if (const auto& engine = shell.engineDescription(); engine.diagnostic && engine.statusLine.isNotEmpty())
+        essential << (essential.isNotEmpty() ? dot : juce::String()) << engine.statusLine;
+    if (essential != lastNotice)
+    {
+        lastNotice = essential;
+        if (essential.isNotEmpty())
+            modOverlay.showNoticeAt (essential, keyboard.getBounds().toFloat().withHeight (1.0f).translated (0.0f, -6.0f));
+    }
 }
 
 void ShellEditor::updateHybridDoor()

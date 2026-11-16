@@ -80,7 +80,7 @@ namespace visualstates
         };
         auto open = [] (Processor& p) {
             std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
-            e->setSize (1448, 1086);
+            e->setSize (1448, juce::roundToInt (dynamic_cast<Editor&> (*e).instrumentHeight()));   // the instrument's own height
             return e;
         };
         auto load = [&sounds] (Processor& p, int count) {
@@ -113,10 +113,10 @@ namespace visualstates
         shoot (*editor, ui, "03-three-layers@2x", 2.0f);
         for (const int width : { 869, 1810 })
         {
-            editor->setSize (width, juce::roundToInt (static_cast<float> (width) * 1086.0f / 1448.0f));
+            editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui.instrumentHeight() / 1448.0f));
             shoot (*editor, ui, "04-window-" + juce::String (width));
         }
-        editor->setSize (1448, 1086);
+        editor->setSize (1448, juce::roundToInt (ui.instrumentHeight()));
         const char* tabs[] = { "amp", "env", "lfo1", "lfo2", "vel", "note" };
         for (int t = 0; t < 6; ++t)
         {

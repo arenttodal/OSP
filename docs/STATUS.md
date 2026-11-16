@@ -734,6 +734,25 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       mode (ANDOR ANALOG's generator) keeps its named key. Tests `[mode-selector]`; screenshots
       `OSP_MODE_SHOTS=<dir> osp_plugin_tests "[mode-shots]"`.
 
+## Interface: trimmed footer with a front apron (16 Nov 2026)
+
+- [x] The instrument ends under the keyboard: the keys' fronts (1014), a 2 px reveal, a 20 px
+      front apron between the teak cheeks, then the edge. The canvas is 1448 x 1036 (was 1086;
+      `design::layout::trimmedHeight`, `frame::instrumentHeight (arpShown, true)`). Nothing above
+      moves or scales: the housing is drawn at its full 1086 px design and cut off below. GUI only,
+      no DSP; the window's resize limits and aspect follow the new height; ARP open adds `arpShift`
+      as before.
+- [x] The status line is gone (its text is still kept). What the player must know appears once in the
+      existing notice over the keyboard (`ModulationOverlay::showNoticeAt`): a failed load, an edit
+      not applied, the natural-pitch warning (OSP); the host's message and a diagnostic engine's
+      line (shell). Routine state (Ready, notes, background stages) is not shown.
+- [x] The shell (ANDOR ANALOG and every product) draws the same footer, so a product stays ANDOR
+      OSP's interface pixel for pixel (`[visual-regression]`). `frame::paint` and
+      `frame::instrumentHeight` still default to the full design for any other caller.
+- [x] Tests: `TrimmedFooterTests.inc` ([ui]) checks every supported width (869, 1086, 1448,
+      1810) and ARP open. The design, website and visual-state captures use the instrument's own
+      height.
+
 ## Website: genuine captures for the ANDOR OSP site (9 Nov 2026)
 
 - [x] Hidden test `[web-capture]` (`tests/plugin/WebCaptureTests.inc`): the real editor (ceramic) in

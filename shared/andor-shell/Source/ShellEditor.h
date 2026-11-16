@@ -91,7 +91,9 @@ public:
     osp::plugin::EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
     osp::plugin::ModulationPanel& modulationPanel() noexcept { return modPanel; }
     void setArpExpanded (bool open);
-    float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown); }
+    /** The same trimmed footer as ANDOR OSP (keys, reveal, apron: layout::trimmedHeight), so a
+        product stays ANDOR OSP's interface pixel for pixel. */
+    float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown, true); }
     /** The popovers: a macro's (0..5, when the product has one), Advanced, a layer's
         REIMAGINED (7 + layer, when the engine reads it), a modulation source's routes or
         larger curve (source 0 LFO 1 .. 3 ENV 2). */
@@ -187,7 +189,8 @@ private:
     float shownWheelPosition = -1.0f;
     std::array<float, 4> shownEnvelope {};   ///< the AMP envelope's values as last drawn
     osp::plugin::OspKeyboard keyboard;
-    juce::Label statusLabel;
+    juce::Label statusLabel;   ///< kept (hidden) for its text; the footer it sat in is gone
+    juce::String lastNotice;   ///< the last essential status sent to the notice, so it is shown once
     osp::plugin::AdvancedCardButton advancedButton { "Advanced" };
     osp::plugin::ArpControl arpButton { shell };
     osp::plugin::ArpInlinePanel arpPanel { shell };
