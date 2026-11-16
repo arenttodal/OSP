@@ -1084,7 +1084,47 @@ Wheel::Wheel (juce::String c, bool spring, std::function<void (float)> move) : c
 
 juce::Rectangle<float> Wheel::slot() const
 {
-    return getLocalBounds().toFloat().withHeight (88.0f);   // reference: 36 x 88, its caption below
+    // Reference: 36 x 88, its caption below; centred in the component (which is wider by
+    // captionRoom either side, so the caption is never clipped).
+    const float w = std::min (36.0f, static_cast<float> (getWidth()));
+    return { 0.5f * (static_cast<float> (getWidth()) - w), 0.0f, w, 88.0f };
+}
+
+Wheel::CaptionLayout Wheel::captionLayout() const
+{
+    const auto font = fonts::make (12.5f, fonts::Weight::medium, 0.06f);
+    const float textWidth = juce::GlyphArrangement::getStringWidth (font, caption);
+    if (! assignable)
+        return { juce::Rectangle<float> (0.5f * (static_cast<float> (getWidth()) - textWidth), 88.0f, textWidth, 18.0f), {}, font };
+    // MOD and its patch socket (the sources' assignment glyph), together centred under the wheel.
+    const float left = 0.5f * (static_cast<float> (getWidth()) - (textWidth + 13.0f));
+    return { juce::Rectangle<float> (left, 88.0f, textWidth + 1.0f, 18.0f), { left + textWidth + 8.5f, 97.0f }, font };
+}
+
+juce::Rectangle<float> Wheel::socketCircle() const
+{
+    if (! assignable)
+        return {};
+    return juce::Rectangle<float> (8.4f, 8.4f).withCentre (captionLayout().socket).expanded (0.625f);   // its 1.25 px stroke
+}
+
+juce::Rectangle<float> Wheel::captionBounds() const
+{
+    const auto l = captionLayout();
+    // The glyphs' own box (what is drawn), not the 18 px line.
+    juce::GlyphArrangement glyphs;
+    glyphs.addFittedText (l.font, caption, l.text.getX(), l.text.getY(), l.text.getWidth(), l.text.getHeight(),
+                          assignable ? juce::Justification::centredLeft : juce::Justification::centred, 1);
+    auto r = glyphs.getBoundingBox (0, -1, true);
+    return assignable ? r.getUnion (socketCircle()) : r;
+}
+
+bool Wheel::hitTest (int x, int y)
+{
+    const juce::Point<float> p (static_cast<float> (x) + 0.5f, static_cast<float> (y) + 0.5f);
+    // The designed column (as before the component grew) and the caption as drawn.
+    const auto column = slot().withHeight (static_cast<float> (getHeight()));
+    return column.contains (p) || (assignable && captionBounds().expanded (2.0f).contains (p));
 }
 
 void Wheel::setValue (float newValue)
@@ -1105,8 +1145,11 @@ void Wheel::setAssignable (juce::Colour colour)
 
 juce::Rectangle<float> Wheel::socketArea() const
 {
-    // The caption's line under the wheel: the word and its socket.
-    return { 0.0f, 88.0f, static_cast<float> (getWidth()), static_cast<float> (getHeight()) - 88.0f };
+    // The caption's line under the wheel: the word and its socket (the designed column, and the
+    // caption where it reaches beyond it).
+    const auto column = slot();
+    juce::Rectangle<float> line (column.getX(), 88.0f, column.getWidth(), static_cast<float> (getHeight()) - 88.0f);
+    return assignable ? line.getUnion (captionBounds().expanded (2.0f).withY (88.0f).withBottom (line.getBottom())) : line;
 }
 
 void Wheel::mouseMove (const juce::MouseEvent& e)
@@ -1232,18 +1275,16 @@ void Wheel::paint (juce::Graphics& g)
         g.fillRect (lit.withHeight (1.0f).reduced (1.5f, 0.0f));
     }
     g.setColour (colour::text.withAlpha (0.8f));
-    const auto font = fonts::make (12.5f, fonts::Weight::medium, 0.06f);
-    g.setFont (font);
+    const auto layout = captionLayout();
+    g.setFont (layout.font);
     if (! assignable)
     {
-        g.drawText (caption, juce::Rectangle<float> (-12.0f, 88.0f, static_cast<float> (getWidth()) + 24.0f, 18.0f), juce::Justification::centred, false);
+        g.drawText (caption, layout.text.expanded (12.0f, 0.0f), juce::Justification::centred, false);
         return;
     }
     // MOD and its patch socket (the sources' assignment glyph), together centred under the wheel.
-    const float textWidth = juce::GlyphArrangement::getStringWidth (font, caption);
-    const float left = 0.5f * (static_cast<float> (getWidth()) - (textWidth + 13.0f));
-    g.drawText (caption, juce::Rectangle<float> (left, 88.0f, textWidth + 1.0f, 18.0f), juce::Justification::centredLeft, false);
-    const juce::Point<float> c (left + textWidth + 8.5f, 97.0f);
+    g.drawText (caption, layout.text, juce::Justification::centredLeft, false);
+    const juce::Point<float> c = layout.socket;
     g.setColour (socket.withAlpha (overSocket ? 0.95f : 0.6f));
     g.drawEllipse (juce::Rectangle<float> (8.4f, 8.4f).withCentre (c), 1.25f);
     if (inUse)

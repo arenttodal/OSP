@@ -265,11 +265,23 @@ public:
     void setAssignable (juce::Colour socketColour);
     std::function<void (juce::Point<int>)> onSourceDrag, onSourceDrop;
     juce::Rectangle<float> socketArea() const;
+    /** The caption as drawn (its text, and MOD's socket), component px. The component is wider
+        than the 36 px slot so the caption is never clipped; the slot stays centred. */
+    juce::Rectangle<float> captionBounds() const;
+    /** MOD's socket circle as drawn (empty when the wheel is not assignable). */
+    juce::Rectangle<float> socketCircle() const;
+    /** Only the designed column (slot and caption line, 36 px) and the caption itself respond. */
+    bool hitTest (int x, int y) override;
+    /** The room either side of the slot that frame::place gives the component for its caption. */
+    static constexpr float captionRoom = 14.0f;
     /** The socket's centre fills while the wheel feeds a route. */
     void setInUse (bool used);
     void mouseMove (const juce::MouseEvent&) override;
 
 private:
+    /** The caption's text box and MOD's socket centre (component px). */
+    struct CaptionLayout { juce::Rectangle<float> text; juce::Point<float> socket; juce::Font font; };
+    CaptionLayout captionLayout() const;
     juce::Rectangle<float> slot() const;
     bool dragging = false;
     juce::String caption;

@@ -537,6 +537,67 @@ TEST_CASE ("shell: presets and sessions save and reload; another product's state
     }
 }
 
+
+namespace trimmedfooter
+{
+    /** The caption checks shared by OSP and the shell: drawn text and socket never clipped by the
+        wheel's own bounds, at least 6 px apart from their neighbours, and clear of the apron. */
+    template <typename Ui>
+    void checkCaptions (Ui& ui)
+    {
+        namespace layout = osp::plugin::design::layout;
+        auto absolute = [] (osp::plugin::Wheel& w, juce::Rectangle<float> r) { return r.translated (static_cast<float> (w.getX()), static_cast<float> (w.getY())); };
+        auto& pitch = ui.pitchBendWheel();
+        auto& mod = ui.modulationWheel();
+        for (auto* w : { &pitch, &mod })
+        {
+            const auto local = w->getLocalBounds().toFloat();
+            CHECK (local.contains (w->captionBounds()));                       // the text (and socket) is never clipped
+            if (! w->socketCircle().isEmpty())
+                CHECK (local.contains (w->socketCircle()));                    // the whole circle is drawn
+            CHECK (w->getBottom() == juce::roundToInt (layout::apronTop));      // nothing clickable in the apron
+            CHECK (w->socketArea().getY() == Approx (88.0f));                   // the caption line as designed
+            CHECK (layout::apronTop - absolute (*w, w->captionBounds()).getBottom() >= 7.5f);
+        }
+        // The slots exactly where they always were (the components only gained caption room).
+        CHECK (pitch.getBounds().toFloat().getCentreX() == Approx (layout::pitchWheel.getCentreX()));
+        CHECK (mod.getBounds().toFloat().getCentreX() == Approx (layout::modWheel.getCentreX()));
+        const auto p = absolute (pitch, pitch.captionBounds());
+        const auto m = absolute (mod, mod.captionBounds());
+        CHECK (p.getX() - layout::housing.getX() >= 6.0f);       // clear of the teak rail
+        CHECK (m.getX() - p.getRight() >= 6.0f);                  // PITCH and MOD apart
+        CHECK (layout::keyboard.getX() - 2.0f - m.getRight() >= 6.0f);   // MOD's socket clear of the key recess
+        // Only the designed column and the caption respond: a click between the two captions,
+        // beside PITCH's slot, does not reach either wheel.
+        CHECK_FALSE (pitch.hitTest (juce::roundToInt (pitch.getWidth() - 3), 40));
+        CHECK (pitch.hitTest (juce::roundToInt (0.5f * pitch.getWidth()), 40));
+        CHECK (mod.hitTest (juce::roundToInt (m.getRight() - static_cast<float> (mod.getX()) - 2.0f), 97));   // the socket
+    }
+
+    /** The teak rails' shadow on the ivory runs on through the apron: across the band beside each
+        rail, the profile under the apron is the profile above it, only shaded (no patch, no step). */
+    inline void checkRailShadow (const juce::Image& shot, float k)
+    {
+        namespace layout = osp::plugin::design::layout;
+        auto lum = [&] (float x, float y) { return 255.0f * shot.getPixelAt (juce::roundToInt (x * k), juce::roundToInt (y * k)).getPerceivedBrightness(); };
+        for (const auto [edge, dir] : { std::pair<float, float> { layout::housing.getX(), 1.0f }, std::pair<float, float> { layout::housing.getRight() - 1.0f, -1.0f } })
+        {
+            INFO ("rail edge " << edge);
+            // The apron is a translucent shade (towards #302418, luminance ~38): it scales each
+            // pixel's distance from that colour by the same factor, so the ratio below/above is
+            // the same across the rail's shadow as on plain ivory. An opaque fill (the bug) turned
+            // the shadow's 81 into the face's 216: a ratio near 5 instead of 0.95.
+            const float above = layout::apronTop - 3.0f, below = layout::apronTop + 12.0f;
+            auto ratio = [&] (float x) { return (lum (x, below) - 38.0f) / std::max (1.0f, lum (x, above) - 38.0f); };
+            const float plain = ratio (edge + dir * 30.0f);
+            float worst = 0.0f;
+            for (float d = 1.0f; d <= 10.0f; d += 1.0f)
+                worst = std::max (worst, std::abs (ratio (edge + dir * d) - plain));
+            CHECK (worst <= 0.2f);   // the rail shadow's shape continues through the apron
+        }
+    }
+}
+
 TEST_CASE ("shell: the trimmed footer as ANDOR OSP's - captions clear of the apron at every size", "[shell][editor]")
 {
     namespace design = osp::plugin::design;
@@ -552,13 +613,10 @@ TEST_CASE ("shell: the trimmed footer as ANDOR OSP's - captions clear of the apr
         INFO ("width " << width);
         editor->setSize (width, juce::roundToInt (static_cast<float> (width) * layout::trimmedHeight / design::width));
         ui->refreshNow();
-        for (auto* wheel : { &ui->pitchBendWheel(), &ui->modulationWheel() })
-        {
-            CHECK (wheel->getBottom() == juce::roundToInt (layout::apronTop));   // nothing clickable in the apron
-            CHECK (wheel->socketArea().getY() == Approx (88.0f));                 // captions as designed
-        }
+        trimmedfooter::checkCaptions (*ui);
         const auto shot = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f, juce::SoftwareImageType());
         const float k = static_cast<float> (width) / design::width;
+        trimmedfooter::checkRailShadow (shot, k);
         int lowest = -1;
         for (int y = juce::roundToInt (1001.0f * k); y < juce::roundToInt (layout::apronTop * k); ++y)
             for (int x = juce::roundToInt (layout::pitchWheel.getX() * k); x < juce::roundToInt (layout::modWheel.getRight() * k); ++x)

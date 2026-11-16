@@ -745,7 +745,12 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       drawn at its full 1086 px design and cut off below. GUI only, no DSP. The window's resize
       limits and aspect follow the new height; ARP open adds `arpShift` as before.
 - [x] The wheels' areas (MOD's socket included) end where the apron starts: nothing is clickable
-      in it.
+      in it. The wheel components are 14 px wider either side than their 36 px slots (the slots
+      centred where they always were) so PITCH and MOD with its socket are never clipped (MOD and
+      the socket circle were cut by the old 36 px bounds); `Wheel::hitTest` keeps the designed
+      column and the caption as the only interactive area.
+- [x] The apron is a translucent shade over the housing (not an opaque fill), so the teak rails'
+      shadows on the ivory run on through it unbroken; on plain ivory it gives the approved tones.
 - [x] The status line's essential messages appear once in the existing notice over the keyboard
       (`ModulationOverlay::showNoticeAt`): a failed load, an edit not applied, the natural-pitch
       warning (OSP); the host's message and a diagnostic engine's line (shell). Routine state

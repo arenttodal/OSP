@@ -3,6 +3,7 @@
 
 #include "CeramicSkin.h"
 #include "EngineCard.h"   // icons
+#include "MainSections.h"   // Wheel (caption room)
 #include "OspLookAndFeel.h"
 
 namespace osp::plugin
@@ -363,8 +364,11 @@ void place (const Parts& parts, bool arpShown, bool trimmedFooter)
     // The wheels and their captions as designed; with the trimmed footer their area (caption and
     // MOD's socket included) ends where the apron starts, so nothing is clickable in the apron.
     const float wheelHeight = trimmedFooter ? layout::apronTop - layout::pitchWheel.getY() : 115.0f;
-    set (parts.pitchWheel, low (layout::pitchWheel.withHeight (wheelHeight)));
-    set (parts.modWheel, low (layout::modWheel.withHeight (wheelHeight)));
+    // The components are wider than the 36 px slots (Wheel::captionRoom either side, the slots
+    // centred where they always were) so PITCH and MOD with its socket are never clipped; only
+    // the designed column and the caption itself respond (Wheel::hitTest).
+    set (parts.pitchWheel, low (layout::pitchWheel.withHeight (wheelHeight).expanded (Wheel::captionRoom, 0.0f)));
+    set (parts.modWheel, low (layout::modWheel.withHeight (wheelHeight).expanded (Wheel::captionRoom, 0.0f)));
     if (parts.keyboard != nullptr)
     {
         parts.keyboard->setBounds (low (layout::keyboard));
@@ -448,10 +452,15 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
         const float y0 = layout::apronTop + (arpShown ? layout::arpShift : 0.0f);
         const auto face = juce::Rectangle<float>::leftTopRightBottom (layout::housing.getX(), y0, layout::housing.getRight(),
                                                                     y0 + layout::underKeyReveal + layout::apronHeight);
+        // Shading, not paint: a warm translucent tone over the housing, so everything the housing
+        // draws there (the teak rails' shadows on the ivory, its edges) runs on through the apron
+        // unbroken. Over the plain surface (#e0d8ca) it gives the approved tones: #d9d1c4 after
+        // the 6 px turn, #d6cec1 across the face, #d0c8bb at the foot.
         const float h = face.getHeight();
-        juce::ColourGradient tone (juce::Colour (0xffe0d8ca), 0.0f, face.getY(), juce::Colour (0xffd0c8bb), 0.0f, face.getBottom(), false);
-        tone.addColour (6.0 / h, juce::Colour (0xffd9d1c4));   // the turn into the face
-        tone.addColour (0.55, juce::Colour (0xffd6cec1));      // the face: warm neutral ivory, a touch darker
+        const juce::Colour shade (0x302418);
+        juce::ColourGradient tone (shade.withAlpha (0.0f), 0.0f, face.getY(), shade.withAlpha (0.092f), 0.0f, face.getBottom(), false);
+        tone.addColour (6.0 / h, shade.withAlpha (0.04f));
+        tone.addColour (0.55, shade.withAlpha (0.057f));
         g.setGradientFill (tone);
         g.fillRect (face);
         // (The keys' fronts keep their recess and its lip, with the recess's own shadow under them.)
