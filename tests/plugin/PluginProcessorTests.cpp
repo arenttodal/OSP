@@ -8011,4 +8011,5 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "CardArpTests.inc"
 #include "CaptureTests.inc"
 #include "ModeSelectorTests.inc"
+#include "TrimmedFooterTests.inc"
 #include "WebCaptureTests.inc"   // last: it uses the capture and atlas helpers above

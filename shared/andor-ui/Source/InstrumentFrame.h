@@ -171,7 +171,10 @@ namespace frame
 
     /** The housing, the identity, the keybed, the macro panel with its lights and the keys
         on the housing: everything the instrument paints under its components. */
-    void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros);
+    /** `trimmedFooter`: OSP's footer-less instrument (layout::trimmedHeight); the default draws
+        the full 1086 px design (sister products unchanged). */
+    void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros,
+                bool trimmedFooter = false);
 
     /** A popover's card size in reference pixels (a panel laid out at a smaller unit is
         scaled up, so every popover's shell reads alike). */
@@ -190,7 +193,7 @@ namespace frame
     void animatePopoverOpening (MiniPanel& popup);
 
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
-    float instrumentHeight (bool arpShown) noexcept;
+    float instrumentHeight (bool arpShown, bool trimmedFooter = false) noexcept;
     /** Scales `content` (laid out at the reference size) uniformly into `editor`, centred:
         if a host keeps another window shape, the instrument still shows whole. */
     void fit (juce::Component& editor, juce::Component& content, float height);

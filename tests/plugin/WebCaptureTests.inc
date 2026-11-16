@@ -47,7 +47,7 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
     struct Shot
     {
         int layers = 1;
-        juce::Point<int> size { 1448, 1086 };
+        juce::Point<int> size { 1448, 0 };
         std::vector<float> scales { 1.0f, 2.0f };
         std::vector<int> held;   // keys held while the shot is taken (played for a moment first)
     };
@@ -80,7 +80,8 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         p.addLayers (list);
         REQUIRE (p.waitForLoads (30000));
         p.pollLoads();
-        e->setSize (shot.size.x, shot.size.y);
+        // Height 0: the instrument's own height (OSP's trimmed footer: 1017, not 1086).
+        e->setSize (shot.size.x, shot.size.y > 0 ? shot.size.y : juce::roundToInt (ui->instrumentHeight()));
         voiced (p);
         setUp (p, *ui);
         if (! shot.held.empty())
@@ -118,14 +119,14 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
     const std::vector<int> chord { 48, 55, 60, 64, 71 };   // C3 G3 C4 E4 B4: an open Cmaj7
 
     // 01 The hero: the instrument as a player meets it, at 1, 2 and 3 layers (3x for print-sharp crops).
-    shoot ({ 1, { 1448, 1086 }, { 1.0f, 2.0f, 3.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
+    shoot ({ 1, { 1448, 0 }, { 1.0f, 2.0f, 3.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
         set (p, "reimagined", 24.0f);
     }, "web-01-hero-1L");
-    shoot ({ 2, { 1448, 1086 }, { 1.0f, 2.0f, 3.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
+    shoot ({ 2, { 1448, 0 }, { 1.0f, 2.0f, 3.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
         set (p, "reimagined", 24.0f);
         set (p, Host::layerParameterId (1, "sourceMode"), 1.0f);
     }, "web-01-hero-2L");
-    shoot ({ 3, { 1448, 1086 }, { 1.0f, 2.0f, 3.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
+    shoot ({ 3, { 1448, 0 }, { 1.0f, 2.0f, 3.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
         set (p, "reimagined", 24.0f);
         set (p, Host::layerParameterId (1, "sourceMode"), 1.0f);
         set (p, Host::synthesizeId (2), 45.0f);
@@ -133,12 +134,12 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         set (p, Host::synthParameterId (2, "imprint"), 80.0f);
     }, "web-01-hero-3L");
     // ... and the empty instrument (the first moment: drop a sound).
-    shoot ({ 0, { 1448, 1086 }, { 1.0f, 2.0f }, {} }, [] (OspAudioProcessor&, Editor&) {}, "web-00-empty");
+    shoot ({ 0, { 1448, 0 }, { 1.0f, 2.0f }, {} }, [] (OspAudioProcessor&, Editor&) {}, "web-00-empty");
 
     // 02 REIMAGINED: each of the five modes with its popover open, one layer, 60 %.
     const char* modes[] = { "kaleidoscope", "tape-frame", "toybox", "mosaic", "mirage" };
     for (int m = 0; m < 5; ++m)
-        shoot ({ 1, { 1448, 1086 }, { 1.0f, 2.0f }, chord }, [&, m] (OspAudioProcessor& p, Editor& ui) {
+        shoot ({ 1, { 1448, 0 }, { 1.0f, 2.0f }, chord }, [&, m] (OspAudioProcessor& p, Editor& ui) {
             set (p, "layerA.reimagined.mode", static_cast<float> (m));
             set (p, "reimagined", 60.0f);
             ui.refreshNow();
@@ -156,13 +157,13 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         if (auto* s = ui.engineCard (0).synthEditorComponent())
             s->refresh();
     };
-    shoot ({ 1, { 1448, 1086 }, { 1.0f, 2.0f }, chord }, [] (OspAudioProcessor&, Editor&) {}, "web-03-synth-1-sample");
-    shoot ({ 1, { 1448, 1086 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) { page (p, ui, 60.0f, 0.0f, 0.0f, 0.0f); }, "web-03-synth-2-analog");
-    shoot ({ 1, { 1448, 1086 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) { page (p, ui, 60.0f, 1.0f, 85.0f, 0.0f); }, "web-03-synth-3-imprint");
-    shoot ({ 1, { 1448, 1086 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) { page (p, ui, 60.0f, 1.0f, 85.0f, 60.0f); }, "web-03-synth-4-imprint-motion");
+    shoot ({ 1, { 1448, 0 }, { 1.0f, 2.0f }, chord }, [] (OspAudioProcessor&, Editor&) {}, "web-03-synth-1-sample");
+    shoot ({ 1, { 1448, 0 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) { page (p, ui, 60.0f, 0.0f, 0.0f, 0.0f); }, "web-03-synth-2-analog");
+    shoot ({ 1, { 1448, 0 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) { page (p, ui, 60.0f, 1.0f, 85.0f, 0.0f); }, "web-03-synth-3-imprint");
+    shoot ({ 1, { 1448, 0 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) { page (p, ui, 60.0f, 1.0f, 85.0f, 60.0f); }, "web-03-synth-4-imprint-motion");
 
     // 04 Granular: one source as a cloud of grains, its controls shown.
-    shoot ({ 1, { 1448, 1086 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
+    shoot ({ 1, { 1448, 0 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
         set (p, "layerA.sourceMode", 1.0f);
         set (p, "layerA.granular.size", 180.0f);
         set (p, "layerA.granular.density", 22.0f);
@@ -172,8 +173,8 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
     }, "web-04-granular-1L");
 
     // 05 The macro popovers that carry the SPACE and ECHO story.
-    shoot ({ 1, { 1448, 1086 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.openPopup (4); }, "web-05-space");
-    shoot ({ 1, { 1448, 1086 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
+    shoot ({ 1, { 1448, 0 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.openPopup (4); }, "web-05-space");
+    shoot ({ 1, { 1448, 0 }, { 1.0f, 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
         set (p, "echo", 40.0f);
         set (p, "echo.type", 2.0f);   // ASCEND
         ui.openPopup (Editor::echoPopup);
@@ -185,13 +186,13 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
             m.setProperty ("popup", rectVar (ui.getLocalArea (panel, panel->getLocalBounds())));
     };
     mark = popupBounds;
-    shoot ({ 1, { 1448, 1086 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.openPopup (0); }, "web-06-life");
+    shoot ({ 1, { 1448, 0 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.openPopup (0); }, "web-06-life");
     mark = popupBounds;
-    shoot ({ 1, { 1448, 1086 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.openPopup (4); }, "web-06-space");
+    shoot ({ 1, { 1448, 0 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.openPopup (4); }, "web-06-space");
     for (int m = 0; m < 5; ++m)
     {
         mark = popupBounds;
-        shoot ({ 1, { 1448, 1086 }, { 3.0f }, chord }, [&, m] (OspAudioProcessor& p, Editor& ui) {
+        shoot ({ 1, { 1448, 0 }, { 3.0f }, chord }, [&, m] (OspAudioProcessor& p, Editor& ui) {
             set (p, "layerA.reimagined.mode", static_cast<float> (m));
             set (p, "reimagined", 60.0f);
             ui.refreshNow();
@@ -204,7 +205,7 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         auto& arp = ui.arpInlinePanel();
         m.setProperty ("arp", rectVar (ui.getLocalArea (&arp, arp.getLocalBounds())));
     };
-    shoot ({ 3, { 1448, 1086 }, { 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
+    shoot ({ 3, { 1448, 0 }, { 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
         set (p, Host::layerParameterId (1, "sourceMode"), 1.0f);
         set (p, "arp.enabled", 1.0f);
         set (p, "arp.pattern", 1.0f);
@@ -217,7 +218,7 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
 
     // 08 The three-layer hero again, with every component's bounds (the site pins notes to them).
     mark = [&] (Editor& ui, juce::DynamicObject& m) { m.setProperty ("components", designcapture::bounds (ui)); };
-    shoot ({ 3, { 1448, 1086 }, { 1.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
+    shoot ({ 3, { 1448, 0 }, { 1.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
         set (p, "reimagined", 24.0f);
         set (p, Host::layerParameterId (1, "sourceMode"), 1.0f);
         set (p, Host::synthesizeId (2), 45.0f);
@@ -229,7 +230,7 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
     auto boundsOf = [&] (Editor& ui, juce::Component* c) { return rectVar (ui.getLocalArea (c, c->getLocalBounds())); };
     // Granular: one source as a cloud of grains with its controls shown.
     mark = [&] (Editor& ui, juce::DynamicObject& m) { m.setProperty ("card", boundsOf (ui, &ui.engineCard (0))); };
-    shoot ({ 1, { 1448, 1086 }, { 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
+    shoot ({ 1, { 1448, 0 }, { 2.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
         set (p, "layerA.sourceMode", 1.0f);
         set (p, "layerA.granular.size", 180.0f);
         set (p, "layerA.granular.density", 22.0f);
@@ -240,7 +241,7 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
     }, "web-09-granular-1L");
     // ECHO with ASCEND (the popover, the way the design capture opens it).
     mark = popupBounds;
-    shoot ({ 1, { 1448, 1086 }, { 3.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
+    shoot ({ 1, { 1448, 0 }, { 3.0f }, chord }, [&] (OspAudioProcessor& p, Editor& ui) {
         set (p, "echo", 40.0f);
         set (p, "echo.type", 2.0f);
         ui.refreshNow();
@@ -248,10 +249,10 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
     }, "web-09-echo");
     // The modulation panel on LFO 1.
     mark = [&] (Editor& ui, juce::DynamicObject& m) { m.setProperty ("mod", boundsOf (ui, &ui.modulationPanel())); };
-    shoot ({ 1, { 1448, 1086 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.modulationPanel().showTab (2); }, "web-09-modulation");
+    shoot ({ 1, { 1448, 0 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.modulationPanel().showTab (2); }, "web-09-modulation");
     // KEY DNA: SIZE with a falling curve and variation, keys held.
     mark = [&] (Editor& ui, juce::DynamicObject& m) { if (auto* d = ui.keyDnaWindow()) m.setProperty ("keydna", boundsOf (ui, d)); };
-    shoot ({ 1, { 1448, 1086 }, { 2.0f }, {} }, [&] (OspAudioProcessor& p, Editor& ui) {
+    shoot ({ 1, { 1448, 0 }, { 2.0f }, {} }, [&] (OspAudioProcessor& p, Editor& ui) {
         p.setParameterValue ("layerA.sourceMode", 1.0f);
         auto dna = p.keyDnaSettings (0);
         dna.enabled = true;
@@ -273,7 +274,7 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         p.keyboardState.noteOn (1, 64, 0.8f);
     }, "web-09-keydna");
     // The Library with the three sounds.
-    shoot ({ 3, { 1448, 1086 }, { 2.0f }, {} }, [&] (OspAudioProcessor&, Editor& ui) { ui.openLibrary(); }, "web-09-library");
+    shoot ({ 3, { 1448, 0 }, { 2.0f }, {} }, [&] (OspAudioProcessor&, Editor& ui) { ui.openLibrary(); }, "web-09-library");
 
     // NOTE MAP (Note Atlas): a recorded phrase mapped into its notes, one selected.
     {
@@ -287,7 +288,7 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         p.addLayers (list);
         REQUIRE (p.waitForLoads (30000));
         p.pollLoads();
-        e->setSize (1448, 1086);
+        e->setSize (1448, juce::roundToInt (dynamic_cast<Editor&> (*e).instrumentHeight()));
         voiced (p);
         p.mapNotes (0);
         settleEdits (p);
@@ -318,7 +319,7 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
         auto* ui = dynamic_cast<Editor*> (e.get());
         REQUIRE (ui != nullptr);
-        e->setSize (1448, 1086);
+        e->setSize (1448, juce::roundToInt (ui->instrumentHeight()));
         voiced (p);
         ui->refreshNow();
         auto& card = ui->engineCard (0);
@@ -400,7 +401,7 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
             m.setProperty ("knobs", knobs);
         };
         const NoCaps noCaps;
-        shoot ({ 3, { 1448, 1086 }, { 1.0f, 3.0f, 4.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
+        shoot ({ 3, { 1448, 0 }, { 1.0f, 3.0f, 4.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
             set (p, "reimagined", 24.0f);
             set (p, Host::layerParameterId (1, "sourceMode"), 1.0f);
             set (p, Host::synthesizeId (2), 45.0f);

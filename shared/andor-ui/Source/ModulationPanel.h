@@ -391,6 +391,8 @@ public:
     int dropOn (int source, const juce::String& parameterId, juce::Rectangle<float> area);
     /** A short message by the controls (a refused assignment), for a few seconds. */
     void showNotice (const juce::String& text);
+    /** A notice at a given place (e.g. OSP's load errors over the keyboard, where its footer was). */
+    void showNoticeAt (const juce::String& text, juce::Rectangle<float> anchor) { noticeAnchor = anchor; showNotice (text); }
     juce::String currentNotice() const;
 
     /** META-MODULATION. What a point is over (root coordinates): a halo's route - its ring

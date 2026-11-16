@@ -281,6 +281,11 @@ namespace layout
     /** The keyboard ends where the arpeggiator's card column begins (the approved mockup). */
     const R keyboard { 148.0f, 913.0f, 1150.0f, 101.0f };
     const R status { 48.0f, 1038.0f, 600.0f, 24.0f };
+    /** OSP's trimmed footer (opt-in, frame::instrumentHeight): the instrument ends 3 px under the
+        keys' fronts (keyboard bottom 1014) instead of at 1086. Nothing above moves or scales: the
+        housing is drawn at its full 1086 px design height and simply cut off, so its rounded foot,
+        the cheeks' ends and the status line fall outside the window. */
+    constexpr float trimmedHeight = 1017.0f;
     /** Right of the keyboard, level with it: the arpeggiator's card (light, ARP, chevron,
         pattern and rate) and the Advanced card under it. */
     const R arpControl { 1308.0f, 913.0f, 105.0f, 64.0f };

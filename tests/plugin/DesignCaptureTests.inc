@@ -125,7 +125,7 @@ TEST_CASE ("plugin: design-system capture (states, components, bounds)", "[.][de
     // Window sizes (the instrument scales as one piece): minimum, default, maximum.
     for (const int width : { 869, 1086, 1810 })
     {
-        editor->setSize (width, juce::roundToInt (width * 1086.0f / 1448.0f));
+        editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui->instrumentHeight() / 1448.0f));
         ui->refreshNow();
         savePng (editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f), out.getChildFile ("states/04-window-" + juce::String (width) + ".png"));
     }

@@ -309,7 +309,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     content.addAndMakeVisible (keyboard);
 
     frame::setUpStatusLabel (statusLabel);
-    content.addAndMakeVisible (statusLabel);
+    content.addChildComponent (statusLabel);   // no footer: its text is kept, essential messages go to the notice
     advancedButton.setTitle ("Advanced settings");
     advancedButton.setTooltip ("Tuning, bend range, voices, pitch character, dynamics (how touch changes the sound), MPE, variation seed");
     advancedButton.onClick = [this] {
@@ -1211,7 +1211,7 @@ void OspAudioProcessorEditor::paint (juce::Graphics& g)
 void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
 {
     // The shared ANDOR frame with OSP's identity (ANDOR/OSP, One Shot Performer).
-    frame::paint (g, content, frame::Identity {}, arpShown, macros);
+    frame::paint (g, content, frame::Identity {}, arpShown, macros, true);
 }
 
 void OspAudioProcessorEditor::resized()
@@ -1392,6 +1392,26 @@ void OspAudioProcessorEditor::updateStatus()
         status << (status.isNotEmpty() ? dot : juce::String()) << message;
     if (statusLabel.getText() != status)
         statusLabel.setText (status, juce::dontSendNotification);
+
+    // The footer is gone: what the player must know (a file that failed, an edit not applied, a
+    // pitch mode that cannot apply) appears once in the notice over the keyboard. Routine state
+    // (Ready, notes playing, preparation in the background) is not repeated there.
+    juce::String essential;
+    if (ospProcessor.loadState (layer) == OspAudioProcessor::LoadState::failed)
+        essential = "Could not load that file";
+    else if (const auto stage = ospProcessor.stageMessage(); stage.contains ("Natural pitch"))
+        essential = stage.fromFirstOccurrenceOf (juce::String::fromUTF8 ("\xc2\xb7"), false, false).trim();
+    if (message.isNotEmpty())
+        essential << (essential.isNotEmpty() ? dot : juce::String()) << message;
+    if (essential != lastNotice)
+    {
+        lastNotice = essential;
+        if (essential.isNotEmpty())
+        {
+            const auto keys = keyboard.getBounds().toFloat();
+            modOverlay.showNoticeAt (essential, keys.withHeight (1.0f).translated (0.0f, -6.0f));
+        }
+    }
 }
 
 void OspAudioProcessorEditor::updateKeyTints()

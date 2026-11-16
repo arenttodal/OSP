@@ -385,10 +385,14 @@ juce::Rectangle<int> sourceColumn (juce::Rectangle<int> area, int columns, int i
     return { area.getX() + index * (width + gap), area.getY(), width, area.getHeight() };
 }
 
-void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros)
+void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros,
+            bool trimmedFooter)
 {
     using namespace design;
-    draw::housing (g, content.getLocalBounds().toFloat());
+    // Trimmed footer: the housing keeps its full design height (no stretch, the same pixels) and
+    // runs past the window's foot, so only its rounded bottom border is lost.
+    const float bleed = trimmedFooter ? height - layout::trimmedHeight : 0.0f;
+    draw::housing (g, content.getLocalBounds().toFloat().withHeight (static_cast<float> (content.getHeight()) + bleed));
     // Ceramic: the source cards and the arpeggiator's panel, drawn here so their shadows
     // fall on the housing.
     draw::raisedChildren (g, content);
@@ -415,13 +419,16 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
     // recess cut into the housing (rendered at the keybed's place: 2 px left and right, 3
     // above and 2 below the keys).
     const auto keys = layout::keyboard.translated (0.0f, arpShown ? layout::arpShift : 0.0f);
+    // Trimmed footer: the recess opens at the front (its bottom lip runs past the window's foot),
+    // so the keys' fronts meet the edge with only the recess's shadow under them.
+    const float lipBleed = trimmedFooter ? 40.0f : 0.0f;
     if (auto* pieces = skin::active(); pieces != nullptr
-        && pieces->draw (g, "keybed", juce::Rectangle<float> (keys.getX() - 2.0f, keys.getY() - 3.0f, keys.getWidth() + 4.0f, keys.getHeight() + 5.0f)))
+        && pieces->draw (g, "keybed", juce::Rectangle<float> (keys.getX() - 2.0f, keys.getY() - 3.0f, keys.getWidth() + 4.0f, keys.getHeight() + 5.0f + lipBleed)))
     {
     }
     else
     {
-        const auto bed = keys.expanded (2.0f);
+        const auto bed = keys.expanded (2.0f).withTrimmedBottom (-lipBleed);
         juce::Path frame;
         frame.addRoundedRectangle (bed, 6.0f);
         design::CachedShadow (juce::Colour (0x22302418), 3, { 0, 1 }).drawForPath (g, frame);
@@ -512,9 +519,9 @@ void animatePopoverOpening (MiniPanel& popup)
     juce::Desktop::getInstance().getAnimator().animateComponent (&popup, final, 1.0f, 110, false, 1.0, 0.0);
 }
 
-float instrumentHeight (bool arpShown) noexcept
+float instrumentHeight (bool arpShown, bool trimmedFooter) noexcept
 {
-    return design::height + (arpShown ? design::layout::arpShift : 0.0f);
+    return (trimmedFooter ? design::layout::trimmedHeight : design::height) + (arpShown ? design::layout::arpShift : 0.0f);
 }
 
 void fit (juce::Component& editor, juce::Component& content, float height)

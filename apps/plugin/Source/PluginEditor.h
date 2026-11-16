@@ -110,7 +110,8 @@ public:
     void setArpExpanded (bool open);
     bool isArpExpanded() const noexcept { return arpShown; }
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
-    float instrumentHeight() const noexcept { return frame::instrumentHeight (arpShown); }
+    /** OSP draws the trimmed footer: the instrument ends 3 px under the keys (layout::trimmedHeight). */
+    float instrumentHeight() const noexcept { return frame::instrumentHeight (arpShown, true); }
     ArpInlinePanel& arpInlinePanel() noexcept { return arpPanel; }
     ArpControl& arpControl() noexcept { return arpButton; }
 
@@ -232,7 +233,8 @@ private:
     bool tintedLoop = true;
     int tintedLayer = -1;
     void updateKeyTints();
-    juce::Label statusLabel;
+    juce::Label statusLabel;   ///< kept (hidden) for its text; the footer it sat in is gone
+    juce::String lastNotice;   ///< the last essential status sent to the notice, so it is shown once
     AdvancedCardButton advancedButton { "Advanced" };
     ArpControl arpButton { ospProcessor };
     ArpInlinePanel arpPanel { ospProcessor };
