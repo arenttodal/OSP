@@ -1176,3 +1176,35 @@ TEST_CASE ("shell: SPACE + ARP + a strip opened together grow the window itself;
         CHECK_FALSE (overflow.overflowing());
     }
 }
+
+TEST_CASE ("shell: PITCH BEND, MOD WHEEL and ADVANCED as every product shows them (ANDOR_SHELL_POPOVER_SHOTS)", "[.][shell-popover-shots]")
+{
+    // The same shared popovers ANDOR ANALOG and every shell product open (ShellEditor's own
+    // anchors), at 1086 and 1448 px.
+    const auto dirName = juce::SystemStats::getEnvironmentVariable ("ANDOR_SHELL_POPOVER_SHOTS", {});
+    REQUIRE (dirName.isNotEmpty());
+    const juce::File dir (dirName);
+    dir.createDirectory();
+    for (const int width : { 1086, 1448 })
+    {
+        ShellProcessor p;
+        std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+        auto& ui = dynamic_cast<ShellEditor&> (*editor);
+        editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui.instrumentHeight() / osp::plugin::design::width));
+        ui.refreshNow();
+        for (const auto& [which, name] : { std::pair<int, const char*> { ShellEditor::pitchWheelPopup, "pitch" },
+                                           { ShellEditor::modWheelPopup, "mod" }, { ShellEditor::advancedPopup, "advanced" } })
+        {
+            ui.openPopup (which);
+            ui.refreshNow();
+            REQUIRE (ui.openPopupPanel() != nullptr);
+            const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+            juce::FileOutputStream out (dir.getChildFile ("shell-" + juce::String (width) + "-" + name + ".png"));
+            REQUIRE (out.openedOk());
+            out.setPosition (0);
+            out.truncate();
+            juce::PNGImageFormat().writeImageToStream (image, out);
+            ui.closePopup();
+        }
+    }
+}

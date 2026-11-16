@@ -9,7 +9,7 @@
 #include "LibraryPlaces.h"
 #include "PluginEditor.h"
 #include "SatellitePanel.h"
-#include "SubPanel.h"
+#include "AndorSubPanel.h"
 
 #include "audio/utility/TestSignals.h"
 #include "core/PitchMath.h"

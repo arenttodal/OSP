@@ -34,7 +34,7 @@ set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/FxPresets.cpp
     ${ANDOR_UI_DIR}/Source/EqSpectrum.cpp
     ${ANDOR_UI_DIR}/Source/SatellitePanel.cpp
-    ${ANDOR_UI_DIR}/Source/SubPanel.cpp
+    ${ANDOR_UI_DIR}/Source/AndorSubPanel.cpp
     ${ANDOR_UI_DIR}/Source/FxRack.cpp
     ${ANDOR_UI_DIR}/Source/FxRouting.cpp
     ${ANDOR_UI_DIR}/Source/CharacterRack.cpp

@@ -1146,9 +1146,17 @@ the shared rack (done) and OSP's routing view and mixer (not started).
   item, no view attribute, no room (the shell test `[aux]`; the OSP captures). Should ANDOR OSP
   want a fourth source, it needs a product strip and an engine bus of its own.
 
+- **ANDOR ANALOG's product tests on OSP's current line.** Building ANDOR ANALOG with
+  external/osp at `claude/osp-wheels` compiles everything but `andor_analog_tests`.
+  - ANALOG's own `product/Source/FxRouting.h` (and the FX presets, FX EQ, SATELLITE rig and
+    SynthRack helpers its tests name as `andor::analog::`) are now shared in OSP as
+    `osp::plugin::` (Shared FX R1-R3).
+  - ANALOG's same-named headers shadow or are shadowed by OSP's.
+  - When its pin moves: delete ANALOG's copies, include the shared ones, and change the tests'
+    namespaces. No DSP change.
 - **ANDOR ANALOG on the shared SUB.** ANDOR OSP's SUB lives in shared code:
   `src/engine/sub` (`osp::sub::SubOsc`), `InstrumentHost::addSubParameters` /
-  `subSettingsFrom`, and `shared/andor-ui` `SubPanel`. ANDOR ANALOG still uses its own copies
+  `subSettingsFrom`, and `shared/andor-ui` `SubPanel` (in `AndorSubPanel.h`). ANDOR ANALOG still uses its own copies
   (`dsp/SubOsc`, `product/Source/SubPanel`). When its pin moves past `claude/osp-sub`:
   - its Synth switches to `osp::sub::SubOsc` (the same code);
   - `addSubTo` becomes `addSubParameters (layout, 30, "analog.sub." + field)`;
@@ -1541,6 +1549,37 @@ on the ADD place, or only the card dropped on. Audit, measured reproduction and 
   with SYNTH off are unchanged.
 - **Schema golden.** It follows the new defaults: three SHAPE lines and six IMPRINT / MOTION
   lines.
+
+## PITCH, MOD WHEEL and ADVANCED: the wheels in OSP, one popover scale (16 Nov 2026, branch claude/osp-wheels)
+
+- **The wheel line in OSP.** OSP's `feature/aux-live-input` wheel work (`9c97d21..cd2291d`:
+  PITCH / MOD caption popovers, per-voice VIBRATO) is merged onto OSP's current line, keeping
+  SUB, LOOP's fallback, Learn 2.0 and SATELLITE.
+  - `vibrato.*` is appended after SUB (version hint 28, ANDOR ANALOG's).
+  - `destExt` gains VIBRATO DEPTH and AMOUNT at its end; saved indices are unchanged.
+- **One popover scale.** The shared measures are in `ShapingPopups.h` `popover::`, used by the
+  macro popovers too (which are unchanged).
+  - PITCH BEND: 280 x 142 (was 436 x 350).
+  - MOD WHEEL: 340 x 256 (was 610 x 634). VIBRATO ON in the title row; DEPTH, RATE, DELAY,
+    RISE and AMOUNT in one row; CONTROL; SOURCES.
+  - ADVANCED: 340 x 249 (was 436 x 675). One view in two sections, PLAYING and DYNAMICS; no
+    BEND (under PITCH); placed clear of ARP / SUB.
+  - Every control and parameter is kept.
+- **Learn.** Help for Pitch Bend, Mod Wheel, Vibrato and Advanced Settings; exact caption and
+  VIBRATO targets; the lesson "Add vibrato to a recording".
+- **Tests.**
+  - `[popover-scale]` at 869, 1086, 1448 and 1810 px: scale, 58 px cells, no overlap, inside
+    the window, every control, clear of ARP / SUB;
+  - the vibrato lesson end to end;
+  - `[wheels]`, `[vibrato]`, `[sub]`, `[short-loop]`, `[learn]` and the schema golden
+    (`vibrato.*`, `destExt`: intentional).
+- **ANDOR ANALOG against this branch** (`feature/aux-live-input` with external/osp pointed here):
+  - its engine, plugin and standalone build, and `analog_dsp_tests` passes (321 cases, vibrato
+    and wheel included);
+  - its product tests do not compile yet (see NEXT);
+  - the shared SUB panel's file was renamed `AndorSubPanel.h`, so it no longer shadows
+    ANALOG's own `SubPanel.h`.
+- Report: `docs/wheels/osp-wheels.md`.
 
 ## LOOP holds short notes (15 Nov 2026, branch claude/osp-short-loop)
 

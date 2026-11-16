@@ -14,7 +14,7 @@ session from before. While it is off the output is bit-identical to before.
 | Oscillator | `dsp/SubOsc.{h,cpp}`, `dsp/Envelope.h` (`andor::analog`) | `src/engine/sub/SubOsc.{h,cpp}`, `SubEnvelope.h` (`osp::sub`), verbatim apart from the namespace and one `#include <initializer_list>` |
 | Parameters | `addSubTo`, `analog.sub.*`, hint 30 | `InstrumentHost::addSubParameters (layout, hint, idOf)`: the same names, ranges, defaults, choices and texts. OSP registers `sub.*` at hint 33, after SATELLITE |
 | Reader | `Reader::readWith` (SUB part) | `InstrumentHost::subSettingsFrom`, the same mapping |
-| Popover V7 | `product/Source/SubPanel.{h,cpp}` | `shared/andor-ui/Source/SubPanel.{h,cpp}` (`osp::plugin`): the IDs come from `subview::Ids`, and the lit keys from an `isKeyDown` function (no `ShellProcessor` cast) |
+| Popover V7 | `product/Source/SubPanel.{h,cpp}` | `shared/andor-ui/Source/AndorSubPanel.{h,cpp}` (named apart from ANDOR ANALOG's own `SubPanel.h`, so both can be on its include path) (`osp::plugin`): the IDs come from `subview::Ids`, and the lit keys from an `isKeyDown` function (no `ShellProcessor` cast) |
 | ARP / SUB housing | the shell's `arpCompanion` | `ArpControl::setSecondRow` (shared, from the same line), wired in OSP's editor |
 
 ANDOR ANALOG keeps its own copy until its pin moves; the plan is under NEXT in `docs/STATUS.md`.
