@@ -64,6 +64,7 @@ add_executable(osp_tests
     integration/GrainPhase2Tests.cpp
     integration/AtlasSetTests.cpp
     integration/AtlasShortSustainTests.cpp
+    integration/AtlasRoundRobinTests.cpp
     integration/PedalLoopIntegrationTests.cpp
     integration/AtlasStagedTests.cpp
     integration/GrainBudgetStressTests.cpp
