@@ -4,12 +4,18 @@
 // Measured on the mixed-duration fixture: abruptly cut saw notes of 20 ms .. 1 s.
 #include "engine/AtlasSet.h"
 #include "engine/InstrumentEngine.h"
+#include "io/AudioFileIO.h"
 #include "research/AtlasFixtures.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <tuple>
 #include <vector>
 
 using namespace osp;
@@ -213,4 +219,119 @@ TEST_CASE ("note fades: fades longer than a short note are shortened in proporti
         peakE = std::max (peakE, std::abs (e[i]));
     }
     CHECK (peakC > 0.5f * peakE);
+}
+
+TEST_CASE ("note fades: listening renders and CPU measurements (OSP_NOTE_ATLAS_RENDERS)", "[.][note-atlas-renders]")
+{
+    // Test 1 (fast bass, fades A-D), Test 2 (round-robin pizzicato x16, LIFE off and normal),
+    // Test 4 (LOOP on vs off with fades set). Synthetic fixtures: no musical judgement claimed.
+    const char* dir = std::getenv ("OSP_NOTE_ATLAS_RENDERS");
+    REQUIRE (dir != nullptr);
+    std::filesystem::create_directories (dir);
+    auto write = [&] (const std::string& name, const std::vector<float>& l, const std::vector<float>& r) {
+        auto audio = AudioData::allocate (2, static_cast<std::int64_t> (l.size()), rate);
+        audio.channels[0] = l;
+        audio.channels[1] = r;
+        std::string error;
+        CHECK (io::writeAudioFile (std::filesystem::path (dir) / name, audio, io::SampleFormat::pcm24, error));
+    };
+    auto setWith = [] (const char* fixture, double in, double out) {
+        auto f = atlasfixtures::make (fixture);
+        f.atlas.mapping.fadeInMs = in;
+        f.atlas.mapping.fadeOutMs = out;
+        auto r = atlasfixtures::build (f);
+        REQUIRE (r.set != nullptr);
+        return r.set;
+    };
+    // A sequence of notes on one layer: (key, start seconds, length seconds).
+    auto play = [] (const InstrumentSet& set, const std::vector<std::tuple<int, double, double>>& notes, double seconds, bool loop, double life) {
+        EngineSettings s;
+        s.macros.life = life;
+        s.macros.motion = 0.0;
+        s.macros.space = 0.0;
+        s.macros.reimagined = 0.0;
+        s.layer[0].loop = loop;
+        InstrumentEngine engine;
+        engine.prepare (rate, 64, s);
+        engine.setInstrumentSet (&set);
+        std::vector<float> l, r, bl (64), br (64);
+        const int total = static_cast<int> (seconds * rate);
+        for (int done = 0; done < total; done += 64)
+        {
+            for (const auto& [key, at, len] : notes)
+            {
+                const int on = static_cast<int> (at * rate), off = static_cast<int> ((at + len) * rate);
+                if (on >= done && on < done + 64)
+                    engine.noteOn (key, 100);
+                if (off >= done && off < done + 64)
+                    engine.noteOff (key);
+            }
+            float* ch[2] = { bl.data(), br.data() };
+            engine.render (ch, 2, 64);
+            l.insert (l.end(), bl.begin(), bl.end());
+            r.insert (r.end(), br.begin(), br.end());
+        }
+        return std::pair { l, r };
+    };
+    // Test 1: the fast bass line played as written, 8th notes at 140 BPM.
+    std::vector<std::tuple<int, double, double>> line;
+    const int keys[] = { 36, 39, 41, 43, 46, 43, 41, 39, 36, 36, 43, 41 };
+    for (int i = 0; i < 12; ++i)
+        line.push_back ({ keys[i], 0.1 + i * 0.214, 0.2 });
+    const std::pair<double, double> fades[] = { { 0, 0 }, { 1, 5 }, { 2, 15 }, { 5, 30 } };
+    const char* names[] = { "A-0-0", "B-1-5", "C-2-15", "D-5-30" };
+    for (int f = 0; f < 4; ++f)
+    {
+        const auto [l, r] = play (*setWith ("fast-bass", fades[f].first, fades[f].second), line, 3.0, false, 0.0);
+        write (std::string ("test1-fast-bass-") + names[f] + ".wav", l, r);
+    }
+    // Test 2: the same key 16 times, LOOP off: the recorded takes in turn.
+    std::vector<std::tuple<int, double, double>> repeats;
+    for (int i = 0; i < 16; ++i)
+        repeats.push_back ({ 48, 0.1 + i * 0.3, 0.15 });
+    for (const double life : { 0.0, 0.5 })
+    {
+        const auto [l, r] = play (*setWith ("pizzicato", 0.0, 0.0), repeats, 5.2, false, life);
+        write (life == 0.0 ? "test2-pizzicato-rr-life-off.wav" : "test2-pizzicato-rr-life-normal.wav", l, r);
+    }
+    // Test 4: fades set, LOOP on (bypassed) then off (applied), a held note.
+    for (const bool loop : { true, false })
+    {
+        const auto [l, r] = play (*setWith ("mixed-duration", 20.0, 200.0), { { 55, 0.1, 1.5 } }, 2.0, loop, 0.0);
+        write (loop ? "test4-loop-on-fades-bypassed.wav" : "test4-loop-off-fades.wav", l, r);
+    }
+
+    // CPU: render time per second of audio, best of three, 8 and 24 voices on the bass set.
+    auto measure = [&] (int voices, double in, double out, bool loop) {
+        const auto set = setWith ("repeated-bass", in, out);
+        double best = 1.0e9;
+        for (int run = 0; run < 3; ++run)
+        {
+            EngineSettings s;
+            s.macros.life = 0.3;
+            s.layer[0].loop = loop;
+            InstrumentEngine engine;
+            engine.prepare (rate, 256, s);
+            engine.setInstrumentSet (set.get());
+            std::vector<float> bl (256), br (256);
+            const auto t0 = std::chrono::steady_clock::now();
+            for (int b = 0; b < static_cast<int> (rate / 256); ++b)
+            {
+                if (b % 4 == 0)
+                    for (int v = 0; v < voices / 8; ++v)
+                        engine.noteOn (30 + (b / 4 + v) % 12, 100);
+                float* ch[2] = { bl.data(), br.data() };
+                engine.render (ch, 2, 256);
+            }
+            best = std::min (best, std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count());
+        }
+        return best;
+    };
+    std::ofstream report (std::filesystem::path (dir) / "cpu.txt");
+    report << "ms of render per 1 s of 48 kHz audio (best of 3), repeated-bass set, LIFE 30 %\n";
+    for (const int v : { 8, 24 })
+    {
+        report << v << " voices: fades 0/0 " << measure (v, 0, 0, false) << " ms; fades 2/15 " << measure (v, 2, 15, false)
+               << " ms; LOOP on (bypassed) " << measure (v, 2, 15, true) << " ms\n";
+    }
 }

@@ -33,7 +33,9 @@ namespace osp::plugin
 class KeyboardUtilityActions final : public juce::Component
 {
 public:
-    enum class Action { aux, settings, info };
+    /** (Append only: products choose their keys by these names.) LIBRARY opens the product's
+        own Library (ANDOR OSP's). */
+    enum class Action { aux, settings, info, library };
 
     explicit KeyboardUtilityActions (std::vector<Action> actions = { Action::settings, Action::info });
     ~KeyboardUtilityActions() override;

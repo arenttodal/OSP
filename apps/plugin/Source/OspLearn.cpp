@@ -701,6 +701,7 @@ static Catalog ospCatalog()
     help ("osp.advanced", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
     help ("keyboard.settings", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
     help ("keyboard.info", "Info", "Turn Info on to read explanations of OSP's controls as you point to them.");
+    help ("keyboard.library", "Library", "Opens the Library: your sounds, presets and instruments. Click it again to close it.");
     help ("osp.wheel.pitch", "Pitch Bend", "The pitch wheel bends notes up or down as you move it. Click PITCH beneath the wheel to set how far it bends.");
     help ("osp.wheel.mod", "Mod Wheel", "The modulation wheel controls assigned parameters while you play. Click MOD beneath the wheel to set up vibrato. The wheel can continue controlling other parameters at the same time.",
           "osp.vibrato");
@@ -738,6 +739,7 @@ struct OspLearnTargets
             for (const char* id : { "osp.advanced", "keyboard.settings", "advanced" })
                 t.add ({ id, key (UA::settings), {}, {}, {}, true });
             t.add ({ "keyboard.info", key (UA::info), {}, {}, {}, true });
+            t.add ({ "keyboard.library", key (UA::library), {}, {}, {}, true });
         }
         // The wheels' captions (their doors), and VIBRATO's controls in MOD's popover.
         t.add ({ "osp.wheel.pitch", comp (e.pitchWheel), [&e] (juce::Component&) { return e.pitchWheel.captionArea().expanded (3.0f).getSmallestIntegerContainer(); }, {}, {}, true });
@@ -1063,7 +1065,7 @@ void OspAudioProcessorEditor::createLearn()
     {
         // INFO only where Learn runs (never a key that looks as if it works).
         learn.reset();
-        utilityKeys.setActions ({ KeyboardUtilityActions::Action::settings });
+        utilityKeys.setActions ({ KeyboardUtilityActions::Action::library, KeyboardUtilityActions::Action::settings });
         refreshUtilityKeys();
         return;
     }

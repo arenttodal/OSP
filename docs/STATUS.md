@@ -1,5 +1,27 @@
 # Status
 
+> **17 Nov 2026, NOTE ATLAS refinements and tutorials (branch `claude/osp-atlas-refine`, for
+> review; `docs/research/note-atlas-refinements.md`):**
+> - **Round robin with LOOP off:** not reproduced. Selection is the same with LOOP on or off, and
+>   LOOP off only removes the "cannot loop" filter. Regression tests added (engine and plugin).
+> - **FADE IN / FADE OUT:**
+>   - under SPEED in NOTES, per note, in output time;
+>   - LOOP off only (dimmed with LOOP on), clamped on short notes;
+>   - saved in the atlas mapping; 0 / 0 is bit-identical.
+> - **NOTES lights the regions the voices really play** (member identity published with the read
+>   heads): round robin, FILL and chords. A voice whose recording has ended shows no read head.
+> - **Footer: LIBRARY, SETTINGS, INFO** (KeyboardUtilityActions::Action::library). LIBRARY
+>   opens and closes the existing Library.
+> - **Learn:**
+>   - "From a phrase to an instrument" comes after the Quick Start, with a sung example phrase,
+>     MAP NOTES and NOTES;
+>   - a done step moves on by itself after 3 s;
+>   - Layering's last step says a sound or phrase can just be dropped.
+> - **NEXT:**
+>   - ANDOR Analog gets the 3-second auto-advance when its OSP pin moves;
+>   - a lesson for Record (live capture), SYNTH and FX ROUTING.
+> - **Queued:** USER MACROS V1.2 port from ANDOR Analog.
+
 > **16 Nov 2026, Learn: every lesson ends in the tutorials; the Quick Start ends on INFO (both
 > instruments, shared `shared/andor-learn`):**
 > - A finished lesson opens the tutorials, with its tick, instead of the "Lesson complete" note.

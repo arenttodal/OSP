@@ -332,3 +332,69 @@ TEST_CASE ("note atlas: a chord lights each of its notes' regions at once; anoth
         CHECK (still->soundingNotes().empty());
     }
 }
+
+TEST_CASE ("note atlas: screenshots - the footer's three keys, NOTES with FADE IN / OUT (LOOP off / on) and its live regions (OSP_NOTE_ATLAS_SHOTS)", "[.][note-atlas-shots]")
+{
+    const char* dir = std::getenv ("OSP_NOTE_ATLAS_SHOTS");
+    REQUIRE (dir != nullptr);
+    const juce::File out (juce::String::fromUTF8 (dir));
+    out.createDirectory();
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    const auto rec = phraseRecording (tmp.dir, "shots.wav", { 57, 60, 64, 67, 69, 72 });
+    p.loadAtlas (rec.atlas);
+    settleEdits (p);
+    editor->setSize (1448, juce::roundToInt (ui->instrumentHeight()));
+    setLayerParameter (p, 0, "loop", 0.0f);
+    p.prepareToPlay (48000.0, 256);
+    ui->refreshNow();
+    auto write = [&] (const juce::Image& image, const juce::String& name) {
+        const auto file = out.getChildFile (name + ".png");
+        file.deleteFile();
+        juce::FileOutputStream stream (file);
+        juce::PNGImageFormat().writeImageToStream (image, stream);
+    };
+    auto& keys = ui->keyboardActions();
+    const auto footer = editor->getLocalArea (&keys, keys.getLocalBounds()).expanded (90, 70).getIntersection (editor->getLocalBounds());
+    write (editor->createComponentSnapshot (footer, true, 3.0f), "01-footer-library-settings-info");
+    write (editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f), "02-full-1448");
+    auto& card = ui->engineCard (0);
+    card.onNotesToggle (0, true);
+    auto* map = card.noteMapComponent();
+    REQUIRE (map != nullptr);
+    map->perform ("fadein+");
+    settleEdits (p);
+    map->refresh();
+    for (int i = 0; i < 6; ++i)
+    {
+        map->perform ("fadeout+");
+        settleEdits (p);
+        map->refresh();
+    }
+    ui->refreshNow();
+    const auto cardArea = editor->getLocalArea (&card, card.getLocalBounds());
+    write (editor->createComponentSnapshot (cardArea, true, 2.0f), "03-notes-fades-loop-off");
+    setLayerParameter (p, 0, "loop", 1.0f);
+    ui->refreshNow();
+    map->refresh();
+    write (editor->createComponentSnapshot (cardArea, true, 2.0f), "04-notes-fades-loop-on-dimmed");
+    setLayerParameter (p, 0, "loop", 0.0f);
+    ui->refreshNow();
+    map->refresh();
+    // A chord sounding: its three regions lit, a read head in each; a fourth note selected.
+    const auto& notes = p.currentInstrument (0)->atlas->notes;
+    map->select ({ notes.back().id });
+    map->refresh();
+    processKeys (p, { 57, 64, 69 }, {}, 12);
+    ui->refreshNow();
+    map->refresh();
+    write (editor->createComponentSnapshot (cardArea, true, 2.0f), "05-notes-chord-sounding-selection-kept");
+    processKeys (p, {}, { 57, 64, 69 }, 400);
+    ui->refreshNow();
+    map->refresh();
+    write (editor->createComponentSnapshot (cardArea, true, 2.0f), "06-notes-after-release");
+}

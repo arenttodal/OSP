@@ -337,8 +337,9 @@ private:
         each, when it changes (never "Ready" or the notes held). */
     juce::String shownStatusMessage, shownSoundWarning;
     bool shownLoadFailed = false;
-    /** SETTINGS (Advanced) and INFO (ANDOR Learn) beneath ARP: OSP has no AUX D, so no D. */
-    KeyboardUtilityActions utilityKeys { { KeyboardUtilityActions::Action::settings, KeyboardUtilityActions::Action::info } };
+    /** LIBRARY, SETTINGS (Advanced) and INFO (ANDOR Learn) beneath ARP: OSP has no AUX D. */
+    KeyboardUtilityActions utilityKeys { { KeyboardUtilityActions::Action::library, KeyboardUtilityActions::Action::settings,
+                                           KeyboardUtilityActions::Action::info } };
     void utilityKeyClicked (KeyboardUtilityActions::Action);
     void refreshUtilityKeys();
     ArpControl arpButton { ospProcessor };

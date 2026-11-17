@@ -1743,6 +1743,17 @@ void OspAudioProcessorEditor::utilityKeyClicked (KeyboardUtilityActions::Action 
         learn->setLearnMode (! learn->learnMode());
         learnAction (andor::learn::actions::infoToggled, "keyboard.info");
     }
+    else if (a == Action::library)
+    {
+        // The existing Library (as the menu's Library... and Cmd+L): opens it, or closes it.
+        if (libraryPanel != nullptr)
+            closeLibrary();
+        else
+        {
+            openLibrary();
+            learnAction ("library.opened", "osp.library");
+        }
+    }
     refreshUtilityKeys();
 }
 
@@ -1751,6 +1762,8 @@ void OspAudioProcessorEditor::refreshUtilityKeys()
     using Action = KeyboardUtilityActions::Action;
     utilityKeys.setActive (Action::settings, popup != nullptr && popupIndex == advancedPopup);
     utilityKeys.setTooltip (Action::settings, "Advanced Settings");
+    utilityKeys.setActive (Action::library, libraryPanel != nullptr);
+    utilityKeys.setTooltip (Action::library, libraryPanel != nullptr ? "Close Library" : "Library");
     const bool on = learn != nullptr && learn->learnMode();
     utilityKeys.setActive (Action::info, on);
     utilityKeys.setTooltip (Action::info, on ? "Hide Info" : "Show Info");
