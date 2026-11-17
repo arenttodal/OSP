@@ -396,7 +396,7 @@ void addTo (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const j
     }
 }
 
-void Reader::attach (juce::AudioProcessorValueTreeState& state, const juce::String& prefix)
+void Reader::attach (juce::AudioProcessorValueTreeState& state, const juce::String& prefix, LiveOffsets* live)
 {
     entries.clear();
     for (int t = 4; t < fx::typeCount; ++t)
@@ -404,8 +404,16 @@ void Reader::attach (juce::AudioProcessorValueTreeState& state, const juce::Stri
         const auto type = static_cast<fx::Type> (t);
         for (int slot = 0; slot < fx::capacity[static_cast<std::size_t> (t)]; ++slot)
             for (const auto& spec : specsOf (type))
-                if (auto* raw = state.getRawParameterValue (idOf (prefix, { type, slot }, spec.name)))
-                    entries.push_back ({ raw, &spec, slot });
+            {
+                const auto id = idOf (prefix, { type, slot }, spec.name);
+                if (auto* raw = state.getRawParameterValue (id))
+                {
+                    LiveParam value { raw, live, live != nullptr ? live->indexOf (id) : -1 };
+                    if (live != nullptr)
+                        live->markRead (value.index);
+                    entries.push_back ({ value, &spec, slot });
+                }
+            }
     }
 }
 

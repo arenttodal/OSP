@@ -197,6 +197,8 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
     for (const char* id : { "vibrato.enabled", "vibrato.depth", "vibrato.rate", "vibrato.delay", "vibrato.rise",   // (hint 28, last: the
                             "vibrato.control", "vibrato.amount", "vibrato.sourceA", "vibrato.sourceB", "vibrato.sourceC" })   // MOD WHEEL's VIBRATO)
         expected.add (id);
+    for (int m = 1; m <= 6; ++m)   // (version 34, last: USER MACROS)
+        expected.add ("userMacro." + juce::String (m));
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)
     {

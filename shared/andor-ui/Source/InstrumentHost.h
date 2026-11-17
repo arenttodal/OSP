@@ -20,6 +20,11 @@
 
 namespace osp::plugin
 {
+struct UserMacroState;
+}
+
+namespace osp::plugin
+{
 
 class MiniPanel;   // (ShapingPopups.h: a product's small panels, SATELLITE's)
 
@@ -152,6 +157,33 @@ public:
     /** The MOD WHEEL's VIBRATO parameters (vibrato.*): appended by each instrument after all
         its others (ANDOR OSP's schema, then a product's own), so no existing parameter moves. */
     static void addVibratoParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout);
+    /** USER MACROS: six float parameters, 0..100 %, default 0 ("User Macro 1" ..), named by
+        `idOf` (ANDOR OSP: userMacro.N; ANDOR ANALOG: analog.userMacro.N). At 0 with no assignment
+        they do nothing at all. Append only. */
+    static void addUserMacroParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint,
+                                        const std::function<juce::String (int macro)>& idOf);
+    static juce::String userMacroId (int macro) { return "userMacro." + juce::String (macro + 1); }
+
+    // -- USER MACROS (UserMacroEditor.h; products with them) --------------------------------------
+    /** The six USER macros' names and assignments (null: the product has no USER macros). */
+    virtual const UserMacroState* userMacroAssignments() const { return nullptr; }
+    /** Replaces them and hands the compiled table to the engine (the caller records undo). */
+    virtual void setUserMacroAssignments (const UserMacroState& state) { juce::ignoreUnused (state); }
+    /** USER macro `macro`'s parameter ID (empty: none). */
+    virtual juce::String userMacroParameterId (int macro) const
+    {
+        juce::ignoreUnused (macro);
+        return {};
+    }
+    /** The engine reads this parameter live every block and it is continuous and real-time safe:
+        a USER macro may move it. */
+    virtual bool userMacroReads (const juce::String& parameterId) const
+    {
+        juce::ignoreUnused (parameterId);
+        return false;
+    }
+    /** Changes with every change of names or assignments (an edit, undo, a preset, a session). */
+    virtual std::uint64_t userMacroRevision() const { return 0; }
 
     /** A layer's EQ as its parameters set it now (from parameterValue). */
     eq::Settings layerEqSettings (int layer) const;

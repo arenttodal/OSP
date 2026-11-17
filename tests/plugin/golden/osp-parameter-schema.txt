@@ -864,3 +864,9 @@ vibrato.amount v28 float "Vibrato Amount" label="%" range=0.0000..100.0000/0.100
 vibrato.sourceA v28 bool "Vibrato Source A" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Off|On|On
 vibrato.sourceB v28 bool "Vibrato Source B" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Off|On|On
 vibrato.sourceC v28 bool "Vibrato Source C" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=Off|On|On
+userMacro.1 v34 float "User Macro 1" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+userMacro.2 v34 float "User Macro 2" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+userMacro.3 v34 float "User Macro 3" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+userMacro.4 v34 float "User Macro 4" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+userMacro.5 v34 float "User Macro 5" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
+userMacro.6 v34 float "User Macro 6" label="%" range=0.0000..100.0000/0.1000 skew=1.00000 default=0.0000 steps=2147483647 texts=0 %|50 %|100 %
