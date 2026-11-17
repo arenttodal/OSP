@@ -170,8 +170,15 @@ public:
         licence (remembered per collection), and whether it is a factory pack. Expansion packs
         for sale, and the core pack built into OSP's installer, are made here. */
     void openPublishSheet (const std::string& collectionId, const juce::String& name);
+    /** Create content pack...: a new collection as the pack's draft content, and its details sheet. */
+    void createPackDraft();
     /** The export behind both: `fields` carries everything but the records. */
     void exportCollection (const std::string& collectionId, library::PackExport fields, const juce::File& out);
+    /** Official factory publishing: only in an authoring build (CMake OSP_FACTORY_AUTHORING=ON).
+        A customer build never offers it, and a factory mark asked for anyway is dropped: its packs
+        are ordinary packs. (Tests switch it to exercise the authoring path.) */
+    static bool factoryAuthoring() noexcept;
+    static void setFactoryAuthoring (bool enabled) noexcept;
     /** The sheet showing now (empty: none) - "save", "settings", "missing", "prompt", "choice", "publish",
         "scan", "trim". */
     juce::String openSheetName() const;

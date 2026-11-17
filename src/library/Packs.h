@@ -79,8 +79,12 @@ struct PackResult
 
 /** Reads and checks a pack without installing anything (for the confirmation). */
 PackResult inspectPack (const Catalog& catalog, const std::filesystem::path& file, const PackPlaces& places);
+/** Where a pack comes from. Factory content comes only with OSP (its bundle, at startup): a
+    pack the user installs from a file is always an ordinary pack, whatever its manifest says,
+    and may never take an installed factory pack's identity. */
+enum class PackSource { user, bundle };
 /** Installs or updates a pack (a downgrade is refused). Reinstalling the same version repairs it. */
-PackResult installPack (Catalog& catalog, const std::filesystem::path& file, const PackPlaces& places);
+PackResult installPack (Catalog& catalog, const std::filesystem::path& file, const PackPlaces& places, PackSource source = PackSource::user);
 /** Removes a pack. Its presets and templates go with its folder (through `moveToTrash`).
     Its sounds go to the Library's trash, recoverable; their audio stays in the store while
     anything (a user preset, a project) may need it. */

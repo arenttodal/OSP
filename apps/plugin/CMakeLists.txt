@@ -65,6 +65,11 @@ target_compile_definitions(OSP_Plugin PUBLIC
     JUCE_DISPLAY_SPLASH_SCREEN=0
     DONT_SET_USING_JUCE_NAMESPACE=1)
 
+# Official factory publishing (the Library's "Factory pack" when publishing a collection): only in
+# an authoring build. Customer builds publish ordinary packs only (docs/sound-design.md).
+option(OSP_FACTORY_AUTHORING "Build OSP with official factory-content publishing" OFF)
+target_compile_definitions(OSP_Plugin PRIVATE OSP_FACTORY_AUTHORING=$<BOOL:${OSP_FACTORY_AUTHORING}>)
+
 # The built-in starting states: whole .ospstate files ("NN Name.ospstate": order and name),
 # made in OSP itself (Save Starting State) and copied here. See docs/sound-design.md.
 file(GLOB OSP_STARTING_STATE_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/StartingStates/*.ospstate")

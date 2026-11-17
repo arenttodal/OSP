@@ -43,11 +43,35 @@ Notes:
 - A file that cannot be read is skipped, never a crash. With no files at all, the previous
   table (names plus eight settings) stands in.
 
-## The Core factory pack
+## Packs: user packs and the factory pack
+
+**Anyone, in any build: a user pack.**
+- **⋮ → Create content pack…** starts a draft: a new collection (its content) and its details
+  (id, name, version, creator, licence, description).
+- **Save Draft** keeps the details with the collection, across sessions, without exporting. The
+  version stays as it is until you publish.
+- Add sounds, presets and Starting States with a row's **Add to collection**.
+- **Publish…** checks everything first:
+  - every preset and Starting State is a loadable state;
+  - a Starting State is never passed off as a preset;
+  - every sound a preset needs is collected, once per content;
+  - a missing sound is refused by name, never left out;
+  - sounds of unknown rights are confirmed.
+
+  It then writes `<Name> <version>.osppack`. A later publish suggests the next version and never
+  overwrites the previous file.
+- **⋮ → Import pack…** installs one.
+  - A pack installed from a file is always an ordinary pack, even if its manifest says factory.
+  - It may never take the id of OSP's installed factory content.
+
+**The ANDOR factory pack: authoring builds only.** Configure with
+`cmake -DOSP_FACTORY_AUTHORING=ON`. Only then does the Publish sheet offer *Factory pack*;
+customer builds publish ordinary packs only. Factory content installs only from OSP's own
+bundle, at startup.
 
 See `docs/library/packs.md` (Publishing) and `packaging/factory-packs/README.md`.
 
-1. Make a collection of the presets, templates and sounds to ship.
+1. In an authoring build, make a collection of the presets, Starting States and sounds to ship.
 2. Choose **Publish as pack…** on that collection, tick *Factory pack*, and set its version.
 3. Attach the `.osppack` to a GitHub Release of this repository.
 4. Add its line to `packaging/factory-packs/packs.lock` (tag, file name, SHA-256).

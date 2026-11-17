@@ -300,3 +300,45 @@ or drops its preset identity. Before, the header took the state's name and SAVE 
   macros, the FX route and the kept empty slot;
 - a rename keeps the identity and the description;
 - a preset and a state of the same name stay apart in the Library.
+
+## Gates 4–6: done (packs)
+
+**The pack format and installer are kept:** `.osppack` (manifest v1: sounds, presets, Starting
+States, checksums, dependencies, updates by stable uid). Extended rather than replaced.
+
+**Gate 4: dependencies and validation (`src/library/Packs.cpp`).**
+- Export already collected every sound a preset needs, once per content, and refused a missing
+  one by name.
+- It now also refuses, by name, any preset or Starting State that is not a loadable state, and
+  any Starting State filed as a preset.
+- Clean-install round trip (`[clean-install]`):
+  - a sound, a preset and a Starting State are published on one machine;
+  - the author's folders and the original recording are deleted;
+  - the pack installs into a fresh Library;
+  - the preset loads with its recording, and the Starting State applies with its description.
+
+**Gate 5: drafts.**
+- **⋮ → Create content pack…** creates a "New pack" collection (the draft's content) and opens
+  the Publish sheet.
+- **Save Draft** stores the details beside the collection, marked as a draft, so reopening keeps
+  the version.
+- Publishing marks it published, and the next opening suggests the next version. An earlier
+  export is never overwritten (the file name carries the version).
+- The builder is the Library itself: its collections, rows and Add to collection. There is no
+  second browser.
+
+**Gate 6: factory protection (§9.7).**
+- **Authoring build:** `OSP_FACTORY_AUTHORING` (CMake option, OFF by default) is the only way to
+  get the Publish sheet's *Factory pack*. A customer build drops a factory mark asked for anyway.
+- **Install:** `installPack` takes the pack's source.
+  - From a file (`PackSource::user`), a factory-marked pack installs as an ordinary pack, with a
+    note.
+  - A pack claiming an installed factory pack's id is refused.
+  - Only `installFactoryPacks` (the bundle, at startup) installs factory content.
+- Library tests `[packs][factory]` cover both; plugin tests `[pack-authoring]` cover the sheet
+  and the customer build.
+
+**Not built:**
+- Pack artwork. The manifest has no artwork field; adding one is a schema change and a decision.
+- Portable instruments (`.ospinstrument`) inside packs: a pack's presets already carry their
+  sounds by content, which is the same portability.

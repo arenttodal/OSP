@@ -1385,6 +1385,13 @@ juce::PopupMenu OspAudioProcessorEditor::mainMenu()
     menu.addSectionHeader ("CONTENT");
     menu.addItem ("Save as Starting State" + ellipsis(), [safe] { if (safe != nullptr) safe->saveStartingState(); });
     menu.addItem ("Export portable instrument" + ellipsis(), count > 0, false, [safe] { if (safe != nullptr) safe->choosePresetFile (true, true); });
+    menu.addItem ("Create content pack" + ellipsis(), [safe] {
+        if (safe == nullptr)
+            return;
+        safe->openLibrary();
+        if (auto* library = safe->libraryWindow())
+            library->createPackDraft();
+    });
     menu.addItem ("Import pack" + ellipsis(), [safe] {
         if (safe == nullptr)
             return;

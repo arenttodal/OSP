@@ -80,7 +80,7 @@ TEST_CASE ("menus: the main menu holds global actions only, in five groups; no s
         (e.header ? headers : items).add (e.text);
     CHECK (headers == juce::StringArray { "INSTRUMENT", "SOURCES", "CONTENT", "PREFERENCES", "SUPPORT" });
     for (const auto* expected : { "New instrument", "Save instrument", "Save as", "Open instrument", "Open Library", "Undo", "Redo", "Add source", "Clear all sources",
-                                  "Save as Starting State", "Export portable instrument", "Import pack", "Manage packs", "Interface size", "Library settings",
+                                  "Save as Starting State", "Export portable instrument", "Create content pack", "Import pack", "Manage packs", "Interface size", "Library settings",
                                   "Tutorials", "About ANDOR OSP" })
     {
         INFO (expected);

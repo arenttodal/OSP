@@ -1971,6 +1971,12 @@ TEST_CASE ("plugin: Library packs and backup - export a pack and a backup on one
 
 TEST_CASE ("plugin: Library publishing - a collection published with the publisher's id and version as a factory pack; it installs at startup beside the user's own presets", "[plugin][library][library-packs]")
 {
+    // (an authoring build: a customer build never publishes factory packs - see the next test)
+    struct Authoring
+    {
+        Authoring() { osp::plugin::LibraryPanel::setFactoryAuthoring (true); }
+        ~Authoring() { osp::plugin::LibraryPanel::setFactoryAuthoring (false); }
+    } authoring;
     TempDir tmp;
     const auto shipped = tmp.dir.getChildFile ("Bundle/Resources/Factory");
     REQUIRE (shipped.createDirectory());
@@ -8163,6 +8169,7 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "MenuArchitectureTests.inc"
 #include "PaletteStudyShots.inc"
 #include "StartingStateAuthoringTests.inc"
+#include "PackAuthoringTests.inc"
 
 TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives the knob, not the halo overlay) opens its modulation menu", "[ui][andor-ui][rightclick]")
 {

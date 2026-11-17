@@ -602,6 +602,82 @@ TEST_CASE ("library packs: a publisher's factory export installs from the plugin
     CHECK (user.catalog->asset (myPreset)->origin == Origin::user);
 }
 
+TEST_CASE ("library packs: factory content comes only with OSP - a file the user installs is an ordinary pack and never takes a factory identity", "[unit][library][packs][factory]")
+{
+    Place maker ("publisher-2");
+    const auto pad = maker.sound ("Pad Warm", tone (220.0, 1.2, 3), "original");
+    const auto hymn = maker.preset ("Warm Hymn", { pad.contentHash });
+    PackExport request;
+    request.assetIds = { hymn };
+    request.id = "com.evenant.osp.core";
+    request.name = "OSP Core";
+    request.version = "1.0.0";
+    request.factory = true;   // (a publisher's factory pack)
+    const auto file = maker.dir / "core.osppack";
+    REQUIRE (exportPack (*maker.catalog, maker.store, request, file, "1.0.0").ok);
+
+    // Installed by the user from a file: an ordinary pack, in the packs folder, origin Pack.
+    {
+        Place user ("musician-2");
+        const auto r = installPack (*user.catalog, file, user.packPlaces());
+        INFO (r.error);
+        REQUIRE (r.ok);
+        CHECK_FALSE (r.manifest.factory);
+        CHECK (user.count (Origin::factory) == 0);
+        const auto installed = user.catalog->assetForPackKey ("com.evenant.osp.core", hymn);
+        REQUIRE (installed);
+        CHECK (user.catalog->asset (*installed)->origin == Origin::pack);
+        CHECK (std::filesystem::path (user.catalog->preset (*installed)->file).parent_path() == user.packs / "com.evenant.osp.core" / "Presets");
+        bool noted = false;
+        for (const auto& n : r.notes)
+            noted = noted || n.find ("ordinary pack") != std::string::npos;
+        CHECK (noted);
+    }
+    // With OSP's own factory pack installed, a file claiming its id is refused, nothing changes.
+    {
+        Place user ("musician-3");
+        const auto shipped = user.dir / "Bundle" / "Factory";
+        std::filesystem::create_directories (shipped);
+        std::filesystem::copy_file (file, shipped / "core.osppack");
+        REQUIRE (installFactoryPacks (*user.catalog, shipped, user.packPlaces()).size() == 1);
+        const auto factoryCount = user.count (Origin::factory);
+        CHECK (factoryCount > 0);
+        request.factory = false;
+        request.version = "2.0.0";
+        const auto impostor = maker.dir / "impostor.osppack";
+        REQUIRE (exportPack (*maker.catalog, maker.store, request, impostor, "1.0.0").ok);
+        const auto r = installPack (*user.catalog, impostor, user.packPlaces());
+        CHECK_FALSE (r.ok);
+        CHECK (r.error.find ("factory") != std::string::npos);
+        CHECK (user.count (Origin::factory) == factoryCount);
+        CHECK (user.catalog->pack ("com.evenant.osp.core")->version == "1.0.0");
+    }
+}
+
+TEST_CASE ("library packs: export validates its content - a preset that will not load, or a Starting State passed off as a preset, is refused by name", "[unit][library][packs]")
+{
+    Place maker ("validator");
+    const auto pad = maker.sound ("Pad", tone (220.0, 0.6, 3), "original");
+    const auto good = maker.preset ("Good", { pad.contentHash });
+    const auto broken = maker.preset ("Broken", { pad.contentHash });
+    std::ofstream (maker.presets / "Broken.osppreset") << "not a state";
+    const auto disguised = maker.preset ("Disguised", { pad.contentHash });
+    std::ofstream (maker.presets / "Disguised.osppreset") << "<OSP stateVersion=\"17\" startingState=\"1\"/>";
+    PackExport request;
+    request.id = "com.example.check";
+    request.name = "Check";
+    for (const auto& [id, expect] : std::initializer_list<std::pair<std::string, const char*>> { { broken, "Broken" }, { disguised, "Disguised" } })
+    {
+        request.assetIds = { good, id };
+        const auto r = exportPack (*maker.catalog, maker.store, request, maker.dir / "check.osppack", "1.0.0");
+        CHECK_FALSE (r.ok);
+        CHECK (r.error.find (expect) != std::string::npos);
+        CHECK (r.error.find ("not a valid") != std::string::npos);
+    }
+    request.assetIds = { good };
+    CHECK (exportPack (*maker.catalog, maker.store, request, maker.dir / "check.osppack", "1.0.0").ok);
+}
+
 //==============================================================================
 
 TEST_CASE ("library backup: a whole Library backed up and restored on another machine, identities kept", "[unit][library][backup]")
