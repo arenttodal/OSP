@@ -1427,6 +1427,10 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
     }
     if (c == nullptr || c == popup.get() || popup->isParentOf (c))
         return;
+    // The overlay above everything took a press for one of the popover's own controls (its
+    // menu, its halo's range): the popover's, not an outside click (ANDOR OSP's fix, shared).
+    if ((c == &modOverlay || modOverlay.isParentOf (c)) && modOverlay.pressBelongsTo (*popup))
+        return;
     if (c != this && ! isParentOf (c))
         return;   // a click in the popover's own menus
     if (popupIndex == anchoredPopup && popupAnchor != nullptr && (c == popupAnchor.getComponent() || popupAnchor->isParentOf (c)))

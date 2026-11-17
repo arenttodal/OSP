@@ -161,6 +161,13 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
     }
     if (c == nullptr || c == popup.get() || popup->isParentOf (c))
         return;
+    // The shared modulation overlay lies above everything, popovers included: a right-click on a
+    // popover's knob (its menu: Assign to Macro, modulation) or a press on its halo's range is
+    // taken by the overlay, so the pressed component is the overlay - but the press is the
+    // popover's own. It stays open; a press the overlay took for a control elsewhere is an
+    // outside click as ever.
+    if ((c == &modOverlay || modOverlay.isParentOf (c)) && modOverlay.pressBelongsTo (*popup))
+        return;
     // Only clicks inside this editor close the popup. The global listener also hears clicks in
     // other JUCE windows - above all the popup's own menus (PATTERN, RATE): closing the popup
     // there would delete the control whose menu item is being chosen, before its choice arrives.

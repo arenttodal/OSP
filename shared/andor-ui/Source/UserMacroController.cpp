@@ -418,6 +418,14 @@ void UserMacroController::mouseDownAnywhere (juce::Component* c)
     for (std::size_t i = 0; i < userRow.size(); ++i)
         if (c == &userRow[i].slider || userRow[i].slider.isParentOf (c) || c == userRow[i].label.get() || c == lenses[i].get())
             return;
+    // A control the chosen macro moves (turning it, in a popover or on the instrument): its
+    // range stays shown - that is the control being worked on, not "elsewhere".
+    auto* slider = dynamic_cast<juce::Slider*> (c);
+    if (slider == nullptr)
+        slider = c->findParentComponentOfClass<juce::Slider>();
+    if (slider != nullptr && hooks.targets != nullptr)
+        if (const auto id = slider->getProperties()["paramId"].toString(); id.isNotEmpty() && hooks.targets (host, chosenMacro).contains (id))
+            return;
     setChosen (-1);
 }
 

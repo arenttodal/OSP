@@ -3344,6 +3344,7 @@ void ModulationOverlay::mouseDown (const juce::MouseEvent& e)
     // when it claimed this press (a host's right-click reaches the overlay itself, so an
     // unmodulated knob must find its menu here, not only through rightClickedControl).
     const int index = targetAt (e.position, e.mods.isAltDown(), e.mods.isPopupMenu());
+    lastPressed = index >= 0 ? targets[static_cast<std::size_t> (index)].slider.getComponent() : nullptr;
     if (index < 0)
         return;
     const auto& t = targets[static_cast<std::size_t> (index)];
