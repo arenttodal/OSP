@@ -1264,14 +1264,25 @@ def strip_light_material(k):
     nt.link(uv, tex.inputs[0])
     sep = nt.n("ShaderNodeSeparateColor")
     nt.link(tex.outputs["Color"], sep.inputs[0])
-    warm = nt.math("SUBTRACT", sep.outputs[0], sep.outputs[2])
-    cool = nt.math("SUBTRACT", sep.outputs[2], sep.outputs[0])
-    m1 = nt.math("MULTIPLY_ADD", warm, 4.0, -0.6)
-    m2 = nt.math("MULTIPLY_ADD", cool, 4.0, -0.6)
+    # hue, not brightness: (R - B) / max(R, B) is ~0.8 along the whole orange gradient (light top,
+    # deep bottom) and ~0.1 on the charcoal strip and the ivory, so the lit shape keeps its full width
+    warm = nt.math("DIVIDE", nt.math("SUBTRACT", sep.outputs[0], sep.outputs[2]), nt.math("MAXIMUM", sep.outputs[0], 0.02))
+    cool = nt.math("DIVIDE", nt.math("SUBTRACT", sep.outputs[2], sep.outputs[0]), nt.math("MAXIMUM", sep.outputs[2], 0.02))
+    m1 = nt.math("MULTIPLY_ADD", warm, 3.0, -0.9)
+    m2 = nt.math("MULTIPLY_ADD", cool, 3.0, -0.9)
     mask = nt.n("ShaderNodeClamp")
     nt.link(nt.math("MAXIMUM", m1, m2), mask.inputs[0])
+    # a hair of noise (about half an 8-bit step) so the capture's gradient does not band once emitted
+    tcn = nt.n("ShaderNodeTexCoord")
+    noise = nt.n("ShaderNodeTexNoise", Scale=9000.0, Detail=0.0)
+    nt.link(tcn.outputs["Object"], noise.inputs["Vector"])
+    dith = nt.n("ShaderNodeMix")
+    dith.data_type, dith.blend_type = "RGBA", "ADD"
+    nt.link(nt.math("MULTIPLY_ADD", noise.outputs["Fac"], 0.006, -0.003), dith.inputs[0])
+    nt.link(tex.outputs["Color"], dith.inputs[6])
+    dith.inputs[7].default_value = (1, 1, 1, 1)
     em = nt.n("ShaderNodeEmission")
-    nt.link(tex.outputs["Color"], em.inputs["Color"])
+    nt.link(dith.outputs[2], em.inputs["Color"])
     nt.link(nt.math("MULTIPLY", mask.outputs[0], 1.6), em.inputs["Strength"])
     tr = nt.n("ShaderNodeBsdfTransparent")
     add = nt.n("ShaderNodeAddShader")
@@ -1615,6 +1626,7 @@ def camera(name, yaw, pitch, dist, lens, target, fstop=None, shift=(0.0, 0.0), f
     d.rotate(Euler((0, 0, math.radians(yaw))))
     o.location = Vector(target) + d * dist
     o.rotation_euler = (Vector(target) - o.location).to_track_quat("-Z", "Y").to_euler()
+    cd.clip_start = 0.005          # macro cameras sit closer than Blender's default 0.1 m near plane
     if fstop:
         cd.dof.use_dof = True
         cd.dof.focus_distance = (Vector(target) - o.location).length

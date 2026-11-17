@@ -87,6 +87,8 @@ Camera, scale, environment and materials are unchanged; the model is synced. The
   - illumination (dynamic);
   - labels and the MOD ring (artwork).
 - **Comparisons:** see `06_touch_strips` and `06b_touch_strips_check` (renders 1–8). **Not merged into the master until approved.**
+- **Lit-shape mask:** keyed on hue, (R − B) / max(R, B), not brightness. So the whole orange gradient, light at the top and deep at the bottom, keeps its full width. Half an 8-bit step of noise stops the capture's gradient from banding once emitted.
+- **Review cameras:** `strips` (no depth of field), `strips34` (sharp three-quarter) and `strips_top` (orthographic, product unrotated, editor x 11–161). The near clip plane is now 5 mm, so macro cameras never cut into the body.
 
 **Timber junction and slots, root causes fixed (not hidden):**
 1. **The dark sliver** at the left cheek was the C2 slot-material rule catching the panel's outer side wall. Charcoal is now only inside the slots.
