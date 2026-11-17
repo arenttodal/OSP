@@ -1,5 +1,6 @@
 // The five macro popups (redesign §2): each one explains its DSP with a picture drawn
 // from the same formulas and parameters the sound uses, plus a few compact controls.
+#include "OspLookAndFeel.h"
 #include "Binding.h"
 #include "EngineCard.h"
 #include "Design.h"
@@ -2597,6 +2598,8 @@ namespace
         {
             auto* window = new juce::AlertWindow ("Save pattern", "A name for this SHAPER pattern:", juce::MessageBoxIconType::NoIcon);
             window->addTextEditor ("name", "My pattern");
+            if (auto* field = window->getTextEditor ("name"))
+                styleTextField (*field);
             window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
             window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
             juce::Component::SafePointer<MovementPanel> safe (this);
@@ -3536,6 +3539,8 @@ namespace
         {
             auto* window = new juce::AlertWindow (title, prompt, juce::MessageBoxIconType::NoIcon);
             window->addTextEditor ("name", current.isNotEmpty() ? current : juce::String ("My preset"));
+            if (auto* field = window->getTextEditor ("name"))
+                styleTextField (*field);
             window->addButton (rename ? "Rename" : "Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
             window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
             juce::Component::SafePointer<RackPresetBar> safe (this);
@@ -4814,6 +4819,8 @@ namespace
         {
             auto* window = new juce::AlertWindow ("Save pattern", "A name for this SHAPER pattern:", juce::MessageBoxIconType::NoIcon);
             window->addTextEditor ("name", "My pattern");
+            if (auto* field = window->getTextEditor ("name"))
+                styleTextField (*field);
             window->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
             window->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
             juce::Component::SafePointer<MovementRack> safe (this);

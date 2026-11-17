@@ -654,7 +654,8 @@ TEST_CASE ("routing view: the layering holds at every window size and after a re
         auto& ui = *rig.ui;
         rig.editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui.instrumentHeight() / 1448.0f));
         ui.setSourceViewShown (true);
-        for (const int which : { 0, 1, 2, 3, 4, osp::plugin::OspAudioProcessorEditor::echoPopup })
+        using E = osp::plugin::OspAudioProcessorEditor;
+        for (const int which : { 0, 1, 2, 3, 4, E::echoPopup, E::advancedPopup, E::pitchWheelPopup, E::modWheelPopup })
         {
             ui.openPopup (which);
             ui.refreshNow();

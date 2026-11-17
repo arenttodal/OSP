@@ -2702,9 +2702,8 @@ void ShellEditor::startUserMacroRename (int macro)
     renameField->setFont (type::macroLabel (0.7f * static_cast<float> (label->getHeight())));
     renameField->setInputRestrictions (24);
     renameField->setText (um->name (shell, macro), false);
+    styleTextField (*renameField);
     renameField->setColour (juce::TextEditor::backgroundColourId, palette::ivory);
-    renameField->setColour (juce::TextEditor::textColourId, palette::text);
-    renameField->setColour (juce::TextEditor::outlineColourId, design::colour::hairline);
     renameField->setColour (juce::TextEditor::focusedOutlineColourId, userMacroColour (macro));
     content.addAndMakeVisible (*renameField);
     renameField->setBounds (label->getBounds().expanded (4, 2));

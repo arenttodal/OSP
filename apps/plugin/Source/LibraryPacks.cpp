@@ -2,6 +2,7 @@
 // and the Library backup (export, restore). The work runs on the Library's background thread;
 // every step that changes something asks first.
 
+#include "OspLookAndFeel.h"
 #include "LibraryCapture.h"
 #include "LibraryPlaces.h"
 #include "library/Archive.h"
@@ -343,6 +344,8 @@ public:
         publish.setTitle ("Publish the pack");
         for (auto* c : std::initializer_list<juce::Component*> { &id, &name, &version, &creator, &licence, &description, &factory, &cancel, &publish })
             addAndMakeVisible (c);
+        for (auto* field : { &id, &name, &version, &creator, &licence, &description })
+            styleTextField (*field);
     }
     void paintContent (juce::Graphics& g) override
     {

@@ -587,9 +587,8 @@ void UserMacroController::startRename (int macro)
     renameField->setFont (type::macroLabel (0.7f * static_cast<float> (label->getHeight())));
     renameField->setInputRestrictions (24);
     renameField->setText (hooks.name (host, macro), false);
+    styleTextField (*renameField);
     renameField->setColour (juce::TextEditor::backgroundColourId, palette::ivory);
-    renameField->setColour (juce::TextEditor::textColourId, palette::text);
-    renameField->setColour (juce::TextEditor::outlineColourId, design::colour::hairline);
     renameField->setColour (juce::TextEditor::focusedOutlineColourId, colour (macro));
     ed.content->addAndMakeVisible (*renameField);
     renameField->setBounds (label->getBounds().expanded (4, 2));

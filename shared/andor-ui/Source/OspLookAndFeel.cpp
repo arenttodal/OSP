@@ -391,4 +391,20 @@ juce::Font OspLookAndFeel::getPopupMenuFont()
     return fonts::make (13.5f, fonts::Weight::regular);
 }
 
+void styleTextField (juce::TextEditor& field, TextSurface surface)
+{
+    // The foreground always follows the field's own surface (never forced dark everywhere).
+    const bool dark = surface == TextSurface::dark;
+    const auto ground = dark ? juce::Colour (0xff1c2122) : palette::raised;
+    const auto ink = dark ? palette::valueBubbleText : palette::text;
+    field.setColour (juce::TextEditor::backgroundColourId, ground);
+    field.setColour (juce::TextEditor::textColourId, ink);
+    field.setColour (juce::TextEditor::highlightColourId, palette::sage.withAlpha (dark ? 0.55f : 0.45f));
+    field.setColour (juce::TextEditor::highlightedTextColourId, ink);
+    field.setColour (juce::TextEditor::outlineColourId, dark ? palette::displayLine : palette::hairline);
+    field.setColour (juce::TextEditor::focusedOutlineColourId, palette::accent);
+    field.setColour (juce::CaretComponent::caretColourId, ink);
+    field.applyColourToAllText (ink, true);
+}
+
 } // namespace osp::plugin

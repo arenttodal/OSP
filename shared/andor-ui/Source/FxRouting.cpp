@@ -336,6 +336,7 @@ public:
     {
         search.setTextToShowWhenEmpty ("Search effects", weak);
         search.setFont (font (11.0f));
+        styleTextField (search);
         search.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xfffbf8f2));
         search.setColour (juce::TextEditor::outlineColourId, edge);
         search.setColour (juce::TextEditor::focusedOutlineColourId, sage);
@@ -744,6 +745,8 @@ juce::PopupMenu FxRoutingView::settingsMenu()
             return;
         auto* w = new juce::AlertWindow ("Save FX chain", "A name for this chain:", juce::MessageBoxIconType::NoIcon);
         w->addTextEditor ("name", "My chain");
+        if (auto* field = w->getTextEditor ("name"))
+            styleTextField (*field);
         w->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
         w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
         w->enterModalState (true, juce::ModalCallbackFunction::create ([safe, w] (int result) {

@@ -165,4 +165,19 @@ private:
     skin::Pieces::Holder skinPieces;
 };
 
+/**
+    An editable text field in ANDOR's colours, resolved explicitly from the palette: the light
+    ceramic input, graphite text and caret, a muted-sage selection under graphite text, a quiet
+    hairline outline and the accent when focused. JUCE bakes a TextEditor's text colour into the
+    text when it is inserted: a field given its text before it joined the editor's look-and-feel
+    kept JUCE's default white - white on the light field (the Library's Rename sheet). So the
+    text already there is recoloured too. A field's placeholder keeps its own (muted) colour.
+*/
+enum class TextSurface
+{
+    light,   ///< a light ceramic input: graphite text on it
+    dark     ///< an input on a graphite display (EQ values): warm light text on it
+};
+void styleTextField (juce::TextEditor& field, TextSurface surface = TextSurface::light);
+
 } // namespace osp::plugin

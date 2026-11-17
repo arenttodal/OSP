@@ -426,6 +426,8 @@ public:
         exclude.setTextToShowWhenEmpty ("Leave out (e.g. *loop*; old/*)", colour::textMicro);
         include.setTitle ("Only names like");
         exclude.setTitle ("Leave out");
+        styleTextField (include);
+        styleTextField (exclude);
         roots.setModel (this);
         roots.setRowHeight (30);
         roots.setColour (juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
@@ -1010,6 +1012,7 @@ private:
         editor->setText (regions[static_cast<std::size_t> (i)].name, false);
         editor->setBounds (list.getX(), list.getY() + i * list.getRowHeight(), list.getWidth(), list.getRowHeight());
         editor->setTitle ("Slice name");
+        styleTextField (*editor);
         juce::Component::SafePointer<TrimSheet> safe (this);
         editor->onReturnKey = editor->onFocusLost = [safe, editor, i] {
             if (safe == nullptr)

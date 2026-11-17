@@ -1050,6 +1050,8 @@ public:
         notes.setReturnKeyStartsNewLine (false);
         notes.setTextToShowWhenEmpty ("Notes", colour::textMicro);
         notes.setTitle ("Notes");
+        styleTextField (tagInput);
+        styleTextField (notes);
         notes.onFocusLost = [this] { commitNotes(); };
         notes.onReturnKey = [this] { commitNotes(); };
         // (no LOAD TO keys: a sound goes to a source by dragging it onto A, B or C; Return and a
@@ -1492,6 +1494,7 @@ namespace
             : Sheet (p, t, { 460, 170 }), done (std::move (d))
         {
             field.setText (initial, false);
+            styleTextField (field);   // (its text was inserted before it joined the editor's colours)
             field.setTitle (t);
             field.onReturnKey = [this] { ok.triggerClick(); };
             field.onEscapeKey = [this] { panel.closeSheet(); };
@@ -1666,6 +1669,7 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
     addChildComponent (backButton);
     search.setTextToShowWhenEmpty (juce::String::fromUTF8 ("Search\xe2\x80\xa6"), colour::textMicro);
     search.setTitle ("Search the Library");
+    styleTextField (search);
     search.setFont (type::micro (16.0f));
     search.setJustification (juce::Justification::centredLeft);
     search.setIndents (12, 0);
@@ -2645,6 +2649,8 @@ namespace
             portable.setButtonText ("Include audio as portable copy (recommended for sharing): an .ospinstrument beside it");
             for (auto* c : std::initializer_list<juce::Component*> { &name, &preset, &templateType, &category, &tags, &notes, &portable, &cancel, &save })
                 addAndMakeVisible (c);
+            for (auto* field : { &name, &tags, &notes })
+                styleTextField (*field);
             name.onReturnKey = [this] { save.triggerClick(); };
             cancel.onClick = [this] { panel.closeSheet(); };
             save.onClick = [this] { commit(); };
