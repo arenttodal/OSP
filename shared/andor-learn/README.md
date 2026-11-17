@@ -110,6 +110,12 @@ The baseline of a "changed" postcondition follows the parameter while no gesture
      task opens a menu (Next would close it).
    - **`unavailableBody`** is what the note says while the target cannot be shown.
 
+   - **The Quick Start ends with `findLearnAgainStep()`**: the INFO key ("keyboard.info": the i
+     in the corner brings back Learn mode) and the three-dot menu's Learn (every tutorial).
+     Every ANDOR instrument ends its Quick Start the same way.
+   - **A finished lesson opens the tutorials**, its tick shown. A lesson that played on its
+     example first asks Keep / Restore, then the tutorials open.
+
 6. **Write help** for Info: `HelpTopic { targetId, title, body, lessonId }`. With no lesson, there is no Start button.
 
    Exact targets: a control can be found by the parameter it edits

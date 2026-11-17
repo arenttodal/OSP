@@ -215,6 +215,20 @@ struct Lesson
     std::vector<Step> steps;
 };
 
+/** Every ANDOR instrument's Quick Start ends here: where Learn is found again. It points at the
+    keyboard's INFO key ("keyboard.info") and names the menu's Learn; nothing is opened for it. */
+inline Step findLearnAgainStep()
+{
+    Step s;
+    s.id = "learn.again";
+    s.targetId = "keyboard.info";
+    s.title = "Learn any time";
+    s.body = "You can always go back to Learn mode: click the i in the corner, then point to any control to read about it. "
+             "For all the tutorials, click the three-dot menu at the top right and choose Learn.";
+    s.revealOnEnter = false;   // (pointing at the key is the lesson: Info stays as it is)
+    return s;
+}
+
 /** Contextual help for a region (Info). */
 struct HelpTopic
 {

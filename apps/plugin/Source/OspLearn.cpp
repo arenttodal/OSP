@@ -198,6 +198,7 @@ static Catalog ospCatalog()
                           Completion::action ({ param (reimaginedToken) }, Condition::equals (reimaginedToken, 0.0f))
                               .withAlreadyDone (Condition::equals (reimaginedToken, 0.0f), "Already at 0 %"));
         l.steps.push_back (back);
+        l.steps.push_back (andor::learn::findLearnAgainStep());   // (the INFO key, and the menu's Learn: every ANDOR instrument's)
         l.completionText = "You have made a playable instrument from one recording. The next lessons change how it plays, add variation and combine sounds.";
         require (l, { soundReady() });
         c.lessons.push_back (l);
