@@ -60,7 +60,7 @@ namespace
         template <typename Pred>
         bool settle (Pred done)
         {
-           #if ! (JUCE_MAC || JUCE_IOS || JUCE_ANDROID)
+           #if ! (JUCE_MAC || JUCE_IOS || JUCE_ANDROID || OSP_TESTS_WITHOUT_MESSAGE_LOOP)
             for (int i = 0; i < 150 && ! done(); ++i)
             {
                 for (int k = 0; k < 50 && juce::detail::dispatchNextMessageOnSystemQueue (true); ++k)
@@ -68,6 +68,10 @@ namespace
                 }
                 juce::Thread::sleep (10);
             }
+           #else
+            // (no message loop to run here: one tick of the view's timer, as it would fire)
+            if (! done())
+                view().syncNow();
            #endif
             return done();
         }
@@ -75,6 +79,7 @@ namespace
         /** The message loop for `ms` (the parameter tree syncs, and records undo, on its timer). */
         void pump (int ms)
         {
+            p.apvts().copyState();   // (the tree syncs now: it records the undo step, on every platform)
             const auto end = juce::Time::getMillisecondCounter() + static_cast<juce::uint32> (ms);
             settle ([end] { return juce::Time::getMillisecondCounter() >= end; });
         }

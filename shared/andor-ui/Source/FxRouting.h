@@ -98,6 +98,9 @@ public:
     bool remove (fx::InstanceId id);
 
     juce::PopupMenu settingsMenu();
+    /** What the view's timer does (8 Hz): follow the route, the subtitles and every effect's
+        ON state. Public for tests on hosts whose message loop they cannot run. */
+    void syncNow();
     /** FX CHAIN presets (the gear): the route and its new effects' settings, as a file. */
     bool saveChain (const juce::String& name);
     bool loadChain (const juce::File& file);

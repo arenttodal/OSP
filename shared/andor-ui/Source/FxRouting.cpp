@@ -960,6 +960,11 @@ juce::String FxRoutingView::signature() const
 
 void FxRoutingView::timerCallback()
 {
+    syncNow();
+}
+
+void FxRoutingView::syncNow()
+{
     // (The window's scale changes the board's tile size: a pure re-projection.)
     if (std::abs (juce::Component::getApproximateScaleFactorForComponent (this) - layoutScale) > 0.01f)
     {
