@@ -643,6 +643,16 @@ void ShellEditor::setSourceViewShown (bool shown)
             return;
         content.addChildComponent (*sourceView);
     }
+    if (shown && sourceView != nullptr)
+    {
+        // The source area's other view, in the cards' layer: the popovers and the modulation
+        // overlay (their halos) stay above it (ANDOR OSP's layering rule, shared).
+        juce::Component* lowest = &modOverlay;
+        for (auto* c : { static_cast<juce::Component*> (popup.get()), static_cast<juce::Component*> (&popupBackdrop) })
+            if (c != nullptr && c->getParentComponent() == &content && content.getIndexOfChildComponent (c) < content.getIndexOfChildComponent (lowest))
+                lowest = c;
+        sourceView->toBehind (lowest);
+    }
     sourceViewOpen = shown;
     sourceViewButton.setToggleState (shown, juce::dontSendNotification);
     sourceViewButton.repaint();

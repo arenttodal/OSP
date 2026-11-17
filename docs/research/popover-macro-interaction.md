@@ -62,3 +62,38 @@ Covered:
 - An LFO depth dragged on a halo inside a popover.
 - The editor destroyed while a menu is pending: its items are safe.
 - macOS Control-click: checked only on macOS (JUCE makes Control a popup press there only).
+
+## Addendum: popovers above the Mixer / FX Routing view
+
+**Root cause (verified).**
+- The routing branch of `OspAudioProcessorEditor::layoutSources` called `routingView->toFront`.
+- It also set `shownCount = -1`, so the editor's timer laid the sources out again at every tick
+  while the view was open.
+- Within one tick, any popover that had just opened ended up behind the routing view, and so did
+  the modulation overlay with its halos.
+- Restoring that line makes the new test fail (LIFE at layer 52, the view at 54). ANDOR ANALOG's
+  shell never raised its source view in layout.
+
+**Fix.**
+- The routing view is an alternative view of the source area, in the cards' layer.
+- It is placed once, as it opens, just beneath the lowest floating layer (the open popover, its
+  backdrop or the modulation overlay), and is no longer raised during layout.
+- The popovers, their halos, menus, the Library and Learn stay above it.
+- Nothing is raised by a timer. The shared `ShellEditor` places its source view the same way.
+
+**Tests** (`[routing]`): the routing view open, through many timer ticks.
+- LIFE above it, opened by its label's own click.
+- A real press turns PITCH: the routing view is not under the pointer.
+- Right-click, Assign to Macro, the 100 % end dragged, Escape mid-drag.
+- Switching to FILTER.
+- An outside click closes the popover and leaves the view open.
+- A USER macro's inspector above it.
+- A popover already open when the view opens.
+- Back to the cards.
+- Every popover after a resize at 869, 1448 and 1810 px.
+
+**Screenshots** (`[popover-shots]`, `docs/research/popover-macro-interaction/`):
+1. LIFE with PITCH's focused halo (and a zoom of it).
+2. The routing view with LIFE open.
+3. PITCH's menu over it.
+4. A halo being dragged inside LIFE.

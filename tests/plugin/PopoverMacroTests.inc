@@ -534,3 +534,196 @@ TEST_CASE ("popover macros: an LFO's depth dragged on a halo inside a popover ke
     }
     CHECK (tested >= 1);   // (most popover knobs are macro-only; FILTER's reach the modulation)
 }
+
+namespace
+{
+    /** Where `c` sits among the instrument's layers (its index among the content's children). */
+    int layerOf (juce::Component& c)
+    {
+        auto* parent = c.getParentComponent();
+        return parent != nullptr ? parent->getIndexOfChildComponent (&c) : -1;
+    }
+}
+
+TEST_CASE ("routing view: popovers open above the Mixer / FX Routing view and stay there through the timer; the halos and every gesture work; closing one leaves the view open", "[plugin][usermacro][popover][routing]")
+{
+    PopoverRig rig;
+    INFO ((rig.realWindow() ? "real window events" : "events routed as JUCE routes them"));
+    auto& ui = *rig.ui;
+    ui.setSourceViewShown (true);
+    REQUIRE (ui.sourceViewShown());
+    auto* routing = ui.sourceViewComponent();
+    REQUIRE (routing != nullptr);
+    // A single click on LIFE's name (the label's own deferred click, as its timer acts on it).
+    auto* label = dynamic_cast<osp::plugin::MacroLabel*> (ui.macroRow()[0].label.get());
+    REQUIRE (label != nullptr);
+    label->onClick();
+    auto* life = ui.openPopupPanel();
+    REQUIRE (life != nullptr);
+    // Through many timer ticks (the routing branch once raised the view at every layout).
+    for (int tick = 0; tick < 10; ++tick)
+        ui.refreshNow();
+    CHECK (ui.openPopupPanel() == life);
+    CHECK (routing->isVisible());
+    CHECK (layerOf (*life) > layerOf (*routing));
+    CHECK (layerOf (rig.overlay()) > layerOf (*life));   // (its halos above it)
+    // The popover's knob takes a real press (not the routing view under it).
+    auto* pitch = rig.inPopup ("life.pitch");
+    REQUIRE (pitch != nullptr);
+    const auto centre = rig.inEditor (*pitch, pitch->getLocalBounds().getCentre().toFloat());
+    CHECK (rig.editor->getComponentAt (centre.roundToInt()) != routing);
+    CHECK_FALSE (routing->isParentOf (rig.editor->getComponentAt (centre.roundToInt())));
+    {
+        const float before = rig.value ("life.pitch");
+        rig.press (centre);
+        rig.drag (centre + juce::Point<float> (0.0f, -30.0f));
+        rig.release (centre + juce::Point<float> (0.0f, -30.0f));
+        CHECK (rig.value ("life.pitch") > before);
+        CHECK (ui.openPopupPanel() == life);
+    }
+    // Right-click -> Assign to Macro 1 -> the halo -> its 100 % end dragged: LIFE and the view open.
+    rig.rightClick (centre);
+    REQUIRE (rig.menus == 1);
+    CHECK (ui.openPopupPanel() == life);
+    const auto* item = PopoverRig::itemOf (rig.lastMenu, "Macro 1");
+    REQUIRE (item != nullptr);
+    item->action();
+    ui.refreshNow();
+    REQUIRE (rig.state().find (0, "life.pitch") == 0);
+    const auto from = rig.handle ("life.pitch", 0, 1);
+    rig.press (from);
+    CHECK (rig.overlay().isEditingMacro());
+    const auto to = rig.ring ("life.pitch", 0.85f);
+    rig.drag (to);
+    rig.release (to);
+    CHECK (rig.state().maps[0][0].map.high == Approx (0.85f).margin (0.03f));
+    CHECK (ui.openPopupPanel() == life);
+    CHECK (ui.sourceViewShown());
+    // Escape mid-drag: cancelled, LIFE open.
+    rig.press (rig.handle ("life.pitch", 0, 1));
+    rig.drag (rig.ring ("life.pitch", 0.5f));
+    CHECK (rig.escape());
+    rig.release (rig.ring ("life.pitch", 0.5f));
+    CHECK (rig.state().maps[0][0].map.high == Approx (0.85f).margin (0.03f));
+    CHECK (ui.openPopupPanel() == life);
+    // Another popover (FILTER), switched to: above the view too.
+    ui.openPopup (2);
+    for (int tick = 0; tick < 5; ++tick)
+        ui.refreshNow();
+    auto* filter = ui.openPopupPanel();
+    REQUIRE (filter != nullptr);
+    CHECK (layerOf (*filter) > layerOf (*routing));
+    // A genuine outside click (the housing's corner): the popover closes, the view stays.
+    const juce::Point<float> outside { 20.0f, 20.0f };
+    rig.press (outside);
+    rig.release (outside);
+    CHECK (ui.openPopupPanel() == nullptr);
+    CHECK (ui.sourceViewShown());
+    CHECK (routing->isVisible());
+    // A USER macro's inspector (anchored above its name) above the view as well.
+    ui.userMacros().showBank (1);
+    ui.userMacros().openPanel (0);
+    for (int tick = 0; tick < 5; ++tick)
+        ui.refreshNow();
+    auto* inspector = ui.openPopupPanel();
+    REQUIRE (inspector != nullptr);
+    CHECK (layerOf (*inspector) > layerOf (*routing));
+    ui.closePopup();
+    ui.userMacros().showBank (0);
+    // A popover already open when the view opens: still above it.
+    ui.setSourceViewShown (false);
+    ui.openPopup (0);
+    ui.setSourceViewShown (true);
+    for (int tick = 0; tick < 5; ++tick)
+        ui.refreshNow();
+    REQUIRE (ui.openPopupPanel() != nullptr);
+    CHECK (layerOf (*ui.openPopupPanel()) > layerOf (*routing));
+    ui.closePopup();
+    // Back to the cards.
+    ui.setSourceViewShown (false);
+    CHECK_FALSE (routing->isVisible());
+    CHECK (ui.engineCard (0).isVisible());
+}
+
+TEST_CASE ("routing view: the layering holds at every window size and after a resize with a popover open", "[plugin][popover][routing]")
+{
+    for (const int width : { 869, 1448, 1810 })
+    {
+        INFO ("width " << width);
+        PopoverRig rig;
+        auto& ui = *rig.ui;
+        rig.editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui.instrumentHeight() / 1448.0f));
+        ui.setSourceViewShown (true);
+        for (const int which : { 0, 1, 2, 3, 4, osp::plugin::OspAudioProcessorEditor::echoPopup })
+        {
+            ui.openPopup (which);
+            ui.refreshNow();
+            rig.editor->setSize (width + 40, juce::roundToInt (static_cast<float> (width + 40) * ui.instrumentHeight() / 1448.0f));
+            for (int tick = 0; tick < 3; ++tick)
+                ui.refreshNow();
+            REQUIRE (ui.openPopupPanel() != nullptr);
+            CHECK (layerOf (*ui.openPopupPanel()) > layerOf (*ui.sourceViewComponent()));
+            rig.editor->setSize (width, juce::roundToInt (static_cast<float> (width) * ui.instrumentHeight() / 1448.0f));
+        }
+        ui.closePopup();
+    }
+}
+
+TEST_CASE ("popover macros: screenshots - a focused halo inside LIFE; with the routing view: LIFE, its knob's menu, a halo being dragged (OSP_POPOVER_SHOTS)", "[.][popover-shots]")
+{
+    const char* dir = std::getenv ("OSP_POPOVER_SHOTS");
+    REQUIRE (dir != nullptr);
+    const juce::File out (juce::String::fromUTF8 (dir));
+    out.createDirectory();
+    osp::plugin::skin::setLook (osp::plugin::skin::Look::ceramic);
+    PopoverRig rig;
+    auto& ui = *rig.ui;
+    auto write = [&] (const juce::String& name, juce::Rectangle<int> area = {}) {
+        ui.refreshNow();
+        const auto image = rig.editor->createComponentSnapshot (area.isEmpty() ? rig.editor->getLocalBounds() : area, true, area.isEmpty() ? 1.0f : 2.0f);
+        const auto file = out.getChildFile (name + ".png");
+        file.deleteFile();
+        juce::FileOutputStream stream (file);
+        juce::PNGImageFormat().writeImageToStream (image, stream);
+    };
+    auto assignPitch = [&] {
+        auto* pitch = rig.inPopup ("life.pitch");
+        REQUIRE (pitch != nullptr);
+        rig.rightClick (rig.inEditor (*pitch, pitch->getLocalBounds().getCentre().toFloat()));
+        const auto* item = PopoverRig::itemOf (rig.lastMenu, "Macro 1");
+        REQUIRE (item != nullptr);
+        item->action();
+        ui.refreshNow();
+    };
+    auto lifeArea = [&] {
+        auto* panel = ui.openPopupPanel();
+        return rig.editor->getLocalArea (panel, panel->getLocalBounds()).expanded (30).getIntersection (rig.editor->getLocalBounds());
+    };
+    // 1. LIFE open, PITCH assigned to Macro 1: the focused halo with its two ends, LIFE still open.
+    ui.openPopup (0);
+    ui.refreshNow();
+    assignPitch();
+    write ("01-life-focused-halo");
+    write ("02-life-focused-halo-zoom", lifeArea());
+    // 2. The routing view, LIFE open above it.
+    ui.setSourceViewShown (true);
+    for (int t = 0; t < 4; ++t)
+        ui.refreshNow();
+    write ("03-routing-life-open");
+    // 3. PITCH's menu over LIFE (shown inside the editor so the snapshot holds it).
+    {
+        auto* pitch = rig.inPopup ("life.pitch");
+        auto menu = rig.overlay().contextMenu ("life.pitch");
+        menu.showMenuAsync (juce::PopupMenu::Options().withParentComponent (rig.editor.get()).withTargetComponent (pitch));
+        write ("04-routing-life-menu");
+        juce::PopupMenu::dismissAllActiveMenus();
+    }
+    // 4. A halo being dragged inside LIFE (the gesture held for the picture).
+    {
+        const auto from = rig.handle ("life.pitch", 0, 1);
+        rig.press (from);
+        rig.drag (rig.ring ("life.pitch", 0.85f));
+        write ("05-routing-life-halo-drag");
+        rig.release (rig.ring ("life.pitch", 0.85f));
+    }
+}

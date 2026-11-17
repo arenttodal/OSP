@@ -853,6 +853,21 @@ void OspAudioProcessorEditor::setSourceViewShown (bool shown)
         routingView = createFxRoutingView (ospProcessor);
         content.addChildComponent (*routingView);
     }
+    if (shown && routingView != nullptr)
+    {
+        // An alternative view of the source area, in the cards' layer - never a top-level
+        // panel: the popovers (and their backdrop), the modulation overlay with the popovers'
+        // halos, the Library and Learn stay above it. Placed once, as it opens (not at every
+        // layout, which once pulled it over an open popover at the next timer tick).
+        juce::Component* lowest = &modOverlay;
+        auto below = [this, &lowest] (juce::Component* c) {
+            if (c != nullptr && c->getParentComponent() == &content && content.getIndexOfChildComponent (c) < content.getIndexOfChildComponent (lowest))
+                lowest = c;
+        };
+        below (popup.get());
+        below (&popupBackdrop);
+        routingView->toBehind (lowest);
+    }
     routingOpen = shown;
     routingKey.setToggleState (shown, juce::dontSendNotification);
     routingKey.repaint();
@@ -890,7 +905,6 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
         dropZone.setVisible (false);
         addTarget.setVisible (false);
         routingView->setBounds (sourceArea);
-        routingView->toFront (false);
         shownCount = -1;   // (the cards are laid out afresh when it closes)
         return;
     }
