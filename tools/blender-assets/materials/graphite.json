@@ -1,0 +1,18 @@
+{
+    "schemaVersion": 1,
+    "description": "Dark knob finishes for controls that sit on the charcoal displays (GUI asset gate 3, exploratory).",
+    "presets": {
+        "satin-graphite": {
+            "label": "Satin Graphite",
+            "baseColor": "#3a3936",
+            "roughness": 0.42,
+            "roughnessVariation": 0.03,
+            "specular": 0.45,
+            "coat": 0.12,
+            "coatRoughness": 0.26,
+            "sheen": 0.0,
+            "subsurface": 0.0,
+            "grain": { "kind": "powder", "size": 0.04, "height": 0.0006, "detail": 2.0 }
+        }
+    }
+}

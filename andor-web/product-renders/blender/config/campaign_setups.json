@@ -604,7 +604,7 @@
       ],
       "fstop": 11,
       "shift": [
-       -0.185,
+       -0.17,
        -0.03
       ],
       "fit": "HORIZONTAL"
@@ -691,7 +691,7 @@
        }
       ]
      },
-     "note": "about 6 % further right than A1-R1 with the camera 5 % further back, so the right cheek keeps its margin"
+     "note": "the instrument's left edge at about 37 % of the width (A1-R1: 33 %) with the camera 5 % further back; a full 6 % shift put the right cheek on the frame edge"
     }
    }
   },
@@ -1642,21 +1642,21 @@
      }
     },
     "M05_sharp": {
-     "title": "M05 \u00b7 teak cheek meeting the ceramic, sharp (f/11)",
+     "title": "M05 \u00b7 front-left corner: teak end grain, ivory front return, lower shell, sharp (f/11)",
      "res": [
       3000,
       2000
      ],
      "rot": -11.0,
      "camera": {
-      "yaw": -62,
-      "pitch": 62,
-      "dist": 0.17,
+      "yaw": -48,
+      "pitch": 60,
+      "dist": 0.13,
       "lens": 100,
       "target": [
-       30,
-       330,
-       -2.0
+       24,
+       1030,
+       -4.0
       ],
       "fstop": 11.0,
       "shift": [
@@ -1667,21 +1667,21 @@
      }
     },
     "M05_cine": {
-     "title": "M05 \u00b7 teak cheek meeting the ceramic, cinematic (f/5.6)",
+     "title": "M05 \u00b7 front-left corner: teak end grain, ivory front return, lower shell, cinematic (f/5.6)",
      "res": [
       3000,
       2000
      ],
      "rot": -11.0,
      "camera": {
-      "yaw": -62,
-      "pitch": 62,
-      "dist": 0.17,
+      "yaw": -48,
+      "pitch": 60,
+      "dist": 0.13,
       "lens": 100,
       "target": [
-       30,
-       330,
-       -2.0
+       24,
+       1030,
+       -4.0
       ],
       "fstop": 5.6,
       "shift": [

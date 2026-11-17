@@ -1,0 +1,90 @@
+{
+    "schemaVersion": 1,
+    "name": "mini-ivory",
+    "type": "knob",
+    "description": "GUI asset gate 3 (exploratory): the small MiniKnob (racks, popovers, envelope, ARP, SUB). A plain domed cap, smooth sidewall, no skirt, a wide indicator: clear at 12-50 px. mini-graphite = the same geometry in satin graphite with a light indicator.",
+    "geometry": {
+        "units": "mm",
+        "diameter": 12.0,
+        "height": 4.8,
+        "taper": 0.04,
+        "topCurvature": 0.3,
+        "bevelWidth": 0.6,
+        "bevelSegments": 6,
+        "edgeRound": 0.15,
+        "angularSamples": 720,
+        "flutes": {
+            "count": 0,
+            "depth": 0.0,
+            "sharpness": 1.0,
+            "fadeIn": 0.5,
+            "topFade": 0.5
+        },
+        "skirt": {
+            "enabled": false,
+            "height": 0.0,
+            "extraRadius": 0.0,
+            "gap": 0.0,
+            "gapDepth": 0.0,
+            "round": 0.0
+        }
+    },
+    "indicator": {
+        "style": "engraved",
+        "width": 1.0,
+        "from": 0.3,
+        "to": 0.92,
+        "depth": 0.1,
+        "downSide": 0.4,
+        "color": "#26231f",
+        "roughness": 0.7
+    },
+    "material": "satin-ivory",
+    "variants": [
+        "soft-ivory",
+        "brushed-ivory",
+        "satin-ivory"
+    ],
+    "camera": "top-down",
+    "lighting": "studio-sculpt",
+    "shadow": {
+        "strength": 0.5,
+        "contactMm": 0.2,
+        "rampMm": 0.5,
+        "note": "restrained: half the cast shadow at this size"
+    },
+    "render": {
+        "engine": "CYCLES",
+        "samples": 96,
+        "denoise": true,
+        "seed": 7,
+        "resolution": 256,
+        "filterWidth": 1.5,
+        "viewTransform": "Standard",
+        "calibrate": {
+            "enabled": true,
+            "target": "#f1ede6",
+            "probeResolution": 160,
+            "probeSamples": 96
+        }
+    },
+    "rotation": {
+        "convention": "JUCE rotary angle: radians clockwise from 12 o'clock",
+        "start": 3.9269908169872414,
+        "end": 8.639379797371932,
+        "source": "shared/andor-ui/Source/OspLookAndFeel.h rotaryStart (1.25 pi) / rotaryEnd (2.75 pi)"
+    },
+    "frames": {
+        "count": 129
+    },
+    "runtime": {
+        "levels": [
+            48,
+            96,
+            180
+        ],
+        "destination": "shared/andor-ui/Resources/knobs/mini-ivory",
+        "note": "exploratory: body 19-49 px at 1448 (popover secondary 9.6 r ... rack 24.6 r); 869 px window at 1x shows the smallest at about 12 px"
+    },
+    "variants_note": "mini-graphite: --set name=mini-graphite --set material=satin-graphite --set indicator.color=#e8e2d8"
+}

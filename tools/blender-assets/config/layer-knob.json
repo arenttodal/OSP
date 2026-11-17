@@ -48,10 +48,10 @@
     "camera": "top-down",
     "lighting": "studio-sculpt",
     "shadow": {
-        "strength": 0.7,
+        "strength": 0.55,
         "contactMm": 0.3,
         "rampMm": 0.8,
-        "note": "a smaller control: a shorter, lighter cast shadow than the macro's (D2 0.8)"
+        "note": "a smaller control: a lighter cast shadow than the macro's D2 (0.8); the knob's own pixels untouched"
     },
     "render": {
         "engine": "CYCLES",
@@ -87,6 +87,7 @@
     },
     "candidates": {
         "B": "smooth sidewall, small bevel (this file)",
-        "C": "--set geometry.flutes.count=32 --set geometry.flutes.depth=0.22 --set geometry.bevelWidth=1.4 --set geometry.height=7.6"
+        "C": "--set geometry.flutes.count=32 --set geometry.flutes.depth=0.22 --set geometry.bevelWidth=1.4 --set geometry.height=7.6",
+        "chosen": "B (smooth sidewall reads cleanest at the real 1x size; C's 32 flutes break up into a jagged rim at 76 px)"
     }
 }
