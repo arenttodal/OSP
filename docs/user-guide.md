@@ -506,15 +506,15 @@ export asks you to confirm you may share it; that answer is remembered.
 
 ## The Library
 
-Every sound you load, every preset and template you save, in one window. Open it from the
+Every sound you load, every preset and Starting State you save, in one window. Open it from the
 preset name's menu (**Open Library…**), from **⋮ → Open Library**, or with **Cmd/Ctrl+L**. It
 covers the instrument down to the keyboard; the keyboard stays below it. **×**, Escape or
 Cmd/Ctrl+L close it.
 
-- **Presets, Templates, Sounds** at the top. On the left: All, Factory, User, Packs,
+- **Presets, Starting States, Sounds** at the top. On the left: All, Factory, User, Packs,
   Favorites, Recent, Trash; your collections (**+** makes one); the categories or sound
   types, each with how many it holds. Type in the search field to narrow it.
-- **STARTING STATES** sit at the top of **Presets** and **Templates**: the built-in states
+- **STARTING STATES** sit at the top of **Presets** and **Starting States**: the built-in states
   (Natural, Alive, Floating, Broken, Frozen, Dream, Wide) as small tiles, the one in use
   marked. A click applies it: the settings change, your sounds stay. Below them, the list:
   **PRESETS** are complete instruments with their sounds; **TEMPLATES** are your own
@@ -532,7 +532,7 @@ Cmd/Ctrl+L close it.
   click on an empty source takes the selected sound. Double-click (or Return) loads the
   selected sound into the first empty source. ▶ plays the three wells together, dry. The
   keyboard and MIDI always play the instrument.
-- **Save…** (top right) saves the patch as a preset (with its sounds) or a template
+- **Save…** (top right) saves the patch as a preset (with its sounds) or a Starting State
   (settings only), with a category, tags and a description. Tick **Include audio as
   portable copy** to also write an `.ospinstrument` you can share. An existing name is
   never overwritten silently: the old one goes to the Library's trash.

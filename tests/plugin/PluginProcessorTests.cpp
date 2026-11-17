@@ -8162,6 +8162,7 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "MenuShots.inc"
 #include "MenuArchitectureTests.inc"
 #include "PaletteStudyShots.inc"
+#include "StartingStateAuthoringTests.inc"
 
 TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives the knob, not the halo overlay) opens its modulation menu", "[ui][andor-ui][rightclick]")
 {

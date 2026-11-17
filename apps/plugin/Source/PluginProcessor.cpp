@@ -4125,7 +4125,7 @@ bool OspAudioProcessor::canSaveInPlace() const
     return true;
 }
 
-bool OspAudioProcessor::saveStartingState (const juce::File& file)
+bool OspAudioProcessor::saveStartingState (const juce::File& file, const juce::String& description)
 {
     auto xml = createStateXml();
     if (xml == nullptr)
@@ -4138,14 +4138,13 @@ bool OspAudioProcessor::saveStartingState (const juce::File& file)
         xml->removeAttribute (property);
     xml->setAttribute ("keptSlots", slotCount());
     xml->setAttribute ("startingState", 1);
+    if (description.isNotEmpty())
+        xml->setAttribute ("description", description);
     file.getParentDirectory().createDirectory();
     if (! xml->writeTo (file))
         return false;
     libraryHub->presetSaved (file, library::AssetType::templateState, {}, slotCount(), stateVersion);
-    presetNameOverride = file.getFileNameWithoutExtension();
-    presetIsProgram = false;
-    lastPresetFile = juce::File();
-    lastStartingStateFile = file;
+    // (the instrument is unchanged: its header name, its preset file and SAVE's target stay)
     return true;
 }
 

@@ -775,7 +775,7 @@ public:
         if (has)
         {
             const auto& r = panel.row (i);
-            load.setButtonText (r.trashed ? "Restore" : (panel.view == View::templates ? "Load Template" : "Load"));
+            load.setButtonText (r.trashed ? "Restore" : (panel.view == View::templates ? "Load State" : "Load"));
         }
         repaint();
     }
@@ -787,7 +787,7 @@ public:
         {
             g.setColour (colour::textMicro);
             g.setFont (type::micro (15.0f));
-            g.drawText (panel.rows.empty() ? juce::String() : "Select a " + juce::String (panel.view == View::templates ? "template" : "preset") + " to see it here.",
+            g.drawText (panel.rows.empty() ? juce::String() : "Select a " + juce::String (panel.view == View::templates ? "starting state" : "preset") + " to see it here.",
                         getLocalBounds(), juce::Justification::centred);
             return;
         }
@@ -952,7 +952,7 @@ public:
         g.setColour (colour::hairline);
         g.fillRect (0, foot + 9, getWidth(), 1);
         g.setColour (colour::textMicro);
-        g.drawText (panel.view == View::templates ? "TEMPLATES" : "PRESETS", 2, foot + 14, 300, footHeight - 14, juce::Justification::centredLeft);
+        g.drawText (panel.view == View::templates ? "YOUR STARTING STATES" : "PRESETS", 2, foot + 14, 300, footHeight - 14, juce::Justification::centredLeft);
     }
 
 private:
@@ -1641,7 +1641,7 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
 {
     setTitle ("ANDOR/OSP Library");
     setWantsKeyboardFocus (true);
-    const char* names[] { "Presets", "Templates", "Sounds" };
+    const char* names[] { "Presets", "Starting States", "Sounds" };
     for (std::size_t i = 0; i < tabs.size(); ++i)
     {
         tabs[i].setButtonText (names[i]);
@@ -2086,7 +2086,7 @@ void LibraryPanel::query()
             const bool sounds = currentView == View::sounds;
             a.side.push_back ({ "header:library", sounds ? "Library" : "Collections", -1 });
             const int builtInCount = currentView == View::templates ? factoryNames.size() : 0;
-            a.side.push_back ({ "all", sounds ? "All Sounds" : (currentView == View::templates ? "All Templates" : "All Presets"),
+            a.side.push_back ({ "all", sounds ? "All Sounds" : (currentView == View::templates ? "All Starting States" : "All Presets"),
                                 count ([] (library::SearchQuery&) {}) + builtInCount });
             if (! sounds)
                 a.side.push_back ({ "factory", "Factory", count ([] (library::SearchQuery& s) { s.origin = Origin::factory; }) + builtInCount });
@@ -2496,7 +2496,7 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
     }
     else
     {
-        menu.addItem (r.type == AssetType::templateState ? "Load template" : "Load", [safe, r] { if (safe != nullptr) safe->loadRow (r); });
+        menu.addItem (r.type == AssetType::templateState ? "Load starting state" : "Load", [safe, r] { if (safe != nullptr) safe->loadRow (r); });
         if (r.isBuiltIn())
         {
             menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
@@ -2684,7 +2684,7 @@ namespace
             name.setText (proc.presetDisplayName() == "INIT" ? juce::String() : proc.presetDisplayName(), false);
             name.setTextToShowWhenEmpty ("My Evolving Texture", colour::textMicro);
             preset.setButtonText ("Preset (with sounds): the complete instrument with its current sounds");
-            templateType.setButtonText ("Template (no sounds): settings only, audio files will not be included");
+            templateType.setButtonText ("Starting State (no audio): every setting, macros, effects and modulation; no recordings");
             preset.setRadioGroupId (77);
             templateType.setRadioGroupId (77);
             (asTemplate ? templateType : preset).setToggleState (true, juce::dontSendNotification);
@@ -2764,7 +2764,7 @@ namespace
                 if (safe == nullptr)
                     return;
                 file.getParentDirectory().createDirectory();
-                const bool ok = isTemplate ? proc.saveStartingState (file) : proc.savePreset (file);
+                const bool ok = isTemplate ? proc.saveStartingState (file, text) : proc.savePreset (file);
                 if (! ok)
                 {
                     safe->setStatus ("Could not save " + file.getFileName() + ".");

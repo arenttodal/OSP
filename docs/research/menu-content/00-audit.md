@@ -241,3 +241,62 @@ The utility-keys test now expects SUPPORT in place of Learn ▸.
 - Three hidden UI tests (`[.][ui]`: mod-ui, andor-ui, meta-ui) fail when selected by hand. They
   check the modulation panel, which this change does not touch, and ctest does not run them.
   Whether they already failed before this change was not checked.
+
+## Gate 3: done, Starting State authoring
+
+**Behaviour that already existed, kept (§8.4):**
+- A Starting State applies onto the sounds already loaded. It keeps them, and keeps an empty
+  slot for each one it was saved with (`keptSlots`).
+- The built-in states and the user's own load the same way.
+
+**One dialog for every way in:**
+- **⋮ → Save as Starting State…** and the preset name's **Save starting state…** both open the
+  Library's Save sheet in Starting State mode.
+- Its fields are a name, the type ("Starting State (no audio): every setting, macros, effects
+  and modulation; no recordings"), a category, tags and a description.
+- The bare file chooser is gone.
+
+**Selective inclusion (§8.2) is not offered.** A Starting State is always the complete musical
+configuration without the source audio:
+- every parameter;
+- the USER macros (names and assignments);
+- the FX route and its effects;
+- modulation and performance;
+- the slots.
+
+Partial recall (for example, effects only) would leave unaddressed parameters at whatever the
+instrument had: contradictory, and outside the existing contract. Audio is never included. To
+keep recordings, save an instrument (a preset, or a portable instrument).
+
+**Audio independence (§8.3):**
+- The source trees are not written, so nothing tied to a recording is: file names, hashes,
+  stored or original paths, analysis, root overrides, Note Atlas regions and edits, multi-sample
+  maps.
+- A test checks the saved file for each of these.
+- Applied onto a new recording, that recording's own analysis and root stand.
+
+**Explicit identity:**
+- `startingState="1"` in the file, and `AssetType::templateState` in the catalog. Never the name
+  or the folder.
+- A preset and a Starting State with the same name are two different items.
+
+**The description travels in the file** (`description` attribute) as well as in the catalog. It
+survives a rename.
+
+**The instrument is unaffected:** saving a Starting State no longer renames the open instrument
+or drops its preset identity. Before, the header took the state's name and SAVE lost its target.
+
+**Library:**
+- the tab reads **Starting States** (it read Templates);
+- the list's heading reads YOUR STARTING STATES, "All Starting States", and **Load State**;
+- the built-in tiles above the list are unchanged;
+- rename, duplicate and trash work through the existing row menu.
+
+**Tests:** `osp_plugin_tests "[starting-state-authoring]"`:
+- saved without audio or anything tied to it;
+- the description is in the file;
+- the instrument's name, preset and SAVE target are unchanged;
+- applied onto another recording, it keeps that recording, its own root, the macros, the USER
+  macros, the FX route and the kept empty slot;
+- a rename keeps the identity and the description;
+- a preset and a state of the same name stay apart in the Library.

@@ -1383,13 +1383,7 @@ juce::PopupMenu OspAudioProcessorEditor::mainMenu()
     // CONTENT: reusable states, portable instruments and packs.
     menu.addSeparator();
     menu.addSectionHeader ("CONTENT");
-    menu.addItem ("Save as Starting State" + ellipsis(), [safe] {
-        if (safe == nullptr)
-            return;
-        safe->openLibrary (LibraryPanel::View::templates);
-        if (auto* library = safe->libraryWindow())
-            library->openSaveSheet (true);
-    });
+    menu.addItem ("Save as Starting State" + ellipsis(), [safe] { if (safe != nullptr) safe->saveStartingState(); });
     menu.addItem ("Export portable instrument" + ellipsis(), count > 0, false, [safe] { if (safe != nullptr) safe->choosePresetFile (true, true); });
     menu.addItem ("Import pack" + ellipsis(), [safe] {
         if (safe == nullptr)
@@ -1530,21 +1524,11 @@ void OspAudioProcessorEditor::showAbout()
 
 void OspAudioProcessorEditor::saveStartingState()
 {
-    auto folder = OspAudioProcessor::startingStateFolder();
-    folder.createDirectory();
-    chooser = std::make_unique<juce::FileChooser> ("Save starting state", folder, juce::String ("*") + OspAudioProcessor::startingStateExtension);
-    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting | juce::FileBrowserComponent::canSelectFiles,
-                          [this] (const juce::FileChooser& fc) {
-                              auto file = fc.getResult();
-                              if (file == juce::File())
-                                  return;
-                              if (file.getFileExtension() != OspAudioProcessor::startingStateExtension)
-                                  file = file.withFileExtension (OspAudioProcessor::startingStateExtension);
-                              const bool ok = ospProcessor.saveStartingState (file);
-                              ospProcessor.showMessage (ok ? "Saved starting state " + file.getFileNameWithoutExtension() : "Could not save " + file.getFileName());
-                              presetBar.refresh();
-                              timerCallback();
-                          });
+    // One dialog for every way in (the main menu, the preset name's list): the Library's Save
+    // sheet as a Starting State - a name, a description, its category and tags.
+    openLibrary (LibraryPanel::View::templates);
+    if (libraryPanel != nullptr)
+        libraryPanel->openSaveSheet (true);
 }
 
 void OspAudioProcessorEditor::choosePresetFile (bool save, bool instrument)

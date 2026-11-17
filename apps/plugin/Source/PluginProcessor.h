@@ -486,7 +486,11 @@ public:
     void resetSettings() override;
     /** A user starting state: every setting and the slot count, no audio. Opening one applies
         the settings to the sounds already loaded (and keeps empty slots for the rest). */
-    bool saveStartingState (const juce::File& file);
+    /** A Starting State: every setting (macros, effects and routing, modulation, performance,
+        the slots), never the sounds or anything tied to them (their trees: analysis, roots,
+        maps, edits). The description travels in the file. Saving one leaves the instrument
+        as it is: its name, its preset and what SAVE updates. */
+    bool saveStartingState (const juce::File& file, const juce::String& description = {});
     bool loadStartingState (const juce::File& file);
     static juce::File startingStateFolder();
     static constexpr const char* startingStateExtension = ".ospstate";
