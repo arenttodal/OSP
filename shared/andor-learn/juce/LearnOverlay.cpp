@@ -140,7 +140,7 @@ public:
 namespace
 {
     constexpr float pad = 16.0f;
-    constexpr float metaHeight = 16.0f, titleHeight = 22.0f, keyHeight = 26.0f;
+    constexpr float metaHeight = 16.0f, titleHeight = 22.0f, keyHeight = 26.0f, keyRowGap = 8.0f;
     juce::Font bodyFont() { return fonts::make (12.5f, fonts::Weight::regular, 0.0f); }
     juce::Font statusFont() { return fonts::make (11.5f, fonts::Weight::medium, 0.0f); }
     constexpr float tickRoom = 18.0f;
@@ -225,7 +225,7 @@ juce::Point<int> Note::preferredSize() const
         h += 10.0f + std::ceil (l.getHeight());
     }
     if (! content.actions.empty())
-        h += 14.0f + keyHeight;
+        h += 14.0f + keyHeight + static_cast<float> (keyRowCount() - 1) * (keyHeight + keyRowGap);
     h += pad - 2.0f;
     return { cardWidth + 2 * margin, juce::roundToInt (h) + 2 * margin };
 }
@@ -236,15 +236,40 @@ juce::Rectangle<float> Note::closeArea() const
     return { c.getRight() - 30.0f, c.getY() + 8.0f, 22.0f, 22.0f };
 }
 
+int Note::keyRowCount() const
+{
+    // Right to left from the primary; a key that would cross the card's left edge starts a row above.
+    const float room = static_cast<float> (cardWidth) - 2.0f * pad;
+    int rows = keys.empty() ? 0 : 1;
+    float used = 0.0f;
+    for (auto it = keys.rbegin(); it != keys.rend(); ++it)
+    {
+        const float w = static_cast<float> ((*it)->preferredWidth());
+        if (used > 0.0f && used + w > room)
+        {
+            ++rows;
+            used = 0.0f;
+        }
+        used += w + 8.0f;
+    }
+    return juce::jmax (1, rows);
+}
+
 void Note::resized()
 {
     // The keys on the bottom row, right-aligned, the primary last (the reading order ends on it).
+    // Too many for one row: the first ones wrap onto a row above, still right-aligned.
     auto row = card().toFloat().reduced (pad, 0.0f);
     row = row.removeFromBottom (pad - 2.0f + keyHeight).removeFromTop (keyHeight);
     float x = row.getRight();
     for (auto it = keys.rbegin(); it != keys.rend(); ++it)
     {
         const float w = static_cast<float> ((*it)->preferredWidth());
+        if (x < row.getRight() && x - w < row.getX())
+        {
+            row = row.translated (0.0f, -(keyHeight + keyRowGap));
+            x = row.getRight();
+        }
         (*it)->setBounds (juce::Rectangle<float> (x - w, row.getY(), w, keyHeight).toNearestInt());
         x -= w + 8.0f;
     }

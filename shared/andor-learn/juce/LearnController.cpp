@@ -476,6 +476,14 @@ void LearnController::noteAction (const juce::String& id)
                 setLearnMode (false);
                 registry.reveal (target);
             }
+            else if (id == "tutorials")
+            {
+                // The tutorial list, nothing started: Info closes first (its note and its mode).
+                setLearnMode (false);
+                hideNote();
+                helpTarget = {};
+                openBrowser();
+            }
             else if (id == "close")
             {
                 hideNote();
@@ -665,6 +673,9 @@ void LearnController::refreshNote()
             const auto* target = registry.find (helpTarget);
             if (target != nullptr && target->reveal != nullptr)
                 keys.push_back ({ "open", "Open Controls", false });
+            // The tutorials from any topic: a neutral key beside Close, which keeps its styling.
+            if (! lessonRunner.catalog().lessons.empty())
+                keys.push_back ({ "tutorials", "See tutorials", false });
             keys.push_back ({ "close", "Close", help->lessonId.isEmpty() });
             if (help->lessonId.isNotEmpty())
                 keys.push_back ({ "start:" + help->lessonId, "Start Lesson", true });
