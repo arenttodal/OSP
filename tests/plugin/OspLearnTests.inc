@@ -4,6 +4,7 @@
 
 #include "LearnController.h"
 #include "TutorialSounds.h"
+#include <set>
 
 namespace
 {
@@ -128,7 +129,7 @@ TEST_CASE ("learn: OSP's own plugin has the shared Learn, idle until asked; its 
     INFO (rig.learn.problems().joinIntoString ("\n"));
     CHECK (rig.learn.isUsable());
     CHECK (rig.learn.catalog().productId == "osp");
-    CHECK (rig.learn.catalog().lessons.size() == 13);
+    CHECK (rig.learn.catalog().lessons.size() == 14);
     CHECK (rig.learn.catalog().help.size() >= 30);
     // Idle: no note, no browser, no ring (nothing of Learn's in the editor).
     CHECK_FALSE (rig.learn.isActive());
@@ -585,4 +586,97 @@ TEST_CASE ("learn: screenshots of every lesson step (OSP_LEARN_SHOTS)", "[.][lea
             }
         }
     }
+}
+
+TEST_CASE ("learn: From a phrase to an instrument - the example phrase, MAP NOTES, its notes on the keys, NOTES; a done step moves on by itself", "[plugin][learn]")
+{
+    LearnRig rig;
+    // Right after the Quick Start in the browser's order.
+    REQUIRE (rig.learn.catalog().lessons.size() > 1);
+    CHECK (rig.learn.catalog().lessons[1].id == "osp.phrase");
+    rig.learn.setAutoAdvanceDelay (0);   // (each step by hand first; the pause is tested below)
+    REQUIRE (rig.learn.startLesson ("osp.phrase"));
+    rig.tick();
+    REQUIRE (rig.stepId() == "setup");
+    CHECK_FALSE (rig.learn.runner().preparationReady());
+    REQUIRE (rig.learn.note()->actionIds().contains ("example"));
+    // The example phrase loads like a dropped recording: OSP asks to map its notes.
+    rig.learn.noteAction ("example");
+    rig.waitLoaded();
+    rig.tick();
+    CHECK (rig.p.mapNotesPrompt (0) >= 5);
+    if (rig.stepId() == "setup")
+    {
+        CHECK (rig.learn.runner().preparationReady());
+        rig.learn.noteAction ("current");
+        rig.tick();
+    }
+    REQUIRE (rig.stepId() == "map");
+    auto& card = rig.ui.engineCard (0);
+    REQUIRE (card.mapNotesPromptComponent() != nullptr);
+    {
+        auto& content = *rig.learn.highlight()->getParentComponent();
+        const auto prompt = rig.learn.targets().boundsIn ("osp.source.mapNotes", content);
+        REQUIRE (prompt.has_value());
+        CHECK (*prompt == content.getLocalArea (card.mapNotesPromptComponent(), card.mapNotesPromptComponent()->getLocalBounds()));
+    }
+    CHECK_FALSE (rig.stepDone());
+    card.answerMapNotesPrompt (true);   // MAP NOTES (the prompt's own handler)
+    rig.tick();
+    CHECK (rig.stepDone());
+    // The analysis lands: the phrase's notes on their keys.
+    for (int i = 0; i < 60 && ! (rig.p.currentInstrument (0) != nullptr && rig.p.currentInstrument (0)->atlas != nullptr
+                                 && rig.p.atlasActivity (0) == osp::plugin::InstrumentHost::AtlasActivity::none);
+         ++i)
+    {
+        REQUIRE (rig.p.waitForLoads (60000));
+        rig.p.pollLoads();
+    }
+    REQUIRE (rig.p.currentInstrument (0) != nullptr);
+    REQUIRE (rig.p.currentInstrument (0)->atlas != nullptr);
+    std::set<int> keys;
+    for (const auto& n : rig.p.currentInstrument (0)->atlas->notes)
+        if (n.included)
+            keys.insert (n.rootMidi);
+    CHECK (keys == std::set<int> { 57, 60, 64, 69 });
+    rig.next();
+    REQUIRE (rig.stepId() == "play");
+    CHECK_FALSE (rig.stepDone());
+    // A done step moves on by itself after the pause (Next is not needed).
+    rig.learn.setAutoAdvanceDelay (60);
+    rig.playNote (60);
+    REQUIRE (rig.stepDone());
+    rig.tick();
+    CHECK (rig.stepId() == "play");   // (not at once)
+    juce::Thread::sleep (90);
+    rig.tick();
+    REQUIRE (rig.stepId() == "notes");
+    rig.learn.setAutoAdvanceDelay (0);
+    // NOTES: the card's own key.
+    CHECK_FALSE (card.isNotesOpen());
+    REQUIRE (card.onNotesToggle != nullptr);
+    card.onNotesToggle (0, true);
+    rig.tick();
+    CHECK (card.isNotesOpen());
+    REQUIRE (rig.stepDone());
+    rig.next();
+    REQUIRE (rig.stepId() == "any");
+    rig.learn.noteAction ("finish");
+    rig.tick();
+    // The example was loaded: Keep or Restore, then the tutorials.
+    REQUIRE (rig.learn.noteKind() == LearnNote::complete);
+    rig.learn.noteAction ("keep");
+    rig.tick();
+    REQUIRE (rig.learn.browser() != nullptr);
+    CHECK (rig.learn.store().read().lessons.at ("osp.phrase").status == "complete");
+    rig.learn.closeBrowser();
+}
+
+TEST_CASE ("learn: Layering's last step says a sound or a phrase can simply be dropped", "[plugin][learn]")
+{
+    LearnRig rig;
+    const auto* layers = rig.learn.catalog().findLesson ("osp.layers");
+    REQUIRE (layers != nullptr);
+    CHECK (layers->steps.back().id == "third");
+    CHECK (layers->steps.back().body.contains ("drop a sound or a phrase onto the instrument"));
 }

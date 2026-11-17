@@ -1123,8 +1123,11 @@ void OspAudioProcessorEditor::addLayerSection (juce::PopupMenu& menu, int layer,
     // Phase 5: a recording becomes an instrument of its notes (MAP NOTES), and back.
     if (loaded != nullptr && loaded->atlas == nullptr && loaded->set == nullptr)
         menu.addItem (juce::String::fromUTF8 ("Map notes\xe2\x80\xa6"), ospProcessor.canMapNotes (layer), false, [safe, layer] {
-            if (safe != nullptr)
-                safe->ospProcessor.mapNotes (layer, phrase::Detection::normal), safe->timerCallback();
+            if (safe == nullptr)
+                return;
+            safe->ospProcessor.mapNotes (layer, phrase::Detection::normal);
+            safe->timerCallback();
+            safe->learnAction ("notes.mapped", "osp.source.mapNotes");
         });
     if (loaded != nullptr && loaded->atlas != nullptr)
     {

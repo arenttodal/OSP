@@ -94,6 +94,7 @@ public:
     static constexpr int pendingTouchTicks = 300;
     /** A musician's press is under way (a knob held): the baseline stays where it was. */
     void setGestureActive (bool held) noexcept { gesture = held; }
+    bool gestureActive() const noexcept { return gesture; }
     /** The browser / Learn mode, while no tour runs (the states they are in). */
     void setBrowsing (bool open);
     void setInspecting (bool on);

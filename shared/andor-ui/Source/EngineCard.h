@@ -610,6 +610,8 @@ public:
     /** The layer's NOTE MAP (a Note Atlas layer only), in the display's place; the EQ and the
         NOTE MAP are never open together. */
     std::function<void (int, bool)> onNotesToggle;
+    /** The "Map notes?" prompt answered by the musician (true: MAP NOTES); after it is acted on. */
+    std::function<void (int, bool)> onMapNotesAnswer;
     void setNotesOpen (bool open);
     bool isNotesOpen() const noexcept { return noteMap != nullptr; }
     NoteMapEditor* noteMapComponent() noexcept { return noteMap.get(); }

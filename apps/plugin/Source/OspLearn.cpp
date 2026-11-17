@@ -81,6 +81,31 @@ namespace
         return r;
     }
 
+    /** The edited layer holds a recording of several notes (asking MAP NOTES), or its mapped notes. */
+    Requirement phraseLoaded()
+    {
+        Requirement r;
+        r.id = "osp.phrase";
+        r.holds = Condition::state ("osp.source.phrase");
+        r.title = "A phrase is needed";
+        r.body = "This lesson needs a recording of several notes, one after another: a melody sung, hummed or played. Drag one onto OSP, or load the example phrase.";
+        r.targetId = "osp.source.dropZone";
+        return r;
+    }
+
+    /** The edited layer's notes are mapped (MAP NOTES has run). */
+    Requirement notesMapped()
+    {
+        Requirement r;
+        r.id = "osp.mapped";
+        r.holds = Condition::state ("osp.source.mapped");
+        r.title = "The notes are not mapped yet";
+        r.body = juce::String::fromUTF8 ("Click MAP NOTES on the card, or choose Map notes\xe2\x80\xa6 from the card's menu.");
+        r.targetId = "osp.source.mapNotes";
+        r.offerExample = false;
+        return r;
+    }
+
     Requirement granular()
     {
         Requirement r;
@@ -204,6 +229,43 @@ static Catalog ospCatalog()
         c.lessons.push_back (l);
     }
     {
+        // Right after the Quick Start: a phrase (a melody of separate notes) dropped in becomes
+        // an instrument of its own notes.
+        Lesson l;
+        l.id = "osp.phrase";
+        l.title = "From a phrase to an instrument";
+        l.description = "Drop a melody and play its own notes from the keys.";
+        l.minutes = 3;
+        l.exampleId = "phrase";
+        auto map = step ("map", "osp.source.mapNotes", "Map its notes",
+                         "OSP heard several notes in the recording. Click MAP NOTES: each note it finds is placed on its own key, so every key plays a real recorded note.",
+                         Completion::action ({ "notes.mapped" }, Condition::state ("osp.source.mapping"))
+                             .withAlreadyDone (Condition::state ("osp.source.mapped"), "The notes are already mapped."));
+        map.unavailableBody = juce::String::fromUTF8 ("MAP NOTES appears on the card just after a recording of several notes is dropped. If it has gone, choose Map notes\xe2\x80\xa6 from the card's menu.");
+        map.revealOnEnter = false;
+        map.doneText = "OSP is placing the notes on the keys.";
+        l.steps.push_back (map);
+        auto play = step ("play", "osp.keyboard", "Play the phrase's notes",
+                          "Play the keys. Each key plays the recorded note nearest to it, transposed as little as possible. Notes the phrase played more than once take turns, so repeated keys sound alive.",
+                          Completion::action ({ "note.played" }, Condition::state ("osp.source.mapped")));
+        play.requirements = { notesMapped() };
+        l.steps.push_back (play);
+        auto notes = step ("notes", "osp.source.notes", "See the notes",
+                           "Click NOTES on the card to see each note OSP found in the recording and the key it plays. Click a note to hear it; you can move it to another key or leave it out.",
+                           Completion::action ({ "notes.opened" }, Condition::state ("osp.source.notesOpen"))
+                               .withAlreadyDone (Condition::state ("osp.source.notesOpen"), "NOTES is already open."));
+        notes.revealOnEnter = false;
+        notes.requirements = { notesMapped() };
+        l.steps.push_back (notes);
+        l.steps.push_back (step ("any", "osp.source.card", "Any phrase works",
+                                 "A bass line, a sung melody or a solo instrument works the same way: drop it onto OSP or onto a card, choose MAP NOTES, and play. "
+                                 "Separate notes, one at a time, map best."));
+        l.completionText = "Your phrase is now an instrument of its own notes. NOTES shows them; the next lessons change how each note plays.";
+        setUp (l, { phraseLoaded() },
+               "Drag a recording of a phrase onto the empty sound area: a melody sung, hummed or played one note at a time. Or load the example phrase.");
+        c.lessons.push_back (l);
+    }
+    {
         Lesson l;
         l.id = "osp.playback";
         l.title = "One Shot & Granular";
@@ -302,7 +364,8 @@ static Catalog ospCatalog()
                                  "Switch layer B to Granular while layer A stays in One Shot (or the other way round). Each layer has its own playback mode.",
                                  Completion::action ({ param ("layerB.sourceMode") }, differ).withAlreadyDone (differ, "Already different")));
         l.steps.push_back (step ("third", "osp.header.menu", "A third layer",
-                                 "OSP holds up to three layers. Add a third recording the same way whenever you want a richer instrument."));
+                                 "OSP holds up to three layers. Add a third recording the same way whenever you want a richer instrument. "
+                                 "You can also just drop a sound or a phrase onto the instrument."));
         l.completionText = "Each layer has its own recording and its own playback controls. Together they play as one instrument.";
         setUp (l, { soundReady() }, "This lesson starts from one recording and adds a second. The example loads two contrasting sounds at once.");
         requireOn (l, { "play", "balance", "solo", "unsolo", "tune", "modes" }, twoLayers());
@@ -713,6 +776,17 @@ struct OspLearnTargets
                  [] (juce::Component& c) { return static_cast<EngineCard&> (c).reimaginedLabelBounds(); } });
         t.add ({ "osp.source.mode", [edited] { auto* c = edited(); return c != nullptr ? static_cast<juce::Component*> (c->modeSelector()) : nullptr; }, {}, {}, {}, true });
         t.add ({ "osp.source.eq", [edited] { auto* c = edited(); return c != nullptr ? static_cast<juce::Component*> (&c->eqToggle()) : nullptr; }, {}, {}, {}, true });
+        // MAP NOTES on the card's prompt (shown just after a phrase is dropped); once it has gone
+        // (pressed, or mapped already), the card itself.
+        t.add ({ "osp.source.mapNotes", [edited]() -> juce::Component* {
+                     auto* c = edited();
+                     if (c == nullptr)
+                         return nullptr;
+                     if (auto* prompt = c->mapNotesPromptComponent())
+                         return prompt;
+                     return c;
+                 },
+                 {}, {}, {}, true });
         t.add ({ "osp.source.notes", [edited] { auto* c = edited(); return c != nullptr ? static_cast<juce::Component*> (&c->notesToggle()) : nullptr; }, {}, {},
                  [edited] { auto* c = edited(); return c != nullptr && c->notesToggle().isVisible(); }, true });
         t.add ({ "osp.source.mute", [edited] { auto* c = edited(); return c != nullptr ? &c->muteKey() : nullptr; },
@@ -918,6 +992,14 @@ struct OspLearnTargets
             const auto inst = p.currentInstrument (p.editLayer());
             return playable (p.editLayer()) && inst->set != nullptr && inst->atlas == nullptr && inst->set->members.size() > 1;
         });
+        // A phrase: several notes asking MAP NOTES, or mapped already; mapping: asked for (the
+        // analysis running) or done; mapped: the notes are on the keys.
+        auto atlasOf = [&p] { const auto inst = p.currentInstrument (p.editLayer()); return inst != nullptr && inst->atlas != nullptr; };
+        auto mapping = [&p, atlasOf] { return atlasOf() || p.atlasActivity (p.editLayer()) != InstrumentHost::AtlasActivity::none; };
+        t.addState ("osp.source.phrase", [&p, mapping] { return p.mapNotesPrompt (p.editLayer()) > 0 || mapping(); });
+        t.addState ("osp.source.mapping", mapping);
+        t.addState ("osp.source.mapped", atlasOf);
+        t.addState ("osp.source.notesOpen", [&e, &p] { return e.engineCard (p.editLayer()).isNotesOpen(); });
         t.addState ("osp.source.granular", [&e, &p] { return e.engineCard (p.editLayer()).isGranular(); });
         t.addState ("osp.popup.reimagined.open", [&e, &p] { return e.popupIndex == OspAudioProcessorEditor::reimaginedPopup + p.editLayer(); });
         t.addState ("osp.popup.life.open", [&e] { return e.popupIndex == 0; });
@@ -1023,6 +1105,17 @@ void OspAudioProcessorEditor::createLearn()
         card.onKeyDna = [this, keyDna] (int l) {
             keyDna (l);
             learnAction ("keydna.opened", "osp.source.keyDna");
+        };
+        card.onMapNotesAnswer = [this] (int, bool yes) {
+            if (yes)
+                learnAction ("notes.mapped", "osp.source.mapNotes");
+        };
+        auto notesToggle = card.onNotesToggle;
+        card.onNotesToggle = [this, notesToggle, &card] (int l, bool open) {
+            if (notesToggle != nullptr)
+                notesToggle (l, open);
+            if (open && card.isNotesOpen())
+                learnAction ("notes.opened", "osp.source.notes");
         };
         auto reimagined = card.onReimagined;
         card.onReimagined = [this, reimagined] (int l) {

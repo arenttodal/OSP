@@ -95,6 +95,9 @@ public:
         their clicks. Never changes the sound. */
     void setLearnMode (bool on);
     bool learnMode() const noexcept { return inspecting; }
+    /** How long a done step waits before moving on by itself (0: never; tests). */
+    void setAutoAdvanceDelay (int milliseconds) noexcept { autoAdvanceMs = milliseconds; }
+    int autoAdvanceDelay() const noexcept { return autoAdvanceMs; }
     void inspect (const juce::String& targetId);
     /** Reset Tutorials... : asks first (Cancel / Reset Tutorials). */
     void confirmResetProgress();
@@ -180,6 +183,12 @@ private:
     /** A lesson just ended with nothing to choose: the tutorials open next (once the note that
         finished it has returned). */
     bool browserAfterLesson = false;
+    /** A step the musician has done moves on by itself after autoAdvanceMs (Next still moves at
+        once); the pause starts again while a control is still held. */
+    int autoAdvanceMs = 3000;
+    std::uint64_t doneGeneration = 0;
+    double doneSince = 0.0;
+    void autoAdvance();
     void openBrowserAfterLesson();
     bool offersRestoreChoice() const;
     juce::String lastScrolledTarget;
