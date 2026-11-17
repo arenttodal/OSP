@@ -134,6 +134,10 @@ public:
     void addSelectedToTray (int slot);
     void commitTray();
     void openSaveSheet();
+    /** The Save to Library sheet as a Starting State (true) or a preset (main menu entries). */
+    void openSaveSheet (bool startingState);
+    /** Install pack...: a file chooser, then the pack's confirmation (the main menu and the ⋯ menu). */
+    void chooseAndInstallPack();
     /** ANDOR Learn: the Save... key (it opens the save sheet). */
     juce::Component& saveKey() noexcept { return saveButton; }
     void openSettingsSheet();

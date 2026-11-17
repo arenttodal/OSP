@@ -145,6 +145,10 @@ public:
     static juce::Array<juce::File> findFiles (const juce::File& folder, const juce::String& extension);
     /** The preset last loaded or saved (empty if none): the browser marks and steps from it. */
     juce::File currentPresetFile() const { return lastPresetFile; }
+    /** SAVE may update the open preset in place: a user preset file this computer can write,
+        not a starting state, never a factory or pack preset (those are read-only: SAVE makes a
+        copy through Save As). */
+    bool canSaveInPlace() const;
     /** Loads the previous (-1) or next (+1) preset under `root` (default: the preset
         folder; a preset opened from elsewhere steps through its own folder), wrapping around. */
     bool stepPreset (int delta, const juce::File& root = presetFolder());

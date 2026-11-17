@@ -1669,15 +1669,7 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
         menu.addItem (juce::String::fromUTF8 ("Scan folder\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openScanSheet(); });
         menu.addItem (juce::String::fromUTF8 ("Inbox folders\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openSettingsSheet(); });
         menu.addSeparator();
-        menu.addItem (juce::String::fromUTF8 ("Install pack\xe2\x80\xa6"), [safe] {
-            if (safe == nullptr)
-                return;
-            safe->chooser = std::make_unique<juce::FileChooser> ("Install a pack", juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile ("Downloads"), "*.osppack");
-            safe->chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
-                if (safe != nullptr && fc.getResult().existsAsFile())
-                    safe->installPack (fc.getResult());
-            });
-        });
+        menu.addItem (juce::String::fromUTF8 ("Install pack\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->chooseAndInstallPack(); });
         menu.addItem (juce::String::fromUTF8 ("Packs\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openPacksSheet(); });
         menu.addSeparator();
         menu.addItem (juce::String::fromUTF8 ("Back up the Library\xe2\x80\xa6"), [safe] {
@@ -3202,7 +3194,22 @@ namespace
 
 void LibraryPanel::openSaveSheet()
 {
-    showSheet (std::make_unique<SaveSheet> (*this, processor, view == View::templates), "save");
+    openSaveSheet (view == View::templates);
+}
+
+void LibraryPanel::openSaveSheet (bool startingState)
+{
+    showSheet (std::make_unique<SaveSheet> (*this, processor, startingState), "save");
+}
+
+void LibraryPanel::chooseAndInstallPack()
+{
+    juce::Component::SafePointer<LibraryPanel> safe (this);
+    chooser = std::make_unique<juce::FileChooser> ("Install a pack", juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile ("Downloads"), "*.osppack");
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+        if (safe != nullptr && fc.getResult().existsAsFile())
+            safe->installPack (fc.getResult());
+    });
 }
 
 void LibraryPanel::openSettingsSheet()

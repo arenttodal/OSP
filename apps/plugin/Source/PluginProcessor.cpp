@@ -4113,6 +4113,18 @@ void OspAudioProcessor::initPatch()
     presetNameOverride = "INIT";
 }
 
+bool OspAudioProcessor::canSaveInPlace() const
+{
+    const auto file = lastPresetFile;
+    if (presetIsProgram || file == juce::File() || ! file.existsAsFile() || file.getFileExtension() != presetExtension || ! file.hasWriteAccess())
+        return false;
+    const auto places = packPlaces();
+    for (const auto& dir : { places.packsDir, places.factoryDir })
+        if (file.isAChildOf (juce::File (juce::String::fromUTF8 (dir.string().c_str()))))
+            return false;
+    return true;
+}
+
 bool OspAudioProcessor::saveStartingState (const juce::File& file)
 {
     auto xml = createStateXml();

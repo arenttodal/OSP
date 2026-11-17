@@ -391,6 +391,86 @@ juce::Font OspLookAndFeel::getPopupMenuFont()
     return fonts::make (13.5f, fonts::Weight::regular);
 }
 
+void OspLookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth, int& idealHeight)
+{
+    if (isSeparator)
+    {
+        idealWidth = 50;
+        idealHeight = 9;
+        return;
+    }
+    idealHeight = standardMenuItemHeight > 0 ? standardMenuItemHeight : popupRowHeight;
+    // Text, the gutter before it, and room after it for a chevron or a shortcut.
+    idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (getPopupMenuFont(), text)) + popupGutter + 30;
+}
+
+void OspLookAndFeel::drawPopupMenuSectionHeader (juce::Graphics& g, const juce::Rectangle<int>& area, const juce::String& sectionName)
+{
+    using namespace palette;
+    // A quiet label in small capitals, sitting low in its row, on the items' text line. (The
+    // groups' hairlines are the menus' own separators: a header cannot know whether it is first.)
+    g.setColour (textDim);
+    g.setFont (fonts::make (10.5f, fonts::Weight::semibold, 0.12f));
+    g.drawFittedText (sectionName, area.withTrimmedLeft (popupGutter).withTrimmedRight (12).withTrimmedTop (area.getHeight() / 3),
+                      juce::Justification::centredLeft, 1, 0.9f);
+}
+
+void OspLookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<int>& area, bool isSeparator, bool isActive, bool isHighlighted, bool isTicked,
+                                        bool hasSubMenu, const juce::String& text, const juce::String& shortcutKeyText, const juce::Drawable* icon,
+                                        const juce::Colour* textColour)
+{
+    using namespace palette;
+    if (isSeparator)
+    {
+        g.setColour (hairline);
+        g.fillRect (juce::Rectangle<int> (area.getX() + 10, area.getCentreY(), area.getWidth() - 20, 1));
+        return;
+    }
+    const auto row = area.reduced (4, 1).toFloat();
+    if (isHighlighted && isActive)
+    {
+        g.setColour (recessed);
+        g.fillRoundedRectangle (row, 4.0f);
+    }
+    const auto ink = (textColour != nullptr ? *textColour : palette::text).withMultipliedAlpha (isActive ? 1.0f : 0.38f);
+    // The gutter: a tick, or the item's icon.
+    const auto gutter = juce::Rectangle<float> (static_cast<float> (area.getX()) + 7.0f, static_cast<float> (area.getY()), 12.0f, static_cast<float> (area.getHeight()));
+    if (icon != nullptr)
+        icon->drawWithin (g, gutter.withSizeKeepingCentre (12.0f, 12.0f), juce::RectanglePlacement::centred, isActive ? 1.0f : 0.4f);
+    else if (isTicked)
+    {
+        const auto c = gutter.getCentre();
+        juce::Path tick;
+        tick.startNewSubPath (c.x - 4.0f, c.y);
+        tick.lineTo (c.x - 1.0f, c.y + 3.0f);
+        tick.lineTo (c.x + 4.5f, c.y - 3.5f);
+        g.setColour (ink);
+        g.strokePath (tick, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+    auto textArea = area.withTrimmedLeft (popupGutter).withTrimmedRight (12);
+    if (hasSubMenu)
+    {
+        const auto chevronBox = textArea.removeFromRight (10).toFloat().withSizeKeepingCentre (6.0f, 9.0f);
+        juce::Path chevron;
+        chevron.startNewSubPath (chevronBox.getX() + 1.0f, chevronBox.getY());
+        chevron.lineTo (chevronBox.getRight() - 1.0f, chevronBox.getCentreY());
+        chevron.lineTo (chevronBox.getX() + 1.0f, chevronBox.getBottom());
+        g.setColour (ink.withMultipliedAlpha (0.7f));
+        g.strokePath (chevron, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        textArea.removeFromRight (6);
+    }
+    if (shortcutKeyText.isNotEmpty())
+    {
+        g.setColour (textDim.withMultipliedAlpha (isActive ? 1.0f : 0.6f));
+        g.setFont (fonts::make (11.5f, fonts::Weight::regular, 0.02f));
+        g.drawText (shortcutKeyText, textArea, juce::Justification::centredRight, false);
+        textArea.removeFromRight (juce::roundToInt (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), shortcutKeyText)) + 12);
+    }
+    g.setColour (ink);
+    g.setFont (getPopupMenuFont());
+    g.drawFittedText (text, textArea, juce::Justification::centredLeft, 1, 0.9f);
+}
+
 void drawDropdownField (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text, bool hot, bool focused, bool enabled)
 {
     // As the racks' MODE field (ValueSelector, RackStyle::mode): drop, rim, light face.

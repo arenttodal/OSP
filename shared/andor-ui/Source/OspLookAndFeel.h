@@ -145,6 +145,14 @@ public:
 
     void drawPopupMenuBackground (juce::Graphics&, int width, int height) override;
     juce::Font getPopupMenuFont() override;
+    /** ANDOR's menus: one row height, text aligned under quiet section labels (small capitals,
+        a hairline above each group), a restrained highlight, shortcuts right-aligned. */
+    void drawPopupMenuItem (juce::Graphics&, const juce::Rectangle<int>& area, bool isSeparator, bool isActive, bool isHighlighted, bool isTicked, bool hasSubMenu,
+                            const juce::String& text, const juce::String& shortcutKeyText, const juce::Drawable* icon, const juce::Colour* textColour) override;
+    void drawPopupMenuSectionHeader (juce::Graphics&, const juce::Rectangle<int>& area, const juce::String& sectionName) override;
+    void getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth, int& idealHeight) override;
+    /** The left gutter (ticks) and the row height every menu shares. */
+    static constexpr int popupGutter = 24, popupRowHeight = 24;
     void drawLabel (juce::Graphics&, juce::Label&) override;
 
     /** The knob itself (also used where no Slider exists, e.g. snapshots). */

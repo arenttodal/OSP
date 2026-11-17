@@ -76,6 +76,9 @@ public:
         Reset Tutorials... (and Restore Previous Sound while a sound kept before an example
         can be restored). */
     void addMenuItems (juce::PopupMenu&);
+    /** The same entries flat, for a menu's SUPPORT section: Tutorials..., Restore Previous Sound
+        (while it can), Reset Tutorials... (Nothing when Learn is unavailable.) */
+    void addSupportItems (juce::PopupMenu&);
     /** A control's committed gesture (see actions::). Only user origins can complete steps. */
     void userAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId, Origin);
     void userAction (const LearnEvent&);

@@ -224,10 +224,10 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     presetBar.onSaveStartingState = [this] { saveStartingState(); };
     presetBar.onOpenLibrary = [this] { openLibrary(); };
     content.addAndMakeVisible (presetBar);
-    savePresetButton.onClick = [this] { choosePresetFile (true, false); };
+    savePresetButton.onClick = [this] { saveInstrument(); };
     content.addAndMakeVisible (savePresetButton);
     content.addAndMakeVisible (volume);
-    menuButton.setTooltip ("Sounds, presets, instruments, undo, size");
+    menuButton.setTooltip ("Instrument, sources, content, preferences, support");
     menuButton.onClick = [this] { showMenu(); };
     content.addAndMakeVisible (menuButton);
     setWantsKeyboardFocus (true);
@@ -1172,87 +1172,136 @@ void OspAudioProcessorEditor::filesDropped (const juce::StringArray& files, int 
 //==============================================================================
 // Menus
 
-void OspAudioProcessorEditor::addLayerSection (juce::PopupMenu& menu, int layer, bool header)
+namespace
 {
+    juce::String ellipsis() { return juce::String::fromUTF8 ("\xe2\x80\xa6"); }
+
+    /** A menu item showing its shortcut at the right (only shortcuts OSP really handles). */
+    juce::PopupMenu::Item itemWithShortcut (const juce::String& text, bool enabled, juce::KeyPress key, std::function<void()> action)
+    {
+        juce::PopupMenu::Item item (text);
+        item.setEnabled (enabled);
+        item.setAction (std::move (action));
+        item.shortcutKeyDescription = key.getTextDescriptionWithIcons();
+        return item;
+    }
+}
+
+juce::PopupMenu OspAudioProcessorEditor::sourceMenu (int layer)
+{
+    // One menu for every source, addressed by its own letter (never A by default): SOURCE,
+    // AUDIO and MANAGEMENT, each showing only what this source's state makes meaningful.
     const auto letter = OspAudioProcessor::layerName (layer);
     const auto loaded = ospProcessor.currentInstrument (layer);
-    if (header)
-        menu.addSectionHeader ("Layer " + letter + (loaded != nullptr ? dot + juce::String::fromUTF8 (loaded->filename.c_str()) : juce::String()));
+    const bool busy = ospProcessor.loadState (layer) == OspAudioProcessor::LoadState::loading;
     juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
-    menu.addItem ("Replace sound" + juce::String::fromUTF8 ("\xe2\x80\xa6"), [safe, layer] { if (safe != nullptr) safe->chooseFile (layer, false); });
-    menu.addItem ("Load example", [safe, layer] { if (safe != nullptr) safe->ospProcessor.replaceLayer ({}, layer), safe->ospProcessor.loadExample (layer); });
+    juce::PopupMenu menu;
+    menu.addSectionHeader ("SOURCE " + letter + (loaded != nullptr ? dot + juce::String::fromUTF8 (loaded->filename.c_str()) : juce::String (dot + "empty")));
+
+    // SOURCE: what this slot holds.
+    menu.addItem ((loaded != nullptr ? "Replace audio" : "Load audio") + ellipsis(), [safe, layer] { if (safe != nullptr) safe->chooseFile (layer, false); });
+    menu.addItem ("Load example", ! busy, false, [safe, layer] { if (safe != nullptr) safe->ospProcessor.replaceLayer ({}, layer), safe->ospProcessor.loadExample (layer); });
+    if (ospProcessor.liveCapture())
+        menu.addItem ("Record audio" + ellipsis(), ! busy, cards[static_cast<std::size_t> (layer)]->isCaptureOpen(), [safe, layer] {
+            if (safe == nullptr)
+                return;
+            auto& card = *safe->cards[static_cast<std::size_t> (layer)];
+            card.setCaptureOpen (! card.isCaptureOpen());
+        });
+
+    // AUDIO: the recording's analysis and mapping (a loaded sound only).
+    if (loaded != nullptr)
     {
-        juce::PopupMenu root;
-        const auto overrideMidi = ospProcessor.rootOverride (layer);
-        root.addItem ("Auto (detected)", true, ! overrideMidi.has_value(), [safe, layer] { if (safe != nullptr) safe->ospProcessor.changeRootOverride (std::nullopt, layer); });
-        for (int octave = 0; octave <= 8; ++octave)
+        menu.addSeparator();
+        menu.addSectionHeader ("AUDIO");
         {
-            juce::PopupMenu notes;
-            for (int note = 12 * (octave + 1); note < 12 * (octave + 2) && note < 128; ++note)
-                notes.addItem (juce::String (midiNoteName (note)), true, overrideMidi && std::lround (*overrideMidi) == note,
-                               [safe, layer, note] { if (safe != nullptr) safe->ospProcessor.changeRootOverride (static_cast<double> (note), layer); });
-            root.addSubMenu ("Octave " + juce::String (octave), notes);
+            juce::PopupMenu root;
+            const auto overrideMidi = ospProcessor.rootOverride (layer);
+            root.addItem ("Auto (detected)", true, ! overrideMidi.has_value(), [safe, layer] { if (safe != nullptr) safe->ospProcessor.changeRootOverride (std::nullopt, layer); });
+            for (int octave = 0; octave <= 8; ++octave)
+            {
+                juce::PopupMenu notes;
+                for (int note = 12 * (octave + 1); note < 12 * (octave + 2) && note < 128; ++note)
+                    notes.addItem (juce::String (midiNoteName (note)), true, overrideMidi && std::lround (*overrideMidi) == note,
+                                   [safe, layer, note] { if (safe != nullptr) safe->ospProcessor.changeRootOverride (static_cast<double> (note), layer); });
+                root.addSubMenu ("Octave " + juce::String (octave), notes);
+            }
+            menu.addSubMenu ("Root" + (overrideMidi ? ": " + juce::String (midiNoteName (static_cast<int> (std::lround (*overrideMidi)))) : juce::String (": auto")), root);
         }
-        menu.addSubMenu ("Root" + (overrideMidi ? ": " + juce::String (midiNoteName (static_cast<int> (std::lround (*overrideMidi)))) : juce::String (": auto")),
-                         root, loaded != nullptr);
-    }
-    // Phase 5: a recording becomes an instrument of its notes (MAP NOTES), and back.
-    if (loaded != nullptr && loaded->atlas == nullptr && loaded->set == nullptr)
-        menu.addItem (juce::String::fromUTF8 ("Map notes\xe2\x80\xa6"), ospProcessor.canMapNotes (layer), false, [safe, layer] {
-            if (safe == nullptr)
-                return;
-            safe->ospProcessor.mapNotes (layer, phrase::Detection::normal);
-            safe->timerCallback();
-            safe->learnAction ("notes.mapped", "osp.source.mapNotes");
-        });
-    if (loaded != nullptr && loaded->atlas != nullptr)
-    {
-        const auto* card = cards[static_cast<std::size_t> (layer)].get();
-        menu.addItem ("Notes", true, card != nullptr && card->isNotesOpen(), [safe, layer] {
-            if (safe == nullptr)
-                return;
-            auto& c = *safe->cards[static_cast<std::size_t> (layer)];
-            c.onNotesToggle (layer, ! c.isNotesOpen());
-        });
-        juce::PopupMenu detect;
-        const auto current = InstrumentHost::detectionOf (*loaded->atlas);
-        const bool busy = ospProcessor.atlasActivity (layer) != InstrumentHost::AtlasActivity::none;
-        for (const auto d : { phrase::Detection::fewer, phrase::Detection::normal, phrase::Detection::more })
-            detect.addItem (juce::String (phrase::toString (d)).toUpperCase() + " notes", ! busy, d == current, [safe, layer, d] {
-                if (safe != nullptr)
-                    safe->ospProcessor.mapNotes (layer, d), safe->timerCallback();
+        // A recording becomes an instrument of its notes (MAP NOTES), and back.
+        if (loaded->atlas == nullptr && loaded->set == nullptr)
+            menu.addItem ("Map notes" + ellipsis(), ospProcessor.canMapNotes (layer), false, [safe, layer] {
+                if (safe == nullptr)
+                    return;
+                safe->ospProcessor.mapNotes (layer, phrase::Detection::normal);
+                safe->timerCallback();
+                safe->learnAction ("notes.mapped", "osp.source.mapNotes");
             });
-        menu.addSubMenu ("Detect notes again", detect, loaded->atlas->analysis.version > 0);
-        menu.addItem ("Play as one sample", [safe, layer] {
-            if (safe != nullptr)
-                safe->ospProcessor.playAsOneSample (layer), safe->timerCallback();
-        });
+        if (loaded->atlas != nullptr)
+        {
+            const auto* card = cards[static_cast<std::size_t> (layer)].get();
+            menu.addItem ("Notes", true, card != nullptr && card->isNotesOpen(), [safe, layer] {
+                if (safe == nullptr)
+                    return;
+                auto& c = *safe->cards[static_cast<std::size_t> (layer)];
+                c.onNotesToggle (layer, ! c.isNotesOpen());
+            });
+            juce::PopupMenu detect;
+            const auto current = InstrumentHost::detectionOf (*loaded->atlas);
+            const bool analysing = ospProcessor.atlasActivity (layer) != InstrumentHost::AtlasActivity::none;
+            for (const auto d : { phrase::Detection::fewer, phrase::Detection::normal, phrase::Detection::more })
+                detect.addItem (juce::String (phrase::toString (d)).toUpperCase() + " notes", ! analysing, d == current, [safe, layer, d] {
+                    if (safe != nullptr)
+                        safe->ospProcessor.mapNotes (layer, d), safe->timerCallback();
+                });
+            menu.addSubMenu ("Detect notes again", detect, loaded->atlas->analysis.version > 0);
+            menu.addItem ("Play as one sample", [safe, layer] {
+                if (safe != nullptr)
+                    safe->ospProcessor.playAsOneSample (layer), safe->timerCallback();
+            });
+        }
+        if (loaded->set != nullptr)
+            menu.addItem ("Samples", true, samplesShown && ospProcessor.editLayer() == layer, [safe, layer] {
+                if (safe == nullptr)
+                    return;
+                safe->ospProcessor.setEditLayer (layer);
+                safe->samplesShown = ! safe->samplesShown;
+                safe->samplesPanel.setVisible (safe->samplesShown);
+                safe->samplesPanel.setInstrument (safe->ospProcessor.currentInstrument (layer), layer);
+                safe->updateFocus();
+                if (safe->samplesShown)
+                    safe->learnAction ("samples.opened", "osp.samples");
+            });
+        // The recording's file: where it was dropped from, else its copy in the sample store.
+        const juce::File original (juce::String::fromUTF8 (loaded->originalPath.c_str())), stored (juce::String::fromUTF8 (loaded->storedPath.c_str()));
+        const auto file = original.existsAsFile() ? original : stored;
+        if (loaded->set == nullptr && loaded->atlasSources.size() <= 1 && file.existsAsFile())
+            menu.addItem ("Reveal source file", [file] { file.revealToUser(); });
     }
-    menu.addItem ("Samples", loaded != nullptr && loaded->set != nullptr, samplesShown && ospProcessor.editLayer() == layer, [safe, layer] {
-        if (safe == nullptr)
-            return;
-        safe->ospProcessor.setEditLayer (layer);
-        safe->samplesShown = ! safe->samplesShown;
-        safe->samplesPanel.setVisible (safe->samplesShown);
-        safe->samplesPanel.setInstrument (safe->ospProcessor.currentInstrument (layer), layer);
-        safe->updateFocus();
-        if (safe->samplesShown)
-            safe->learnAction ("samples.opened", "osp.samples");
-    });
-    // Removing a loaded sound asks once more (a sub-menu), and can be restored from the menu.
+
+    // MANAGEMENT
+    menu.addSeparator();
+    menu.addSectionHeader ("MANAGEMENT");
+    menu.addItem ("Reset source settings", ospProcessor.isLayerOccupied (layer) || ospProcessor.isKeptEmptySlot (layer), false,
+                  [safe, layer] { if (safe != nullptr) safe->ospProcessor.resetLayerControls (layer), safe->timerCallback(); });
+    // Removing asks once more (a sub-menu); the removed source can be restored from the main menu.
     juce::PopupMenu confirm;
-    confirm.addItem ("Remove " + (loaded != nullptr ? juce::String::fromUTF8 (loaded->filename.c_str()) : "layer " + letter),
+    confirm.addItem ("Remove " + (loaded != nullptr ? juce::String::fromUTF8 (loaded->filename.c_str()) : "source " + letter),
                      [safe, layer] { if (safe != nullptr) safe->ospProcessor.removeLayer (layer), safe->timerCallback(); });
-    menu.addSubMenu ("Remove layer " + letter, confirm, (ospProcessor.isLayerOccupied (layer) || ospProcessor.isKeptEmptySlot (layer))
-                                                            && ospProcessor.loadState (layer) != OspAudioProcessor::LoadState::loading);
+    menu.addSubMenu ("Remove source " + letter, confirm, (ospProcessor.isLayerOccupied (layer) || ospProcessor.isKeptEmptySlot (layer)) && ! busy);
+    return menu;
 }
 
 void OspAudioProcessorEditor::showLayerMenu (int layer, juce::Component& target)
 {
     ospProcessor.setEditLayer (layer);
     updateFocus();
-    juce::PopupMenu menu;
-    addLayerSection (menu, layer, false);
+    auto menu = sourceMenu (layer);
+    if (showMenuForTest != nullptr)
+    {
+        showMenuForTest (menu);
+        return;
+    }
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (target).withDeletionCheck (*this));
 }
 
@@ -1280,76 +1329,86 @@ void OspAudioProcessorEditor::openNewLayerCapture()
     layoutSources (false);
 }
 
-void OspAudioProcessorEditor::showMenu()
+juce::PopupMenu OspAudioProcessorEditor::mainMenu()
 {
+    // Global actions only (each source's own are on its card): INSTRUMENT, SOURCES, CONTENT,
+    // PREFERENCES and SUPPORT. No development command appears here.
     juce::PopupMenu menu;
     juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
     const int count = ospProcessor.occupiedLayerCount();
-    if (count < OspAudioProcessor::numLayers)
-        menu.addItem (count == 0 ? juce::String::fromUTF8 ("Load sound\xe2\x80\xa6") : juce::String::fromUTF8 ("Add layer\xe2\x80\xa6"),
-                      [safe] { if (safe != nullptr) safe->chooseFile (-1, true); });
-    if (count == 0)
-        menu.addItem ("Load example", [safe] { if (safe != nullptr) { safe->ospProcessor.resetLayerControls (0); safe->ospProcessor.loadExample (0); } });
-    if (count < OspAudioProcessor::numLayers && ospProcessor.liveCapture())
-        menu.addItem (juce::String::fromUTF8 (count == 0 ? "Record\xe2\x80\xa6" : "Record into a new layer\xe2\x80\xa6"),
-                      [safe] { if (safe != nullptr) safe->openNewLayerCapture(); });
+    const auto command = juce::ModifierKeys::commandModifier;
+
+    menu.addSectionHeader ("INSTRUMENT");
+    menu.addItem ("New instrument", [safe] {
+        if (safe == nullptr)
+            return;
+        safe->ospProcessor.initPatch();
+        safe->presetBar.refresh();
+        safe->timerCallback();
+    });
+    menu.addItem ("Save instrument", [safe] { if (safe != nullptr) safe->saveInstrument(); });
+    menu.addItem ("Save as" + ellipsis(), [safe] { if (safe != nullptr) safe->choosePresetFile (true, false); });
+    menu.addItem ("Open instrument" + ellipsis(), [safe] { if (safe != nullptr) safe->openInstrumentFile(); });
+    menu.addItem (itemWithShortcut ("Open Library", true, juce::KeyPress ('l', command, 0), [safe] {
+        if (safe != nullptr)
+        {
+            safe->openLibrary();
+            safe->learnAction ("library.opened", "osp.library");
+        }
+    }));
+    menu.addItem (itemWithShortcut ("Undo " + ospProcessor.undoManager.getUndoDescription(), ospProcessor.undoManager.canUndo(), juce::KeyPress ('z', command, 0),
+                                    [safe] { if (safe != nullptr) safe->ospProcessor.undoManager.undo(); }));
+    menu.addItem (itemWithShortcut ("Redo " + ospProcessor.undoManager.getRedoDescription(), ospProcessor.undoManager.canRedo(),
+                                    juce::KeyPress ('z', command | juce::ModifierKeys::shiftModifier, 0),
+                                    [safe] { if (safe != nullptr) safe->ospProcessor.undoManager.redo(); }));
+
+    // SOURCES: the instrument's set of sources (one source's own actions are on its card).
+    menu.addSeparator();
+    menu.addSectionHeader ("SOURCES");
+    menu.addItem ("Add source" + ellipsis(), count < OspAudioProcessor::numLayers, false, [safe] { if (safe != nullptr) safe->chooseFile (-1, true); });
+    if (ospProcessor.liveCapture())
+        menu.addItem ("Record new source" + ellipsis(), count < OspAudioProcessor::numLayers, false, [safe] { if (safe != nullptr) safe->openNewLayerCapture(); });
     if (ospProcessor.canRestoreRemovedLayer())
-        menu.addItem ("Restore removed layer", [safe] { if (safe != nullptr) safe->ospProcessor.restoreRemovedLayer(), safe->timerCallback(); });
-    if (ospProcessor.slotCount() > 0)
-        addLayerSection (menu, ospProcessor.editLayer(), true);
+        menu.addItem ("Restore removed source", [safe] { if (safe != nullptr) safe->ospProcessor.restoreRemovedLayer(), safe->timerCallback(); });
     {
         // Every sound out, every setting and slot kept (a sub-menu asks once more).
         juce::PopupMenu confirm;
-        confirm.addItem ("Clear all samples (settings are kept)", [safe] {
+        confirm.addItem ("Clear all sources (settings are kept)", [safe] {
             if (safe != nullptr)
                 safe->ospProcessor.clearAllSamples(), safe->timerCallback();
         });
-        menu.addSubMenu ("Clear all samples", confirm, count > 0);
+        menu.addSubMenu ("Clear all sources", confirm, count > 0);
     }
-    menu.addSeparator();
 
-    // The user's presets and instruments, by folder (sub-folders become sub-menus).
-    auto browse = [this] (const juce::File& folder, const juce::String& extension, bool instrument) {
-        juce::PopupMenu list;
-        std::map<juce::String, juce::PopupMenu> subFolders;
-        const auto current = ospProcessor.currentPresetFile();
-        juce::Component::SafePointer<OspAudioProcessorEditor> editor (this);
-        for (const auto& file : OspAudioProcessor::findFiles (folder, extension))
-        {
-            const auto parent = file.getParentDirectory();
-            auto& target = parent == folder ? list : subFolders[parent.getRelativePathFrom (folder)];
-            target.addItem (file.getFileNameWithoutExtension(), true, ! instrument && file == current, [editor, file, instrument] {
-                if (editor == nullptr)
-                    return;
-                juce::String error;
-                const bool ok = instrument ? editor->ospProcessor.importInstrument (file, error) : editor->ospProcessor.loadPreset (file);
-                editor->ospProcessor.showMessage (ok ? "Opened " + file.getFileNameWithoutExtension() : (error.isEmpty() ? "Could not open " + file.getFileName() : error));
-                editor->timerCallback();
-            });
-        }
-        for (auto& [name, sub] : subFolders)
-            list.addSubMenu (name, sub);
-        if (list.getNumItems() == 0)
-            list.addItem (instrument ? "No instruments yet" : "No presets yet", false, false, [] {});
-        list.addSeparator();
-        list.addItem ("Show folder", [folder] {
-            folder.createDirectory();
-            folder.revealToUser();
-        });
-        return list;
-    };
-    menu.addItem (juce::String::fromUTF8 ("Library\xe2\x80\xa6"), [safe] { if (safe != nullptr) { safe->openLibrary(); safe->learnAction ("library.opened", "osp.library"); } });
-    menu.addSubMenu ("Presets", browse (OspAudioProcessor::presetFolder(), OspAudioProcessor::presetExtension, false));
-    menu.addItem ("Open preset file...", [safe] { if (safe != nullptr) safe->choosePresetFile (false, false); });
+    // CONTENT: reusable states, portable instruments and packs.
     menu.addSeparator();
-    menu.addSubMenu ("Instruments", browse (OspAudioProcessor::instrumentFolder(), OspAudioProcessor::instrumentExtension, true));
-    menu.addItem ("Export instrument...", count > 0, false, [safe] { if (safe != nullptr) safe->choosePresetFile (true, true); });
-    menu.addItem ("Open instrument file...", [safe] { if (safe != nullptr) safe->choosePresetFile (false, true); });
+    menu.addSectionHeader ("CONTENT");
+    menu.addItem ("Save as Starting State" + ellipsis(), [safe] {
+        if (safe == nullptr)
+            return;
+        safe->openLibrary (LibraryPanel::View::templates);
+        if (auto* library = safe->libraryWindow())
+            library->openSaveSheet (true);
+    });
+    menu.addItem ("Export portable instrument" + ellipsis(), count > 0, false, [safe] { if (safe != nullptr) safe->choosePresetFile (true, true); });
+    menu.addItem ("Import pack" + ellipsis(), [safe] {
+        if (safe == nullptr)
+            return;
+        safe->openLibrary();
+        if (auto* library = safe->libraryWindow())
+            library->chooseAndInstallPack();
+    });
+    menu.addItem ("Manage packs" + ellipsis(), [safe] {
+        if (safe == nullptr)
+            return;
+        safe->openLibrary();
+        if (auto* library = safe->libraryWindow())
+            library->openPacksSheet();
+    });
+
+    // PREFERENCES
     menu.addSeparator();
-    menu.addItem ("Undo " + ospProcessor.undoManager.getUndoDescription(), ospProcessor.undoManager.canUndo(), false,
-                  [safe] { if (safe != nullptr) safe->ospProcessor.undoManager.undo(); });
-    menu.addItem ("Redo " + ospProcessor.undoManager.getRedoDescription(), ospProcessor.undoManager.canRedo(), false,
-                  [safe] { if (safe != nullptr) safe->ospProcessor.undoManager.redo(); });
+    menu.addSectionHeader ("PREFERENCES");
     juce::PopupMenu size;
     for (int percent : { 80, 100, 125, 150, 200 })
         size.addItem (juce::String (percent) + " %", true, std::abs (ospProcessor.uiScale() * 100.0f - static_cast<float> (percent)) < 1.0f,
@@ -1360,15 +1419,113 @@ void OspAudioProcessorEditor::showMenu()
                           safe->setScaleFactor (safe->ospProcessor.uiScale());
                       });
     menu.addSubMenu ("Interface size", size);
-    // (Advanced is the SETTINGS key's, Info the INFO key's: beneath ARP.)
+    menu.addItem ("Library settings" + ellipsis(), [safe] {
+        if (safe == nullptr)
+            return;
+        safe->openLibrary();
+        if (auto* library = safe->libraryWindow())
+            library->openSettingsSheet();
+    });
+
+    // SUPPORT
+    menu.addSeparator();
+    menu.addSectionHeader ("SUPPORT");
     if (learn != nullptr)
-        learn->addMenuItems (menu);   // LEARN: Tutorials..., Reset Tutorials...
+        learn->addSupportItems (menu);   // Tutorials..., Reset Tutorials...
+    menu.addItem ("About ANDOR OSP", [safe] { if (safe != nullptr) safe->showAbout(); });
+    return menu;
+}
+
+void OspAudioProcessorEditor::showMenu()
+{
+    auto menu = mainMenu();
     if (showMenuForTest != nullptr)
     {
         showMenuForTest (menu);
         return;
     }
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (menuButton).withDeletionCheck (*this));
+    // Under its key, its right edge on the key's (the key is at the window's right: a menu that
+    // opened rightwards from it would leave the plugin).
+    const int width = popupMenuWidth (menu);
+    const auto key = menuButton.getScreenBounds();
+    menu.showMenuAsync (juce::PopupMenu::Options()
+                            .withTargetScreenArea (juce::Rectangle<int> (key.getRight() - width, key.getY(), width, key.getHeight()))
+                            .withMinimumWidth (width)
+                            .withDeletionCheck (*this));
+}
+
+int OspAudioProcessorEditor::popupMenuWidth (const juce::PopupMenu& menu)
+{
+    // The width the look gives this menu's widest row (its text and shortcut), as JUCE measures it.
+    int widest = 120;
+    for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+    {
+        const auto& item = it.getItem();
+        if (item.isSeparator)
+            continue;
+        int w = 0, h = 0;
+        const auto measured = item.shortcutKeyDescription.isNotEmpty() ? item.text + "      " + item.shortcutKeyDescription : item.text;
+        lookAndFeel.getIdealPopupMenuItemSize (measured, false, -1, w, h);
+        if (item.isSectionHeader)
+            w += w / 4;
+        widest = std::max (widest, w);
+    }
+    return widest;
+}
+
+void OspAudioProcessorEditor::saveInstrument()
+{
+    // SAVE: the open user preset is updated in place (its Library record, tags, favourite and
+    // collections stay). A starting state, a factory or pack preset, or a new patch: Save As.
+    if (ospProcessor.canSaveInPlace())
+    {
+        const auto file = ospProcessor.currentPresetFile();
+        const bool ok = ospProcessor.savePreset (file);
+        ospProcessor.showMessage (ok ? "Saved " + file.getFileNameWithoutExtension() : "Could not save " + file.getFileName());
+        if (ok)
+            learnAction ("preset.saved", "osp.header.save");
+        presetBar.refresh();
+        timerCallback();
+        return;
+    }
+    choosePresetFile (true, false);
+}
+
+void OspAudioProcessorEditor::openInstrumentFile()
+{
+    // One chooser for a preset and a portable instrument: the file's type decides.
+    auto folder = OspAudioProcessor::presetFolder();
+    folder.createDirectory();
+    chooser = std::make_unique<juce::FileChooser> ("Open instrument", folder,
+                                                   juce::String ("*") + OspAudioProcessor::presetExtension + ";*" + OspAudioProcessor::instrumentExtension);
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this] (const juce::FileChooser& fc) {
+        const auto file = fc.getResult();
+        if (file == juce::File())
+            return;
+        const bool portable = file.hasFileExtension (OspAudioProcessor::instrumentExtension);
+        juce::String error;
+        const bool ok = portable ? ospProcessor.importInstrument (file, error) : ospProcessor.loadPreset (file);
+        ospProcessor.showMessage (ok ? "Opened " + file.getFileNameWithoutExtension() : (error.isEmpty() ? "Could not open " + file.getFileName() : error));
+        if (ok)
+            learnAction (portable ? "instrument.opened" : "preset.opened", "osp.header.menu");
+        presetBar.refresh();
+        timerCallback();
+    });
+}
+
+void OspAudioProcessorEditor::showAbout()
+{
+    juce::String text;
+    text << "Version " << JucePlugin_VersionString << "\n"
+         << "Built " << __DATE__ << "\n\n"
+         << "One tonal recording, an expressive instrument.";
+    juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                      .withIconType (juce::MessageBoxIconType::NoIcon)
+                                      .withTitle ("ANDOR OSP")
+                                      .withMessage (text)
+                                      .withButton ("Close")
+                                      .withAssociatedComponent (this),
+                                  nullptr);
 }
 
 void OspAudioProcessorEditor::saveStartingState()

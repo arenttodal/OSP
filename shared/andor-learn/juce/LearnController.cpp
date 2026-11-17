@@ -106,6 +106,26 @@ void LearnController::addMenuItems (juce::PopupMenu& menu)
     menu.addSubMenu ("Learn", sub);
 }
 
+void LearnController::addSupportItems (juce::PopupMenu& menu)
+{
+    if (! usable)
+        return;
+    juce::WeakReference<LearnController> weak (this);
+    menu.addItem ("Tutorials" + ellipsis(), [weak] {
+        if (weak != nullptr)
+            weak->openBrowser();
+    });
+    if (hooks.canRestoreSound != nullptr && hooks.canRestoreSound())
+        menu.addItem ("Restore Previous Sound", [weak] {
+            if (weak != nullptr)
+                weak->restorePreviousSound();
+        });
+    menu.addItem ("Reset Tutorials" + ellipsis(), [weak] {
+        if (weak != nullptr)
+            weak->confirmResetProgress();
+    });
+}
+
 void LearnController::userAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId, Origin origin)
 {
     LearnEvent e;

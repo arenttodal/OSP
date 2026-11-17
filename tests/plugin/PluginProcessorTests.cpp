@@ -8159,6 +8159,8 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "FinalPolishTests.inc"
 #include "FinalPolishShots.inc"
 #include "BuiltInStatesTests.inc"
+#include "MenuShots.inc"
+#include "MenuArchitectureTests.inc"
 
 TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives the knob, not the halo overlay) opens its modulation menu", "[ui][andor-ui][rightclick]")
 {
@@ -8520,14 +8522,14 @@ TEST_CASE ("plugin: keyboard utility keys - LIBRARY, SETTINGS and INFO (no AUX k
         CHECK_FALSE (keys.isActive (UA::info));
         CHECK (values() == before);
 
-        // The menu: no Advanced settings, no Toggle Info; Learn holds Tutorials / Reset Tutorials.
+        // The menu: no Advanced settings, no Toggle Info; SUPPORT holds Tutorials / Reset Tutorials.
         juce::PopupMenu shown;
         editor->showMenuForTest = [&] (juce::PopupMenu& m) { shown = m; };
         editor->openMainMenu();
         juce::StringArray texts;
         for (juce::PopupMenu::MenuItemIterator it (shown, true); it.next();)
             texts.add (it.getItem().text);
-        CHECK (texts.contains ("Learn"));
+        CHECK (texts.contains ("SUPPORT"));
         CHECK (texts.contains (juce::String::fromUTF8 ("Tutorials\xe2\x80\xa6")));
         CHECK (texts.contains (juce::String::fromUTF8 ("Reset Tutorials\xe2\x80\xa6")));
         for (const auto& gone : { "Advanced settings", "Advanced Settings", "Toggle Info", "Show AUX", "Hide AUX" })
