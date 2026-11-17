@@ -8,6 +8,7 @@
 #include <cmath>
 #include <filesystem>
 #include <functional>
+#include <iterator>
 
 namespace osp::plugin::tutorial
 {
@@ -80,6 +81,23 @@ namespace
         return out;
     }
 
+    /** A sung phrase: one vowel per note, 0.8 s each with 0.2 s of quiet between, the way a
+        melody hummed or played one note at a time is. A, C, E and A again, then back down:
+        the repeated notes are takes of the same pitch, so the keys take turns between them. */
+    AudioData sungPhrase()
+    {
+        const int keys[] = { 57, 60, 64, 69, 64, 60, 57 };
+        const auto note = static_cast<std::int64_t> (0.8 * rate), gap = static_cast<std::int64_t> (0.2 * rate);
+        auto audio = AudioData::allocate (1, static_cast<std::int64_t> (std::size (keys)) * (note + gap) + gap, rate);
+        for (std::size_t k = 0; k < std::size (keys); ++k)
+        {
+            const auto v = testsignals::vowel (hzOf (keys[k]), 0.8, rate, 0x9a0 + k, 0.5, 1);
+            const auto start = gap + static_cast<std::int64_t> (k) * (note + gap);
+            std::copy (v.channels[0].begin(), v.channels[0].begin() + note, audio.channels[0].begin() + start);
+        }
+        return audio;
+    }
+
     struct Spec
     {
         juce::String filename;
@@ -96,6 +114,8 @@ namespace
                 return { { "Tutorial Pluck A3.wav", [] { return testsignals::pluck (hzOf (57.0), 1.6, rate, 0x91c4, 0.7, 1); } } };
             case Example::voice:
                 return { { "Tutorial Voice A3.wav", [] { return testsignals::vowel (hzOf (57.0), 5.0, rate, 0x7a3, 0.5, 2); } } };
+            case Example::phrase:
+                return { { "Tutorial Phrase A3.wav", [] { return sungPhrase(); } } };
             case Example::layered:
             {
                 auto bowed = specs (Example::bowed);
@@ -132,13 +152,14 @@ juce::String idOf (Example e)
         case Example::voice: return "voice";
         case Example::layered: return "layered";
         case Example::pluckSet: return "pluckSet";
+        case Example::phrase: return "phrase";
     }
     return {};
 }
 
 std::optional<Example> fromId (const juce::String& id)
 {
-    for (auto e : { Example::bowed, Example::pluck, Example::voice, Example::layered, Example::pluckSet })
+    for (auto e : { Example::bowed, Example::pluck, Example::voice, Example::layered, Example::pluckSet, Example::phrase })
         if (idOf (e) == id)
             return e;
     return std::nullopt;
@@ -153,6 +174,7 @@ juce::String nameOf (Example e)
         case Example::voice: return "the voice";
         case Example::layered: return "the layered example";
         case Example::pluckSet: return "the pluck set";
+        case Example::phrase: return "the sung phrase";
     }
     return {};
 }

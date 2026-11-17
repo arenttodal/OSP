@@ -1,5 +1,67 @@
 # Status
 
+> **17 Nov 2026, Library & Preset Browser polish (branch `claude/osp-library-polish`;
+> `docs/research/library-polish/`, before/after shots):**
+> - **Space:** plays, pauses (keeping the position) and resumes the selected sound.
+>   - It used to restart every time: `previewSelected()` always called `play()`, and the
+>     engine had no pause.
+>   - One press gives one transition (key-repeat is eaten).
+>   - A 3 ms ramp is used: `PreviewEngine::playFrom` / `pause`, `Audition::Transport`.
+> - **Removed:** LOAD TO A/B/C, Load to First Empty, Keys play the instrument and Load to
+>   Instrument. A drop on **SOURCES A B C** loads into that source at once (recoverable).
+> - **STARTING STATES:** tiles above the PRESETS and TEMPLATES lists, by program index (a user
+>   preset called Natural stays a preset).
+> - **Sounds rows:** name first; Root, Type and Length quiet. The inspector is reordered.
+> - **Library glyph:** the leaning book is at 5°.
+
+> **17 Nov 2026, USER MACROS V1.2: ANDOR ANALOG's USER MACROS ported into OSP (branch
+> `claude/osp-user-macros`, on `claude/osp-atlas-refine`; `docs/research/osp-user-macros/`):**
+> - **Macros:** six USER macros (`userMacro.1..6`) behind a CORE / USER folder tab on the macro
+>   panel. Each moves up to eight controls, with an anchored range and no jump when assigned.
+> - **Engine and state:**
+>   - offsets are summed and clamped once, before modulation, gliding in ~20 ms;
+>   - an unassigned macro is bit-exact;
+>   - the `UserMacros` state is stateVersion 17;
+>   - the bank shown is a preference of this computer (Documents/OSP/Interface.xml).
+> - **Shared code:**
+>   - core, state, edits and panel are in `src/engine/usermacro` and `shared/andor-ui`
+>     (UserMacroCore, UserMacroAssignments, UserMacroEditor);
+>   - the editor glue is the new `UserMacroController`;
+>   - `LiveParam` routes every parameter read through the offsets.
+> - **Interface:**
+>   - lens drag, pick mode, the right-click menu "Assign to Macro" (overlay and knob);
+>   - range ends on the halos;
+>   - rename, the label menu, the panel above the name;
+>   - Learn lesson "Create a macro".
+> - **Coverage:** 491 of 872 parameters (`01-coverage.md`).
+> - **CPU:** about +0.3 % of real time with 48 moving assignments.
+> - **NEXT:**
+>   - ANDOR ANALOG's `ShellEditor` replaces its own copy of the glue with
+>     `UserMacroController` when its OSP pin moves (FxRouting.h header collisions block that
+>     build today);
+>   - a manual pass in Logic and Ableton (automation of `userMacro.N`, right-click routing).
+
+> **17 Nov 2026, NOTE ATLAS refinements and tutorials (branch `claude/osp-atlas-refine`, for
+> review; `docs/research/note-atlas-refinements.md`):**
+> - **Round robin with LOOP off:** not reproduced. Selection is the same with LOOP on or off, and
+>   LOOP off only removes the "cannot loop" filter. Regression tests added (engine and plugin).
+> - **FADE IN / FADE OUT:**
+>   - under SPEED in NOTES, per note, in output time;
+>   - LOOP off only (dimmed with LOOP on), clamped on short notes;
+>   - saved in the atlas mapping; 0 / 0 is bit-identical.
+> - **NOTES lights the regions the voices really play** (member identity published with the read
+>   heads): round robin, FILL and chords. A voice whose recording has ended shows no read head.
+> - **Footer: LIBRARY, SETTINGS, INFO** (KeyboardUtilityActions::Action::library). LIBRARY
+>   opens and closes the existing Library.
+> - **Learn:**
+>   - "From a phrase to an instrument" comes after the Quick Start, with a sung example phrase,
+>     MAP NOTES and NOTES;
+>   - a done step moves on by itself after 3 s;
+>   - Layering's last step says a sound or phrase can just be dropped.
+> - **NEXT:**
+>   - ANDOR Analog gets the 3-second auto-advance when its OSP pin moves;
+>   - a lesson for Record (live capture), SYNTH and FX ROUTING.
+
 > **16 Nov 2026, Learn: every lesson ends in the tutorials; the Quick Start ends on INFO (both
 > instruments, shared `shared/andor-learn`):**
 > - A finished lesson opens the tutorials, with its tick, instead of the "Lesson complete" note.

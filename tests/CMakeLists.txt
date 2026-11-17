@@ -13,6 +13,7 @@ add_executable(osp_tests
     unit/AdsrTests.cpp
     unit/SubTests.cpp
     unit/ShortLoopTests.cpp
+    unit/UserMacroCoreTests.cpp
     unit/SamplerTests.cpp
     unit/AudioFileTests.cpp
     unit/JsonTests.cpp
@@ -64,6 +65,8 @@ add_executable(osp_tests
     integration/GrainPhase2Tests.cpp
     integration/AtlasSetTests.cpp
     integration/AtlasShortSustainTests.cpp
+    integration/AtlasRoundRobinTests.cpp
+    integration/AtlasEdgeFadeTests.cpp
     integration/PedalLoopIntegrationTests.cpp
     integration/AtlasStagedTests.cpp
     integration/GrainBudgetStressTests.cpp

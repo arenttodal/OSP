@@ -244,6 +244,7 @@ void InstrumentEngine::publishGrains() noexcept
                 continue;
             snapshot.playheadPosition[static_cast<std::size_t> (heads)].store (where, std::memory_order_relaxed);
             snapshot.playheadLevel[static_cast<std::size_t> (heads)].store (level, std::memory_order_relaxed);
+            snapshot.playheadMember[static_cast<std::size_t> (heads)].store (voice.member(), std::memory_order_relaxed);
             ++heads;
         }
         snapshot.playheads.store (heads, std::memory_order_release);
@@ -810,11 +811,13 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     double referenceVelocity = 100.0;
     double registerDb = 0.0;
     bool setMember = false, layered = false;
+    int memberIndex = -1;
     if (set != nullptr && (set->members.size() > 1 || set->restrictsKeys()))
     {
         const int index = memberFor (note, velocity, eventIndex, layerNumber);
         if (index >= 0)
         {
+            memberIndex = index;
             const auto& member = set->members[static_cast<std::size_t> (index)];
             const auto& group = set->groups[static_cast<std::size_t> (member.pitchGroup)];
             model = member.model.get();
@@ -833,6 +836,7 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     }
     InstrumentVoiceStart params;
     params.model = model;
+    params.member = memberIndex;
     params.shape = shapeFor (model, note, velocity, eventIndex, referenceVelocity, registerDb, setMember, layered);
     params.layer = &model->layerFor (static_cast<double> (note), config.pitchCharacter);
     // REIMAGINED modes other than KALEIDOSCOPE make their own pitch from the recording
@@ -892,7 +896,16 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.reverse = layerSettings.reverse;
     params.follow = layerSettings.follow;
     if (const auto* set = slots[context].set; set != nullptr)
+    {
         params.speed = set->speed;   // SPEED (atlas sets; file sets keep 1)
+        // FADE IN / OUT: a note played once (LOOP off). With LOOP on the loop's own crossfades
+        // keep its edges smooth, so the values are kept but not applied.
+        if (! layerSettings.loop)
+        {
+            params.edgeFadeInSeconds = set->noteFadeInMs / 1000.0;
+            params.edgeFadeOutSeconds = set->noteFadeOutMs / 1000.0;
+        }
+    }
     params.synthesize = &slots[context].synthesizeLive;
     params.synthBlend = config.synthBlend;
     params.synthEnvelope = config.synthEnvelope;

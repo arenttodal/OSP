@@ -43,6 +43,9 @@ enum class PedalLoopMode
 struct InstrumentVoiceStart
 {
     const InstrumentModel* model = nullptr;
+    /** The set member it plays (index into InstrumentSet::members; -1: not a set member). The
+        displays show exactly this recording (round robin, FILL), never a guess. */
+    int member = -1;
     const PitchLayer* layer = nullptr;
     int note = 60;
     int velocity = 100;
@@ -87,6 +90,10 @@ struct InstrumentVoiceStart
     /** SPEED: how fast the note moves through its recording, pitch kept (1: as recorded,
         the plain read; 0.3..2). Not in Granular or REIMAGINED modes. */
     double speed = 1.0;
+    /** FADE IN / FADE OUT (Note Atlas, LOOP off): fades at the note's own audible start and end,
+        in seconds of playback (output time, so transposition and SPEED keep their length).
+        Applied to the recording only (never SYNTH), in One Shot; 0 / 0: none. */
+    double edgeFadeInSeconds = 0.0, edgeFadeOutSeconds = 0.0;
     /** PEDAL LOOP of the layer as the note starts (kept for the note's life). */
     PedalLoopMode pedalLoop = PedalLoopMode::normal;
     /** SATELLITE of the layer (InstrumentEngine's, read each render), and with BOUNCE + NOTE
@@ -176,12 +183,15 @@ public:
     /** KEY DNA AMOUNT as this voice applies it now (smoothed; 1 without a profile). */
     double keyDnaAmountNow() const noexcept { return keyDnaAmountApplied; }
     int grainCount() const noexcept { return granularMode ? granularSource.grainCount() : 0; }
+    /** The set member this voice plays (InstrumentVoiceStart::member; -1: none). */
+    int member() const noexcept { return memberIndex; }
     /** One Shot voices: where the read head is (0..1 of the recording the display shows: a
         Note Atlas note reads inside its own region of the phrase) and how loud the note is
         now (envelope, 0..1), for the display. False for granular or idle voices. */
     bool playhead (float& where, float& level) const noexcept
     {
-        if (! active || granularMode || layer == nullptr || layer->source == nullptr)
+        // (once the recording has ended - SYNTH holding the note on - nothing reads it)
+        if (! active || granularMode || sourceEnded || layer == nullptr || layer->source == nullptr)
             return false;
         const auto frames = static_cast<double> (std::max<std::int64_t> (1, layer->source->numFrames()));
         const double read = modeEngine != nullptr && modeEngine->sourcePosition() >= 0.0 ? modeEngine->sourcePosition() : position;
@@ -281,6 +291,7 @@ private:
 
     const SincInterpolator* sinc = nullptr;
     const InstrumentModel* currentModel = nullptr;
+    int memberIndex = -1;
     const PitchLayer* layer = nullptr;
     const ContinuationModel* cont = nullptr;
     Adsr envelope;
@@ -373,6 +384,13 @@ private:
     float dampingCoef = 1.0f;
     float attackRamp = 1.0f;       // soft-attack fade-in
     float attackRampStep = 0.0f;
+    // FADE IN / FADE OUT (InstrumentVoiceStart::edgeFade*): the note's edge fades, in output
+    // samples, on the recording only. edgeOutGain never jumps up (a PEDAL LOOP taking the note
+    // over mid-fade brings it back over 5 ms).
+    bool edgeFades = false;
+    double edgeInSamples = 0.0, edgeOutSamples = 0.0, edgeElapsed = 0.0, edgeEndFrame = 0.0;
+    float edgeOutGain = 1.0f, edgeRise = 0.0f;
+    float edgeGain() noexcept;
     double settleCents = 0.0;
     double settleCoef = 1.0;
     float panLeft = 1.0f, panRight = 1.0f;

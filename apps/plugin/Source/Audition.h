@@ -98,6 +98,25 @@ public:
     /** Plays tray slots (bit 0 = A) or, with mask 1 << browserSlot, the browser's preview. */
     void play (unsigned slotMask);
     void stop();
+
+    /** The browser preview's transport (Space and the inspector's play key share it): one
+        state, never "playing and paused". Stopped -> plays from the start; playing -> pauses,
+        keeping the position; paused -> resumes there. A preview that ran to its end is stopped
+        again (the next press restarts it). `key` names the sound the press is for (its asset
+        id, or "file:<path>"): a press for another sound than the paused one starts that sound
+        from its start - a paused recording is never resumed for the wrong row. `startFresh`
+        starts `key` from the beginning (preparing it when it is not ready). */
+    enum class Transport { stopped, playing, paused };
+    void toggleBrowser (const std::string& key, const std::function<void()>& startFresh);
+    /** The selection moved, the view changed, a drag began: the browser preview stops (a short
+        fade), its transport stopped. Tray auditions and keyboard notes keep sounding. */
+    void stopBrowser();
+    /** Where the transport is now (a finished preview reads stopped). */
+    Transport browserTransport();
+    /** The browser preview's position: the playhead while playing, the kept one while paused,
+        -1 when stopped. */
+    double browserPosition();
+    const std::string& browserKey() const noexcept { return transportKey; }
     const Slot& slot (int index) const;   ///< 0..2 the tray, 3 the browser preview
     bool trayEmpty() const;
     double playheadSeconds (int slot) const { return engine.playheadSeconds (slot); }
@@ -148,6 +167,12 @@ private:
     void changed();
     /** From a background thread: run on the message thread at the next deliver(). */
     void post (std::function<void()> onMessageThread);
+    void updateTransport();
+    Transport transport = Transport::stopped;
+    std::string transportKey;
+    double pausedAt = 0.0, lastHead = 0.0;
+    bool heard = false;                 ///< the audio thread has reported this play's playhead
+    juce::uint32 readySince = 0;        ///< when the sound was ready to play (a host that never renders: the play ends)
     std::map<std::string, std::vector<float>> overviews;   ///< by asset id (message thread)
     std::set<std::string> overviewsPending;
     std::mutex doneMutex;

@@ -27,7 +27,8 @@ enum class Example
     pluck,
     voice,
     layered,
-    pluckSet
+    pluckSet,
+    phrase   ///< a sung phrase of seven notes (MAP NOTES makes it an instrument)
 };
 
 juce::String idOf (Example);

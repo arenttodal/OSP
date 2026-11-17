@@ -81,6 +81,31 @@ namespace
         return r;
     }
 
+    /** The edited layer holds a recording of several notes (asking MAP NOTES), or its mapped notes. */
+    Requirement phraseLoaded()
+    {
+        Requirement r;
+        r.id = "osp.phrase";
+        r.holds = Condition::state ("osp.source.phrase");
+        r.title = "A phrase is needed";
+        r.body = "This lesson needs a recording of several notes, one after another: a melody sung, hummed or played. Drag one onto OSP, or load the example phrase.";
+        r.targetId = "osp.source.dropZone";
+        return r;
+    }
+
+    /** The edited layer's notes are mapped (MAP NOTES has run). */
+    Requirement notesMapped()
+    {
+        Requirement r;
+        r.id = "osp.mapped";
+        r.holds = Condition::state ("osp.source.mapped");
+        r.title = "The notes are not mapped yet";
+        r.body = juce::String::fromUTF8 ("Click MAP NOTES on the card, or choose Map notes\xe2\x80\xa6 from the card's menu.");
+        r.targetId = "osp.source.mapNotes";
+        r.offerExample = false;
+        return r;
+    }
+
     Requirement granular()
     {
         Requirement r;
@@ -204,6 +229,43 @@ static Catalog ospCatalog()
         c.lessons.push_back (l);
     }
     {
+        // Right after the Quick Start: a phrase (a melody of separate notes) dropped in becomes
+        // an instrument of its own notes.
+        Lesson l;
+        l.id = "osp.phrase";
+        l.title = "From a phrase to an instrument";
+        l.description = "Drop a melody and play its own notes from the keys.";
+        l.minutes = 3;
+        l.exampleId = "phrase";
+        auto map = step ("map", "osp.source.mapNotes", "Map its notes",
+                         "OSP heard several notes in the recording. Click MAP NOTES: each note it finds is placed on its own key, so every key plays a real recorded note.",
+                         Completion::action ({ "notes.mapped" }, Condition::state ("osp.source.mapping"))
+                             .withAlreadyDone (Condition::state ("osp.source.mapped"), "The notes are already mapped."));
+        map.unavailableBody = juce::String::fromUTF8 ("MAP NOTES appears on the card just after a recording of several notes is dropped. If it has gone, choose Map notes\xe2\x80\xa6 from the card's menu.");
+        map.revealOnEnter = false;
+        map.doneText = "OSP is placing the notes on the keys.";
+        l.steps.push_back (map);
+        auto play = step ("play", "osp.keyboard", "Play the phrase's notes",
+                          "Play the keys. Each key plays the recorded note nearest to it, transposed as little as possible. Notes the phrase played more than once take turns, so repeated keys sound alive.",
+                          Completion::action ({ "note.played" }, Condition::state ("osp.source.mapped")));
+        play.requirements = { notesMapped() };
+        l.steps.push_back (play);
+        auto notes = step ("notes", "osp.source.notes", "See the notes",
+                           "Click NOTES on the card to see each note OSP found in the recording and the key it plays. Click a note to hear it; you can move it to another key or leave it out.",
+                           Completion::action ({ "notes.opened" }, Condition::state ("osp.source.notesOpen"))
+                               .withAlreadyDone (Condition::state ("osp.source.notesOpen"), "NOTES is already open."));
+        notes.revealOnEnter = false;
+        notes.requirements = { notesMapped() };
+        l.steps.push_back (notes);
+        l.steps.push_back (step ("any", "osp.source.card", "Any phrase works",
+                                 "A bass line, a sung melody or a solo instrument works the same way: drop it onto OSP or onto a card, choose MAP NOTES, and play. "
+                                 "Separate notes, one at a time, map best."));
+        l.completionText = "Your phrase is now an instrument of its own notes. NOTES shows them; the next lessons change how each note plays.";
+        setUp (l, { phraseLoaded() },
+               "Drag a recording of a phrase onto the empty sound area: a melody sung, hummed or played one note at a time. Or load the example phrase.");
+        c.lessons.push_back (l);
+    }
+    {
         Lesson l;
         l.id = "osp.playback";
         l.title = "One Shot & Granular";
@@ -302,7 +364,8 @@ static Catalog ospCatalog()
                                  "Switch layer B to Granular while layer A stays in One Shot (or the other way round). Each layer has its own playback mode.",
                                  Completion::action ({ param ("layerB.sourceMode") }, differ).withAlreadyDone (differ, "Already different")));
         l.steps.push_back (step ("third", "osp.header.menu", "A third layer",
-                                 "OSP holds up to three layers. Add a third recording the same way whenever you want a richer instrument."));
+                                 "OSP holds up to three layers. Add a third recording the same way whenever you want a richer instrument. "
+                                 "You can also just drop a sound or a phrase onto the instrument."));
         l.completionText = "Each layer has its own recording and its own playback controls. Together they play as one instrument.";
         setUp (l, { soundReady() }, "This lesson starts from one recording and adds a second. The example loads two contrasting sounds at once.");
         requireOn (l, { "play", "balance", "solo", "unsolo", "tune", "modes" }, twoLayers());
@@ -565,6 +628,68 @@ static Catalog ospCatalog()
         c.lessons.push_back (l);
     }
     {
+        // USER MACROS (ANDOR ANALOG's lesson, on the edited layer's LEVEL).
+        Lesson l;
+        l.id = "osp.usermacros";
+        l.title = "Create a macro";
+        l.description = "Control several settings with one knob.";
+        l.minutes = 3;
+        l.exampleId = "pluck";
+        auto user = step ("user", "macros.bank", "Open USER macros",
+                          "Click USER above the main macro knobs. This bank holds six knobs you can assign to settings anywhere in OSP.",
+                          Completion::action ({ "macroBank.changed" }, Condition::state ("macros.bank.user"))
+                              .withAlreadyDone (Condition::state ("macros.bank.user"), "The USER bank is already open."));
+        user.doneText = "The USER bank is open.";
+        user.revealOnEnter = false;
+        l.steps.push_back (user);
+        auto menu = step ("menu", "osp.source.level", "Choose a setting", "Find the layer's LEVEL knob on the card. Right-click it to open its menu.",
+                          Completion::action ({ "control.menu.opened" }, Condition::always()));
+        menu.advanceWhenDone = true;   // (its menu is open now: the next step speaks to it)
+        l.steps.push_back (menu);
+        auto assign = step ("assign", "osp.source.level", "Assign Macro 1",
+                            "Choose Assign to Macro, then Macro 1. LEVEL is now moved by Macro 1, from where it is: nothing jumps.",
+                            Completion::action ({ "usermacro.assigned" }, Condition::state ("osp.usermacro.1.level"))
+                                .withAlreadyDone (Condition::state ("osp.usermacro.1.level"), "LEVEL is already assigned to Macro 1."));
+        assign.doneText = "Macro 1 now moves LEVEL.";
+        assign.outlineTarget = false;   // (the instruction is about the menu: the note sits by the knob)
+        assign.unavailableBody = "Right-click the layer's LEVEL knob again to open its menu.";
+        l.steps.push_back (assign);
+        Requirement assigned;
+        assigned.id = "osp.usermacro.assigned";
+        assigned.holds = Condition::state ("osp.usermacro.1.level");
+        assigned.title = "Assign Macro 1 first";
+        assigned.body = "Right-click the layer's LEVEL knob and choose Assign to Macro, then Macro 1.";
+        assigned.targetId = "osp.source.level";
+        assigned.offerExample = false;
+        auto range = step ("range", "osp.source.level", "Set the range",
+                           "The coloured arc around LEVEL is the range Macro 1 moves it through. Drag either end of the arc to change it.",
+                           Completion::action ({ "usermacro.range.changed" }, Condition::state ("osp.usermacro.1.level")));
+        range.doneText = "The range is set.";
+        range.requirements = { assigned };
+        l.steps.push_back (range);
+        auto turn = step ("turn", "usermacro.0", "Turn Macro 1",
+                          "Turn Macro 1 in the USER bank and play. The arc around LEVEL shows where it is now; the LEVEL knob itself stays where you set it.",
+                          Completion::action ({ "usermacro.0.touched" }, Condition::changed ("userMacro.1")));
+        turn.doneText = "Macro 1 moved LEVEL.";
+        turn.keepClear = { "osp.source.level" };
+        Requirement shown;
+        shown.id = "osp.usermacro.bank";
+        shown.holds = Condition::state ("macros.bank.user");
+        shown.title = "Open the USER bank";
+        shown.body = "Macro 1 is in the USER bank. Click USER above the main knobs.";
+        shown.targetId = "macros.bank";
+        shown.offerExample = false;
+        turn.requirements = { assigned, shown };
+        l.steps.push_back (turn);
+        auto review = step ("review", "usermacro.0.label", "Review the assignment",
+                            "Click the macro's name to see its assignments: LOW and HIGH, + ADD ASSIGNMENT for more settings, REMOVE. A double-click renames it.");
+        review.revealLabel = "Open USER";
+        l.steps.push_back (review);
+        l.completionText = "Macro 1 now moves LEVEL. One macro can move up to eight settings, each with its own range; the macros are saved with the sound.";
+        setUp (l, { soundReady() }, "A macro needs a sound to move: use your current one, or the plucked example.");
+        c.lessons.push_back (l);
+    }
+    {
         Lesson l;
         l.id = "osp.presets";
         l.title = "Presets and instruments";
@@ -625,6 +750,9 @@ static Catalog ospCatalog()
     help ("osp.macro.movement", "MOVEMENT", "How the sound changes over time: DRIFT, TAPE, CHORUS, PULSE or SHAPER. The knob sets how much.", "osp.sound");
     help ("osp.macro.echo", "ECHO", "Repeats of the sound (TAPE, BBD or ASCEND). The knob sets how loud they are; 0 % is off.", "osp.sound");
     help ("osp.macro.space", "SPACE", "Reverb: the knob sets how much. Click the name for ROOM, HALL, PLATE, SPRING and the other spaces.", "osp.sound");
+    help ("macros.bank", "CORE and USER macros",
+          "CORE holds the six main sound controls. USER holds six macros you assign yourself: right-click a knob and choose Assign to Macro, or drag the light under a USER knob onto it.",
+          "osp.usermacros");
     help ("osp.arp.control", "ARP", "Plays the notes you hold as a repeating pattern. The light switches it on; the rest of the key opens its settings.", "osp.arp");
     help ("osp.sub.row", "SUB", "A sub-bass one or two octaves below the keys you hold, added after the effects. The light switches it on; the row opens WAVE, GRIT, LEVEL and its key range.",
           "osp.sub");
@@ -638,6 +766,8 @@ static Catalog ospCatalog()
     help ("osp.advanced", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
     help ("keyboard.settings", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
     help ("keyboard.info", "Info", "Turn Info on to read explanations of OSP's controls as you point to them.");
+    help ("keyboard.library", "Library",
+          "Opens the Library: starting states, presets and your sounds. In Sounds: select a sound, press Space to play or pause, drag it onto a source. Click the key again to close it.");
     help ("osp.wheel.pitch", "Pitch Bend", "The pitch wheel bends notes up or down as you move it. Click PITCH beneath the wheel to set how far it bends.");
     help ("osp.wheel.mod", "Mod Wheel", "The modulation wheel controls assigned parameters while you play. Click MOD beneath the wheel to set up vibrato. The wheel can continue controlling other parameters at the same time.",
           "osp.vibrato");
@@ -675,6 +805,7 @@ struct OspLearnTargets
             for (const char* id : { "osp.advanced", "keyboard.settings", "advanced" })
                 t.add ({ id, key (UA::settings), {}, {}, {}, true });
             t.add ({ "keyboard.info", key (UA::info), {}, {}, {}, true });
+            t.add ({ "keyboard.library", key (UA::library), {}, {}, {}, true });
         }
         // The wheels' captions (their doors), and VIBRATO's controls in MOD's popover.
         t.add ({ "osp.wheel.pitch", comp (e.pitchWheel), [&e] (juce::Component&) { return e.pitchWheel.captionArea().expanded (3.0f).getSmallestIntegerContainer(); }, {}, {}, true });
@@ -713,6 +844,17 @@ struct OspLearnTargets
                  [] (juce::Component& c) { return static_cast<EngineCard&> (c).reimaginedLabelBounds(); } });
         t.add ({ "osp.source.mode", [edited] { auto* c = edited(); return c != nullptr ? static_cast<juce::Component*> (c->modeSelector()) : nullptr; }, {}, {}, {}, true });
         t.add ({ "osp.source.eq", [edited] { auto* c = edited(); return c != nullptr ? static_cast<juce::Component*> (&c->eqToggle()) : nullptr; }, {}, {}, {}, true });
+        // MAP NOTES on the card's prompt (shown just after a phrase is dropped); once it has gone
+        // (pressed, or mapped already), the card itself.
+        t.add ({ "osp.source.mapNotes", [edited]() -> juce::Component* {
+                     auto* c = edited();
+                     if (c == nullptr)
+                         return nullptr;
+                     if (auto* prompt = c->mapNotesPromptComponent())
+                         return prompt;
+                     return c;
+                 },
+                 {}, {}, {}, true });
         t.add ({ "osp.source.notes", [edited] { auto* c = edited(); return c != nullptr ? static_cast<juce::Component*> (&c->notesToggle()) : nullptr; }, {}, {},
                  [edited] { auto* c = edited(); return c != nullptr && c->notesToggle().isVisible(); }, true });
         t.add ({ "osp.source.mute", [edited] { auto* c = edited(); return c != nullptr ? &c->muteKey() : nullptr; },
@@ -766,6 +908,28 @@ struct OspLearnTargets
                          return knob.getLocalArea (&e.content, r);
                      }, {}, {}, true });
             t.add ({ id + ".label", [&m] { return static_cast<juce::Component*> (m.label.get()); } });
+        }
+        // USER MACROS: the CORE | USER tab (a click reports "macroBank.changed"), the six USER knobs
+        // (touches: "usermacro.N.touched"; Show me opens USER, an interface preference) and their names.
+        if (e.userMacroController != nullptr)
+        {
+            auto& um = *e.userMacroController;
+            t.add ({ "macros.bank", [&um] { return static_cast<juce::Component*> (um.tab()); }, {}, {}, {}, true });
+            t.addState ("macros.bank.user", [&um] { return um.bankShown() == 1; });
+            auto showUser = [&um] { um.showBank (1); return um.bankShown() == 1; };
+            for (int i = 0; i < frame::macroCount; ++i)
+            {
+                auto& knob = um.row()[static_cast<std::size_t> (i)];
+                t.add ({ "usermacro." + juce::String (i) + ".label",
+                         [&um, &knob] { return um.bankShown() == 1 ? static_cast<juce::Component*> (knob.label.get()) : nullptr; }, {}, showUser });
+                t.add ({ "usermacro." + juce::String (i), [&um, &knob] { return um.bankShown() == 1 ? static_cast<juce::Component*> (&knob.slider) : nullptr; }, {},
+                         showUser, {}, false, true });
+            }
+            // Macro 1 moves the edited layer's LEVEL (that exact assignment, not merely any).
+            t.addState ("osp.usermacro.1.level", [&p] {
+                const auto* s = p.userMacroAssignments();
+                return s != nullptr && s->find (0, InstrumentHost::layerParameterId (p.editLayer(), "level")) >= 0;
+            });
         }
         t.add ({ "osp.macros", comp (e.content), [&e] (juce::Component&) {
                      juce::Rectangle<int> all;
@@ -918,6 +1082,14 @@ struct OspLearnTargets
             const auto inst = p.currentInstrument (p.editLayer());
             return playable (p.editLayer()) && inst->set != nullptr && inst->atlas == nullptr && inst->set->members.size() > 1;
         });
+        // A phrase: several notes asking MAP NOTES, or mapped already; mapping: asked for (the
+        // analysis running) or done; mapped: the notes are on the keys.
+        auto atlasOf = [&p] { const auto inst = p.currentInstrument (p.editLayer()); return inst != nullptr && inst->atlas != nullptr; };
+        auto mapping = [&p, atlasOf] { return atlasOf() || p.atlasActivity (p.editLayer()) != InstrumentHost::AtlasActivity::none; };
+        t.addState ("osp.source.phrase", [&p, mapping] { return p.mapNotesPrompt (p.editLayer()) > 0 || mapping(); });
+        t.addState ("osp.source.mapping", mapping);
+        t.addState ("osp.source.mapped", atlasOf);
+        t.addState ("osp.source.notesOpen", [&e, &p] { return e.engineCard (p.editLayer()).isNotesOpen(); });
         t.addState ("osp.source.granular", [&e, &p] { return e.engineCard (p.editLayer()).isGranular(); });
         t.addState ("osp.popup.reimagined.open", [&e, &p] { return e.popupIndex == OspAudioProcessorEditor::reimaginedPopup + p.editLayer(); });
         t.addState ("osp.popup.life.open", [&e] { return e.popupIndex == 0; });
@@ -981,7 +1153,7 @@ void OspAudioProcessorEditor::createLearn()
     {
         // INFO only where Learn runs (never a key that looks as if it works).
         learn.reset();
-        utilityKeys.setActions ({ KeyboardUtilityActions::Action::settings });
+        utilityKeys.setActions ({ KeyboardUtilityActions::Action::library, KeyboardUtilityActions::Action::settings });
         refreshUtilityKeys();
         return;
     }
@@ -1023,6 +1195,17 @@ void OspAudioProcessorEditor::createLearn()
         card.onKeyDna = [this, keyDna] (int l) {
             keyDna (l);
             learnAction ("keydna.opened", "osp.source.keyDna");
+        };
+        card.onMapNotesAnswer = [this] (int, bool yes) {
+            if (yes)
+                learnAction ("notes.mapped", "osp.source.mapNotes");
+        };
+        auto notesToggle = card.onNotesToggle;
+        card.onNotesToggle = [this, notesToggle, &card] (int l, bool open) {
+            if (notesToggle != nullptr)
+                notesToggle (l, open);
+            if (open && card.isNotesOpen())
+                learnAction ("notes.opened", "osp.source.notes");
         };
         auto reimagined = card.onReimagined;
         card.onReimagined = [this, reimagined] (int l) {
@@ -1099,11 +1282,11 @@ void OspAudioProcessorEditor::createLearn()
     samplesPanel.onUserEdit = [this] (const juce::String& what) { learnAction ("samples." + what, "osp.samples"); };
 }
 
-void OspAudioProcessorEditor::learnAction (const juce::String& actionId, const juce::String& targetId)
+void OspAudioProcessorEditor::learnAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId)
 {
     // Called only from the handlers of the musician's own clicks, drops and keys.
     if (learn != nullptr)
-        learn->userAction (actionId, targetId, {}, andor::learn::Origin::userPointer);
+        learn->userAction (actionId, targetId, parameterId, andor::learn::Origin::userPointer);
 }
 
 void OspAudioProcessorEditor::tickLearn()

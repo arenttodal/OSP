@@ -127,6 +127,32 @@ void LearnController::userAction (const LearnEvent& event)
     openBrowserAfterLesson();
 }
 
+void LearnController::autoAdvance()
+{
+    // Done by the musician (never "already so": that waits for Continue), the step moves on by
+    // itself after a short pause, so the lesson flows; Next still moves at once.
+    using State = LessonRunner::State;
+    if (autoAdvanceMs <= 0 || shownNote != NoteKind::lesson || lessonRunner.state() != State::stepComplete
+        || lessonRunner.status (lessonRunner.stepIndex()) != LessonRunner::StepStatus::done)
+    {
+        doneSince = 0.0;
+        return;
+    }
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (doneSince <= 0.0 || doneGeneration != lessonRunner.generation() || lessonRunner.gestureActive())
+    {
+        // (a knob still held: the pause starts when it is let go)
+        doneGeneration = lessonRunner.generation();
+        doneSince = now;
+        return;
+    }
+    if (now - doneSince >= static_cast<double> (autoAdvanceMs))
+    {
+        doneSince = 0.0;
+        noteAction ("next");
+    }
+}
+
 bool LearnController::offersRestoreChoice() const
 {
     const auto* lesson = lessonRunner.lesson();
@@ -186,6 +212,7 @@ void LearnController::tick()
     }
     if (! isActive())
         return;
+    autoAdvance();
     if (inspecting)
         followPointer();
     // Controls rebuilt since (a routing view created on demand) are watched again.

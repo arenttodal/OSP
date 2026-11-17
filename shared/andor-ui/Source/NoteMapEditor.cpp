@@ -79,6 +79,32 @@ namespace
     }
     juce::String speedText (double speed) { return juce::String (juce::roundToInt (100.0 * speed)) + " %"; }
 
+    // FADE IN / FADE OUT's steps (ms of playback): fine near zero, where clicks are cured.
+    constexpr std::array<double, 14> fadeInSteps { 0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0, 50.0, 75.0, 100.0 };
+    constexpr std::array<double, 17> fadeOutSteps { 0.0, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0, 50.0, 75.0, 100.0, 150.0, 200.0, 300.0, 500.0 };
+    template <std::size_t N>
+    double nextStep (const std::array<double, N>& steps, double value, int direction)
+    {
+        if (direction > 0)
+        {
+            for (const auto s : steps)
+                if (s > value + 1.0e-6)
+                    return s;
+            return steps.back();
+        }
+        for (auto it = steps.rbegin(); it != steps.rend(); ++it)
+            if (*it < value - 1.0e-6)
+                return *it;
+        return steps.front();
+    }
+    juce::String fadeText (double ms)
+    {
+        // Below 10 ms a tenth where it is one (0.5 ms); whole milliseconds above.
+        if (ms < 10.0 && std::abs (ms - std::round (ms)) > 1.0e-6)
+            return juce::String (ms, 1) + " ms";
+        return juce::String (juce::roundToInt (ms)) + " ms";
+    }
+
     constexpr float edgeGrab = 5.0f;
     constexpr float rowHeight = 24.0f;
     constexpr float rowGap = 5.0f;
@@ -159,7 +185,10 @@ void NoteMapEditor::refresh()
     const bool changedStage = now != instrument;
     if (! changedAtlas && ! changedStage && nowActivity == activity && nowState == loadState && nowConflicts == conflicts && nowReport == report
         && nowLoop == loopOn)
+    {
+        refreshPlayback();
         return;
+    }
     instrument = now;
     atlas = nowAtlas;
     activity = nowActivity;
@@ -177,6 +206,46 @@ void NoteMapEditor::refresh()
     }
     rebuildInspector();
     repaint();
+    refreshPlayback();
+}
+
+void NoteMapEditor::refreshPlayback()
+{
+    // The voices' own read heads (the engine's lock-free snapshot, read at the editor's rate):
+    // each names the member it plays, so the region lit is the take actually heard. Only the
+    // regions whose state changed are repainted.
+    std::vector<std::string> nowSounding;
+    std::vector<std::int64_t> nowHeads;
+    const auto current = host.currentInstrument (layer);
+    if (current != nullptr && current == instrument && current->set != nullptr && atlas != nullptr)
+    {
+        const auto& snapshot = host.grainSnapshot (layer);
+        const int count = std::clamp (snapshot.playheads.load (std::memory_order_acquire), 0, InstrumentEngine::GrainSnapshot::playheadCapacity);
+        const auto total = static_cast<double> (sourceFrames());
+        const auto& members = current->set->members;
+        for (int i = 0; i < count; ++i)
+        {
+            const auto index = static_cast<std::size_t> (i);
+            const int m = snapshot.playheadMember[index].load (std::memory_order_relaxed);
+            if (m < 0 || m >= static_cast<int> (members.size()))
+                continue;
+            const auto& id = members[static_cast<std::size_t> (m)].regionId;
+            if (std::find (nowSounding.begin(), nowSounding.end(), id) == nowSounding.end())
+                nowSounding.push_back (id);
+            nowHeads.push_back (static_cast<std::int64_t> (static_cast<double> (snapshot.playheadPosition[index].load (std::memory_order_relaxed)) * total));
+        }
+    }
+    if (nowSounding == sounding && nowHeads == heads)
+        return;
+    juce::Rectangle<float> dirty;
+    for (const auto* list : { &sounding, &nowSounding })
+        for (const auto& id : *list)
+            if (const auto r = regionBounds (id); ! r.isEmpty())
+                dirty = dirty.isEmpty() ? r : dirty.getUnion (r);
+    sounding = std::move (nowSounding);
+    heads = std::move (nowHeads);
+    if (! dirty.isEmpty())
+        repaint (dirty.expanded (3.0f).getSmallestIntegerContainer());
 }
 
 void NoteMapEditor::defaultView()
@@ -523,10 +592,18 @@ bool NoteMapEditor::perform (const juce::String& action)
         refresh();
     }
     else if (action == "fill" || action == "fill+" || action == "fill-" || action == "tuning"
-             || action == "speed-" || action == "speed+" || action == "speed.reset")
+             || action == "speed-" || action == "speed+" || action == "speed.reset" || action.startsWith ("fadein") || action.startsWith ("fadeout"))
     {
         auto mapping = atlas->mapping;
-        if (action == "speed-" || action == "speed+")
+        if (action == "fadein-" || action == "fadein+")
+            mapping.fadeInMs = nextStep (fadeInSteps, mapping.fadeInMs, action == "fadein+" ? 1 : -1);
+        else if (action == "fadein.reset")
+            mapping.fadeInMs = 0.0;
+        else if (action == "fadeout-" || action == "fadeout+")
+            mapping.fadeOutMs = nextStep (fadeOutSteps, mapping.fadeOutMs, action == "fadeout+" ? 1 : -1);
+        else if (action == "fadeout.reset")
+            mapping.fadeOutMs = 0.0;
+        else if (action == "speed-" || action == "speed+")
             mapping.speed = std::clamp (nextSpeed (mapping.speed, action == "speed+" ? 1 : -1), atlas::Mapping::minSpeed, atlas::Mapping::maxSpeed);
         else if (action == "speed.reset")
             mapping.speed = 1.0;
@@ -538,9 +615,11 @@ bool NoteMapEditor::perform (const juce::String& action)
             mapping.maxTransposeSemitones = std::clamp (mapping.maxTransposeSemitones + (action == "fill+" ? 1.0 : -1.0), 1.0, 48.0);
         if (mapping == atlas->mapping)
             return false;
-        const auto name = action == "tuning" ? juce::String (mapping.correctTuning ? "Play in tune" : "Play as recorded")
-                        : action.startsWith ("speed") ? "Speed " + speedText (mapping.speed)
-                                                      : juce::String ("Fill keyboard");
+        const auto name = action == "tuning"              ? juce::String (mapping.correctTuning ? "Play in tune" : "Play as recorded")
+                        : action.startsWith ("speed")     ? "Speed " + speedText (mapping.speed)
+                        : action.startsWith ("fadein")    ? "Fade in " + fadeText (mapping.fadeInMs)
+                        : action.startsWith ("fadeout")   ? "Fade out " + fadeText (mapping.fadeOutMs)
+                                                          : juce::String ("Fill keyboard");
         edit (name, [mapping] (atlas::NoteAtlas& a, const AudioData&) {
             if (a.mapping == mapping)
                 return false;
@@ -783,6 +862,18 @@ void NoteMapEditor::rebuildInspector()
         rows.push_back ({ "SPEED", { cell ("speed-", minus, false, m.speed > atlas::Mapping::minSpeed + 1.0e-6), valueCell (speedText (m.speed)),
                                      cell ("speed+", "+", false, m.speed < atlas::Mapping::maxSpeed - 1.0e-6),
                                      cell ("speed.reset", "Reset", false, m.speed != 1.0) } });
+        // FADE IN / FADE OUT: each note's own edge fades, LOOP off only (LOOP's crossfades smooth
+        // a looping note). Always shown, dimmed while LOOP is on, the values kept and readable.
+        auto fadeRow = [&] (const char* label, const char* id, double value, double max) {
+            const bool live = ! loopOn;
+            auto shown = valueCell (fadeText (value));
+            shown.enabled = live;
+            rows.push_back ({ label, { cell (juce::String (id) + "-", minus, false, live && value > 1.0e-6), shown,
+                                       cell (juce::String (id) + "+", "+", false, live && value < max - 1.0e-6),
+                                       cell (juce::String (id) + ".reset", "Reset", false, live && value != 0.0) } });
+        };
+        fadeRow (narrow ? "FD IN" : "FADE IN", "fadein", m.fadeInMs, atlas::Mapping::maxFadeInMs);
+        fadeRow (narrow ? "FD OUT" : "FADE OUT", "fadeout", m.fadeOutMs, atlas::Mapping::maxFadeOutMs);
         Row sustain;
         int sustaining = 0, included = 0;
         for (const auto* n : all)
@@ -894,7 +985,9 @@ void NoteMapEditor::paintRegionFields (juce::Graphics& g, juce::Rectangle<float>
         const bool isSelected = std::find (selected.begin(), selected.end(), n->id) != selected.end();
         const bool hot = hover.noteId == n->id;
         const auto tone = colour::forPitch (n->playKey());
-        g.setColour (tone.withAlpha (colour::regionFillAlpha (tone, isSelected ? 0.38f : (hot ? 0.34f : 0.28f))));
+        // Sounding now: a little more of its own hue (as the card lights a playing region).
+        const float alpha = isSounding (n->id) ? (isSelected ? 0.46f : 0.42f) : (isSelected ? 0.38f : (hot ? 0.34f : 0.28f));
+        g.setColour (tone.withAlpha (colour::regionFillAlpha (tone, alpha)));
         g.fillRect (r.withTrimmedTop (std::max (0.0f, graph.getY() + 18.0f - r.getY())));
     }
     g.restoreState();
@@ -1075,6 +1168,25 @@ void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> grap
                 }
             }
         }
+    }
+    // The notes sounding now: their edges brighter in their own hue and a thin read head where
+    // each voice is (the card's language; the selection's outline is drawn as it was).
+    for (const auto* n : notes)
+    {
+        if (! isSounding (n->id))
+            continue;
+        const auto r = regionBounds (n->id);
+        if (r.isEmpty())
+            continue;
+        const auto tone = colour::forPitch (n->playKey());
+        g.setColour (tone.brighter (0.35f).withAlpha (0.9f));
+        g.drawRect (r.reduced (0.6f), 1.2f);
+        for (const auto frame : heads)
+            if (frame >= n->attackStart && frame <= n->sourceEnd)
+            {
+                g.setColour (colour::regionWave.withAlpha (0.9f));
+                vline (g, xForFrame (frame), r.getY() + 1.0f, r.getBottom() - 1.0f);
+            }
     }
     g.restoreState();
 }
@@ -1362,6 +1474,13 @@ void NoteMapEditor::mouseMove (const juce::MouseEvent& e)
         tip = "Drag: where the note starts";
     else if (now.edge == Edge::end)
         tip = "Drag: where the note ends";
+    else
+        for (const auto& row : rows)
+            if ((row.label.startsWith ("FADE") || row.label.startsWith ("FD"))
+                && row.cells.size() > 1 && row.cells.front().area.getUnion (row.cells.back().area).contains (e.position))
+                tip = loopOn ? "Available when LOOP is off."
+                             : (row.label.contains ("IN") ? "A fade at the start of every note (ms of playback)"
+                                                          : "A fade at the end of every note, ending as the note does (ms of playback)");
     setTooltip (tip);
 }
 

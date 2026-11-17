@@ -89,14 +89,24 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     bool keyPressed (const juce::KeyPress&) override;
+    bool keyStateChanged (bool isKeyDown) override;
 
     // For tests and the window's own controls ------------------------------
     /** Asks the catalog again (search, filters, scope). */
     void refresh();
+    /** Tests: one tick of the window's display timer (answers, the play key, playheads). */
+    void timerCallbackForTest() { timerCallback(); }
     /** Waits for the catalog and the preview, delivering their answers (tests). */
     bool settle (int milliseconds = 10000);
     int rowCount() const noexcept { return static_cast<int> (rows.size()); }
     const LibraryRow& row (int index) const { return rows[static_cast<std::size_t> (index)]; }
+    /** STARTING STATES (Presets and Templates): the built-in states the search and scope leave,
+        shown as tiles above the list (identity: LibraryRow::program, never the name). */
+    int stateCount() const noexcept { return static_cast<int> (states.size()); }
+    const LibraryRow& state (int index) const { return states[static_cast<std::size_t> (index)]; }
+    /** Tests: a tile, as the musician clicks it (loads that state). */
+    juce::Component* stateTile (int index) const;
+    void chooseState (int index);
     int selectedRow() const;
     void selectRow (int index);
     /** Several rows at once (candidate scopes allow it: Shift/Cmd-click). */
@@ -116,7 +126,10 @@ public:
         first empty layer (asks which when none is). */
     void loadSelected();
     void loadSelectedInto (int layer);
+    /** The selected sound's preview: plays, pauses, resumes (Space; Audition::toggleBrowser). */
     void previewSelected();
+    /** The preview transport's name for a row (its asset id, or "file:<path>" for a candidate). */
+    static std::string previewKey (const LibraryRow& row);
     /** Puts the selected sound into a tray slot (0..2). */
     void addSelectedToTray (int slot);
     void commitTray();
@@ -176,6 +189,7 @@ public:
 
     class Sidebar;
     class Results;
+    class StartingStates;
     class CandidateInspector;
     class ScanSheet;
     class TrimSheet;
@@ -188,6 +202,7 @@ public:
 
 private:
     friend class Sidebar;
+    friend class StartingStates;
     friend class CandidateInspector;
     friend class ScanSheet;
     friend class TrimSheet;
@@ -217,12 +232,13 @@ private:
     OspAudioProcessor& processor;
     View view = View::presets;
     juce::String scopeKey = "all";
-    std::vector<LibraryRow> rows;
+    std::vector<LibraryRow> rows, states;
     std::vector<SideItem> side;
     std::optional<LibrarySoundDetail> detail;
     std::uint64_t queryGeneration = 0, appliedGeneration = 0;
     juce::String status;
     bool statusOffersBack = false;
+    bool spaceHeld = false;   ///< Space is down: its auto-repeat never toggles the preview again
 
     std::array<juce::TextButton, 3> tabs;
     juce::TextButton closeButton { juce::String::fromUTF8 ("\xc3\x97") }, menuButton { juce::String::fromUTF8 ("\xe2\x8b\xaf") };
@@ -232,6 +248,7 @@ private:
     juce::ComboBox originFilter, lengthFilter, sortOrder;
     std::unique_ptr<Sidebar> sidebar;
     std::unique_ptr<Results> results;
+    std::unique_ptr<StartingStates> startingStates;
     std::unique_ptr<Detail> detailStrip;
     std::unique_ptr<Inspector> inspector;
     std::unique_ptr<Tray> tray;

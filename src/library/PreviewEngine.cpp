@@ -112,24 +112,34 @@ std::shared_ptr<const PreviewSound> PreviewEngine::sound (int slot) const
     return slot >= 0 && slot < numSlots ? latest[static_cast<std::size_t> (slot)] : nullptr;
 }
 
-void PreviewEngine::play (unsigned slotMask)
+void PreviewEngine::push (const Command& command) noexcept
 {
     const int w = commandWrite.load (std::memory_order_relaxed);
     const int next = (w + 1) % commandCapacity;
     if (next == commandRead.load (std::memory_order_acquire))
         return;   // the audio thread is not running (or far behind): nothing to hear anyway
-    commands[static_cast<std::size_t> (w)] = { Command::Kind::play, slotMask };
+    commands[static_cast<std::size_t> (w)] = command;
     commandWrite.store (next, std::memory_order_release);
+}
+
+void PreviewEngine::play (unsigned slotMask)
+{
+    push ({ Command::Kind::play, slotMask, 0.0 });
+}
+
+void PreviewEngine::playFrom (unsigned slotMask, double startSeconds)
+{
+    push ({ Command::Kind::play, slotMask, std::max (0.0, startSeconds) });
+}
+
+void PreviewEngine::pause (unsigned slotMask)
+{
+    push ({ Command::Kind::pause, slotMask, 0.0 });
 }
 
 void PreviewEngine::stop()
 {
-    const int w = commandWrite.load (std::memory_order_relaxed);
-    const int next = (w + 1) % commandCapacity;
-    if (next == commandRead.load (std::memory_order_acquire))
-        return;
-    commands[static_cast<std::size_t> (w)] = { Command::Kind::stop, 0u };
-    commandWrite.store (next, std::memory_order_release);
+    push ({ Command::Kind::stop, 0u, 0.0 });
 }
 
 void PreviewEngine::setGainDb (float db) noexcept
@@ -162,7 +172,7 @@ void PreviewEngine::release (Voice& voice, float seconds) noexcept
     voice.fadeStep = -std::max (voice.fade, 1.0e-3f) / frames;
 }
 
-void PreviewEngine::startVoice (int slot, const Entry* entry, int note, float gain) noexcept
+void PreviewEngine::startVoice (int slot, const Entry* entry, int note, float gain, double startSeconds) noexcept
 {
     if (entry == nullptr || entry->sound == nullptr || entry->sound->audio.numFrames() < 2)
         return;
@@ -201,6 +211,12 @@ void PreviewEngine::startVoice (int slot, const Entry* entry, int note, float ga
     free->gain = gain;
     free->fade = 0.0f;
     free->fadeStep = 1.0f / std::max (1.0f, 0.0005f * static_cast<float> (rate));   // 0.5 ms: no click, the attack kept
+    if (startSeconds > 0.0)
+    {
+        // A resume mid-sound: from where it paused, over the safety ramp (never past its end).
+        free->position = std::min (startSeconds * sound.audio.sampleRate, static_cast<double> (sound.audio.numFrames() - 1));
+        free->fadeStep = 1.0f / std::max (1.0f, resumeFadeSeconds * static_cast<float> (rate));
+    }
     free->age = ++voiceCounter;
 }
 
@@ -218,6 +234,13 @@ void PreviewEngine::handleCommands() noexcept
                 release (v, 0.02f);
             continue;
         }
+        if (command.kind == Command::Kind::pause)
+        {
+            for (auto& v : voices)
+                if (v.note < 0 && v.slot >= 0 && (command.mask & (1u << v.slot)) != 0)
+                    release (v, resumeFadeSeconds);
+            continue;
+        }
         for (auto& v : voices)
             if (v.note < 0)
                 release (v, 0.005f);
@@ -228,7 +251,7 @@ void PreviewEngine::handleCommands() noexcept
         const float gain = count > 0 ? 1.0f / std::sqrt (static_cast<float> (count)) : 0.0f;   // equal power
         for (int s = 0; s < numSlots; ++s)
             if ((command.mask & (1u << s)) != 0)
-                startVoice (s, blockSlots[static_cast<std::size_t> (s)], -1, gain);
+                startVoice (s, blockSlots[static_cast<std::size_t> (s)], -1, gain, command.startSeconds);
     }
     commandRead.store (r, std::memory_order_release);
 }

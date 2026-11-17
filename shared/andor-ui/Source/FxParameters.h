@@ -1,5 +1,6 @@
 #pragma once
 
+#include "LiveParameters.h"
 #include "engine/fx/FxGraph.h"
 #include "engine/fx/FxSettings.h"
 
@@ -40,13 +41,15 @@ juce::String format (const Spec& spec, float value);
 class Reader
 {
 public:
-    void attach (juce::AudioProcessorValueTreeState& state, const juce::String& prefix);
+    /** `live`: the values as the engine reads them (USER MACROS' offsets; null: the parameters'
+        own values, as before). Marks every parameter it reads as read. */
+    void attach (juce::AudioProcessorValueTreeState& state, const juce::String& prefix, LiveOffsets* live = nullptr);
     void read (fx::Settings& settings) const noexcept;
 
 private:
     struct Entry
     {
-        std::atomic<float>* value = nullptr;
+        LiveParam value;
         const Spec* spec = nullptr;
         int slot = 0;
     };

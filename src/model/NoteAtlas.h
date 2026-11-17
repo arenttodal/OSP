@@ -206,6 +206,11 @@ struct Mapping
         twice as long). Written to JSON only when it is not 1 (older files read as 1). */
     double speed = 1.0;
     static constexpr double minSpeed = 0.3, maxSpeed = 2.0;
+    /** FADE IN / FADE OUT: a fade at each note's own start and end, in milliseconds of
+        playback (One Shot with LOOP off only; 0 = none, the note as before). Written to JSON
+        only when not 0 (older files read as 0). */
+    double fadeInMs = 0.0, fadeOutMs = 0.0;
+    static constexpr double maxFadeInMs = 100.0, maxFadeOutMs = 500.0;
     bool operator== (const Mapping&) const = default;
 };
 

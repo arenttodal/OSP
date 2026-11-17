@@ -2629,6 +2629,9 @@ void EngineCard::answerMapNotesPrompt (bool yes)
 {
     if (yes)
         processor.mapNotes (layerIndex);
+    // (reported while the prompt still shows: it is what the musician pressed)
+    if (onMapNotesAnswer != nullptr)
+        onMapNotesAnswer (layerIndex, yes);
     processor.dismissMapNotesPrompt (layerIndex);
     updateMapPrompt();
 }

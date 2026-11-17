@@ -1451,14 +1451,16 @@ TEST_CASE ("plugin: Library window - presets, templates and sounds; search, scop
     CHECK (p.canRestorePreviousState());
     CHECK (panel->statusText().contains ("Loaded Warm Hymn"));
 
-    // Templates (view B): the built-in starting states (read only) and the saved one.
+    // Templates (view B): the built-in starting states (read only) as STARTING STATES tiles,
+    // the saved one in the list below.
     panel->setView (Panel::View::templates);
     REQUIRE (panel->settle());
-    const int natural = rowNamed (*panel, "Natural");
-    REQUIRE (natural >= 0);
-    CHECK (panel->row (natural).isBuiltIn());
+    CHECK (rowNamed (*panel, "Natural") < 0);   // (not a list row any more: a tile)
+    REQUIRE (panel->stateCount() == OspAudioProcessor::factoryStartingStates().size());
+    CHECK (panel->state (0).name == "Natural");
+    CHECK (panel->state (0).isBuiltIn());
     REQUIRE (rowNamed (*panel, "Floating Settings") >= 0);
-    CHECK (sideCount (*panel, "all") == panel->rowCount());
+    CHECK (sideCount (*panel, "all") == panel->rowCount() + panel->stateCount());
     panel->selectRow (rowNamed (*panel, "Floating Settings"));
     snapshot ("library-templates.png");
 
@@ -8145,6 +8147,9 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "ShortLoopPluginTests.inc"
 #include "PopoverScaleTests.inc"
 #include "EffectiveVisualTests.inc"
+#include "AtlasRefineTests.inc"
+#include "UserMacroPluginTests.inc"
+#include "LibraryPolishTests.inc"
 
 TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives the knob, not the halo overlay) opens its modulation menu", "[ui][andor-ui][rightclick]")
 {
@@ -8400,7 +8405,7 @@ TEST_CASE ("plugin: the wheels' captions - never clipped, a click opens their se
     editor->closePopup();
 }
 
-TEST_CASE ("plugin: keyboard utility keys - SETTINGS and INFO (no AUX key) centred beneath ARP; each opens its own thing; the menu no longer carries them", "[ui][andor-ui][utility-keys]")
+TEST_CASE ("plugin: keyboard utility keys - LIBRARY, SETTINGS and INFO (no AUX key) beneath ARP; each opens its own thing; the menu no longer carries settings or info", "[ui][andor-ui][utility-keys]")
 {
     // OSP's lower-right keys: two of ANDOR's three (D is only for an instrument with an AUX
     // strip), centred where the long Advanced key was, never a gap for D.
@@ -8422,13 +8427,21 @@ TEST_CASE ("plugin: keyboard utility keys - SETTINGS and INFO (no AUX key) centr
         editor->refreshNow();
         auto& keys = editor->keyboardActions();
 
-        // Geometry: two square keys, 31 units, centred in Advanced's old 105 x 31 area.
+        // Geometry: three square keys, 31 units, 6 apart, filling Advanced's old 105 x 31 area.
         CHECK_FALSE (keys.has (UA::aux));
+        REQUIRE (keys.has (UA::library));
         REQUIRE (keys.has (UA::settings));
         REQUIRE (keys.has (UA::info));
         CHECK (keys.button (UA::aux) == nullptr);
+        auto* library = keys.button (UA::library);
         auto* settings = keys.button (UA::settings);
         auto* info = keys.button (UA::info);
+        CHECK (library->getWidth() == 31);
+        CHECK (library->getHeight() == 31);
+        CHECK (settings->getX() - library->getRight() == 6);
+        CHECK (library->getTitle() == "Library");
+        CHECK (library->getTooltip() == "Library");
+        CHECK (library->getWantsKeyboardFocus());
         CHECK (&editor->advancedSettingsButton() == settings);
         const auto area = layout::advanced.expanded (static_cast<float> (osp::plugin::KeyboardUtilityActions::margin));
         CHECK (std::abs (static_cast<float> (keys.getX()) - area.getX()) <= 1.0f);
@@ -8437,8 +8450,21 @@ TEST_CASE ("plugin: keyboard utility keys - SETTINGS and INFO (no AUX key) centr
         CHECK (settings->getHeight() == 31);
         CHECK (info->getWidth() == 31);
         CHECK (info->getX() - settings->getRight() == 6);
-        const float pairCentre = 0.5f * static_cast<float> (settings->getX() + info->getRight());
-        CHECK (std::abs (pairCentre - 0.5f * static_cast<float> (keys.getWidth())) <= 1.0f);
+        const float rowCentre = 0.5f * static_cast<float> (library->getX() + info->getRight());
+        CHECK (std::abs (rowCentre - 0.5f * static_cast<float> (keys.getWidth())) <= 1.0f);
+        CHECK_FALSE (library->getBoundsInParent().intersects (settings->getBoundsInParent()));
+        // LIBRARY opens the existing Library and closes it again (active while open).
+        REQUIRE (library->onClick != nullptr);
+        CHECK (editor->libraryWindow() == nullptr);
+        library->onClick();
+        editor->refreshNow();
+        CHECK (editor->libraryWindow() != nullptr);
+        CHECK (keys.isActive (UA::library));
+        CHECK (library->getTooltip() == "Close Library");
+        library->onClick();
+        editor->refreshNow();
+        CHECK (editor->libraryWindow() == nullptr);
+        CHECK_FALSE (keys.isActive (UA::library));
         CHECK_FALSE (settings->getBoundsInParent().intersects (info->getBoundsInParent()));
         CHECK_FALSE (keys.getBoundsInParent().reduced (osp::plugin::KeyboardUtilityActions::margin).intersects (editor->arpControl().getBoundsInParent()));
         // Accessible: focusable buttons with names and tooltips.

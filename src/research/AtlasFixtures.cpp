@@ -148,11 +148,80 @@ atlas::SourceAsset assetFor (const std::string& id, const std::string& name, con
 std::vector<std::string> names()
 {
     return { "sung-four", "repeated-note", "velocity-layers", "bowed-phrase", "silence-gaps", "legato", "stereo-wide", "out-of-tune",
-             "missing-notes", "boundary-probe" };
+             "missing-notes", "boundary-probe", "repeated-bass", "pizzicato", "fast-bass", "mixed-duration" };
 }
 
 Fixture make (const std::string& name)
 {
+    // The NOTE ATLAS refinements' fixtures (round robin with LOOP off, per-note fades): plucked
+    // notes, so their regions are short and decaying - the recordings a sustain loop does not suit.
+    auto plucked = [] (double midi, double seconds, std::uint64_t seed, double amplitude) {
+        return testsignals::pluck (midiToHz (midi), seconds, rate, seed, amplitude, 2);
+    };
+    if (name == "repeated-bass")
+    {
+        // Eight takes of C2, each its own pluck (seed) and level: which take played is known.
+        Recording rec (2);
+        rec.gap (0.05);
+        for (int t = 0; t < 8; ++t)
+        {
+            rec.note (plucked (36.0, 0.4, static_cast<std::uint64_t> (0xba55 + t), 0.4 + 0.03 * t), 36.0);
+            rec.gap (0.1);
+        }
+        atlas::NoteAtlas a;
+        for (const auto& p : rec.placed)
+            a.notes.push_back (noteAt (a, p, p.midi));
+        return finish ("repeated-bass", "eight plucked takes of C2", rec, std::move (a));
+    }
+    if (name == "pizzicato")
+    {
+        // Short pizzicato-like notes (0.15-0.25 s): too short for a sustain loop. C3 three times.
+        Recording rec (2);
+        rec.gap (0.05);
+        const std::pair<double, double> notes[] = { { 48.0, 0.18 }, { 48.0, 0.2 }, { 52.0, 0.16 }, { 48.0, 0.22 }, { 55.0, 0.25 }, { 55.0, 0.15 } };
+        std::uint64_t seed = 0x7122;
+        for (const auto& [midi, seconds] : notes)
+        {
+            rec.note (plucked (midi, seconds, ++seed, 0.5), midi);
+            rec.gap (0.08);
+        }
+        atlas::NoteAtlas a;
+        for (const auto& p : rec.placed)
+            a.notes.push_back (noteAt (a, p, p.midi));
+        return finish ("pizzicato", "short plucked notes: C3 x3, E3, G3 x2", rec, std::move (a));
+    }
+    if (name == "fast-bass")
+    {
+        // A fast bass line: 0.12 s notes cut abruptly (no fades), 20 ms apart.
+        Recording rec (2);
+        rec.gap (0.05);
+        const double keys[] = { 36.0, 39.0, 41.0, 43.0, 46.0, 43.0, 41.0, 39.0 };
+        for (const double midi : keys)
+        {
+            rec.note (testsignals::saw (midiToHz (midi), 0.12, rate, 0.35, 2), midi);
+            rec.gap (0.02);
+        }
+        atlas::NoteAtlas a;
+        for (const auto& p : rec.placed)
+            a.notes.push_back (noteAt (a, p, p.midi));
+        return finish ("fast-bass", "a fast bass line of abruptly cut 0.12 s notes", rec, std::move (a));
+    }
+    if (name == "mixed-duration")
+    {
+        // Notes of 20 ms, 50 ms, 100 ms, 250 ms and 1 s (abrupt edges): fade clamping.
+        Recording rec (2);
+        rec.gap (0.05);
+        const std::pair<double, double> notes[] = { { 48.0, 0.02 }, { 50.0, 0.05 }, { 52.0, 0.1 }, { 53.0, 0.25 }, { 55.0, 1.0 } };
+        for (const auto& [midi, seconds] : notes)
+        {
+            rec.note (testsignals::saw (midiToHz (midi), seconds, rate, 0.35, 2), midi);
+            rec.gap (0.1);
+        }
+        atlas::NoteAtlas a;
+        for (const auto& p : rec.placed)
+            a.notes.push_back (noteAt (a, p, p.midi));
+        return finish ("mixed-duration", "notes of 20 ms, 50 ms, 100 ms, 250 ms and 1 s", rec, std::move (a));
+    }
     if (name == "sung-four")
         return simplePhrase ("sung-four", "a sung phrase: A3, C4, E4, G4 with short gaps", 2, { { 57.0, 3 }, { 60.0, 4 }, { 64.0, 5 }, { 67.0, 6 } }, 0.8, 0.12);
     if (name == "repeated-note")

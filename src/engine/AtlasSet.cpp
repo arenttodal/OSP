@@ -106,6 +106,7 @@ struct PreparedAtlas
     bool fill = false;
     double fillLimitSemitones = 0.0;
     double speed = 1.0;                                   ///< SPEED (atlas mapping), clamped
+    double fadeInMs = 0.0, fadeOutMs = 0.0;               ///< FADE IN / OUT (atlas mapping), clamped
     BuildReport report;                                   ///< Stage A's (warnings, skipped and cut notes)
 };
 
@@ -196,6 +197,8 @@ namespace
         set->fill = prepared.fill;
         set->fillLimitSemitones = prepared.fillLimitSemitones;
         set->speed = prepared.speed;
+        set->noteFadeInMs = prepared.fadeInMs;
+        set->noteFadeOutMs = prepared.fadeOutMs;
         // Which keys can loop (with LOOP on only they play), once the loops are analysed:
         // Stage A plays every note while its loops are being prepared.
         set->loopSelects = loopsAnalysed;
@@ -391,6 +394,8 @@ StagedBuild buildPlayableSet (const atlas::NoteAtlas& atlas, const std::vector<S
     prepared->fill = atlas.mapping.fill;
     prepared->fillLimitSemitones = std::max (0.0, atlas.mapping.maxTransposeSemitones);
     prepared->speed = std::clamp (atlas.mapping.speed, atlas::Mapping::minSpeed, atlas::Mapping::maxSpeed);
+    prepared->fadeInMs = std::clamp (atlas.mapping.fadeInMs, 0.0, atlas::Mapping::maxFadeInMs);
+    prepared->fadeOutMs = std::clamp (atlas.mapping.fadeOutMs, 0.0, atlas::Mapping::maxFadeOutMs);
 
     const auto finaliseStart = std::chrono::steady_clock::now();
     auto set = assemble (*prepared, models, false);

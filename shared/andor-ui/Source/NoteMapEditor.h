@@ -66,6 +66,10 @@ public:
     bool perform (const juce::String& action);
     juce::StringArray actions() const;
     juce::Rectangle<float> actionArea (const juce::String& action) const;
+    /** The recorded notes sounding now (the members the voices really play: round robin and
+        FILL as heard), and their read heads (source frames). Never the editing selection. */
+    const std::vector<std::string>& soundingNotes() const noexcept { return sounding; }
+    const std::vector<std::int64_t>& soundingHeads() const noexcept { return heads; }
     /** Repeat markers of a note (source frames), as drawn. */
     std::vector<std::int64_t> repeatMarkers (const std::string& noteId) const;
     /** The status word in the top row: Analyzing, Preparing, Playable, Enhancing, Ready, Needs review, Failed. */
@@ -91,6 +95,10 @@ public:
     bool keyPressed (const juce::KeyPress&) override;
 
 private:
+    std::vector<std::string> sounding;
+    std::vector<std::int64_t> heads;
+    void refreshPlayback();
+    bool isSounding (const std::string& id) const { return std::find (sounding.begin(), sounding.end(), id) != sounding.end(); }
     struct Cell
     {
         juce::String action, text;

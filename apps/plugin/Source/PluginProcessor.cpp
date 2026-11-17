@@ -108,6 +108,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     // The MOD WHEEL's VIBRATO (`vibrato.*`, version hint 28 as in ANDOR ANALOG; appended after
     // SUB, so nothing before moves): off by default and in every session from before.
     addVibratoParameters (layout);
+    // USER MACROS (version hint 34; after VIBRATO): six assignable macros, userMacro.1 .. 6, as
+    // ANDOR ANALOG's. At 0 with no assignment (every session from before) they do nothing.
+    addUserMacroParameters (layout, 34, [] (int macro) { return userMacroId (macro); });
     return layout;
 }
 
@@ -251,55 +254,63 @@ OspAudioProcessor::OspAudioProcessor()
       parameters (*this, &undoManager, "OSP", createLayout()),
       store (SampleStore::defaultDirectory())
 {
+    // USER MACROS: every parameter the engine reads goes through LiveParam (its value, plus a
+    // macro's offset while one moves it).
+    liveOffsets.attach (parameters);
+    for (int m = 0; m < usermacro::macroCount; ++m)
+        userMacroParams[static_cast<std::size_t> (m)] = parameters.getRawParameterValue (userMacroId (m));
+    userMacroWant.assign (static_cast<std::size_t> (liveOffsets.size()), 0.0);
+    userMacroOffsets.assign (static_cast<std::size_t> (liveOffsets.size()), 0.0);
+    userMacroTouched.assign (static_cast<std::size_t> (liveOffsets.size()), 0);
     lanes = std::make_unique<CardArpLanes>();
     laneHost = std::make_unique<LaneHost> (*this);
-    fxReader.attach (parameters, fxParameterPrefix());
-    attackParam = parameters.getRawParameterValue (ids::attack);
-    releaseParam = parameters.getRawParameterValue (ids::release);
-    gainParam = parameters.getRawParameterValue (ids::gain);
-    velocityRangeParam = parameters.getRawParameterValue (ids::velocityRange);
-    fineTuneParam = parameters.getRawParameterValue (ids::fineTune);
-    bendRangeParam = parameters.getRawParameterValue (ids::bendRange);
+    fxReader.attach (parameters, fxParameterPrefix(), &liveOffsets);
+    attackParam = liveParameter (ids::attack);
+    releaseParam = liveParameter (ids::release);
+    gainParam = liveParameter (ids::gain);
+    velocityRangeParam = liveParameter (ids::velocityRange);
+    fineTuneParam = liveParameter (ids::fineTune);
+    bendRangeParam = liveParameter (ids::bendRange);
     for (std::size_t i = 0; i < subFields().size(); ++i)
-        subParams[i] = parameters.getRawParameterValue (subFieldId (subFields()[i]));
+        subParams[i] = liveParameter (subFieldId (subFields()[i]));
     {
         const std::array<juce::String, 10> vibratoIds { ids::vibratoEnabled, ids::vibratoDepth, ids::vibratoRate, ids::vibratoDelay, ids::vibratoRise,
                                                         ids::vibratoControl, ids::vibratoAmount, ids::vibratoSourceA, ids::vibratoSourceB, ids::vibratoSourceC };
         for (std::size_t i = 0; i < vibratoIds.size(); ++i)
-            vibratoParams[i] = parameters.getRawParameterValue (vibratoIds[i]);
+            vibratoParams[i] = liveParameter (vibratoIds[i]);
     }
-    lifeParam = parameters.getRawParameterValue (ids::life);
-    dynamicsParam = parameters.getRawParameterValue (ids::dynamics);
-    characterParam = parameters.getRawParameterValue (ids::character);
-    motionParam = parameters.getRawParameterValue (ids::motion);
-    spaceParam = parameters.getRawParameterValue (ids::space);
-    reimaginedParam = parameters.getRawParameterValue (ids::reimagined);
-    echoParam = parameters.getRawParameterValue (ids::echo);
-    driveParam = parameters.getRawParameterValue (ids::drive);
-    arpEnabledParam = parameters.getRawParameterValue (ids::arpEnabled);
-    arpPatternParam = parameters.getRawParameterValue (ids::arpPattern);
-    arpRateParam = parameters.getRawParameterValue (ids::arpRate);
-    arpGateParam = parameters.getRawParameterValue (ids::arpGate);
-    arpOctavesParam = parameters.getRawParameterValue (ids::arpOctaves);
-    arpSwingParam = parameters.getRawParameterValue (ids::arpSwing);
-    arpVelocityParam = parameters.getRawParameterValue (ids::arpVelocity);
+    lifeParam = liveParameter (ids::life);
+    dynamicsParam = liveParameter (ids::dynamics);
+    characterParam = liveParameter (ids::character);
+    motionParam = liveParameter (ids::motion);
+    spaceParam = liveParameter (ids::space);
+    reimaginedParam = liveParameter (ids::reimagined);
+    echoParam = liveParameter (ids::echo);
+    driveParam = liveParameter (ids::drive);
+    arpEnabledParam = liveParameter (ids::arpEnabled);
+    arpPatternParam = liveParameter (ids::arpPattern);
+    arpRateParam = liveParameter (ids::arpRate);
+    arpGateParam = liveParameter (ids::arpGate);
+    arpOctavesParam = liveParameter (ids::arpOctaves);
+    arpSwingParam = liveParameter (ids::arpSwing);
+    arpVelocityParam = liveParameter (ids::arpVelocity);
     for (int i = 0; i < 2; ++i)
     {
         auto& l = modLfoParams[static_cast<std::size_t> (i)];
         const char* names[] { "shape", "rate", "sync", "division", "phase", "polarity", "mode", "scope" };
         for (std::size_t k = 0; k < l.size(); ++k)
-            l[k] = parameters.getRawParameterValue (modLfoId (i, names[k]));
+            l[k] = liveParameter (modLfoId (i, names[k]));
         auto& e = modEnvParams[static_cast<std::size_t> (i)];
         const char* envNames[] { "mode", "attack", "decay", "sustain", "release", "curve", "length" };
         for (std::size_t k = 0; k < e.size(); ++k)
-            e[k] = parameters.getRawParameterValue (modEnvId (i, envNames[k]));
+            e[k] = liveParameter (modEnvId (i, envNames[k]));
     }
     for (int r = 0; r < mod::maxRoutes; ++r)
     {
         auto& rp = modRouteParams[static_cast<std::size_t> (r)];
         const char* names[] { "source", "dest", "depth", "enabled", "destExt" };
         for (std::size_t k = 0; k < rp.size(); ++k)
-            rp[k] = parameters.getRawParameterValue (modRouteId (r, names[k]));
+            rp[k] = liveParameter (modRouteId (r, names[k]));
     }
     libraryHub = std::make_unique<LibraryService> (store.directory());
     auditionHub = std::make_unique<Audition> (preview, *libraryHub, store.directory(),
@@ -329,60 +340,60 @@ OspAudioProcessor::OspAudioProcessor()
     lastModValues.fill (-1.0e9f);
     customPattern = RhythmicShaper::patternSteps (ShaperParams().pattern);   // CUSTOM starts as THREE
     publishCustomPattern();
-    pitchCharacterParam = parameters.getRawParameterValue (ids::pitchCharacter);
-    sustainParam = parameters.getRawParameterValue (ids::sustain);
-    seedParam = parameters.getRawParameterValue (ids::seed);
-    arpLinkParam = parameters.getRawParameterValue (ids::arpLink ({}));
+    pitchCharacterParam = liveParameter (ids::pitchCharacter);
+    sustainParam = liveParameter (ids::sustain);
+    seedParam = liveParameter (ids::seed);
+    arpLinkParam = liveParameter (ids::arpLink ({}));
     for (int card = 0; card < 3; ++card)
-        arpCardParams[static_cast<std::size_t> (card)] = parameters.getRawParameterValue (ids::arpCard ({}, card));
+        arpCardParams[static_cast<std::size_t> (card)] = liveParameter (ids::arpCard ({}, card));
     for (int card = 1; card < 3; ++card)
     {
         const auto i = static_cast<std::size_t> (card - 1);
-        arpLanePatternParams[i] = parameters.getRawParameterValue (ids::arpCardSetting ({}, card, "pattern"));
-        arpLaneRateParams[i] = parameters.getRawParameterValue (ids::arpCardSetting ({}, card, "rate"));
-        arpLaneOctavesParams[i] = parameters.getRawParameterValue (ids::arpCardSetting ({}, card, "octaves"));
+        arpLanePatternParams[i] = liveParameter (ids::arpCardSetting ({}, card, "pattern"));
+        arpLaneRateParams[i] = liveParameter (ids::arpCardSetting ({}, card, "rate"));
+        arpLaneOctavesParams[i] = liveParameter (ids::arpCardSetting ({}, card, "octaves"));
     }
-    mpeParam = parameters.getRawParameterValue (ids::mpe);
+    mpeParam = liveParameter (ids::mpe);
     for (int i = 0; i < numShapingParams; ++i)
-        shapingParams[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (shapingIds()[i]);
+        shapingParams[static_cast<std::size_t> (i)] = liveParameter (shapingIds()[i]);
     lastShaping.fill (-1.0e9f);
-    blendParam = parameters.getRawParameterValue (ids::blend);
+    blendParam = liveParameter (ids::blend);
     for (int layer = 0; layer < numLayers; ++layer)
     {
         auto& lp = layerParams[static_cast<std::size_t> (layer)];
-        lp.mode = parameters.getRawParameterValue (layerParameterId (layer, granularNames()[0]));
+        lp.mode = liveParameter (layerParameterId (layer, granularNames()[0]));
         for (int i = 0; i < 5; ++i)
-            lp.granular[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (layerParameterId (layer, granularNames()[i + 1]));
+            lp.granular[static_cast<std::size_t> (i)] = liveParameter (layerParameterId (layer, granularNames()[i + 1]));
         for (int i = 0; i < layerControlNames().size(); ++i)
-            lp.controls[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (layerParameterId (layer, layerControlNames()[i]));
-        lp.mute = parameters.getRawParameterValue (layerParameterId (layer, "mute"));
-        lp.solo = parameters.getRawParameterValue (layerParameterId (layer, "solo"));
+            lp.controls[static_cast<std::size_t> (i)] = liveParameter (layerParameterId (layer, layerControlNames()[i]));
+        lp.mute = liveParameter (layerParameterId (layer, "mute"));
+        lp.solo = liveParameter (layerParameterId (layer, "solo"));
         if (layer > 0)
-            lp.reimagined = parameters.getRawParameterValue (reimaginedParameterId (layer));
+            lp.reimagined = liveParameter (reimaginedParameterId (layer));
         for (int i = 0; i < reimaginedModeNames().size(); ++i)
-            lp.modes[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (reimaginedModeParameterId (layer, reimaginedModeNames()[i]));
+            lp.modes[static_cast<std::size_t> (i)] = liveParameter (reimaginedModeParameterId (layer, reimaginedModeNames()[i]));
         lp.lastModes.fill (-1.0e9f);
         jassert (eqParameterNames().size() == static_cast<int> (lp.eq.size()));
         for (int i = 0; i < eqParameterNames().size(); ++i)
-            lp.eq[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (eqParameterId (layer, eqParameterNames()[i]));
+            lp.eq[static_cast<std::size_t> (i)] = liveParameter (eqParameterId (layer, eqParameterNames()[i]));
         lp.lastEq.fill (-1.0e9f);
         for (int i = 0; i < dampenParameterNames().size(); ++i)
-            lp.dampen[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (dampenParameterId (layer, dampenParameterNames()[i]));
+            lp.dampen[static_cast<std::size_t> (i)] = liveParameter (dampenParameterId (layer, dampenParameterNames()[i]));
         lp.lastDampen.fill (-1.0e9f);
-        lp.grainOptions = { parameters.getRawParameterValue (layerParameterId (layer, "granular.scatter")),
-                            parameters.getRawParameterValue (layerParameterId (layer, "granular.pan")),
-                            parameters.getRawParameterValue (layerParameterId (layer, "granular.window")) };
-        lp.keyDnaAmount = parameters.getRawParameterValue (layerParameterId (layer, "keyDna.amount"));
-        lp.synthesize = parameters.getRawParameterValue (layerParameterId (layer, "synthesize"));
-        lp.pedalLoop = parameters.getRawParameterValue (pedalLoopParameterId (layer));
+        lp.grainOptions = { liveParameter (layerParameterId (layer, "granular.scatter")),
+                            liveParameter (layerParameterId (layer, "granular.pan")),
+                            liveParameter (layerParameterId (layer, "granular.window")) };
+        lp.keyDnaAmount = liveParameter (layerParameterId (layer, "keyDna.amount"));
+        lp.synthesize = liveParameter (layerParameterId (layer, "synthesize"));
+        lp.pedalLoop = liveParameter (pedalLoopParameterId (layer));
         for (std::size_t i = 0; i < satelliteFields().size(); ++i)
-            lp.satellite[i] = parameters.getRawParameterValue (satelliteFieldId (layer, satelliteFields()[i]));
+            lp.satellite[i] = liveParameter (satelliteFieldId (layer, satelliteFields()[i]));
         for (int i = 0; i < synthParameterNames().size(); ++i)
-            lp.synth[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (synthParameterId (layer, synthParameterNames()[i]));
+            lp.synth[static_cast<std::size_t> (i)] = liveParameter (synthParameterId (layer, synthParameterNames()[i]));
         for (int i = 0; i < imprintParameterNames().size(); ++i)
-            lp.imprint[static_cast<std::size_t> (i)] = parameters.getRawParameterValue (synthParameterId (layer, imprintParameterNames()[i]));
+            lp.imprint[static_cast<std::size_t> (i)] = liveParameter (synthParameterId (layer, imprintParameterNames()[i]));
     }
-    grainBudgetParam = parameters.getRawParameterValue (ids::grainBudget);
+    grainBudgetParam = liveParameter (ids::grainBudget);
     for (int layer = 0; layer < numLayers; ++layer)
     {
         juce::StringArray ids { reimaginedParameterId (layer) };
@@ -395,12 +406,12 @@ OspAudioProcessor::OspAudioProcessor()
                 p->addListener (this);
             }
     }
-    mixXParam = parameters.getRawParameterValue (ids::mixX);
-    mixYParam = parameters.getRawParameterValue (ids::mixY);
-    decayParam = parameters.getRawParameterValue (ids::decay);
-    sustainLevelParam = parameters.getRawParameterValue (ids::sustainLevel);
-    voiceModeParam = parameters.getRawParameterValue (ids::voiceMode);
-    glideParam = parameters.getRawParameterValue (ids::glide);
+    mixXParam = liveParameter (ids::mixX);
+    mixYParam = liveParameter (ids::mixY);
+    decayParam = liveParameter (ids::decay);
+    sustainLevelParam = liveParameter (ids::sustainLevel);
+    voiceModeParam = liveParameter (ids::voiceMode);
+    glideParam = liveParameter (ids::glide);
 
     engineSettings.polyphony = 24;
     engineSettings.outputGainDb = -9.0;
@@ -451,6 +462,8 @@ juce::VST3ClientExtensions* OspAudioProcessor::getVST3ClientExtensions()
 
 void OspAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    userMacroRate = sampleRate;
+    userMacroPrimed = false;   // (the macros land where they are: nothing glides in from 0)
     // Not the audio thread: allocation is allowed here. Start from the current macro
     // values so smoothing never begins from a previous session's state.
     lastMacroParam.fill (-1.0f);
@@ -498,6 +511,89 @@ void OspAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 namespace
 {
     bool changed (float a, float b) noexcept { return std::abs (a - b) > 1.0e-6f; }
+}
+
+void OspAudioProcessor::setUserMacroAssignments (const UserMacroState& next)
+{
+    userMacroState = next;
+    // Compiled: active assignments only (enabled, not orphaned, a target the engine reads).
+    usermacro::Snapshot table;
+    for (int macro = 0; macro < usermacro::macroCount; ++macro)
+        for (const auto& a : userMacroState.maps[static_cast<std::size_t> (macro)])
+        {
+            if (! a.map.enabled || a.orphaned || table.count >= usermacro::maxMaps || ! userMacroReads (a.target))
+                continue;
+            auto& c = table.maps[static_cast<std::size_t> (table.count++)];
+            c.macro = static_cast<std::uint8_t> (macro);
+            c.kind = usermacro::TargetKind::synth;
+            c.index = static_cast<std::int16_t> (liveOffsets.indexOf (a.target));
+            c.map = a.map;
+        }
+    userMacroCompiled = table;
+    userMacroTables.publish (table);
+    ++userMacroRevisionCount;
+}
+
+bool OspAudioProcessor::userMacroReads (const juce::String& id) const
+{
+    // Continuous and real-time safe: a float parameter the engine reads every block (a LiveParam),
+    // never a macro itself (no feedback), a modulation route, the variation seed or the grain
+    // budget (structural). Switches, choices and modes are other parameter kinds.
+    if (id.isEmpty() || id.startsWith ("userMacro.") || id.startsWith ("mod.route") || id == ids::seed || id == ids::grainBudget)
+        return false;
+    const int index = liveOffsets.indexOf (id);
+    if (index < 0 || index > std::numeric_limits<std::int16_t>::max() || ! liveOffsets.isRead (index))
+        return false;
+    return dynamic_cast<juce::AudioParameterFloat*> (liveOffsets.parameter (index)) != nullptr;
+}
+
+void OspAudioProcessor::applyUserMacros (int samples) noexcept
+{
+    // USER MACROS (ANDOR ANALOG's AnalogEngine::applyUserMacros): each assignment adds its offset
+    // (normalised, around the target's own live value); the knobs and their automation are never
+    // written. Nothing assigned and nothing still gliding out: not a value touched.
+    const auto& table = userMacroTables.read();
+    if (table.empty() && ! userMacroLive)
+        return;
+    // ~20 ms glides, whatever the block size: the macros' values, and each target's sum.
+    const double coef = 1.0 - std::exp (-static_cast<double> (std::max (1, samples)) / (0.02 * userMacroRate));
+    for (int m = 0; m < usermacro::macroCount; ++m)
+    {
+        const double target = std::clamp (0.01 * static_cast<double> (userMacroParams[static_cast<std::size_t> (m)]->load (std::memory_order_relaxed)), 0.0, 1.0);
+        auto& v = userMacroValue[static_cast<std::size_t> (m)];
+        v = userMacroPrimed ? v + (target - v) * coef : target;
+    }
+    userMacroPrimed = true;
+    for (int i = 0; i < table.count; ++i)
+    {
+        const auto& c = table.maps[static_cast<std::size_t> (i)];
+        const auto at = static_cast<std::size_t> (c.index);
+        if (at >= userMacroWant.size())
+            continue;
+        userMacroWant[at] += usermacro::offsetOf (c.map, userMacroValue[c.macro]);
+        userMacroTouched[at] = 1;
+    }
+    userMacroLive = false;
+    for (std::size_t at = 0; at < userMacroTouched.size(); ++at)
+    {
+        if (userMacroTouched[at] == 0)
+            continue;
+        auto& offset = userMacroOffsets[at];
+        offset += (userMacroWant[at] - offset) * coef;
+        const bool stillAssigned = userMacroWant[at] != 0.0 || std::any_of (table.maps.begin(), table.maps.begin() + table.count, [at] (const usermacro::CompiledMap& c) {
+            return static_cast<std::size_t> (c.index) == at;
+        });
+        userMacroWant[at] = 0.0;
+        if (! stillAssigned && std::abs (offset) < 1.0e-7)
+        {
+            offset = 0.0;   // (glided out: untouched from now on)
+            userMacroTouched[at] = 0;
+            liveOffsets.setOffset (static_cast<int> (at), 0.0f);
+            continue;
+        }
+        liveOffsets.setOffset (static_cast<int> (at), static_cast<float> (offset));   // (exactly 0 at the anchor: the value untouched)
+        userMacroLive = true;
+    }
 }
 
 void OspAudioProcessor::applyParameters (bool force) noexcept
@@ -573,7 +669,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     }
 
     // Macro = host parameter, unless a MIDI CC (20-25) moved it more recently.
-    std::array<std::atomic<float>*, 8> macroParams { lifeParam, dynamicsParam, characterParam, motionParam, spaceParam, reimaginedParam, echoParam, driveParam };
+    std::array<LiveParam, 8> macroParams { lifeParam, dynamicsParam, characterParam, motionParam, spaceParam, reimaginedParam, echoParam, driveParam };
     std::array<double, 8> values {};
     for (std::size_t i = 0; i < values.size(); ++i)
     {
@@ -804,13 +900,13 @@ void OspAudioProcessor::applyModulation (bool force) noexcept
     std::array<float, numModValues> now {};
     std::size_t k = 0;
     for (const auto& l : modLfoParams)
-        for (auto* p : l)
+        for (const auto& p : l)
             now[k++] = p->load();
     for (const auto& e : modEnvParams)
-        for (auto* p : e)
+        for (const auto& p : e)
             now[k++] = p->load();
     for (const auto& r : modRouteParams)
-        for (auto* p : r)
+        for (const auto& p : r)
             now[k++] = p->load();
     for (const auto& t : modRouteTargets)
         now[k++] = static_cast<float> (t.load (std::memory_order_relaxed));
@@ -1534,6 +1630,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             handleMidi (juce::MidiMessage::controllerEvent (1, 1, juce::jlimit (0, 127, juce::roundToInt (mod * 127.0f))));
         }
     }
+    applyUserMacros (numSamples);   // USER MACROS: before anything reads a parameter (they move its base)
     applyParameters (false);
     const auto& notes = runCardArpeggiators (midi, numSamples, timing);
 
@@ -3307,6 +3404,9 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
         fxTree.setProperty ("graph", juce::String (fx::toText (route)), nullptr);
         stateTree.appendChild (fxTree, nullptr);
     }
+    // USER MACROS: names and assignments, only when there are some (absent: none, as before).
+    if (! userMacroState.isDefault())
+        stateTree.appendChild (juce::ValueTree::fromXml (*userMacroState.toXml()), nullptr);
     return stateTree.createXml();
 }
 
@@ -3413,6 +3513,13 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     stateTree.removeChild (keyDnaTree, nullptr);
     const auto fxRouteTree = stateTree.getChildWithName ("FxRouting");
     stateTree.removeChild (fxRouteTree, nullptr);
+    // USER MACROS: the saved ones, or none (a preset or session without them clears the last's).
+    {
+        const auto userMacroTree = stateTree.getChildWithName ("UserMacros");
+        stateTree.removeChild (userMacroTree, nullptr);
+        const auto userMacroXml = userMacroTree.isValid() ? userMacroTree.createXml() : nullptr;
+        setUserMacroAssignments (UserMacroState::fromXml (userMacroXml.get()));
+    }
     const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
     // LOOP's fallback for short notes: the session's, per layer. Saved before it existed: off
     // for every layer that holds a saved sound (it plays as it did), on for the others.
@@ -3897,6 +4004,7 @@ bool OspAudioProcessor::loadPreset (const juce::File& file)
 
 void OspAudioProcessor::resetSettings()
 {
+    setUserMacroAssignments (UserMacroState {});   // (a new instrument: no USER macro assignments)
     for (auto* parameter : getParameters())
         if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
             ranged->setValueNotifyingHost (ranged->getDefaultValue());
@@ -3981,6 +4089,37 @@ namespace
             return juce::File (juce::String::fromUTF8 (dir));
         return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP");
     }
+}
+
+int OspAudioProcessor::macroBank() const
+{
+    if (! macroBankShown.has_value())
+    {
+        int bank = 0;
+        if (const auto xml = juce::XmlDocument::parse (documentsRoot().getChildFile ("Interface.xml")); xml != nullptr && xml->hasTagName ("Interface"))
+            if (const auto* node = xml->getChildByName ("MacroBank"))
+                bank = node->getStringAttribute ("shown") == "user" ? 1 : 0;
+        macroBankShown = bank;
+    }
+    return *macroBankShown;
+}
+
+void OspAudioProcessor::setMacroBank (int bank)
+{
+    bank = bank == 1 ? 1 : 0;
+    if (macroBank() == bank)
+        return;
+    macroBankShown = bank;
+    const auto file = documentsRoot().getChildFile ("Interface.xml");
+    juce::XmlElement xml ("Interface");
+    if (const auto old = juce::XmlDocument::parse (file); old != nullptr && old->hasTagName ("Interface"))
+        xml = *old;
+    auto* node = xml.getChildByName ("MacroBank");
+    if (node == nullptr)
+        node = xml.createNewChildElement ("MacroBank");
+    node->setAttribute ("shown", bank == 1 ? "user" : "core");
+    file.getParentDirectory().createDirectory();
+    xml.writeTo (file);
 }
 
 juce::File OspAudioProcessor::startingStateFolder()

@@ -3,6 +3,8 @@
 #include "Audition.h"
 #include "InstrumentLoader.h"
 #include "InstrumentHost.h"
+#include "LiveParameters.h"
+#include "UserMacroAssignments.h"
 #include "LibraryService.h"
 #include "LoadedInstrument.h"
 #include "CardArpLanes.h"
@@ -411,6 +413,26 @@ public:
     /** The grains a layer is playing now (display; lock-free, any thread). */
     const InstrumentEngine::GrainSnapshot& grainSnapshot (int layer) const noexcept override { return engine.grainSnapshot (layer); }
 
+    // -- USER MACROS (InstrumentHost; UserMacroEditor.h) ------------------------------------------
+    const UserMacroState* userMacroAssignments() const override { return &userMacroState; }
+    /** Compiles the active assignments (eligible targets only) and hands them to the audio thread. */
+    void setUserMacroAssignments (const UserMacroState& state) override;
+    juce::String userMacroParameterId (int macro) const override { return macro >= 0 && macro < usermacro::macroCount ? userMacroId (macro) : juce::String(); }
+    bool userMacroReads (const juce::String& parameterId) const override;
+    std::uint64_t userMacroRevision() const override { return userMacroRevisionCount; }
+    /** The macros' smoothed sum on a parameter as the engine adds it now (normalised). */
+    float userMacroOffsetOf (const juce::String& parameterId) const { return liveOffsets.offset (liveOffsets.indexOf (parameterId)); }
+    /** The active, compiled table (tests). */
+    const usermacro::Snapshot& userMacroTable() const noexcept { return userMacroCompiled; }
+    /** The macro bank shown (0 CORE, 1 USER): an interface preference of this computer
+        (Documents/OSP/Interface.xml, <MacroBank shown="core|user"/>), never a sound's - a preset,
+        undo or a session never changes it. A new musician starts on CORE. */
+    int macroBank() const;
+    /** The built-in starting state the patch is now (its program index), or -1 (a preset, a user
+        starting state, INIT or Reset): the Library marks its tile, never by name. */
+    int activeBuiltInState() const noexcept { return presetIsProgram && presetNameOverride.isEmpty() ? currentProgram : -1; }
+    void setMacroBank (int bank);
+
     juce::AudioProcessorValueTreeState parameters;
     juce::MidiKeyboardState keyboardState;
     std::atomic<int> activeVoices { 0 };     ///< played notes sounding (a note on three layers counts once)
@@ -523,7 +545,7 @@ public:
         16: LOOP's fallback for short notes (`loopFallback`, one 0/1 per layer). Absent, i.e. a
             session or preset saved before it: off for every layer that holds a saved sound, so
             it plays as it did; a sound loaded later (and every new session) has it on. */
-    static constexpr int stateVersion = 16;
+    static constexpr int stateVersion = 17;   ///< 17: USER MACROS (<UserMacros schema="1">, optional)
     /** LOOP's fallback for short notes on `layer` (on, but off for the sounds of a session saved
         before it; tests). */
     bool loopFallback (int layer) const noexcept { return layers[static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1))].loopFallback.load(); }
@@ -797,35 +819,58 @@ private:
     mutable std::mutex modelMutex;         // message-side use of the layers' exchanges (hosts may save state off the message thread)
 
     // Cached parameter values (audio thread)
-    std::atomic<float>* attackParam = nullptr;
-    std::atomic<float>* releaseParam = nullptr;
-    std::atomic<float>* gainParam = nullptr;
-    std::atomic<float>* velocityRangeParam = nullptr;
-    std::atomic<float>* fineTuneParam = nullptr;
-    std::atomic<float>* bendRangeParam = nullptr;
-    std::array<std::atomic<float>*, 10> subParams {};   ///< SUB (subFields() order, version hint 33)
+    /** USER MACROS: the parameters as the engine reads them (LiveParameters.h). */
+    LiveOffsets liveOffsets;
+    /** USER MACROS: each assignment's offset, smoothed (~20 ms), into liveOffsets - before
+        anything reads a parameter this block (so before global modulation). Nothing assigned and
+        nothing gliding out: returns at once, no value touched. Audio thread. */
+    void applyUserMacros (int samples) noexcept;
+    UserMacroState userMacroState;                          ///< message thread (the sound's state)
+    usermacro::Snapshot userMacroCompiled;
+    usermacro::TripleBuffer<usermacro::Snapshot> userMacroTables;
+    std::array<std::atomic<float>*, usermacro::macroCount> userMacroParams {};   ///< their own values (never live: no feedback)
+    std::array<double, usermacro::macroCount> userMacroValue {};
+    std::vector<double> userMacroWant, userMacroOffsets;     ///< per LiveOffsets index (sized in the constructor)
+    std::vector<char> userMacroTouched;
+    bool userMacroLive = false, userMacroPrimed = false;
+    double userMacroRate = 48000.0;
+    std::uint64_t userMacroRevisionCount = 1;
+    mutable std::optional<int> macroBankShown;
+    LiveParam liveParameter (const juce::String& id)
+    {
+        LiveParam p { parameters.getRawParameterValue (id), &liveOffsets, liveOffsets.indexOf (id) };
+        liveOffsets.markRead (p.index);
+        return p;
+    }
+    LiveParam attackParam {};
+    LiveParam releaseParam {};
+    LiveParam gainParam {};
+    LiveParam velocityRangeParam {};
+    LiveParam fineTuneParam {};
+    LiveParam bendRangeParam {};
+    std::array<LiveParam, 10> subParams {};   ///< SUB (subFields() order, version hint 33)
     /** VIBRATO (enabled, depth, rate, delay, rise, control, amount, sources A-C). */
-    std::array<std::atomic<float>*, 10> vibratoParams {};
-    std::atomic<float>* lifeParam = nullptr;
-    std::atomic<float>* dynamicsParam = nullptr;
-    std::atomic<float>* characterParam = nullptr;
-    std::atomic<float>* motionParam = nullptr;
-    std::atomic<float>* spaceParam = nullptr;
-    std::atomic<float>* reimaginedParam = nullptr;
-    std::atomic<float>* echoParam = nullptr;
-    std::atomic<float>* driveParam = nullptr;
-    std::atomic<float>* arpEnabledParam = nullptr;
-    std::atomic<float>* arpPatternParam = nullptr;
-    std::atomic<float>* arpRateParam = nullptr;
-    std::atomic<float>* arpGateParam = nullptr;
-    std::atomic<float>* arpOctavesParam = nullptr;
-    std::atomic<float>* arpVelocityParam = nullptr;
-    std::atomic<float>* arpSwingParam = nullptr;
+    std::array<LiveParam, 10> vibratoParams {};
+    LiveParam lifeParam {};
+    LiveParam dynamicsParam {};
+    LiveParam characterParam {};
+    LiveParam motionParam {};
+    LiveParam spaceParam {};
+    LiveParam reimaginedParam {};
+    LiveParam echoParam {};
+    LiveParam driveParam {};
+    LiveParam arpEnabledParam {};
+    LiveParam arpPatternParam {};
+    LiveParam arpRateParam {};
+    LiveParam arpGateParam {};
+    LiveParam arpOctavesParam {};
+    LiveParam arpVelocityParam {};
+    LiveParam arpSwingParam {};
     // MODULATION's parameters, its curves (message thread, customLock) and their tables
     // for the audio thread (atomics + generation, as SHAPER CUSTOM's steps).
-    std::array<std::array<std::atomic<float>*, 8>, 2> modLfoParams {};
-    std::array<std::array<std::atomic<float>*, 7>, 2> modEnvParams {};
-    std::array<std::array<std::atomic<float>*, 5>, mod::maxRoutes> modRouteParams {};   ///< source, dest, depth, enabled, destExt
+    std::array<std::array<LiveParam, 8>, 2> modLfoParams {};
+    std::array<std::array<LiveParam, 7>, 2> modEnvParams {};
+    std::array<std::array<LiveParam, 5>, mod::maxRoutes> modRouteParams {};   ///< source, dest, depth, enabled, destExt
     static constexpr int numModValues = 2 * 8 + 2 * 7 + mod::maxRoutes * 6;   // (each route's five parameters and its target)
     // META-MODULATION's links: each route's stable ID and a depth route's target ID live in
     // the state's ModLinks child (saved, undoable); the audio thread reads them resolved to
@@ -844,48 +889,48 @@ private:
     std::uint32_t appliedModCurveGeneration = 0;
     void publishModulationCurves() noexcept;
     void applyModulation (bool force) noexcept;
-    std::atomic<float>* pitchCharacterParam = nullptr;
-    std::atomic<float>* sustainParam = nullptr;
-    std::atomic<float>* seedParam = nullptr;
+    LiveParam pitchCharacterParam {};
+    LiveParam sustainParam {};
+    LiveParam seedParam {};
     // The per-card arpeggiator (version hint 27).
-    std::atomic<float>* arpLinkParam = nullptr;
-    std::array<std::atomic<float>*, 3> arpCardParams {};
-    std::array<std::atomic<float>*, 2> arpLanePatternParams {}, arpLaneRateParams {}, arpLaneOctavesParams {};
-    std::atomic<float>* mpeParam = nullptr;
+    LiveParam arpLinkParam {};
+    std::array<LiveParam, 3> arpCardParams {};
+    std::array<LiveParam, 2> arpLanePatternParams {}, arpLaneRateParams {}, arpLaneOctavesParams {};
+    LiveParam mpeParam {};
     // A/B layers: blend, then per layer source mode and POS, SIZE, DENS, TUNE, SPREAD.
-    std::atomic<float>* blendParam = nullptr;
+    LiveParam blendParam {};
     struct LayerParams
     {
-        std::atomic<float>* mode = nullptr;
-        std::array<std::atomic<float>*, 5> granular {};
+        LiveParam mode {};
+        std::array<LiveParam, 5> granular {};
         std::array<float, 9> last { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
-        std::array<std::atomic<float>*, 8> controls {};   ///< in layerControlNames() order
+        std::array<LiveParam, 8> controls {};   ///< in layerControlNames() order
         std::array<float, 8> lastControls { -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f, -1.0e9f };
-        std::atomic<float>* reimagined = nullptr;   ///< B and C (A follows the instrument's)
+        LiveParam reimagined {};   ///< B and C (A follows the instrument's)
         float lastReimagined = -1.0e9f;
-        std::array<std::atomic<float>*, 15> modes {};   ///< in reimaginedModeNames() order
+        std::array<LiveParam, 15> modes {};   ///< in reimaginedModeNames() order
         std::array<float, 15> lastModes {};
-        std::atomic<float>* mute = nullptr;
-        std::atomic<float>* solo = nullptr;
+        LiveParam mute {};
+        LiveParam solo {};
         bool lastAudible = true;
-        std::array<std::atomic<float>*, 19> eq {};   ///< in eqParameterNames() order
+        std::array<LiveParam, 19> eq {};   ///< in eqParameterNames() order
         std::array<float, 19> lastEq {};
         eq::Settings eqSettings;
-        std::array<std::atomic<float>*, 5> dampen {};   ///< in dampenParameterNames() order
+        std::array<LiveParam, 5> dampen {};   ///< in dampenParameterNames() order
         std::array<float, 5> lastDampen {};
         std::uint32_t dampenGeneration = 0;
         dampen::Settings dampenSettings;
-        std::array<std::atomic<float>*, 3> grainOptions {};   ///< SCATTER, PAN, WINDOW (hint 20)
-        std::atomic<float>* keyDnaAmount = nullptr;
-        std::atomic<float>* synthesize = nullptr;   ///< SYNTHESIZE 0..100 % (hint 22)
-        std::atomic<float>* pedalLoop = nullptr;    ///< PEDAL LOOP: 0 Normal, 1 Forward, 2 Ping-Pong (hint 29)
-        std::array<std::atomic<float>*, 10> satellite {};   ///< SATELLITE's fields (satelliteFields(), hint 32)
+        std::array<LiveParam, 3> grainOptions {};   ///< SCATTER, PAN, WINDOW (hint 20)
+        LiveParam keyDnaAmount {};
+        LiveParam synthesize {};   ///< SYNTHESIZE 0..100 % (hint 22)
+        LiveParam pedalLoop {};    ///< PEDAL LOOP: 0 Normal, 1 Forward, 2 Ping-Pong (hint 29)
+        std::array<LiveParam, 10> satellite {};   ///< SATELLITE's fields (satelliteFields(), hint 32)
         float lastPedalLoop = -1.0f;
         int lastLoopFallback = -1;
-        std::array<std::atomic<float>*, 6> synth {};   ///< the SYNTH page (hint 23), synthParameterNames() order
-        std::array<std::atomic<float>*, 3> imprint {};   ///< its spectral imprint (hint 28), imprintParameterNames() order
+        std::array<LiveParam, 6> synth {};   ///< the SYNTH page (hint 23), synthParameterNames() order
+        std::array<LiveParam, 3> imprint {};   ///< its spectral imprint (hint 28), imprintParameterNames() order
     };
-    std::atomic<float>* grainBudgetParam = nullptr;
+    LiveParam grainBudgetParam {};
     std::atomic<int> synthAudition { 0 };   ///< SYNTHESIZE's development audition (blend | envelope << 8); never saved
     // KEY DNA: the message thread's settings and the profiles handed to the audio thread.
     mutable std::mutex keyDnaMutex;   ///< message-side (hosts may save state off the message thread)
@@ -895,17 +940,17 @@ private:
     std::array<const keydna::Profile*, numLayers> keyDnaPlaying {};   ///< audio thread
     std::array<std::atomic<std::uint64_t>, numLayers> keyDnaInUse {};
     void swapKeyDnaIfPending() noexcept;
-    std::atomic<float>* mixXParam = nullptr;
-    std::atomic<float>* mixYParam = nullptr;
-    std::atomic<float>* decayParam = nullptr;
-    std::atomic<float>* sustainLevelParam = nullptr;
-    std::atomic<float>* voiceModeParam = nullptr;
-    std::atomic<float>* glideParam = nullptr;
+    LiveParam mixXParam {};
+    LiveParam mixYParam {};
+    LiveParam decayParam {};
+    LiveParam sustainLevelParam {};
+    LiveParam voiceModeParam {};
+    LiveParam glideParam {};
     float lastDecay = -1.0f, lastSustainLevel = -1.0f;
     std::array<LayerParams, numLayers> layerParams;
     // Shaping system v1.0 (the macro popups), in the order of shapingIds().
     static constexpr int numShapingParams = 71;
-    std::array<std::atomic<float>*, numShapingParams> shapingParams {};
+    std::array<LiveParam, numShapingParams> shapingParams {};
     std::array<float, numShapingParams> lastShaping {};
     Shaping shapingFromParameters() const noexcept;
     // MIDI-controlled macro values (CC 20-26; ECHO is 26), used until the host parameter moves again.

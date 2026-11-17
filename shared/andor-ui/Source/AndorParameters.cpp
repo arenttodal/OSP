@@ -802,6 +802,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
     return layout;
 }
 
+void InstrumentHost::addUserMacroParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint,
+                                             const std::function<juce::String (int macro)>& idOf)
+{
+    // As ANDOR ANALOG's (USER MACROS V1.1): 0..100 % in 0.1 steps, default 0.
+    auto percentText = [] (float v, int) { return juce::String (juce::roundToInt (v)) + " %"; };
+    for (int macro = 0; macro < 6; ++macro)
+        layout.add (parameters::make<juce::AudioParameterFloat> (juce::ParameterID { idOf (macro), versionHint }, "User Macro " + juce::String (macro + 1),
+                                                                 juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f), 0.0f,
+                                                                 juce::AudioParameterFloatAttributes().withLabel ("%").withStringFromValueFunction (percentText)));
+}
+
 void InstrumentHost::addVibratoParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout)
 {
     using Range = juce::NormalisableRange<float>;

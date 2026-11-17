@@ -70,6 +70,23 @@ public:
                 }
                 break;
             }
+            case Action::library:
+            {
+                // Books on a shelf, line art in the sliders' weight: two upright spines and a third
+                // tilted 5 degrees (the owner's choice, 17 November), standing on its outer foot
+                // on the shelf line, so the three stand on one optical baseline.
+                const float base = c.y + 6.0f, h = 12.0f;
+                g.setColour (ink);
+                g.drawRoundedRectangle (juce::Rectangle<float> (c.x - 7.0f, base - h, 3.6f, h), 0.8f, 1.2f);
+                g.drawRoundedRectangle (juce::Rectangle<float> (c.x - 2.6f, base - h + 1.5f, 3.6f, h - 1.5f), 0.8f, 1.2f);
+                juce::Path leaning;
+                leaning.addRoundedRectangle (juce::Rectangle<float> (-3.6f, -h + 1.0f, 3.6f, h - 1.0f), 0.8f);
+                leaning.applyTransform (juce::AffineTransform::rotation (juce::degreesToRadians (5.0f)).translated (c.x + 6.2f, base));
+                g.strokePath (leaning, juce::PathStrokeType (1.2f));
+                g.setColour (ink.withMultipliedAlpha (0.75f));
+                g.fillRoundedRectangle (c.x - 8.0f, base + 0.6f, 16.0f, 1.2f, 0.6f);
+                break;
+            }
             case Action::info:
             {
                 // A small circled "i"; on, the circle in Learn's green.
@@ -101,6 +118,7 @@ private:
             case Action::aux: return "AUX D";
             case Action::settings: return "Advanced Settings";
             case Action::info: return "Info";
+            case Action::library: return "Library";
         }
         return {};
     }
@@ -111,6 +129,7 @@ private:
             case Action::aux: return "Shows or hides AUX D below the oscillator cards";
             case Action::settings: return "Opens or closes the Advanced settings";
             case Action::info: return "Turns contextual Info on or off";
+            case Action::library: return "Opens or closes the Library of sounds and instruments";
         }
         return {};
     }

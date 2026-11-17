@@ -495,20 +495,24 @@ Cmd/Ctrl+L close it.
 - **Presets, Templates, Sounds** at the top. On the left: All, Factory, User, Packs,
   Favorites, Recent, Trash; your collections (**+** makes one); the categories or sound
   types, each with how many it holds. Type in the search field to narrow it.
-- **Presets** are complete instruments with their sounds. **Templates** are settings only,
-  ready for your own sounds; the built-in starting states (Natural, Alive, …) are there,
-  read only. Double-click (or **Load**) to open one. **Back to previous patch** at the
-  bottom undoes it.
-- **Sounds**: every sound you have loaded is kept here automatically. Click one to see it in
-  the inspector on the right: its waveform (click it, ▶, or press Space to hear it), Type,
-  root note, collections, tags, notes and details. **Load to A / B / C** puts it in that
-  layer; **Load to First Empty** in the first free one (when all three are full, it asks
-  which to replace).
-- **Audition**: drag up to three sounds into **A**, **B** and **C** at the bottom (or click
-  an empty slot to take the selected sound). Click a slot to hear it, ▶ to hear all three
-  together. Switch **Keys play the audition** to play them on the keyboard, pitched. None of
-  this changes your patch. **Load to Instrument** puts them in A, B and C at once (layers
-  keep their settings); **Back to previous patch** undoes it.
+- **STARTING STATES** sit at the top of **Presets** and **Templates**: the built-in states
+  (Natural, Alive, Floating, Broken, Frozen, Dream, Wide) as small tiles, the one in use
+  marked. A click applies it: the settings change, your sounds stay. Below them, the list:
+  **PRESETS** are complete instruments with their sounds; **TEMPLATES** are your own
+  settings-only states, ready for your sounds. Double-click (or **Load**) to open one. The
+  search narrows both sections. **Back to previous patch** at the bottom undoes it.
+- **Sounds**: every sound you have loaded is kept here automatically. Select a sound. Press
+  Space to play or pause. Drag it onto a source. Space pauses where it is and resumes from
+  there; at the end of the sound it starts again from the beginning (the ▶ / ❚❚ key in the
+  inspector is the same transport). Space is the preview's while the Library has the keyboard
+  focus and you are not typing; holding it toggles once. The inspector shows the sound's name,
+  its length, channels, rate and format, its waveform (with the playhead and time), Type, root
+  note, collections, tags and notes.
+- **SOURCES A B C** at the bottom: drag a sound onto **A**, **B** or **C** and it is in that
+  source at once (an occupied source is replaced; **Back to previous patch** undoes it). A
+  click on an empty source takes the selected sound. Double-click (or Return) loads the
+  selected sound into the first empty source. ▶ plays the three wells together, dry. The
+  keyboard and MIDI always play the instrument.
 - **Save…** (top right) saves the patch as a preset (with its sounds) or a template
   (settings only), with a category, tags and a description. Tick **Include audio as
   portable copy** to also write an `.ospinstrument` you can share. An existing name is

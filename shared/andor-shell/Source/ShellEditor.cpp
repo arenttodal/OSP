@@ -1893,6 +1893,8 @@ void ShellEditor::utilityKeyClicked (osp::plugin::KeyboardUtilityActions::Action
                 learnAction (andor::learn::actions::infoToggled, "keyboard.info");
             }
             break;
+        case Action::library:
+            break;   // (ANDOR OSP's key: no shell product shows it)
     }
     refreshUtilityKeys();
 }

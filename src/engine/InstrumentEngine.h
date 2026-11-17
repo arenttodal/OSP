@@ -394,6 +394,8 @@ public:
         // One Shot notes: one read head per playing voice.
         static constexpr int playheadCapacity = 64;
         std::array<std::atomic<float>, playheadCapacity> playheadPosition {}, playheadLevel {};
+        /** The set member each read head plays (-1: not a set member): which recorded region. */
+        std::array<std::atomic<int>, playheadCapacity> playheadMember {};
         std::atomic<int> playheads { 0 };
     };
     const GrainSnapshot& grainSnapshot (int layer) const noexcept { return slots[layerIndex (layer)].grains; }
