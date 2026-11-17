@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "UserMacroEditor.h"
 #include "MacroPopups.h"
 #include "WheelPopups.h"
 #include "ActionEvents.h"
@@ -151,6 +152,8 @@ void OspAudioProcessorEditor::OutsideClickWatcher::mouseDown (const juce::MouseE
 
 void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
 {
+    if (userMacroController != nullptr && (c == this || isParentOf (c)))
+        userMacroController->mouseDownAnywhere (c);   // (a click elsewhere: the halos back to their quiet arcs)
     if (popup == nullptr)
     {
         closedByLabelPress = -1;
@@ -417,6 +420,47 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     modPanel.showTab (ospProcessor.modPanelTab());
     content.addAndMakeVisible (modOverlay);   // last: above everything (popups bring it back up)
 
+    // USER MACROS: six assignable macros in CORE's places, behind the CORE / USER tabs.
+    {
+        UserMacroController::Editor host;
+        host.host = &ospProcessor;
+        host.parameters = &ospProcessor.parameters;
+        host.content = &content;
+        host.coreRow = &macros;
+        host.modOverlay = &modOverlay;
+        juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
+        host.closePopup = [safe] { if (safe != nullptr) safe->closePopup(); };
+        host.openPanel = [safe] (std::unique_ptr<MiniPanel> panel, juce::Component& anchor) {
+            if (safe == nullptr)
+                return false;
+            safe->openAnchoredPopover (std::move (panel), anchor);
+            if (safe->popupIndex != anchoredPopup)
+                return false;
+            safe->anchorAbove = true;   // (over the macro's name, as CORE's popovers)
+            safe->positionPopup();
+            return true;
+        };
+        host.learnAction = [safe] (const juce::String& action, const juce::String& target, const juce::String& parameterId) {
+            if (safe != nullptr)
+                safe->learnAction (action, target, parameterId);
+        };
+        host.savedBank = [safe] { return safe != nullptr ? safe->ospProcessor.macroBank() : 0; };
+        host.saveBank = [safe] (int bank) { if (safe != nullptr) safe->ospProcessor.setMacroBank (bank); };
+        host.macroPanelArea = [safe] { return safe != nullptr ? design::layout::macroPanel.translated (0.0f, -safe->sourceTrim()) : juce::Rectangle<float>(); };
+        host.isShowing = [safe] { return safe != nullptr && safe->isShowing(); };
+        auto descriptor = usermacros::descriptor();
+        auto makePanel = descriptor.panel;
+        descriptor.panel = [safe, makePanel] (InstrumentHost& h, int macro, const juce::String& select) -> std::unique_ptr<MiniPanel> {
+            auto panel = makePanel (h, macro, select);
+            if (auto* p = dynamic_cast<UserMacroPanel*> (panel.get()))
+                p->onAddAssignment = [safe] (int m) { if (safe != nullptr && safe->userMacroController != nullptr) safe->userMacroController->beginPick (m); };
+            return panel;
+        };
+        userMacroController = std::make_unique<UserMacroController> (std::move (host), std::move (descriptor));
+        userMacroController->setUp();
+        userMacroController->place();
+    }
+
     juce::Desktop::getInstance().addGlobalMouseListener (&outsideClicks);
 
     // The instrument is laid out once at the reference size (design::width x height) and
@@ -652,14 +696,18 @@ void OspAudioProcessorEditor::closePopup()
     }
     if (popupIndex == subPopup)
         arpButton.setSecondRowOpen (false);
-    if (popupIndex == anchoredPopup)
+    const bool anchored = popupIndex == anchoredPopup;
+    if (anchored)
     {
         content.removeChildComponent (&popupBackdrop);
         popupAnchor = nullptr;
+        anchorAbove = false;
     }
     juce::Desktop::getInstance().getAnimator().cancelAnimation (popup.get(), false);
     popup.reset();
     popupIndex = -1;
+    if (anchored && userMacroController != nullptr)
+        userMacroController->popupClosed();   // (a USER macro's panel: its name no longer open)
 }
 
 void OspAudioProcessorEditor::openAnchoredPopover (std::unique_ptr<MiniPanel> panel, juce::Component& anchor)
@@ -713,6 +761,13 @@ void OspAudioProcessorEditor::positionPopup()
     else if (popupIndex == routesPopup || popupIndex == curvePopup)
     {
         const auto at = frame::modulationPopoverOrigin (modPanel.getBounds().toFloat(), size);
+        x = at.x;
+        y = at.y;
+    }
+    else if (popupIndex == anchoredPopup && popupAnchor != nullptr && anchorAbove)
+    {
+        // A USER macro's assignments unfold directly above its name, as CORE's popovers do.
+        const auto at = frame::macroPopoverOrigin (content.getLocalArea (popupAnchor.getComponent(), popupAnchor->getLocalBounds()).toFloat(), size);
         x = at.x;
         y = at.y;
     }
@@ -1378,6 +1433,8 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
     // Escape closes Learn's note, browser or Info first; then the popover, as before.
     if (learn != nullptr && learn->keyPressed (key))
         return true;
+    if (userMacroController != nullptr && userMacroController->keyPressed (key))
+        return true;   // (Escape: an assignment being dragged or picked is cancelled)
     if (key == juce::KeyPress::escapeKey && popup != nullptr)
     {
         // Closed asynchronously: the key may have come through one of the popup's children.
@@ -1439,13 +1496,17 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
     // The shared ANDOR frame with OSP's identity (ANDOR/OSP, One Shot Performer).
     // (The housing keeps its height; what the arpeggiator and the racks add is room under it, as
     // the shell's editor draws it.)
-    frame::paint (g, content, frame::Identity {}, arpShown, macros, rackShift(), sourceTrim(), design::height - sourceTrim());
+    // (the macros shown: CORE's or the USER bank's - their lights follow the knobs on screen)
+    const auto& shownRow = userMacroController != nullptr ? userMacroController->paintedRow() : macros;
+    frame::paint (g, content, frame::Identity {}, arpShown, shownRow, rackShift(), sourceTrim(), design::height - sourceTrim());
 }
 
 void OspAudioProcessorEditor::resized()
 {
     frame::fit (*this, content, instrumentHeight(), &overflow);
     modOverlay.setBounds (content.getLocalBounds());
+    if (userMacroController != nullptr)
+        userMacroController->assignOverlay().setBounds (content.getLocalBounds());   // (over the whole instrument, as the halos)
 }
 
 juce::Point<int> OspAudioProcessorEditor::toInstrument (juce::Point<int> editorPoint) const
@@ -1654,6 +1715,8 @@ void OspAudioProcessorEditor::layoutInstrument()
     parts.rackShift = rackShift();
     parts.sourceTrim = sourceTrim();
     frame::place (parts, arpShown);
+    if (userMacroController != nullptr)
+        userMacroController->place();   // (USER in CORE's places, the tabs on the panel's edge)
     {
         // FX ROUTING's key as ANDOR ANALOG's: SAVE's size, 8 px after it on its centre line (one
         // group of keys); MIX moved right by as much, narrower by as much (it centres itself).
@@ -1772,6 +1835,8 @@ void OspAudioProcessorEditor::refreshUtilityKeys()
 void OspAudioProcessorEditor::timerCallback()
 {
     refreshUtilityKeys();
+    if (userMacroController != nullptr)
+        userMacroController->tick();
     bool changed = false;
     int count = 0;
     for (int l = 0; l < OspAudioProcessor::numLayers; ++l)

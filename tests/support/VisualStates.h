@@ -183,7 +183,11 @@ namespace visualstates
         std::vector<Mask> result { { "identity", "the product's name and tagline", identity },
                                    { "preset-name", "the product's own presets", presetName },
                                    { "fx-routing", "FX ROUTING's key and the MIX it moves (absent without the routing view)", routingKey },
-                                   { "keyboard-actions", "the product's own keyboard action keys (D / SETTINGS / INFO)", keyboardActions } };
+                                   { "keyboard-actions", "the product's own keyboard action keys (D / SETTINGS / INFO)", keyboardActions },
+                                   // CORE / USER on the macro panel's top-left edge: products with USER macros
+                                   // (ANDOR OSP, ANDOR ANALOG); a product without them draws the plain edge.
+                                   { "macro-bank", "the CORE / USER folder tabs (absent without USER macros)",
+                                     osp::plugin::MacroBankTab::boundsFor (macroPanel.translated (0.0f, -sourceTrim)) } };
         // The open ARP panel's per-card row (PLAYS / LINK / EDIT): ANDOR OSP's arpeggiator plays
         // per card; a product with one engine (or one arpeggiator) draws nothing there.
         if (arpOpen)

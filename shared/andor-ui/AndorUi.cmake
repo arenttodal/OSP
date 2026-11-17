@@ -38,6 +38,7 @@ set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/AndorSubPanel.cpp
     ${ANDOR_UI_DIR}/Source/UserMacroAssignments.cpp
     ${ANDOR_UI_DIR}/Source/UserMacroEditor.cpp
+    ${ANDOR_UI_DIR}/Source/UserMacroController.cpp
     ${ANDOR_UI_DIR}/Source/FxRack.cpp
     ${ANDOR_UI_DIR}/Source/FxRouting.cpp
     ${ANDOR_UI_DIR}/Source/CharacterRack.cpp

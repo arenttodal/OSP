@@ -4091,6 +4091,37 @@ namespace
     }
 }
 
+int OspAudioProcessor::macroBank() const
+{
+    if (! macroBankShown.has_value())
+    {
+        int bank = 0;
+        if (const auto xml = juce::XmlDocument::parse (documentsRoot().getChildFile ("Interface.xml")); xml != nullptr && xml->hasTagName ("Interface"))
+            if (const auto* node = xml->getChildByName ("MacroBank"))
+                bank = node->getStringAttribute ("shown") == "user" ? 1 : 0;
+        macroBankShown = bank;
+    }
+    return *macroBankShown;
+}
+
+void OspAudioProcessor::setMacroBank (int bank)
+{
+    bank = bank == 1 ? 1 : 0;
+    if (macroBank() == bank)
+        return;
+    macroBankShown = bank;
+    const auto file = documentsRoot().getChildFile ("Interface.xml");
+    juce::XmlElement xml ("Interface");
+    if (const auto old = juce::XmlDocument::parse (file); old != nullptr && old->hasTagName ("Interface"))
+        xml = *old;
+    auto* node = xml.getChildByName ("MacroBank");
+    if (node == nullptr)
+        node = xml.createNewChildElement ("MacroBank");
+    node->setAttribute ("shown", bank == 1 ? "user" : "core");
+    file.getParentDirectory().createDirectory();
+    xml.writeTo (file);
+}
+
 juce::File OspAudioProcessor::startingStateFolder()
 {
     return documentsRoot().getChildFile ("Starting States");

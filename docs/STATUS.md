@@ -1,5 +1,32 @@
 # Status
 
+> **17 Nov 2026, USER MACROS V1.2: ANDOR ANALOG's USER MACROS ported into OSP (branch
+> `claude/osp-user-macros`, on `claude/osp-atlas-refine`; `docs/research/osp-user-macros/`):**
+> - **Macros:** six USER macros (`userMacro.1..6`) behind a CORE / USER folder tab on the macro
+>   panel. Each moves up to eight controls, with an anchored range and no jump when assigned.
+> - **Engine and state:**
+>   - offsets are summed and clamped once, before modulation, gliding in ~20 ms;
+>   - an unassigned macro is bit-exact;
+>   - the `UserMacros` state is stateVersion 17;
+>   - the bank shown is a preference of this computer (Documents/OSP/Interface.xml).
+> - **Shared code:**
+>   - core, state, edits and panel are in `src/engine/usermacro` and `shared/andor-ui`
+>     (UserMacroCore, UserMacroAssignments, UserMacroEditor);
+>   - the editor glue is the new `UserMacroController`;
+>   - `LiveParam` routes every parameter read through the offsets.
+> - **Interface:**
+>   - lens drag, pick mode, the right-click menu "Assign to Macro" (overlay and knob);
+>   - range ends on the halos;
+>   - rename, the label menu, the panel above the name;
+>   - Learn lesson "Create a macro".
+> - **Coverage:** 491 of 872 parameters (`01-coverage.md`).
+> - **CPU:** about +0.3 % of real time with 48 moving assignments.
+> - **NEXT:**
+>   - ANDOR ANALOG's `ShellEditor` replaces its own copy of the glue with
+>     `UserMacroController` when its OSP pin moves (FxRouting.h header collisions block that
+>     build today);
+>   - a manual pass in Logic and Ableton (automation of `userMacro.N`, right-click routing).
+
 > **17 Nov 2026, NOTE ATLAS refinements and tutorials (branch `claude/osp-atlas-refine`, for
 > review; `docs/research/note-atlas-refinements.md`):**
 > - **Round robin with LOOP off:** not reproduced. Selection is the same with LOOP on or off, and
@@ -20,7 +47,6 @@
 > - **NEXT:**
 >   - ANDOR Analog gets the 3-second auto-advance when its OSP pin moves;
 >   - a lesson for Record (live capture), SYNTH and FX ROUTING.
-> - **Queued:** USER MACROS V1.2 port from ANDOR Analog.
 
 > **16 Nov 2026, Learn: every lesson ends in the tutorials; the Quick Start ends on INFO (both
 > instruments, shared `shared/andor-learn`):**

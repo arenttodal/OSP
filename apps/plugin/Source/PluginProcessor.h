@@ -424,6 +424,11 @@ public:
     float userMacroOffsetOf (const juce::String& parameterId) const { return liveOffsets.offset (liveOffsets.indexOf (parameterId)); }
     /** The active, compiled table (tests). */
     const usermacro::Snapshot& userMacroTable() const noexcept { return userMacroCompiled; }
+    /** The macro bank shown (0 CORE, 1 USER): an interface preference of this computer
+        (Documents/OSP/Interface.xml, <MacroBank shown="core|user"/>), never a sound's - a preset,
+        undo or a session never changes it. A new musician starts on CORE. */
+    int macroBank() const;
+    void setMacroBank (int bank);
 
     juce::AudioProcessorValueTreeState parameters;
     juce::MidiKeyboardState keyboardState;
@@ -827,6 +832,7 @@ private:
     bool userMacroLive = false, userMacroPrimed = false;
     double userMacroRate = 48000.0;
     std::uint64_t userMacroRevisionCount = 1;
+    mutable std::optional<int> macroBankShown;
     LiveParam liveParameter (const juce::String& id)
     {
         LiveParam p { parameters.getRawParameterValue (id), &liveOffsets, liveOffsets.indexOf (id) };

@@ -18,6 +18,7 @@
 #include "PluginProcessor.h"
 #include "ShapingPopups.h"
 #include "LearnController.h"
+#include "UserMacroController.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -215,7 +216,7 @@ public:
     andor::learn::LearnController* learnController() noexcept { return learn.get(); }
     /** A committed user gesture that is not a parameter (a popover opened, a tab chosen, a file
         dropped): reported to Learn from the click's own handler, never from a callback. */
-    void learnAction (const juce::String& actionId, const juce::String& targetId = {});
+    void learnAction (const juce::String& actionId, const juce::String& targetId = {}, const juce::String& parameterId = {});
     /** Tests: the parameter-gesture bridge (a knob's gesture as JUCE delivers it). */
     andor::learn::ParameterGestureBridge* learnGestureBridge() noexcept { return learnGestures.get(); }
     const std::array<OspKeyboard::KeyTint, 128>& keyboardTints() const noexcept { return keyTints; }
@@ -314,6 +315,8 @@ public:
     static std::optional<rack::Kind> macroRackKind (const juce::String& parameterId);
     bool isMacroRackOpen (rack::Kind kind) const;
     frame::MacroRow& macroRow() noexcept { return macros; }
+    /** USER MACROS (UserMacroController: the USER bank, assigning, the halos' ranges). */
+    UserMacroController& userMacros() noexcept { return *userMacroController; }
 private:
 
     // Mix, macros, envelope
@@ -346,6 +349,8 @@ private:
     ArpInlinePanel arpPanel { ospProcessor };
     bool arpShown = false;
     ModulationOverlay modOverlay { ospProcessor, content };
+    std::unique_ptr<UserMacroController> userMacroController;   ///< (after modOverlay: it unhooks it first)
+    bool anchorAbove = false;   ///< anchoredPopup unfolds above its anchor (a USER macro's panel, over its name)
     int modSelSource = -1, modSelSlot = -1;
     int popupSource = 0;                 ///< the modulation popovers' source
     int hoverMacro = -1;                 ///< a dragged source resting on a macro (opens its popover)

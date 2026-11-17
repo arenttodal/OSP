@@ -24,16 +24,19 @@ namespace
                              .getChildFile ("osp-learn-test-" + juce::String (juce::Random::getSystemRandom().nextInt64()));
         juce::String learnBefore = juce::SystemStats::getEnvironmentVariable ("ANDOR_LEARN_DIR", {});
         juce::String tutorialBefore = juce::SystemStats::getEnvironmentVariable ("OSP_TUTORIAL_DIR", {});
+        juce::String documentsBefore = juce::SystemStats::getEnvironmentVariable ("OSP_DOCUMENTS_DIR", {});
         ScopedLearnFolders()
         {
             dir.createDirectory();
             setEnv ("ANDOR_LEARN_DIR", dir.getChildFile ("learn").getFullPathName());
             setEnv ("OSP_TUTORIAL_DIR", dir.getChildFile ("sounds").getFullPathName());
+            setEnv ("OSP_DOCUMENTS_DIR", dir.getChildFile ("documents").getFullPathName());   // (the CORE / USER preference)
         }
         ~ScopedLearnFolders()
         {
             setEnv ("ANDOR_LEARN_DIR", learnBefore);
             setEnv ("OSP_TUTORIAL_DIR", tutorialBefore);
+            setEnv ("OSP_DOCUMENTS_DIR", documentsBefore);
             dir.deleteRecursively();
         }
     };
@@ -129,7 +132,7 @@ TEST_CASE ("learn: OSP's own plugin has the shared Learn, idle until asked; its 
     INFO (rig.learn.problems().joinIntoString ("\n"));
     CHECK (rig.learn.isUsable());
     CHECK (rig.learn.catalog().productId == "osp");
-    CHECK (rig.learn.catalog().lessons.size() == 14);
+    CHECK (rig.learn.catalog().lessons.size() == 15);
     CHECK (rig.learn.catalog().help.size() >= 30);
     // Idle: no note, no browser, no ring (nothing of Learn's in the editor).
     CHECK_FALSE (rig.learn.isActive());
@@ -679,4 +682,78 @@ TEST_CASE ("learn: Layering's last step says a sound or a phrase can simply be d
     REQUIRE (layers != nullptr);
     CHECK (layers->steps.back().id == "third");
     CHECK (layers->steps.back().body.contains ("drop a sound or a phrase onto the instrument"));
+}
+
+TEST_CASE ("learn: Create a macro - USER, a right-click on LEVEL, Assign to Macro 1, its range on the halo, Macro 1 turned", "[plugin][learn][usermacro]")
+{
+    LearnRig rig (1448);
+    rig.learn.setAutoAdvanceDelay (0);
+    REQUIRE (rig.learn.startLesson ("osp.usermacros"));
+    rig.tick();
+    REQUIRE (rig.stepId() == "setup");
+    rig.learn.noteAction ("example");
+    rig.waitLoaded();
+    rig.tick();
+    if (rig.stepId() == "setup")
+    {
+        rig.learn.noteAction ("current");
+        rig.tick();
+    }
+    REQUIRE (rig.stepId() == "user");
+    auto& um = rig.ui.userMacros();
+    REQUIRE (um.bankShown() == 0);
+    um.tab()->onChange (1);   // (a click on USER: the tab's own handler)
+    rig.tick();
+    CHECK (rig.stepDone());
+    rig.learn.noteAction ("next");
+    rig.tick();
+    REQUIRE (rig.stepId() == "menu");
+    const auto level = osp::plugin::InstrumentHost::layerParameterId (rig.p.editLayer(), "level");
+    auto menu = rig.ui.modulationOverlay().contextMenu (level);   // (a right-click on LEVEL)
+    rig.tick();
+    REQUIRE (rig.stepId() == "assign");   // (its menu open: the step after speaks to it)
+    const juce::PopupMenu::Item* macro1 = nullptr;
+    for (juce::PopupMenu::MenuItemIterator it (menu, true); it.next();)
+        if (it.getItem().text == "Macro 1")
+            macro1 = &it.getItem();
+    REQUIRE (macro1 != nullptr);
+    macro1->action();
+    rig.tick();
+    CHECK (rig.stepDone());
+    CHECK (um.bankShown() == 1);   // (assigning never switches the tab)
+    rig.learn.noteAction ("next");
+    rig.tick();
+    REQUIRE (rig.stepId() == "range");
+    // An end dragged on the halo (the overlay's own hook, as its mouse-up commits).
+    auto& overlay = rig.ui.modulationOverlay();
+    REQUIRE (overlay.editMacroRange != nullptr);
+    using Edit = osp::plugin::ModulationOverlay::MacroEdit;
+    overlay.editMacroRange (0, level, 1, 0.9f, Edit::begin);
+    overlay.editMacroRange (0, level, 1, 0.9f, Edit::move);
+    overlay.editMacroRange (0, level, 1, 0.9f, Edit::commit);
+    rig.tick();
+    CHECK (rig.stepDone());
+    rig.learn.noteAction ("next");
+    rig.tick();
+    REQUIRE (rig.stepId() == "turn");
+    // (the USER knob pressed, turned and released: Learn's own touch watcher on it)
+    auto* watcher = rig.learn.touchWatcher ("usermacro.0");
+    REQUIRE (watcher != nullptr);
+    auto* knob = dynamic_cast<juce::Slider*> (watcher->watched());
+    REQUIRE (knob == &um.row()[0].slider);
+    const auto at = [knob] {
+        return juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), {}, {}, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, knob, knob,
+                                 juce::Time::getCurrentTime(), {}, juce::Time::getCurrentTime(), 1, false);
+    };
+    watcher->mouseDown (at());
+    knob->setValue (60.0, juce::sendNotificationSync);
+    rig.tick();
+    watcher->mouseUp (at());
+    rig.tick();
+    CHECK (rig.stepDone());
+    rig.learn.noteAction ("next");
+    rig.tick();
+    REQUIRE (rig.stepId() == "review");
+    CHECK (rig.learn.targets().boundsIn ("usermacro.0.label", *rig.learn.highlight()->getParentComponent()).has_value());
+    um.showBank (0);
 }

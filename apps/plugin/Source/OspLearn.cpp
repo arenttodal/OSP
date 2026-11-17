@@ -628,6 +628,68 @@ static Catalog ospCatalog()
         c.lessons.push_back (l);
     }
     {
+        // USER MACROS (ANDOR ANALOG's lesson, on the edited layer's LEVEL).
+        Lesson l;
+        l.id = "osp.usermacros";
+        l.title = "Create a macro";
+        l.description = "Control several settings with one knob.";
+        l.minutes = 3;
+        l.exampleId = "pluck";
+        auto user = step ("user", "macros.bank", "Open USER macros",
+                          "Click USER above the main macro knobs. This bank holds six knobs you can assign to settings anywhere in OSP.",
+                          Completion::action ({ "macroBank.changed" }, Condition::state ("macros.bank.user"))
+                              .withAlreadyDone (Condition::state ("macros.bank.user"), "The USER bank is already open."));
+        user.doneText = "The USER bank is open.";
+        user.revealOnEnter = false;
+        l.steps.push_back (user);
+        auto menu = step ("menu", "osp.source.level", "Choose a setting", "Find the layer's LEVEL knob on the card. Right-click it to open its menu.",
+                          Completion::action ({ "control.menu.opened" }, Condition::always()));
+        menu.advanceWhenDone = true;   // (its menu is open now: the next step speaks to it)
+        l.steps.push_back (menu);
+        auto assign = step ("assign", "osp.source.level", "Assign Macro 1",
+                            "Choose Assign to Macro, then Macro 1. LEVEL is now moved by Macro 1, from where it is: nothing jumps.",
+                            Completion::action ({ "usermacro.assigned" }, Condition::state ("osp.usermacro.1.level"))
+                                .withAlreadyDone (Condition::state ("osp.usermacro.1.level"), "LEVEL is already assigned to Macro 1."));
+        assign.doneText = "Macro 1 now moves LEVEL.";
+        assign.outlineTarget = false;   // (the instruction is about the menu: the note sits by the knob)
+        assign.unavailableBody = "Right-click the layer's LEVEL knob again to open its menu.";
+        l.steps.push_back (assign);
+        Requirement assigned;
+        assigned.id = "osp.usermacro.assigned";
+        assigned.holds = Condition::state ("osp.usermacro.1.level");
+        assigned.title = "Assign Macro 1 first";
+        assigned.body = "Right-click the layer's LEVEL knob and choose Assign to Macro, then Macro 1.";
+        assigned.targetId = "osp.source.level";
+        assigned.offerExample = false;
+        auto range = step ("range", "osp.source.level", "Set the range",
+                           "The coloured arc around LEVEL is the range Macro 1 moves it through. Drag either end of the arc to change it.",
+                           Completion::action ({ "usermacro.range.changed" }, Condition::state ("osp.usermacro.1.level")));
+        range.doneText = "The range is set.";
+        range.requirements = { assigned };
+        l.steps.push_back (range);
+        auto turn = step ("turn", "usermacro.0", "Turn Macro 1",
+                          "Turn Macro 1 in the USER bank and play. The arc around LEVEL shows where it is now; the LEVEL knob itself stays where you set it.",
+                          Completion::action ({ "usermacro.0.touched" }, Condition::changed ("userMacro.1")));
+        turn.doneText = "Macro 1 moved LEVEL.";
+        turn.keepClear = { "osp.source.level" };
+        Requirement shown;
+        shown.id = "osp.usermacro.bank";
+        shown.holds = Condition::state ("macros.bank.user");
+        shown.title = "Open the USER bank";
+        shown.body = "Macro 1 is in the USER bank. Click USER above the main knobs.";
+        shown.targetId = "macros.bank";
+        shown.offerExample = false;
+        turn.requirements = { assigned, shown };
+        l.steps.push_back (turn);
+        auto review = step ("review", "usermacro.0.label", "Review the assignment",
+                            "Click the macro's name to see its assignments: LOW and HIGH, + ADD ASSIGNMENT for more settings, REMOVE. A double-click renames it.");
+        review.revealLabel = "Open USER";
+        l.steps.push_back (review);
+        l.completionText = "Macro 1 now moves LEVEL. One macro can move up to eight settings, each with its own range; the macros are saved with the sound.";
+        setUp (l, { soundReady() }, "A macro needs a sound to move: use your current one, or the plucked example.");
+        c.lessons.push_back (l);
+    }
+    {
         Lesson l;
         l.id = "osp.presets";
         l.title = "Presets and instruments";
@@ -688,6 +750,9 @@ static Catalog ospCatalog()
     help ("osp.macro.movement", "MOVEMENT", "How the sound changes over time: DRIFT, TAPE, CHORUS, PULSE or SHAPER. The knob sets how much.", "osp.sound");
     help ("osp.macro.echo", "ECHO", "Repeats of the sound (TAPE, BBD or ASCEND). The knob sets how loud they are; 0 % is off.", "osp.sound");
     help ("osp.macro.space", "SPACE", "Reverb: the knob sets how much. Click the name for ROOM, HALL, PLATE, SPRING and the other spaces.", "osp.sound");
+    help ("macros.bank", "CORE and USER macros",
+          "CORE holds the six main sound controls. USER holds six macros you assign yourself: right-click a knob and choose Assign to Macro, or drag the light under a USER knob onto it.",
+          "osp.usermacros");
     help ("osp.arp.control", "ARP", "Plays the notes you hold as a repeating pattern. The light switches it on; the rest of the key opens its settings.", "osp.arp");
     help ("osp.sub.row", "SUB", "A sub-bass one or two octaves below the keys you hold, added after the effects. The light switches it on; the row opens WAVE, GRIT, LEVEL and its key range.",
           "osp.sub");
@@ -842,6 +907,28 @@ struct OspLearnTargets
                          return knob.getLocalArea (&e.content, r);
                      }, {}, {}, true });
             t.add ({ id + ".label", [&m] { return static_cast<juce::Component*> (m.label.get()); } });
+        }
+        // USER MACROS: the CORE | USER tab (a click reports "macroBank.changed"), the six USER knobs
+        // (touches: "usermacro.N.touched"; Show me opens USER, an interface preference) and their names.
+        if (e.userMacroController != nullptr)
+        {
+            auto& um = *e.userMacroController;
+            t.add ({ "macros.bank", [&um] { return static_cast<juce::Component*> (um.tab()); }, {}, {}, {}, true });
+            t.addState ("macros.bank.user", [&um] { return um.bankShown() == 1; });
+            auto showUser = [&um] { um.showBank (1); return um.bankShown() == 1; };
+            for (int i = 0; i < frame::macroCount; ++i)
+            {
+                auto& knob = um.row()[static_cast<std::size_t> (i)];
+                t.add ({ "usermacro." + juce::String (i) + ".label",
+                         [&um, &knob] { return um.bankShown() == 1 ? static_cast<juce::Component*> (knob.label.get()) : nullptr; }, {}, showUser });
+                t.add ({ "usermacro." + juce::String (i), [&um, &knob] { return um.bankShown() == 1 ? static_cast<juce::Component*> (&knob.slider) : nullptr; }, {},
+                         showUser, {}, false, true });
+            }
+            // Macro 1 moves the edited layer's LEVEL (that exact assignment, not merely any).
+            t.addState ("osp.usermacro.1.level", [&p] {
+                const auto* s = p.userMacroAssignments();
+                return s != nullptr && s->find (0, InstrumentHost::layerParameterId (p.editLayer(), "level")) >= 0;
+            });
         }
         t.add ({ "osp.macros", comp (e.content), [&e] (juce::Component&) {
                      juce::Rectangle<int> all;
@@ -1194,11 +1281,11 @@ void OspAudioProcessorEditor::createLearn()
     samplesPanel.onUserEdit = [this] (const juce::String& what) { learnAction ("samples." + what, "osp.samples"); };
 }
 
-void OspAudioProcessorEditor::learnAction (const juce::String& actionId, const juce::String& targetId)
+void OspAudioProcessorEditor::learnAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId)
 {
     // Called only from the handlers of the musician's own clicks, drops and keys.
     if (learn != nullptr)
-        learn->userAction (actionId, targetId, {}, andor::learn::Origin::userPointer);
+        learn->userAction (actionId, targetId, parameterId, andor::learn::Origin::userPointer);
 }
 
 void OspAudioProcessorEditor::tickLearn()
