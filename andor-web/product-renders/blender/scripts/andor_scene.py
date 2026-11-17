@@ -44,6 +44,9 @@ p.add_argument("--setup", choices=["ANDOR_GALLERY", "ANDOR_FLOATING", "ANDOR_MAT
                help="Gate C: a campaign setup from config/campaign_setups.json (stage, lights, float, exposure); needs --shot")
 p.add_argument("--shot", help="Gate C: the setup's shot (camera, product rotation, resolution), e.g. A1, B2, C1")
 p.add_argument("--noise", type=float, default=0.012, help="adaptive-sampling noise threshold (masters: 0.005 keeps fine GUI text out of the denoiser's reach)")
+p.add_argument("--bezel-height", type=float, default=0.6, help="--wheels physical: the ivory bezel's height above the panel (mm; C2 test 0.6, C2.5 studies 0.4 / 0.3)")
+p.add_argument("--wheel-finish", default="satin", choices=["c2", "satin"],
+               help="--wheels physical: c2 = the C2 test's soft-touch charcoal; satin = a slightly lighter, lower-roughness crown that catches a highlight, over a darker, rougher slot")
 p.add_argument("--wheels", default="flat", choices=["flat", "physical"],
                help="C2 test only: 'physical' models PITCH/MOD from the GUI (ivory bezel, slot, wheel, PITCH's orange band); default flat artwork")
 p.add_argument("--float", type=float, help="override the setup's float height (m), for floating-height studies")
@@ -87,6 +90,18 @@ if args.setup:
     _cfg = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "campaign_setups.json")))
     SETUP = _cfg["setups"][args.setup]
     SHOT = SETUP["shots"][args.shot]
+    # C2.5: a shot may refine its setup without touching it ("overrides": floor, world, exposure,
+    # product_light_ev, per-light changes by name, extra lights), so earlier shots render as they were.
+    _ov = SHOT.get("overrides")
+    if _ov:
+        import copy
+        SETUP = copy.deepcopy(SETUP)
+        for _k in ("floor", "world", "exposure", "product_light_ev"):
+            if _k in _ov:
+                SETUP[_k] = _ov[_k]
+        for _L in SETUP["lights"]:
+            _L.update(_ov.get("lights", {}).get(_L["name"], {}))
+        SETUP["lights"] = [L for L in SETUP["lights"] if not L.get("off")] + _ov.get("add_lights", [])
     args.stage = SETUP["stage"]
     if args.res is None:
         args.res = SHOT["res"]
@@ -96,7 +111,11 @@ if args.res is None:
 TEX = os.path.abspath(args.textures)
 GEO = json.load(open(os.path.join(TEX, "geometry.json")))
 EW, EH = GEO["editor_px"]
-APRON = GEO.get("apron")          # checkpoint 2 (the trimmed editor); absent: the pass 3.5 footer + teak fascia
+APRON = GEO.get("apron")
+# C2.5: the current editor trims its three source cards (EngineCard::footTrim), so everything under
+# them sits higher. KY carries that to every editor y below the cards that is written as a number here
+# (0 for every earlier capture: their scenes rebuild unchanged).
+KY = GEO["keyboard"]["bed"][1] - 913.0          # checkpoint 2 (the trimmed editor); absent: the pass 3.5 footer + teak fascia
 # World origin: the pass 3.5 face centre (editor 1448 x 1086), kept for the trimmed editor too, so the
 # old and new instruments share every camera, light and pixel above the keyboard.
 CY = 1086 / 2
@@ -675,8 +694,8 @@ def front_body():
     SECTION["lip_bottom"] = zR
     # the keybed opening (geometry.keybed 146..1300 from 910) and, in front of it, the keyboard
     # section of the front lowered to the lip
-    cut = slab("Keybed cutter", ex(146), ey(1017.5), ex(1300), ey(910), 6 * PX, zF - 1 * MM, P + 2 * MM, [M_BEZEL], seg=6)
-    notch = slab("Front notch cutter", ex(146), ey(EH + 4), ex(1300), ey(1016), 0, zR - 1 * MM, P + 2 * MM, [M_BEZEL])
+    cut = slab("Keybed cutter", ex(146), ey(1017.5 + KY), ex(1300), ey(910 + KY), 6 * PX, zF - 1 * MM, P + 2 * MM, [M_BEZEL], seg=6)
+    notch = slab("Front notch cutter", ex(146), ey(EH + 4), ex(1300), ey(1016 + KY), 0, zR - 1 * MM, P + 2 * MM, [M_BEZEL])
     for c_ in (cut, notch):
         c_.hide_render = c_.hide_viewport = True
 
@@ -701,7 +720,7 @@ def front_body():
     bake(tray, lambda c, n: 0)
 
     # 3 keybed floor (dark), under the keys and the slot
-    floor = slab("Keybed floor", ex(144), ey(1019), ex(1302), ey(903), 0, zF - 0.8 * MM, zF, [M_KEYBED])
+    floor = slab("Keybed floor", ex(144), ey(1019 + KY), ex(1302), ey(903 + KY), 0, zF - 0.8 * MM, zF, [M_KEYBED])
     bake(floor, lambda c, n: 0)
 
     # 2 keys
@@ -710,7 +729,7 @@ def front_body():
     pitch = (KB_[2] - KB_[0]) / n_white
     g, bg = 0.12 * MM / PX, 0.30 * MM / PX
     blacks = [(k[0], k[2]) for k in GEO["keyboard"]["black"]]
-    yc, yb, yf = 975.5 + bg, 906.0, KB_[3]      # cut-out depth (behind the black keys), key backs (under the shell), fronts
+    yc, yb, yf = 975.5 + KY + bg, 906.0 + KY, KB_[3]      # cut-out depth (behind the black keys), key backs (under the shell), fronts
     prisms = []
     for i in range(n_white):
         a, b = KB_[0] + i * pitch + g, KB_[0] + (i + 1) * pitch - g
@@ -731,7 +750,7 @@ def front_body():
     bm = bmesh.new()
     ti, fi = 0.22 * MM, 1.1 * MM
     for bx0, bx1 in blacks:
-        X0b, X1b, Yback, Yfront = ex(bx0), ex(bx1), ey(yb), ey(975.5)
+        X0b, X1b, Yback, Yfront = ex(bx0), ex(bx1), ey(yb), ey(975.5 + KY)
         lo = [bm.verts.new(v) for v in ((X0b, Yfront, zF), (X1b, Yfront, zF), (X1b, Yback, zF), (X0b, Yback, zF))]
         hi = [bm.verts.new(v) for v in ((X0b + ti, Yfront + fi, zB), (X1b - ti, Yfront + fi, zB), (X1b - ti, Yback, zB), (X0b + ti, Yback, zB))]
         bm.faces.new(list(reversed(lo)))
@@ -750,7 +769,7 @@ def front_body():
     bake(bk, lambda c, n: 0)
 
     # 4 the front return: cheek to cheek, from the slot to the front edge, printed with the apron
-    ledge = mesh_obj("Front return", [(rect_px(146, 1017, 1300, EH), zR, zL)], [M_FACE, M_RETURN],
+    ledge = mesh_obj("Front return", [(rect_px(146, 1017 + KY, 1300, EH), zR, zL)], [M_FACE, M_RETURN],
                      mark=lambda p_, q_: (abs(p_.y - YF) < 1e-7 and abs(q_.y - YF) < 1e-7 and
                                           ((p_.z > zL - 1e-7 and q_.z > zL - 1e-7) or (abs(p_.z - zR) < 1e-7 and abs(q_.z - zR) < 1e-7))),
                      nose=args.ledge_round * MM, nose_seg=8, edge=0.4 * MM, edge_seg=3)
@@ -764,7 +783,7 @@ def front_body():
 
     # under the lip, the body steps back (`--front-setback`): the lip's shadow is real construction
     sb = args.front_setback * MM / PX
-    body = slab("Front body", WX0, ey(EH - sb - 0.02 * MM / PX), WX1, ey(990), 0, PLINTH_H - 0.3 * MM, zR + 0.3 * MM, [M_SHELL_LOWER],
+    body = slab("Front body", WX0, ey(EH - sb - 0.02 * MM / PX), WX1, ey(990 + KY), 0, PLINTH_H - 0.3 * MM, zR + 0.3 * MM, [M_SHELL_LOWER],
                 bevel=0.3 * MM, bevel_segments=2)
     bake(body, lambda c, n: 0)
 
@@ -1214,14 +1233,21 @@ def wheel_solid(name, u0, u1, v_c, zc, R, a0, a1, mat, seg=72):
 
 if args.wheels == "physical" and APRON:
     P_ = PANEL_TOP
-    M_WHEEL = mat_solid("Wheel (charcoal, soft-touch)", (36, 34, 32), 0.58, spec=0.3, bump=0)
+    if args.wheel_finish == "satin":
+        # C2.5: the crown reads as a turned part: a touch lighter and satin, so its upper edge
+        # catches the key; the slot darker and rougher, so wheel and slot separate.
+        M_WHEEL = mat_solid("Wheel (charcoal, satin)", (50, 48, 45), 0.36, spec=0.45, coat=0.08, bump=0)
+        M_SLOT = mat_solid("Wheel slot (charcoal)", (24, 23, 21), 0.86, spec=0.15, bump=0)
+    else:
+        M_WHEEL = mat_solid("Wheel (charcoal, soft-touch)", (36, 34, 32), 0.58, spec=0.3, bump=0)
+        M_SLOT = mat_solid("Wheel slot (charcoal)", (30, 28, 26), 0.75, spec=0.2, bump=0)
     M_FLANGE = mat_solid("Wheel flange", (78, 74, 68), 0.45, spec=0.35, bump=0)
     M_PITCH = mat_solid("PITCH band (orange satin)", (214, 104, 42), 0.40, spec=0.4, coat=0.1, bump=0)
-    M_SLOT = mat_solid("Wheel slot (charcoal)", (30, 28, 26), 0.75, spec=0.2, bump=0)
+    BZ_H = args.bezel_height * MM
     SLOT_DEPTH, R_W = 5.0 * MM, 8.0 * MM
     WHEELS = [  # bezel (editor px), slot, PITCH band (None for MOD), from web-10-hero-3L-nocaps@4x
-        ((42.5, 913.75, 77.5, 1001.0), (46.0, 918.75, 74.0, 997.0), (52.5, 937.0, 65.0, 990.0)),
-        ((93.75, 913.75, 128.75, 1001.0), (97.5, 918.75, 125.0, 997.0), None),
+        ((42.5, 913.75 + KY, 77.5, 1001.0 + KY), (46.0, 918.75 + KY, 74.0, 997.0 + KY), (52.5, 937.0 + KY, 65.0, 990.0 + KY)),
+        ((93.75, 913.75 + KY, 128.75, 1001.0 + KY), (97.5, 918.75 + KY, 125.0, 997.0 + KY), None),
     ]
     panel_o = bpy.data.objects["Ceramic panel"]
     panel_o.data.materials.append(M_SLOT)
@@ -1230,11 +1256,11 @@ if args.wheels == "physical" and APRON:
         cut.hide_render = cut.hide_viewport = True
         b_ = panel_o.modifiers.new(f"Slot {k}", "BOOLEAN")
         b_.operation, b_.solver, b_.object = "DIFFERENCE", "EXACT", cut
-        bezel = slab(f"Wheel bezel {k}", ex(bz[0]), ey(bz[3]), ex(bz[2]), ey(bz[1]), 7 * PX, P_ - 0.2 * MM, P_ + 0.6 * MM,
-                     [M_FACE, M_PANEL_SIDE], bevel=0.22 * MM, seg=8, cutters=[cut], bevel_segments=3)
-        bake(bezel, top_side(P_ + 0.6 * MM))
+        bezel = slab(f"Wheel bezel {k}", ex(bz[0]), ey(bz[3]), ex(bz[2]), ey(bz[1]), 7 * PX, P_ - 0.2 * MM, P_ + BZ_H,
+                     [M_FACE, M_PANEL_SIDE], bevel=min(0.22 * MM, 0.45 * BZ_H), seg=8, cutters=[cut], bevel_segments=3)
+        bake(bezel, top_side(P_ + BZ_H))
         vc = (sl[1] + sl[3]) / 2
-        zc = P_ + 0.35 * MM - R_W
+        zc = P_ + BZ_H - 0.25 * MM - R_W      # the crown 0.25 mm under the bezel's top, whatever its height
         inset = 0.6 * MM / PX
         wheel_solid(f"Wheel {k}", sl[0] + inset + 1.2, sl[2] - inset - 1.2, vc, zc, R_W, 0, 2 * math.pi, M_WHEEL)
         for f0, f1 in ((sl[0] + inset, sl[0] + inset + 1.2), (sl[2] - inset - 1.2, sl[2] - inset)):
@@ -1244,8 +1270,18 @@ if args.wheels == "physical" and APRON:
             a_hi = math.asin(max(-0.999, min(0.999, (ey(band[1]) - ey(vc)) / R_W)))
             wheel_solid("PITCH band", band[0], band[2], vc, zc, R_W + 0.06 * MM, -a_hi, -a_lo, M_PITCH, seg=240)
     YT_ = ey(APRON["top"])
-    bake(panel_o, lambda c, n: 3 if (n.z < 0.9 and c.z < P_ - 0.05 * MM and c.y > YT_ and abs(c.x) > ex(140) * -1 and c.x < ex(135))
-         else (0 if n.z > 0.9 and c.z > P_ - 0.05 * MM else (2 if c.y < YT_ - 1e-4 else (3 if c.z < P_ - 0.05 * MM and c.x < ex(135) and c.y > YT_ else 1))))
+    # Charcoal only on the slots' own walls and floor. (C2's rule took every face below the panel
+    # top left of x 135 px, which included the panel's outer side wall along the left cheek: the
+    # dark sliver at the timber junction.)
+    TOL = 0.05 * MM
+    SLOTS = [(min(ex(sl[0]), ex(sl[2])) - TOL, max(ex(sl[0]), ex(sl[2])) + TOL, min(ey(sl[1]), ey(sl[3])) - TOL, max(ey(sl[1]), ey(sl[3])) + TOL)
+             for _, sl, _ in WHEELS]
+
+    def in_slot(c):
+        return c.z < P_ - 0.05 * MM and any(x0 <= c.x <= x1 and y0 <= c.y <= y1 for x0, x1, y0, y1 in SLOTS)
+
+    bake(panel_o, lambda c, n: 3 if in_slot(c)
+         else (0 if n.z > 0.9 and c.z > P_ - 0.05 * MM else (2 if c.y < YT_ - 1e-4 else 1)))
     for o_ in [o for o in bpy.data.objects if o.name.startswith("Wheel slot cutter")]:
         bpy.data.objects.remove(o_)
 
@@ -1470,9 +1506,9 @@ CAMS = {
     "hero_B": dict(yaw=-24, pitch=54, dist=1.16, lens=85, target=T, fstop=9, shift=(-0.035, 0.05), fit="HORIZONTAL"),
     "macros": dict(yaw=-18, pitch=50, dist=0.64, lens=85, target=prod(493, 812, REF_PANEL_TOP + CARD_H + 4 * MM), fstop=11),
     "display": dict(yaw=-20, pitch=42, dist=0.30, lens=100, target=prod(723, 330, REF_PANEL_TOP + CARD_H), fstop=8),
-    "corner": dict(yaw=38, pitch=66, dist=0.26, lens=100, target=prod(1390, 1050, REF_FRAME_TOP * 0.6), fstop=8),
+    "corner": dict(yaw=38, pitch=66, dist=0.26, lens=100, target=prod(1390, 1050 + KY, REF_FRAME_TOP * 0.6), fstop=8),
     "corner_back": dict(yaw=-150, pitch=62, dist=0.26, lens=100, target=prod(40, 30, REF_FRAME_TOP * 0.6), fstop=8),
-    "corner_fl": dict(yaw=-38, pitch=66, dist=0.26, lens=100, target=prod(58, 1050, REF_FRAME_TOP * 0.6), fstop=8),
+    "corner_fl": dict(yaw=-38, pitch=66, dist=0.26, lens=100, target=prod(58, 1050 + KY, REF_FRAME_TOP * 0.6), fstop=8),
     "corner_br": dict(yaw=150, pitch=62, dist=0.26, lens=100, target=prod(1408, 30, REF_FRAME_TOP * 0.6), fstop=8),
     "knob": dict(yaw=-20, pitch=52, dist=0.21, lens=100, target=prod(493, 818, REF_PANEL_TOP + 4 * MM), fstop=11),
     # pass 3.5: the same knobs from a lower elevation (22 deg above the panel) to read the sidewall
@@ -1481,9 +1517,9 @@ CAMS = {
     "module": dict(yaw=-24, pitch=55, dist=0.20, lens=100, target=prod(60, 640, REF_PANEL_TOP + CARD_H), fstop=11),
     # checkpoint 2: the front edge straight on (product square to the camera, 8 deg above the floor)
     # and a three-quarter close-up of the key fronts and the return
-    "front_edge": dict(yaw=0, pitch=82, dist=1.70, lens=135, target=prod(724, 1046, REF_FRAME_TOP * 0.55), fstop=16),
-    "keys_macro": dict(yaw=-28, pitch=64, dist=0.17, lens=100, target=prod(600, 985, REF_PANEL_TOP - 3 * MM), fstop=9),
-    "keys34": dict(yaw=-32, pitch=62, dist=0.27, lens=100, target=prod(520, 985, REF_PANEL_TOP - 3 * MM), fstop=11),
+    "front_edge": dict(yaw=0, pitch=82, dist=1.70, lens=135, target=prod(724, 1046 + KY, REF_FRAME_TOP * 0.55), fstop=16),
+    "keys_macro": dict(yaw=-28, pitch=64, dist=0.17, lens=100, target=prod(600, 985 + KY, REF_PANEL_TOP - 3 * MM), fstop=9),
+    "keys34": dict(yaw=-32, pitch=62, dist=0.27, lens=100, target=prod(520, 985 + KY, REF_PANEL_TOP - 3 * MM), fstop=11),
 }
 if SHOT:
     sc = dict(SHOT["camera"])

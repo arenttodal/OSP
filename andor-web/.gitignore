@@ -4,6 +4,7 @@ assets/source/
 tests/visual/out/
 framer-upload/
 product-renders/blender/textures/
+product-renders/blender/textures_current/
 *.blend
 *.blend1
 product-renders/renders/**/*_16bit.png

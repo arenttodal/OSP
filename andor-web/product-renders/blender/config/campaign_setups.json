@@ -237,6 +237,352 @@
        0.3
       ]
      }
+    },
+    "A1_R1": {
+     "title": "Gallery A1-R1 \u00b7 Warm Gallery (C2.5)",
+     "res": [
+      2560,
+      1440
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -30,
+      "pitch": 52,
+      "dist": 1.78,
+      "lens": 85,
+      "target": [
+       724,
+       520,
+       0
+      ],
+      "fstop": 11,
+      "shift": [
+       -0.13,
+       -0.03
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "text_safe": {
+      "x": [
+       0.06,
+       0.42
+      ],
+      "y": [
+       0.2,
+       0.62
+      ]
+     },
+     "overrides": {
+      "floor": {
+       "rgb": [
+        0.655,
+        0.622,
+        0.573
+       ],
+       "roughness": 0.78,
+       "note": "C2.5 R1: about 12 % brighter than C2's 0.585/0.556/0.512, same hue ratios (no yellow or peach)"
+      },
+      "lights": {
+       "Key softbox": {
+        "size": [
+         1.1,
+         0.8
+        ]
+       },
+       "Overhead": {
+        "power": 2.2
+       },
+       "Fill": {
+        "power": 1.6
+       },
+       "Low rake": {
+        "power": 4.5
+       }
+      },
+      "add_lights": [
+       {
+        "name": "Detail rake",
+        "offset": [
+         -0.55,
+         0.65,
+         0.16
+        ],
+        "size": [
+         0.9,
+         0.12
+        ],
+        "power": 0.8,
+        "rgb": [
+         1.0,
+         0.96,
+         0.92
+        ],
+        "spread": 60,
+        "link": "product",
+        "why": "C2.5: grazes from behind left at about 12 % of the key, so flutes, small-knob bevels and card edges model without lifting the top surface"
+       },
+       {
+        "name": "Cheek glint",
+        "offset": [
+         -0.95,
+         -0.55,
+         0.1
+        ],
+        "size": [
+         0.6,
+         0.05
+        ],
+        "power": 2.5,
+        "rgb": [
+         1.0,
+         0.93,
+         0.85
+        ],
+        "spread": 40,
+        "link": "product",
+        "why": "C2.5: a low, narrow sheen along the left teak cheek's outer face: richer timber without recolouring it"
+       }
+      ]
+     }
+    },
+    "A1_R2": {
+     "title": "Gallery A1-R2 \u00b7 Architectural Ivory (C2.5)",
+     "res": [
+      2560,
+      1440
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -30,
+      "pitch": 52,
+      "dist": 1.78,
+      "lens": 85,
+      "target": [
+       724,
+       520,
+       0
+      ],
+      "fstop": 11,
+      "shift": [
+       -0.13,
+       -0.03
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "text_safe": {
+      "x": [
+       0.06,
+       0.42
+      ],
+      "y": [
+       0.2,
+       0.62
+      ]
+     },
+     "overrides": {
+      "floor": {
+       "rgb": [
+        0.735,
+        0.708,
+        0.662
+       ],
+       "roughness": 0.74,
+       "note": "C2.5 R2: a light, slightly cooler ivory stone (about 25 % above C2); never white"
+      },
+      "exposure": -0.42,
+      "world": {
+       "rgb": [
+        0.34,
+        0.325,
+        0.3
+       ],
+       "strength": 0.09
+      },
+      "lights": {
+       "Key softbox": {
+        "size": [
+         0.9,
+         0.6
+        ],
+        "power": 32
+       },
+       "Overhead": {
+        "power": 1.6
+       },
+       "Fill": {
+        "power": 1.2
+       },
+       "Low rake": {
+        "power": 4.5
+       }
+      },
+      "add_lights": [
+       {
+        "name": "Detail rake",
+        "offset": [
+         -0.55,
+         0.65,
+         0.16
+        ],
+        "size": [
+         0.9,
+         0.12
+        ],
+        "power": 0.8,
+        "rgb": [
+         1.0,
+         0.96,
+         0.92
+        ],
+        "spread": 60,
+        "link": "product",
+        "why": "C2.5: grazes from behind left at about 12 % of the key, so flutes, small-knob bevels and card edges model without lifting the top surface"
+       },
+       {
+        "name": "Cheek glint",
+        "offset": [
+         -0.95,
+         -0.55,
+         0.1
+        ],
+        "size": [
+         0.6,
+         0.05
+        ],
+        "power": 2.5,
+        "rgb": [
+         1.0,
+         0.93,
+         0.85
+        ],
+        "spread": 40,
+        "link": "product",
+        "why": "C2.5: a low, narrow sheen along the left teak cheek's outer face: richer timber without recolouring it"
+       }
+      ]
+     }
+    },
+    "A1M_R1": {
+     "title": "Gallery A1M-R1 \u00b7 mobile hero, product closer to the headline (19.5:9, C2.5)",
+     "res": [
+      1170,
+      2532
+     ],
+     "rot": -28.0,
+     "camera": {
+      "yaw": -30,
+      "pitch": 41,
+      "dist": 1.15,
+      "lens": 85,
+      "target": [
+       724,
+       540,
+       0
+      ],
+      "fstop": 11,
+      "shift": [
+       -0.03,
+       -0.155
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "text_safe": {
+      "x": [
+       0.08,
+       0.92
+      ],
+      "y": [
+       0.085,
+       0.235
+      ]
+     },
+     "layout": {
+      "nav": [
+       0.0,
+       0.065
+      ],
+      "headline": [
+       0.085,
+       0.235
+      ],
+      "cta": [
+       0.56,
+       0.63
+      ],
+      "note": "a phone-shaped master (390 x 844 / 430 x 932 CSS): Framer places the live headline, CTA and nav; on 9:16 screens it crops top and bottom floor"
+     },
+     "overrides": {
+      "floor": {
+       "rgb": [
+        0.655,
+        0.622,
+        0.573
+       ],
+       "roughness": 0.78,
+       "note": "C2.5 R1: about 12 % brighter than C2's 0.585/0.556/0.512, same hue ratios (no yellow or peach)"
+      },
+      "lights": {
+       "Key softbox": {
+        "size": [
+         1.1,
+         0.8
+        ]
+       },
+       "Overhead": {
+        "power": 2.2
+       },
+       "Fill": {
+        "power": 1.6
+       },
+       "Low rake": {
+        "power": 4.5
+       }
+      },
+      "add_lights": [
+       {
+        "name": "Detail rake",
+        "offset": [
+         -0.55,
+         0.65,
+         0.16
+        ],
+        "size": [
+         0.9,
+         0.12
+        ],
+        "power": 0.8,
+        "rgb": [
+         1.0,
+         0.96,
+         0.92
+        ],
+        "spread": 60,
+        "link": "product",
+        "why": "C2.5: grazes from behind left at about 12 % of the key, so flutes, small-knob bevels and card edges model without lifting the top surface"
+       },
+       {
+        "name": "Cheek glint",
+        "offset": [
+         -0.95,
+         -0.55,
+         0.1
+        ],
+        "size": [
+         0.6,
+         0.05
+        ],
+        "power": 2.5,
+        "rgb": [
+         1.0,
+         0.93,
+         0.85
+        ],
+        "spread": 40,
+        "link": "product",
+        "why": "C2.5: a low, narrow sheen along the left teak cheek's outer face: richer timber without recolouring it"
+       }
+      ]
+     }
     }
    }
   },
@@ -540,6 +886,70 @@
       ]
      },
      "note": "C2: recomposed (product turned -34 deg) so the larger size fits the phone frame without cropping a cheek"
+    },
+    "B1_R1": {
+     "title": "Floating B1-R1 \u00b7 fill -15 % (C2.5)",
+     "res": [
+      1800,
+      2250
+     ],
+     "rot": -16.0,
+     "camera": {
+      "yaw": -36,
+      "pitch": 58,
+      "dist": 1.2,
+      "lens": 85,
+      "target": [
+       724,
+       560,
+       0
+      ],
+      "fstop": 9,
+      "shift": [
+       0.0,
+       -0.03
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "overrides": {
+      "lights": {
+       "Fill": {
+        "power": 0.68
+       }
+      }
+     }
+    },
+    "B1_R2": {
+     "title": "Floating B1-R2 \u00b7 fill -25 % (C2.5)",
+     "res": [
+      1800,
+      2250
+     ],
+     "rot": -16.0,
+     "camera": {
+      "yaw": -36,
+      "pitch": 58,
+      "dist": 1.2,
+      "lens": 85,
+      "target": [
+       724,
+       560,
+       0
+      ],
+      "fstop": 9,
+      "shift": [
+       0.0,
+       -0.03
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "overrides": {
+      "lights": {
+       "Fill": {
+        "power": 0.6
+       }
+      }
+     }
     }
    },
    "product_light_ev": -0.3,
@@ -686,6 +1096,56 @@
        5.5
       ],
       "fstop": 14.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M02": {
+     "title": "Material M02 \u00b7 source controls (3:2, C2.5)",
+     "res": [
+      2400,
+      1600
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -20,
+      "pitch": 57,
+      "dist": 0.24,
+      "lens": 100,
+      "target": [
+       205,
+       455,
+       4.0
+      ],
+      "fstop": 11.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M04": {
+     "title": "Material M04 \u00b7 keyboard (3:2, C2.5)",
+     "res": [
+      2400,
+      1600
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -30,
+      "pitch": 63,
+      "dist": 0.26,
+      "lens": 100,
+      "target": [
+       560,
+       915,
+       0.0
+      ],
+      "fstop": 11.0,
       "shift": [
        0.0,
        0.0

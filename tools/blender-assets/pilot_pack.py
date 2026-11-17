@@ -30,7 +30,7 @@ def comparison(render_out, dest):
     for i in range(count):
         path = os.path.join(render_out, "master", f"frame_{i:03d}.png")
         if os.path.exists(path):
-            have[i] = pp.edge_fade(Image.open(path).convert("RGBA"))
+            have[i] = pp.prepare(Image.open(path).convert("RGBA"), config)
     if not have:
         raise SystemExit("no frames rendered")
     nearest = {i: min(have, key=lambda k: abs(k - i)) for i in range(count)}
