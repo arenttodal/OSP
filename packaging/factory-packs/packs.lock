@@ -1,0 +1,5 @@
+# Factory packs built into the installers (fetched by fetch.sh before configuring).
+# One per line: <release-tag> <asset-file-name> <sha256>
+# Publish the Core pack in OSP's Library (Publish as pack..., Factory pack ticked), attach the
+# .osppack to a GitHub Release of this repository, then add its line here, e.g.:
+# packs-core-1.0.0 ANDOR-Core-1.0.0.osppack 3b7f...e1c2

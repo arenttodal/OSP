@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "OspStartingStates.h"
 #include "TutorialSounds.h"
 #include "engine/fx/Effects.h"
 #include "FxIdentity.h"
@@ -65,6 +66,55 @@ namespace
         { "Dream", 40, 45, 60, 45, 60, 65, 300, 4000 },
         { "Wide", 40, 60, 90, 40, 55, 30, 10, 1200 },
     };
+
+    /** A built-in starting state as it ships: a whole .ospstate embedded from
+        apps/plugin/Resources/StartingStates ("NN Name.ospstate": its place and its name). */
+    struct BuiltInState
+    {
+        juce::String name;
+        std::shared_ptr<const juce::XmlElement> xml;
+    };
+
+    /** The embedded states in file order; an unreadable one is skipped (and reported). Empty: the
+        legacy table above stands in (names, and its few settings). Message thread. */
+    const std::vector<BuiltInState>& builtInStates()
+    {
+        static const std::vector<BuiltInState> states = [] {
+            std::vector<std::pair<juce::String, int>> files;
+            for (int i = 0; i < OspStartingStatesData::namedResourceListSize; ++i)
+                files.push_back ({ juce::String::fromUTF8 (OspStartingStatesData::originalFilenames[i]), i });
+            std::sort (files.begin(), files.end(), [] (const auto& a, const auto& b) { return a.first.compareNatural (b.first) < 0; });
+            std::vector<BuiltInState> out;
+            for (const auto& [file, index] : files)
+            {
+                int size = 0;
+                const char* data = OspStartingStatesData::getNamedResource (OspStartingStatesData::namedResourceList[index], size);
+                auto xml = data != nullptr ? juce::XmlDocument::parse (juce::String::fromUTF8 (data, size)) : nullptr;
+                if (xml == nullptr || ! xml->hasTagName ("OSP"))
+                {
+                    DBG ("OSP: the built-in starting state " << file << " could not be read; skipped");
+                    continue;
+                }
+                // "01 Natural.ospstate" -> "Natural" (the number orders them only).
+                auto name = file.upToLastOccurrenceOf (".", false, false).trim();
+                if (name.initialSectionContainingOnly ("0123456789").isNotEmpty())
+                    name = name.fromFirstOccurrenceOf (" ", false, false).trim();
+                out.push_back ({ name.isNotEmpty() ? name : file, std::shared_ptr<const juce::XmlElement> (std::move (xml)) });
+            }
+            return out;
+        }();
+        return states;
+    }
+
+    int builtInCount() { return builtInStates().empty() ? static_cast<int> (std::size (startingStates)) : static_cast<int> (builtInStates().size()); }
+
+    juce::String builtInName (int index)
+    {
+        index = std::clamp (index, 0, builtInCount() - 1);
+        return builtInStates().empty() ? juce::String (startingStates[index].name) : builtInStates()[static_cast<std::size_t> (index)].name;
+    }
+
+    std::atomic<bool> newInstancesOpenOnFirstState { true };
 }
 
 /** The shared per-card lanes' view of this processor (osp::plugin::CardArpLanes::Host). */
@@ -418,6 +468,18 @@ OspAudioProcessor::OspAudioProcessor()
     engine.prepare (48000.0, 512, engineSettings);
 
     startTimerHz (20);
+    // A new instance opens on the first built-in state, all of it: the header names it and the
+    // controls hold it. (A session or preset the host restores next replaces it as ever.)
+    if (newInstancesOpenOnFirstState.load())
+    {
+        setCurrentProgram (0);
+        undoManager.clearUndoHistory();
+    }
+}
+
+void OspAudioProcessor::setNewInstancesOpenOnFirstState (bool shouldOpen) noexcept
+{
+    newInstancesOpenOnFirstState.store (shouldOpen);
 }
 
 OspAudioProcessor::~OspAudioProcessor()
@@ -2869,8 +2931,8 @@ void OspAudioProcessor::parameterGestureChanged (int parameterIndex, bool gestur
 std::vector<OspAudioProcessor::PresetEntry> OspAudioProcessor::presetList() const
 {
     std::vector<PresetEntry> list;
-    for (int i = 0; i < static_cast<int> (std::size (startingStates)); ++i)
-        list.push_back ({ startingStates[i].name, i, {}, true });
+    for (int i = 0; i < builtInCount(); ++i)
+        list.push_back ({ builtInName (i), i, {}, true });
     for (const auto& file : findFiles (startingStateFolder(), startingStateExtension))
         list.push_back ({ file.getFileNameWithoutExtension(), -1, file, true });
     for (const auto& file : findFiles (presetFolder(), presetExtension))
@@ -2884,7 +2946,7 @@ juce::String OspAudioProcessor::presetDisplayName() const
         return lastPresetFile.getFileNameWithoutExtension();
     if (! presetIsProgram && presetNameOverride.isNotEmpty())
         return presetNameOverride;
-    return startingStates[std::clamp (currentProgram, 0, static_cast<int> (std::size (startingStates)) - 1)].name;
+    return builtInName (currentProgram);
 }
 
 void OspAudioProcessor::openPresetEntry (const PresetEntry& entry)
@@ -3892,18 +3954,30 @@ void OspAudioProcessor::recallInstrument (const juce::ValueTree& tree, int layer
 
 int OspAudioProcessor::getNumPrograms()
 {
-    return static_cast<int> (std::size (startingStates));
+    return builtInCount();
 }
 
 const juce::String OspAudioProcessor::getProgramName (int index)
 {
-    return index >= 0 && index < getNumPrograms() ? juce::String (startingStates[index].name) : juce::String();
+    return index >= 0 && index < getNumPrograms() ? builtInName (index) : juce::String();
 }
 
 void OspAudioProcessor::setCurrentProgram (int index)
 {
     if (index < 0 || index >= getNumPrograms())
         return;
+    if (! builtInStates().empty())
+    {
+        // The whole state, as a starting state from the Library applies it: every setting, the
+        // modulation, FX route, macros and slots; the sounds already loaded stay.
+        applyStateXml (*builtInStates()[static_cast<std::size_t> (index)].xml, true);
+        currentProgram = index;
+        presetIsProgram = true;
+        presetNameOverride.clear();
+        lastPresetFile = juce::File();
+        lastStartingStateFile = juce::File();
+        return;
+    }
     currentProgram = index;
     presetIsProgram = true;
     presetNameOverride.clear();

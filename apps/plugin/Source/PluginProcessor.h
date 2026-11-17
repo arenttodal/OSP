@@ -71,6 +71,9 @@ public:
     int getNumPrograms() override;
     int getCurrentProgram() override { return currentProgram; }
     void setCurrentProgram (int index) override;
+    /** Whether a new instance opens on the first built-in state (true; the headless tests turn
+        it off so their processors start from the parameters' defaults). */
+    static void setNewInstancesOpenOnFirstState (bool shouldOpen) noexcept;
     const juce::String getProgramName (int index) override;
     void changeProgramName (int, const juce::String&) override {}
 

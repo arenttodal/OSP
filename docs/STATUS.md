@@ -1,5 +1,29 @@
 # Status
 
+> **17 Nov 2026, final interface polish (branch `claude/osp-final-polish`):**
+> - **Popovers stay open** through right-click, Assign to Macro, halo range drags,
+>   invert/reset, Escape and menu cancel, and knob turns.
+>   - Cause: presses on the shared modulation overlay looked like outside clicks.
+>   - Fix: `ModulationOverlay::pressBelongsTo`.
+>   - Docs: `docs/research/popover-macro-interaction.md`.
+> - **Popovers and halos sit above the Mixer / FX Routing view.**
+>   - Cause: the view's per-tick `toFront`.
+>   - Fix: it is placed once, at the cards' layer.
+> - **Text fields read on every surface:** `styleTextField` (light / dark), with every field
+>   audited (`docs/research/text-inputs-and-layers.md`). The Library opens above the Mixer.
+> - **Signal chain pedal light:** follows the effect's real ON (a click, automation, undo,
+>   presets). Bypassed, only the display dims (`docs/research/pedal-led/`).
+> - **INFO: See tutorials.** Preset card heart and actions aligned. A compact **ROOT NOTE**
+>   selector (any MIDI root). **TYPE** in ANDOR's dropdown look (`docs/research/final-polish/`).
+> - **Built-in starting states are whole states:**
+>   - embedded `.ospstate` files (`apps/plugin/Resources/StartingStates`);
+>   - a new instance opens on the first, applied in full;
+>   - CI fetches the Core factory pack listed in `packaging/factory-packs/packs.lock`;
+>   - how to design them: `docs/sound-design.md`.
+> - **NEXT:**
+>   - replace the seven baked states with designed ones;
+>   - publish the Core pack and add its line to `packs.lock`.
+
 > **17 Nov 2026, Library & Preset Browser polish (branch `claude/osp-library-polish`;
 > `docs/research/library-polish/`, before/after shots):**
 > - **Space:** plays, pauses (keeping the position) and resumes the selected sound.

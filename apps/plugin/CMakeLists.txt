@@ -65,8 +65,17 @@ target_compile_definitions(OSP_Plugin PUBLIC
     JUCE_DISPLAY_SPLASH_SCREEN=0
     DONT_SET_USING_JUCE_NAMESPACE=1)
 
+# The built-in starting states: whole .ospstate files ("NN Name.ospstate": order and name),
+# made in OSP itself (Save Starting State) and copied here. See docs/sound-design.md.
+file(GLOB OSP_STARTING_STATE_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/StartingStates/*.ospstate")
+juce_add_binary_data(OspStartingStates
+    HEADER_NAME OspStartingStates.h
+    NAMESPACE OspStartingStatesData
+    SOURCES ${OSP_STARTING_STATE_FILES})
+
 target_link_libraries(OSP_Plugin
     PRIVATE
+        OspStartingStates
         osp_dsp
         osp_library
         juce::juce_audio_utils

@@ -2522,6 +2522,10 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
 
 int main (int argc, char* argv[])
 {
+    // Processors made here start from the parameters' defaults (the built-in states' own tests
+    // turn the first-state opening back on where they check it).
+    OspAudioProcessor::setNewInstancesOpenOnFirstState (false);
+
     // Isolated sample store per run so tests never touch the user's library.
     const auto store = juce::File::getSpecialLocation (juce::File::tempDirectory)
                            .getChildFile ("osp-plugin-test-store-" + juce::String (juce::Random::getSystemRandom().nextInt64()));
@@ -8154,6 +8158,7 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "PedalLedTests.inc"
 #include "FinalPolishTests.inc"
 #include "FinalPolishShots.inc"
+#include "BuiltInStatesTests.inc"
 
 TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives the knob, not the halo overlay) opens its modulation menu", "[ui][andor-ui][rightclick]")
 {
