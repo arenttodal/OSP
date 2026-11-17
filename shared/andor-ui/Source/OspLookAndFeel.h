@@ -166,6 +166,35 @@ private:
 };
 
 /**
+    ANDOR's dropdown field (the approved effects racks' MODE look): a light ceramic field with a
+    soft drop, its value centred in quiet capitals, a small chevron at the right, and the focus
+    ring the racks use. Shared by AndorDropdown and by fields that open their own pickers.
+*/
+void drawDropdownField (juce::Graphics&, juce::Rectangle<float> bounds, const juce::String& text, bool hot, bool focused, bool enabled = true);
+
+/** A ComboBox drawn as ANDOR's dropdown field: same items, same list, same behaviour. */
+class AndorDropdown : public juce::ComboBox
+{
+public:
+    using juce::ComboBox::ComboBox;
+    void paint (juce::Graphics& g) override
+    {
+        const auto text = getSelectedId() != 0 || getText().isNotEmpty() ? getText() : getTextWhenNothingSelected();
+        drawDropdownField (g, getLocalBounds().toFloat().reduced (0.5f, 1.5f), text, isMouseOver (true) || isPopupActive(), hasKeyboardFocus (true), isEnabled());
+    }
+    void resized() override
+    {
+        juce::ComboBox::resized();
+        // (the field draws its own value; the built-in label would draw it a second time)
+        for (auto* child : getChildren())
+            if (dynamic_cast<juce::Label*> (child) != nullptr)
+                child->setVisible (false);
+    }
+    void mouseEnter (const juce::MouseEvent& e) override { juce::ComboBox::mouseEnter (e); repaint(); }
+    void mouseExit (const juce::MouseEvent& e) override { juce::ComboBox::mouseExit (e); repaint(); }
+};
+
+/**
     An editable text field in ANDOR's colours, resolved explicitly from the palette: the light
     ceramic input, graphite text and caret, a muted-sage selection under graphite text, a quiet
     hairline outline and the accent when focused. JUCE bakes a TextEditor's text colour into the

@@ -391,6 +391,35 @@ juce::Font OspLookAndFeel::getPopupMenuFont()
     return fonts::make (13.5f, fonts::Weight::regular);
 }
 
+void drawDropdownField (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text, bool hot, bool focused, bool enabled)
+{
+    // As the racks' MODE field (ValueSelector, RackStyle::mode): drop, rim, light face.
+    const float radius = 5.0f;
+    g.setColour (juce::Colour (0x65c5bcae));
+    g.fillRoundedRectangle (r.translated (0.0f, 1.0f), radius);
+    g.setColour (juce::Colour (hot && enabled ? 0xffc8bfb2 : 0xffd3cbbf));
+    g.fillRoundedRectangle (r, radius);
+    g.setColour (juce::Colour (hot && enabled ? 0xfffaf7f1 : 0xfff6f2eb));
+    g.fillRoundedRectangle (r.reduced (1.0f), radius - 1.0f);
+    const auto ink = juce::Colour (0xff66615e).withMultipliedAlpha (enabled ? 1.0f : 0.45f);
+    auto area = r.reduced (10.0f, 0.0f);
+    const auto chevronBox = area.removeFromRight (10.0f).withSizeKeepingCentre (8.0f, 8.0f);
+    juce::Path chevron;
+    chevron.startNewSubPath (chevronBox.getX(), chevronBox.getY() + 2.5f);
+    chevron.lineTo (chevronBox.getCentreX(), chevronBox.getBottom() - 1.5f);
+    chevron.lineTo (chevronBox.getRight(), chevronBox.getY() + 2.5f);
+    g.setColour (ink.withMultipliedAlpha (0.8f));
+    g.strokePath (chevron, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (ink);
+    g.setFont (fonts::make (11.0f, fonts::Weight::regular, 0.04f));
+    g.drawText (text.toUpperCase(), area.withTrimmedRight (4.0f), juce::Justification::centred, true);
+    if (focused)
+    {
+        g.setColour (juce::Colour (0xff90adbf));
+        g.drawRoundedRectangle (r.expanded (2.0f), radius + 2.0f, 2.0f);
+    }
+}
+
 void styleTextField (juce::TextEditor& field, TextSurface surface)
 {
     // The foreground always follows the field's own surface (never forced dark everywhere).

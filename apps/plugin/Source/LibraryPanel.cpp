@@ -3,6 +3,7 @@
 #include "Design.h"
 #include "LibraryCapture.h"
 #include "OspLookAndFeel.h"
+#include "RootNoteSelector.h"
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
 #include "library/Classifier.h"
@@ -795,10 +796,11 @@ public:
         drawLibraryArtwork (g, art, r.id, 8.0f);
         const float x = art.getRight() + 18.0f;
         const float w = static_cast<float> (load.getX()) - x - 20.0f;
+        const auto lay = layout();
         g.setColour (colour::text);
         g.setFont (type::preset (0.9f));
-        g.drawText (r.name, juce::Rectangle<float> (x, 16.0f, w - 40.0f, 26.0f), juce::Justification::centredLeft, true);
-        heart = juce::Rectangle<float> (x + w - 22.0f, 20.0f, 18.0f, 16.0f);
+        g.drawText (r.name, lay.name, juce::Justification::centredLeft, true);
+        heart = lay.heart;
         if (! r.isBuiltIn())
             drawHeart (g, heart, r.favourite);
         juce::StringArray meta;
@@ -827,10 +829,36 @@ public:
             drawStars (g, stars, r.rating);
         }
     }
+    /** Where the name and its heart go (paint, clicks and tests): the heart 10 px after the
+        name, on its centre line; a long name truncates before the heart, never under it. */
+    LibraryPanel::DetailLayout layout() const
+    {
+        LibraryPanel::DetailLayout out;
+        out.load = load.getBounds();
+        out.more = more.getBounds();
+        const int i = panel.selectedRow();
+        if (i < 0)
+            return out;
+        const auto& r = panel.row (i);
+        const auto art = juce::Rectangle<float> (16.0f, 16.0f, static_cast<float> (getHeight()) - 32.0f, static_cast<float> (getHeight()) - 32.0f);
+        out.artwork = art;
+        const float x = art.getRight() + 18.0f;
+        const float w = static_cast<float> (load.getX()) - x - 20.0f;
+        const auto nameLine = juce::Rectangle<float> (x, 16.0f, w, 26.0f);
+        const float heartW = 18.0f, heartH = 16.0f, heartGap = 10.0f;
+        const float nameRoom = r.isBuiltIn() ? w : juce::jmax (0.0f, w - heartGap - heartW);
+        out.nameWidth = std::ceil (juce::GlyphArrangement::getStringWidth (type::preset (0.9f), r.name));
+        out.name = nameLine.withWidth (nameRoom);
+        // (optically centred: the heart's mass sits above its box's middle, so the box drops 1 px)
+        out.heart = juce::Rectangle<float> (x + juce::jmin (nameRoom, out.nameWidth) + heartGap, nameLine.getCentreY() - heartH * 0.5f + 1.0f, heartW, heartH);
+        out.truncated = out.nameWidth > nameRoom;
+        return out;
+    }
     void resized() override
     {
+        // Load and the menu: one centre line, the card's own vertical centre, the same height.
         auto r = getLocalBounds().reduced (16);
-        more.setBounds (r.removeFromRight (40).withSizeKeepingCentre (40, 36));
+        more.setBounds (r.removeFromRight (40).withSizeKeepingCentre (40, 38));
         r.removeFromRight (8);
         load.setBounds (r.removeFromRight (150).withSizeKeepingCentre (150, 38));
     }
@@ -856,6 +884,13 @@ private:
     juce::TextButton more { juce::String::fromUTF8 ("\xe2\x8b\xaf") };
     juce::Rectangle<float> heart, stars;
 };
+
+LibraryPanel::DetailLayout LibraryPanel::detailLayout() const
+{
+    return detailStrip != nullptr ? detailStrip->layout() : DetailLayout {};
+}
+
+juce::Component* LibraryPanel::detailCard() const noexcept { return detailStrip.get(); }
 
 //==============================================================================
 // The sound inspector (mockup panel 5): waveform and preview, Type, collections, tags, notes,
@@ -1008,16 +1043,12 @@ public:
                 if (typeBox.getText() != r->category)
                     panel.edit ([id = r->id, t = typeBox.getText().toStdString()] (library::Catalog& c) { return c.setCategory (id, t); });
         };
-        rootBox.setTitle ("Root note");
-        rootBox.addItem ("Detected", 1);
-        for (int n = 24; n <= 96; ++n)
-            rootBox.addItem (noteName (n), n + 100);
-        rootBox.onChange = [this] {
+        // ROOT NOTE: Detected, a pitch class and an octave (any MIDI root); the same catalog edit.
+        rootBox.onChange = [this] (std::optional<int> chosen) {
             const auto* r = current();
             if (r == nullptr)
                 return;
-            const int id = rootBox.getSelectedId();
-            const std::optional<double> root = id > 100 ? std::optional<double> (id - 100) : std::nullopt;
+            const std::optional<double> root = chosen ? std::optional<double> (*chosen) : std::nullopt;
             if (root == r->rootMidi)
                 return;
             panel.edit ([aid = r->id, root] (library::Catalog& c) { return c.setRootMidi (aid, root); }, "Root note set");
@@ -1060,6 +1091,10 @@ public:
     /** The play key shows what a press does: play, or pause while playing. */
     void updateTransport()
     {
+        // (the analysis's root arrives once the preview is prepared)
+        if (const auto* r = current(); r != nullptr && ! r->rootMidi && ! rootBox.root())
+            if (const auto d = detectedRoot (*r); d != rootBox.detected())
+                rootBox.setRoot (std::nullopt, d);
         const auto* r = current();
         const bool playing = r != nullptr && panel.processor.audition().browserTransport() == Audition::Transport::playing
                           && panel.processor.audition().browserKey() == panel.previewKey (*r);
@@ -1073,13 +1108,15 @@ public:
     void update()
     {
         const auto* r = current();
+        if (r == nullptr)
+            rootBox.showPicker (false);
         for (auto* c : std::initializer_list<juce::Component*> { &play, &typeBox, &rootBox, &tagInput, &notes, &addCollection, &tags, &collections })
             c->setVisible (r != nullptr && ! r->trashed);
         updateTransport();
         if (r != nullptr)
         {
             typeBox.setText (r->category, juce::dontSendNotification);
-            rootBox.setSelectedId (r->rootMidi ? juce::roundToInt (*r->rootMidi) + 100 : 1, juce::dontSendNotification);
+            rootBox.setRoot (r->rootMidi ? std::optional<int> (juce::roundToInt (*r->rootMidi)) : std::nullopt, detectedRoot (*r));
             if (! notes.hasKeyboardFocus (true))
                 notes.setText (r->notes, false);
             tags.setChips (r->tags);
@@ -1235,6 +1272,21 @@ private:
         const int i = panel.selectedRow();
         return i >= 0 ? &panel.row (i) : nullptr;
     }
+    /** The analysis's own root for the selected sound, once its preview is prepared (a root the
+        user gave replaces it in the prepared sound, so only an unset one is the analysis's). */
+    std::optional<int> detectedRoot (const LibraryRow& r) const
+    {
+        const auto& slot = panel.processor.audition().slot (library::PreviewEngine::browserSlot);
+        if (r.rootMidi || slot.assetId != r.id || slot.sound == nullptr || ! slot.sound->rootKnown)
+            return std::nullopt;
+        return juce::roundToInt (slot.sound->rootMidi);
+    }
+
+public:
+    RootNoteSelector& rootSelector() noexcept { return rootBox; }
+    juce::ComboBox& typeSelector() noexcept { return typeBox; }
+
+private:
     void commitNotes()
     {
         if (const auto* r = current(); r != nullptr && notes.getText() != r->notes)
@@ -1277,7 +1329,8 @@ private:
 
     LibraryPanel& panel;
     juce::TextButton play { juce::String::fromUTF8 ("\xe2\x96\xb6") };
-    juce::ComboBox typeBox, rootBox;
+    AndorDropdown typeBox;
+    RootNoteSelector rootBox;
     juce::TextEditor tagInput, notes;
     juce::TextButton addCollection { "+" };
     ChipRow tags, collections;
@@ -1285,6 +1338,9 @@ private:
     juce::Rectangle<float> heart;
     int propertiesTop = 0;
 };
+
+RootNoteSelector* LibraryPanel::rootNoteSelector() const noexcept { return inspector != nullptr ? &inspector->rootSelector() : nullptr; }
+juce::ComboBox* LibraryPanel::typeDropdown() const noexcept { return inspector != nullptr ? &inspector->typeSelector() : nullptr; }
 
 //==============================================================================
 // SOURCES A B C (was the audition tray, mockup panel 4): a sound dragged onto A, B or C loads

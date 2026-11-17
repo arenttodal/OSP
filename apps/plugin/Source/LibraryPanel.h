@@ -174,6 +174,19 @@ public:
     juce::Component* sheet() const noexcept { return sheetComponent.get(); }
     void closeSheet();
     juce::String statusText() const { return status; }
+    /** The preset detail card's parts (tests and screenshots), in the card's coordinates. */
+    struct DetailLayout
+    {
+        juce::Rectangle<float> artwork, name, heart;
+        juce::Rectangle<int> load, more;
+        float nameWidth = 0.0f;
+        bool truncated = false;
+    };
+    DetailLayout detailLayout() const;
+    /** The sound inspector's ROOT NOTE selector and TYPE dropdown (tests and screenshots). */
+    class RootNoteSelector* rootNoteSelector() const noexcept;
+    juce::ComboBox* typeDropdown() const noexcept;
+    juce::Component* detailCard() const noexcept;
 
     /** A sound dragged from the results: its asset id. */
     static juce::var dragDescription (const std::string& assetId) { return "osp-sound:" + juce::String (assetId); }

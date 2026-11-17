@@ -47,6 +47,7 @@ target_sources(OSP_Plugin PRIVATE
     Source/LibraryPacks.cpp
     Source/LibraryPlaces.cpp
     Source/LibraryPanel.cpp
+    Source/RootNoteSelector.cpp
     Source/OspLearn.cpp
     Source/TutorialSounds.cpp
     ${ANDOR_LEARN_SOURCES}
