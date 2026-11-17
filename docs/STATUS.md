@@ -1,5 +1,19 @@
 # Status
 
+> **17 Nov 2026, Library & Preset Browser polish (branch `claude/osp-library-polish`;
+> `docs/research/library-polish/`, before/after shots):**
+> - **Space:** plays, pauses (keeping the position) and resumes the selected sound.
+>   - It used to restart every time: `previewSelected()` always called `play()`, and the
+>     engine had no pause.
+>   - One press gives one transition (key-repeat is eaten).
+>   - A 3 ms ramp is used: `PreviewEngine::playFrom` / `pause`, `Audition::Transport`.
+> - **Removed:** LOAD TO A/B/C, Load to First Empty, Keys play the instrument and Load to
+>   Instrument. A drop on **SOURCES A B C** loads into that source at once (recoverable).
+> - **STARTING STATES:** tiles above the PRESETS and TEMPLATES lists, by program index (a user
+>   preset called Natural stays a preset).
+> - **Sounds rows:** name first; Root, Type and Length quiet. The inspector is reordered.
+> - **Library glyph:** the leaning book is at 5°.
+
 > **17 Nov 2026, USER MACROS V1.2: ANDOR ANALOG's USER MACROS ported into OSP (branch
 > `claude/osp-user-macros`, on `claude/osp-atlas-refine`; `docs/research/osp-user-macros/`):**
 > - **Macros:** six USER macros (`userMacro.1..6`) behind a CORE / USER folder tab on the macro

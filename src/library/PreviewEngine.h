@@ -78,8 +78,17 @@ public:
     /** Plays the slots in `slotMask` once from the start, together (replacing what the
         previous play() started). */
     void play (unsigned slotMask);
+    /** As play(), from `startSeconds` into each sound (a paused preview resumed): faded in over
+        `resumeFadeSeconds` so a resume mid-waveform never clicks. 0: play(). */
+    void playFrom (unsigned slotMask, double startSeconds);
+    /** Fades out (over `resumeFadeSeconds`) what play() / playFrom() started in `slotMask`;
+        keyboard notes keep sounding. The caller keeps the position (playheadSeconds before). */
+    void pause (unsigned slotMask);
     /** Fades out everything the preview is playing. */
     void stop();
+    /** The short safety ramp of a pause and a resume (seconds): 3 ms, inside the 2-5 ms that
+        hides a cut at any amplitude and keeps the transport immediate. */
+    static constexpr float resumeFadeSeconds = 0.003f;
     void setGainDb (float db) noexcept;
     float gainDb() const noexcept { return gainDecibels.load (std::memory_order_relaxed); }
     /** Frees sounds the audio thread can no longer reach. */
@@ -119,11 +128,13 @@ private:
     };
     struct Command
     {
-        enum class Kind : std::uint8_t { play, stop } kind = Kind::play;
+        enum class Kind : std::uint8_t { play, stop, pause } kind = Kind::play;
         unsigned mask = 0;
+        double startSeconds = 0.0;
     };
 
-    void startVoice (int slot, const Entry* entry, int note, float gain) noexcept;
+    void startVoice (int slot, const Entry* entry, int note, float gain, double startSeconds = 0.0) noexcept;
+    void push (const Command& command) noexcept;
     void release (Voice& voice, float seconds) noexcept;
     void handleCommands() noexcept;
 

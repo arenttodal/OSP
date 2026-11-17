@@ -766,7 +766,8 @@ static Catalog ospCatalog()
     help ("osp.advanced", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
     help ("keyboard.settings", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
     help ("keyboard.info", "Info", "Turn Info on to read explanations of OSP's controls as you point to them.");
-    help ("keyboard.library", "Library", "Opens the Library: your sounds, presets and instruments. Click it again to close it.");
+    help ("keyboard.library", "Library",
+          "Opens the Library: starting states, presets and your sounds. In Sounds: select a sound, press Space to play or pause, drag it onto a source. Click the key again to close it.");
     help ("osp.wheel.pitch", "Pitch Bend", "The pitch wheel bends notes up or down as you move it. Click PITCH beneath the wheel to set how far it bends.");
     help ("osp.wheel.mod", "Mod Wheel", "The modulation wheel controls assigned parameters while you play. Click MOD beneath the wheel to set up vibrato. The wheel can continue controlling other parameters at the same time.",
           "osp.vibrato");

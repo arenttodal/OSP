@@ -428,6 +428,9 @@ public:
         (Documents/OSP/Interface.xml, <MacroBank shown="core|user"/>), never a sound's - a preset,
         undo or a session never changes it. A new musician starts on CORE. */
     int macroBank() const;
+    /** The built-in starting state the patch is now (its program index), or -1 (a preset, a user
+        starting state, INIT or Reset): the Library marks its tile, never by name. */
+    int activeBuiltInState() const noexcept { return presetIsProgram && presetNameOverride.isEmpty() ? currentProgram : -1; }
     void setMacroBank (int bank);
 
     juce::AudioProcessorValueTreeState parameters;

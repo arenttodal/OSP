@@ -565,7 +565,7 @@ public:
         if (panel.candidateScope())
             return { { "", 150 }, { "Name", 0 }, { "Kind", 150 }, { "Length", 64 }, { "State", 110 } };
         if (panel.view == View::sounds)
-            return { { "", 150 }, { "Name", 0 }, { "Type", 100 }, { "Length", 64 }, { "Origin", 84 }, { "Date", 96 } };
+            return { { "", 150 }, { "Name", 0 }, { "Root", 60 }, { "Type", 104 }, { "Length", 64 } };   // (origin and date: the sidebar and the sort)
         if (panel.view == View::templates)
             return { { "Name", 0 }, { "Category", 150 }, { "Origin", 120 }, { "Sources", 80 }, { "Rating", 100 }, { "Date", 110 } };
         return { { "Name", 0 }, { "Category", 160 }, { "Origin", 130 }, { "Rating", 100 }, { "Date", 110 } };
@@ -612,6 +612,11 @@ private:
             return {};
         const auto& r = panel.rows[static_cast<std::size_t> (index)];
         return r.name + (r.category.isNotEmpty() ? ", " + r.category : juce::String()) + ", " + originName (r.origin);
+    }
+    /** A long name truncates in its row; its full name is the row's tooltip. */
+    juce::String getTooltipForRow (int index) override
+    {
+        return index >= 0 && index < getNumRows() ? panel.rows[static_cast<std::size_t> (index)].name : juce::String();
     }
     void paintListBoxItem (int index, juce::Graphics& g, int width, int height, bool selected) override
     {
@@ -664,11 +669,14 @@ private:
                 g.setColour (colour::hairline);
                 g.fillRect (wave.withHeight (1.0f).withY (wave.getCentreY()));
             }
+            // The name first; its root and type quieter; its length for browsing (the inspector
+            // keeps the details).
             text (1, r.name, true);
-            text (2, r.category);
-            text (3, lengthText (r.seconds));
-            text (4, origin);
-            text (5, dateText (r.created));
+            g.setColour (colour::textMicro);
+            g.setFont (type::micro (13.0f));
+            g.drawText (r.rootMidi ? noteName (*r.rootMidi) : juce::String(), cell (2), juce::Justification::centredLeft, true);
+            g.drawText (r.category, cell (3), juce::Justification::centredLeft, true);
+            g.drawText (lengthText (r.seconds), cell (4), juce::Justification::centredLeft, true);
             if (r.favourite)
                 drawHeart (g, juce::Rectangle<float> (static_cast<float> (cell (1).getRight()) - 14.0f, static_cast<float> (height) * 0.5f - 6.0f, 12.0f, 11.0f), true);
             return;
@@ -853,6 +861,134 @@ private:
 // The sound inspector (mockup panel 5): waveform and preview, Type, collections, tags, notes,
 // properties, root, and where it goes.
 
+//==============================================================================
+// STARTING STATES: the fixed creative collection (the built-in states, by their program index,
+// never by name - a user preset called Natural is a preset), as one compact row of understated
+// tiles above the browsable list (PRESETS or TEMPLATES).
+
+class LibraryPanel::StartingStates final : public juce::Component
+{
+public:
+    explicit StartingStates (LibraryPanel& p) : panel (p) { setTitle ("Starting states"); }
+
+    static constexpr int headerHeight = 24, tileHeight = 44, footHeight = 34, minTileWidth = 118, gap = 8;
+    /** The strip's height for `count` tiles across `width` (0: nothing to show). */
+    static int heightFor (int count, int width)
+    {
+        if (count <= 0)
+            return 0;
+        const int perRow = std::max (1, std::min (count, (width + gap) / (minTileWidth + gap)));
+        const int rows = (count + perRow - 1) / perRow;
+        return headerHeight + rows * tileHeight + (rows - 1) * gap + footHeight;
+    }
+    void update()
+    {
+        tiles.clear();
+        removeAllChildren();
+        for (int i = 0; i < static_cast<int> (panel.states.size()); ++i)
+        {
+            auto t = std::make_unique<Tile> (*this, i);
+            addAndMakeVisible (*t);
+            tiles.push_back (std::move (t));
+        }
+        resized();
+        repaint();
+    }
+    Component* tile (int i) const { return i >= 0 && i < static_cast<int> (tiles.size()) ? tiles[static_cast<std::size_t> (i)].get() : nullptr; }
+    void resized() override
+    {
+        const int count = static_cast<int> (tiles.size());
+        if (count == 0)
+            return;
+        const int perRow = std::max (1, std::min (count, (getWidth() + gap) / (minTileWidth + gap)));
+        const int w = (getWidth() - (perRow - 1) * gap) / perRow;
+        for (int i = 0; i < count; ++i)
+            tiles[static_cast<std::size_t> (i)]->setBounds ((i % perRow) * (w + gap), headerHeight + (i / perRow) * (tileHeight + gap), w, tileHeight);
+    }
+    void paint (juce::Graphics& g) override
+    {
+        if (tiles.empty())
+            return;
+        g.setColour (colour::textMicro);
+        g.setFont (type::popupTitle (12.5f));
+        g.drawText ("STARTING STATES", 2, 0, 300, headerHeight - 6, juce::Justification::centredLeft);
+        // The understated separator, then the list's own section.
+        const int foot = getHeight() - footHeight;
+        g.setColour (colour::hairline);
+        g.fillRect (0, foot + 9, getWidth(), 1);
+        g.setColour (colour::textMicro);
+        g.drawText (panel.view == View::templates ? "TEMPLATES" : "PRESETS", 2, foot + 14, 300, footHeight - 14, juce::Justification::centredLeft);
+    }
+
+private:
+    struct Tile final : public juce::Component
+    {
+        Tile (StartingStates& o, int i) : owner (o), index (i)
+        {
+            const auto& r = owner.panel.states[static_cast<std::size_t> (i)];
+            setTitle (r.name + " (starting state)");
+            setWantsKeyboardFocus (true);
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+        }
+        const LibraryRow& state() const { return owner.panel.states[static_cast<std::size_t> (index)]; }
+        bool active() const { return owner.panel.processor.activeBuiltInState() == state().program; }
+        void paint (juce::Graphics& g) override
+        {
+            const auto r = getLocalBounds().toFloat().reduced (1.0f);
+            const bool on = active(), over = isMouseOver() || hasKeyboardFocus (false);
+            g.setColour (on ? colour::panelBottom.darker (0.05f) : (over ? colour::panelTop.brighter (0.04f) : colour::panelTop));
+            g.fillRoundedRectangle (r, 8.0f);
+            g.setColour (colour::hairline.withAlpha (over || on ? 0.9f : 0.55f));
+            g.drawRoundedRectangle (r, 8.0f, 1.0f);
+            if (on)
+            {
+                g.setColour (colour::accent);
+                g.fillRoundedRectangle (juce::Rectangle<float> (r.getX() + 2.0f, r.getCentreY() - 8.0f, 3.0f, 16.0f), 1.5f);
+            }
+            // Its quiet identity (the Library's generated artwork, D-09), then its name.
+            const auto swatch = juce::Rectangle<float> (r.getX() + 12.0f, r.getCentreY() - 11.0f, 22.0f, 22.0f);
+            drawLibraryArtwork (g, swatch, state().id, 5.0f);
+            g.setColour (colour::text);
+            g.setFont (type::micro (15.0f));
+            g.drawText (state().name, r.withTrimmedLeft (44.0f).withTrimmedRight (8.0f).toNearestInt(), juce::Justification::centredLeft, true);
+        }
+        void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+        void mouseExit (const juce::MouseEvent&) override { repaint(); }
+        void focusGained (FocusChangeType) override { repaint(); }
+        void focusLost (FocusChangeType) override { repaint(); }
+        void mouseUp (const juce::MouseEvent& e) override
+        {
+            if (e.mouseWasClicked() && getLocalBounds().contains (e.getPosition()))
+                owner.choose (index);
+        }
+        bool keyPressed (const juce::KeyPress& key) override
+        {
+            if (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey)
+            {
+                owner.choose (index);
+                return true;
+            }
+            return false;
+        }
+        StartingStates& owner;
+        int index;
+    };
+public:
+    void choose (int index)
+    {
+        if (index < 0 || index >= static_cast<int> (panel.states.size()))
+            return;
+        const auto r = panel.states[static_cast<std::size_t> (index)];
+        panel.loadRow (r);   // (settings only: the sounds stay; recoverable)
+        for (auto& t : tiles)
+            t->repaint();
+    }
+
+private:
+    LibraryPanel& panel;
+    std::vector<std::unique_ptr<Tile>> tiles;
+};
+
 class LibraryPanel::Inspector final : public juce::Component
 {
 public:
@@ -861,8 +997,8 @@ public:
         setTitle ("Sound inspector");
         for (auto* c : std::initializer_list<juce::Component*> { &play, &typeBox, &rootBox, &tagInput, &notes, &addCollection, &tags, &collections })
             addAndMakeVisible (c);
-        play.setTitle ("Preview");
-        play.onClick = [this] { panel.previewSelected(); };
+        play.setTitle ("Play or pause the preview (Space)");
+        play.onClick = [this] { panel.previewSelected(); };   // (the same transport as Space)
         typeBox.setTitle ("Type");
         typeBox.setTextWhenNothingSelected ("Type");
         for (int i = 0; i < soundTypes.size(); ++i)
@@ -916,18 +1052,20 @@ public:
         notes.setTitle ("Notes");
         notes.onFocusLost = [this] { commitNotes(); };
         notes.onReturnKey = [this] { commitNotes(); };
-        for (int i = 0; i < 4; ++i)
+        // (no LOAD TO keys: a sound goes to a source by dragging it onto A, B or C; Return and a
+        // double-click load it into the first empty source)
+    }
+    /** The play key shows what a press does: play, or pause while playing. */
+    void updateTransport()
+    {
+        const auto* r = current();
+        const bool playing = r != nullptr && panel.processor.audition().browserTransport() == Audition::Transport::playing
+                          && panel.processor.audition().browserKey() == panel.previewKey (*r);
+        const auto text = playing ? juce::String::fromUTF8 ("\xe2\x9d\x9a\xe2\x9d\x9a") : juce::String::fromUTF8 ("\xe2\x96\xb6");
+        if (play.getButtonText() != text)
         {
-            auto& b = loadButtons[static_cast<std::size_t> (i)];
-            b.setButtonText (i < 3 ? "Load to " + OspAudioProcessor::layerName (i) : juce::String ("Load to First Empty"));
-            b.setTitle (b.getButtonText());
-            b.onClick = [this, i] {
-                if (i < 3)
-                    panel.loadSelectedInto (i);
-                else
-                    panel.loadSelected();
-            };
-            addAndMakeVisible (b);
+            play.setButtonText (text);
+            play.setTitle (playing ? "Pause the preview (Space)" : "Play the preview (Space)");
         }
     }
     void update()
@@ -935,8 +1073,7 @@ public:
         const auto* r = current();
         for (auto* c : std::initializer_list<juce::Component*> { &play, &typeBox, &rootBox, &tagInput, &notes, &addCollection, &tags, &collections })
             c->setVisible (r != nullptr && ! r->trashed);
-        for (auto& b : loadButtons)
-            b.setVisible (r != nullptr && ! r->trashed);
+        updateTransport();
         if (r != nullptr)
         {
             typeBox.setText (r->category, juce::dontSendNotification);
@@ -961,12 +1098,27 @@ public:
         {
             g.setColour (colour::textMicro);
             g.setFont (type::micro (15.0f));
-            g.drawFittedText ("Select a sound to hear it, tag it and choose where it goes.", getLocalBounds().reduced (30), juce::Justification::centred, 3);
+            g.drawFittedText (juce::String::fromUTF8 ("Select a sound. Press Space to play or pause. Drag it onto a source."), getLocalBounds().reduced (30),
+                              juce::Justification::centred, 3);
             return;
         }
         g.setColour (colour::text);
         g.setFont (type::preset (0.82f));
-        g.drawText (r->name, juce::Rectangle<int> (play.getRight() + 10, 14, getWidth() - play.getRight() - 50, 30), juce::Justification::centredLeft, true);
+        g.drawText (r->name, juce::Rectangle<int> (play.getRight() + 10, 10, getWidth() - play.getRight() - 50, 26), juce::Justification::centredLeft, true);
+        // The essentials under the name, quiet (the details, the row does not show them).
+        {
+            juce::StringArray essentials;
+            essentials.add (lengthText (r->seconds));
+            essentials.add (r->channels == 1 ? juce::String ("Mono") : r->channels == 2 ? juce::String ("Stereo") : juce::String (r->channels) + " ch");
+            if (r->sampleRate > 0.0)
+                essentials.add (juce::String (r->sampleRate / 1000.0, 1) + " kHz");
+            if (r->format.isNotEmpty())
+                essentials.add (r->format.toUpperCase() + (r->bitDepth > 0 ? " " + juce::String (r->bitDepth) + "-bit" : juce::String()));
+            g.setColour (colour::textMicro);
+            g.setFont (type::micro (12.5f));
+            g.drawText (essentials.joinIntoString (juce::String::fromUTF8 ("  \xc2\xb7  ")), juce::Rectangle<int> (play.getRight() + 10, 34, getWidth() - play.getRight() - 30, 16),
+                        juce::Justification::centredLeft, true);
+        }
         heart = juce::Rectangle<float> (static_cast<float> (getWidth()) - 34.0f, 21.0f, 18.0f, 16.0f);
         drawHeart (g, heart, r->favourite);
 
@@ -985,16 +1137,19 @@ public:
                 const float bottom = area.getCentreY() - s.peakMin[i] * area.getHeight() * 0.5f;
                 g.fillRect (juce::Rectangle<float> (area.getX() + static_cast<float> (i) * step, top, std::max (1.0f, step), std::max (1.0f, bottom - top)));
             }
-            const double head = panel.processor.audition().playheadSeconds (library::PreviewEngine::browserSlot);
+            // The playhead while it plays, kept where it paused; the time with it.
+            auto& audition = panel.processor.audition();
+            const double head = audition.browserKey() == panel.previewKey (*r) ? audition.browserPosition() : -1.0;
             if (head >= 0.0 && s.durationSeconds() > 0.0)
             {
-                const float x = area.getX() + area.getWidth() * static_cast<float> (head / s.durationSeconds());
+                const float x = area.getX() + area.getWidth() * static_cast<float> (std::min (1.0, head / s.durationSeconds()));
                 g.setColour (colour::accent);
                 g.fillRect (juce::Rectangle<float> (x, area.getY() - 4.0f, 1.5f, area.getHeight() + 8.0f));
             }
             g.setColour (colour::wellText);
             g.setFont (type::micro (12.5f));
-            g.drawText (lengthText (s.durationSeconds()) + (s.rootKnown ? juce::String ("   root ") + noteName (s.rootMidi) : juce::String ("   no clear pitch")),
+            const auto time = head >= 0.0 ? juce::String (head, 1) + " / " + lengthText (s.durationSeconds()) : lengthText (s.durationSeconds());
+            g.drawText (time + (s.rootKnown ? juce::String ("   root ") + noteName (s.rootMidi) : juce::String ("   no clear pitch")),
                         wave.reduced (10, 4), juce::Justification::bottomRight);
             if (panel.detail && panel.detail->id == r->id && panel.detail->classification.isNotEmpty())
                 g.drawText (kindName (panel.detail->classification), wave.reduced (10, 4), juce::Justification::bottomLeft);
@@ -1017,15 +1172,11 @@ public:
         label ("Tags", 16, tags.getY() - 20);
         label ("Properties", 16, propertiesTop);
 
-        // Properties, two columns.
+        // Properties, two columns (length, channels, rate and format are under the name).
         juce::StringArray left, right;
-        left.add ("Length  " + lengthText (r->seconds));
-        left.add (juce::String ("Channels  ") + (r->channels == 1 ? "Mono" : r->channels == 2 ? "Stereo" : juce::String (r->channels)));
         left.add ("Added  " + dateText (r->created));
         left.add ("Last used  " + (r->lastUsed > 0 ? dateText (r->lastUsed) : juce::String ("never")));
-        right.add ("Rate  " + (r->sampleRate > 0.0 ? juce::String (r->sampleRate / 1000.0, 1) + " kHz" : juce::String()));
         right.add ("Size  " + (r->bytes > 0 ? bytesText (r->bytes) : juce::String()));
-        right.add ("Format  " + r->format.toUpperCase() + (r->bitDepth > 0 ? " " + juce::String (r->bitDepth) + "-bit" : juce::String()));
         right.add ("Uses  " + juce::String (panel.detail && panel.detail->id == r->id ? panel.detail->uses : 0));
         g.setFont (type::micro (13.5f));
         for (int i = 0; i < left.size(); ++i)
@@ -1039,7 +1190,7 @@ public:
             const auto place = panel.detail->places.isEmpty() ? juce::String() : panel.detail->places[0];
             g.setColour (panel.detail->resolvedWhere.isEmpty() ? colour::accent : colour::textMicro);
             g.setFont (type::micro (12.5f));
-            g.drawText (panel.detail->resolvedWhere.isEmpty() ? "Missing: last seen at " + place : place, 16, propertiesTop + 92, getWidth() - 32, 18,
+            g.drawText (panel.detail->resolvedWhere.isEmpty() ? "Missing: last seen at " + place : place, 16, propertiesTop + 56, getWidth() - 32, 18,
                         juce::Justification::centredLeft, true);
         }
     }
@@ -1064,10 +1215,6 @@ public:
         notes.setBounds (16, y, w - 32, 36);
         y += 44;
         propertiesTop = y;
-        const int bw = (w - 32 - 12) / 3;
-        for (int i = 0; i < 3; ++i)
-            loadButtons[static_cast<std::size_t> (i)].setBounds (16 + i * (bw + 6), getHeight() - 84, bw, 32);
-        loadButtons[3].setBounds (16, getHeight() - 46, w - 32, 32);
     }
     void mouseUp (const juce::MouseEvent& e) override
     {
@@ -1132,31 +1279,28 @@ private:
     juce::TextEditor tagInput, notes;
     juce::TextButton addCollection { "+" };
     ChipRow tags, collections;
-    std::array<juce::TextButton, 4> loadButtons;
     juce::Rectangle<int> wave;
     juce::Rectangle<float> heart;
     int propertiesTop = 0;
 };
 
 //==============================================================================
-// The A/B/C audition tray (mockup panel 4): sounds heard together before they are committed.
+// SOURCES A B C (was the audition tray, mockup panel 4): a sound dragged onto A, B or C loads
+// into that source at once (one recoverable step, the Library's "Back to previous patch"); the
+// wells show what was put there and play together, dry.
 
 class LibraryPanel::Tray final : public juce::Component, public juce::DragAndDropTarget
 {
 public:
     explicit Tray (LibraryPanel& p) : panel (p)
     {
-        setTitle ("Audition tray");
-        for (auto* c : std::initializer_list<juce::Component*> { &playAll, &stop, &keys, &commit, &level })
+        setTitle ("Sources A, B and C");
+        for (auto* c : std::initializer_list<juce::Component*> { &playAll, &stop, &level })
             addAndMakeVisible (c);
         playAll.setTitle ("Play A, B and C together");
         playAll.onClick = [this] { panel.processor.audition().play (library::PreviewEngine::trayMask); };
         stop.setTitle ("Stop");
         stop.onClick = [this] { panel.processor.audition().stop(); };
-        keys.setTitle ("Play the tray on the keyboard");
-        keys.setClickingTogglesState (true);
-        keys.onClick = [this] { updateKeys(); };
-        commit.onClick = [this] { panel.commitTray(); };
         level.setSliderStyle (juce::Slider::LinearHorizontal);
         level.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
         level.setRange (-36.0, 6.0, 0.5);
@@ -1168,16 +1312,15 @@ public:
         level.onValueChange = [this] { panel.processor.audition().setGainDb (static_cast<float> (level.getValue())); };
     }
     ~Tray() override { panel.processor.setPreviewKeys (false, 0u); }
-    void updateKeys()
+    /** The keys (MIDI and the on-screen keyboard) play the instrument, as everywhere else. */
+    void updateKeys() { panel.processor.setPreviewKeys (false, 0u); }
+    /** A sound for source `s`: into the instrument at once, and shown in its well. */
+    void loadInto (int s, const std::string& assetId)
     {
-        unsigned mask = 0;
-        for (int s = 0; s < Audition::numTraySlots; ++s)
-            if (panel.processor.audition().slot (s).sound != nullptr)
-                mask |= 1u << s;
-        if (mask == 0)
-            mask = 1u << library::PreviewEngine::browserSlot;   // an empty tray: the keyboard plays the selected sound
-        panel.processor.setPreviewKeys (keys.getToggleState(), mask);
-        keys.setButtonText (keys.getToggleState() ? "Keys play the audition" : "Keys play the instrument");
+        if (assetId.empty())
+            return;
+        panel.processor.audition().setSlot (s, assetId);
+        panel.loadSound (assetId, s);
     }
     juce::Rectangle<int> slotBounds (int s) const
     {
@@ -1189,7 +1332,7 @@ public:
         design::draw::raised (g, getLocalBounds().toFloat().reduced (1.0f), 12.0f, colour::panelTop, colour::panelBottom, 0.6f);
         g.setColour (colour::textMicro);
         g.setFont (type::popupTitle (12.5f));
-        g.drawText ("AUDITION  A  B  C", 16, 8, 300, 20, juce::Justification::centredLeft);
+        g.drawText ("SOURCES  A  B  C", 16, 8, 300, 20, juce::Justification::centredLeft);
         auto& audition = panel.processor.audition();
         for (int s = 0; s < Audition::numTraySlots; ++s)
         {
@@ -1206,9 +1349,15 @@ public:
             g.drawText (OspAudioProcessor::layerName (s), badge, juce::Justification::centred);
             if (slot.assetId.empty())
             {
+                // What the source holds now (dimmed), or the one hint the window gives.
+                const auto now = panel.processor.currentInstrument (s);
                 g.setColour (colour::wellText);
                 g.setFont (type::micro (13.0f));
-                g.drawText ("Drag a sound here", r.reduced (10.0f).withTrimmedTop (24.0f).toNearestInt(), juce::Justification::centred);
+                if (now != nullptr && ! now->filename.empty())
+                    g.drawText (juce::String (now->filename), juce::Rectangle<float> (r.getX() + 10.0f, r.getBottom() - 22.0f, r.getWidth() - 20.0f, 18.0f).toNearestInt(),
+                                juce::Justification::centredLeft, true);
+                else
+                    g.drawText ("Drag onto a source", r.reduced (10.0f).withTrimmedTop (24.0f).toNearestInt(), juce::Justification::centred);
                 continue;
             }
             const auto waveArea = r.withTrimmedTop (38.0f).withTrimmedBottom (24.0f).reduced (10.0f, 2.0f);
@@ -1253,11 +1402,7 @@ public:
     {
         auto r = getLocalBounds().reduced (16, 12);
         auto right = r.removeFromRight (250);
-        commit.setBounds (right.removeFromBottom (40));
-        right.removeFromBottom (8);
-        keys.setBounds (right.removeFromBottom (30));
-        right.removeFromBottom (6);
-        auto transport = right.removeFromBottom (30);
+        auto transport = right.withTrimmedTop (22).removeFromTop (30);
         playAll.setBounds (transport.removeFromLeft (44));
         transport.removeFromLeft (6);
         stop.setBounds (transport.removeFromLeft (44));
@@ -1274,7 +1419,8 @@ public:
             const auto& slot = panel.processor.audition().slot (s);
             if (slot.assetId.empty())
             {
-                panel.addSelectedToTray (s);   // a click on an empty slot takes the selected sound
+                if (const int i = panel.selectedRow(); i >= 0 && ! panel.row (i).candidate && ! panel.row (i).trashed)
+                    loadInto (s, panel.row (i).id);   // a click on an empty source takes the selected sound
                 return;
             }
             if (juce::Rectangle<float> (r.getRight() - 30.0f, r.getY() + 6.0f, 26.0f, 26.0f).contains (e.position))
@@ -1283,7 +1429,11 @@ public:
             {
                 juce::PopupMenu menu;
                 juce::Component::SafePointer<LibraryPanel> safe (&panel);
-                menu.addItem ("Replace with the selected sound", [safe, s] { if (safe != nullptr) safe->addSelectedToTray (s); });
+                menu.addItem ("Replace with the selected sound", [safe, s] {
+                    if (safe != nullptr)
+                        if (const int i = safe->selectedRow(); i >= 0 && ! safe->row (i).candidate && ! safe->row (i).trashed)
+                            safe->tray->loadInto (s, safe->row (i).id);
+                });
                 menu.addItem ("Clear", [safe, s] { if (safe != nullptr) safe->processor.audition().clearSlot (s); });
                 menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
             }
@@ -1316,7 +1466,7 @@ public:
         const auto id = assetFromDrag (d.description);
         for (int s = 0; s < Audition::numTraySlots; ++s)
             if (slotBounds (s).contains (d.localPosition) && ! id.empty())
-                panel.processor.audition().setSlot (s, id);
+                loadInto (s, id);   // (dropped on a source: it is that source's now)
         dragOver = -1;
         updateKeys();
         repaint();
@@ -1325,8 +1475,6 @@ public:
 private:
     LibraryPanel& panel;
     juce::TextButton playAll { juce::String::fromUTF8 ("\xe2\x96\xb6") }, stop { juce::String::fromUTF8 ("\xe2\x96\xa0") };
-    juce::TextButton keys { "Keys play the instrument" };
-    PrimaryButton commit { "Load to Instrument" };
     juce::Slider level;
     int dragOver = -1;
 };
@@ -1552,6 +1700,8 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
     addAndMakeVisible (*sidebar);
     results = std::make_unique<Results> (*this);
     addAndMakeVisible (*results);
+    startingStates = std::make_unique<StartingStates> (*this);
+    addChildComponent (*startingStates);
     detailStrip = std::make_unique<Detail> (*this);
     addAndMakeVisible (*detailStrip);
     inspector = std::make_unique<Inspector> (*this);
@@ -1597,6 +1747,8 @@ void LibraryPanel::setView (View v)
 {
     if (sheetComponent != nullptr)
         closeSheet();
+    if (v != view)
+        processor.audition().stopBrowser();   // (another tab: the sound's preview ends)
     view = v;
     tabs[static_cast<std::size_t> (v)].setToggleState (true, juce::dontSendNotification);
     scopeKey = "all";
@@ -1638,6 +1790,16 @@ void LibraryPanel::setSearchText (const juce::String& text)
 {
     search.setText (text, false);
     refresh();
+}
+
+juce::Component* LibraryPanel::stateTile (int index) const
+{
+    return startingStates->tile (index);
+}
+
+void LibraryPanel::chooseState (int index)
+{
+    startingStates->choose (index);
 }
 
 int LibraryPanel::selectedRow() const
@@ -1688,7 +1850,7 @@ void LibraryPanel::query()
                                                           library::SearchQuery::Sort::added, library::SearchQuery::Sort::rating,
                                                           library::SearchQuery::Sort::length }[static_cast<std::size_t> (juce::jlimit (0, 4, sortOrder.getSelectedId() - 1))];
     const auto key = scopeKey;
-    bool builtIns = view == View::templates;
+    bool builtIns = view != View::sounds;   // (the STARTING STATES strip: both preset views)
     if (key == "factory")
         q.origin = Origin::factory;
     else if (key == "user")
@@ -1732,7 +1894,7 @@ void LibraryPanel::query()
     const auto generation = ++queryGeneration;
     struct Answer
     {
-        std::vector<LibraryRow> rows;
+        std::vector<LibraryRow> rows, states;
         std::vector<SideItem> side;
     };
     juce::Component::SafePointer<LibraryPanel> safe (this);
@@ -1825,7 +1987,7 @@ void LibraryPanel::query()
                     r.name = factoryNames[i];
                     r.category = "Starting state";
                     r.program = i;
-                    a.rows.push_back (r);
+                    a.states.push_back (r);
                 }
             for (const auto& asset : candidates ? std::vector<library::Asset> {} : c.search (q))
             {
@@ -1915,6 +2077,8 @@ void LibraryPanel::query()
             for (const int i : safe->selectedRows())
                 keep.insert (safe->row (i).id);
             safe->rows = std::move (a.rows);
+            safe->states = std::move (a.states);
+            safe->startingStates->update();
             safe->side = std::move (a.side);
             safe->appliedGeneration = generation;
             safe->results->update();
@@ -1954,6 +2118,10 @@ void LibraryPanel::selectionChanged()
 {
     detailStrip->update();
     const int i = selectedRow();
+    // Another sound selected: the previous preview stops (a paused one is forgotten), so Space
+    // always speaks to the sound selected now.
+    if (i < 0 || previewKey (row (i)) != processor.audition().browserKey())
+        processor.audition().stopBrowser();
     if (candidateScope())
     {
         if (i >= 0 && selectedRows().size() == 1)
@@ -2266,9 +2434,7 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
     }
     if (r.type == AssetType::sound)
     {
-        menu.addItem ("Preview", [safe] { if (safe != nullptr) safe->previewSelected(); });
-        for (int s = 0; s < 3; ++s)
-            menu.addItem ("Audition in " + OspAudioProcessor::layerName (s), [safe, s] { if (safe != nullptr) safe->addSelectedToTray (s); });
+        menu.addItem ("Play / Pause", [safe] { if (safe != nullptr) safe->previewSelected(); });
         menu.addSeparator();
         for (int l = 0; l < 3; ++l)
             menu.addItem ("Load into " + OspAudioProcessor::layerName (l), [safe, l] { if (safe != nullptr) safe->loadSelectedInto (l); });
@@ -2356,26 +2522,39 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
 }
 
+std::string LibraryPanel::previewKey (const LibraryRow& r)
+{
+    return r.candidate ? "file:" + r.path.toStdString() : r.id;
+}
+
 void LibraryPanel::previewSelected()
 {
+    // Play, pause, resume (Space and the inspector's key: one transport, Audition's).
     const int i = selectedRow();
     if (i < 0 || view != View::sounds || row (i).trashed)
         return;
     auto& audition = processor.audition();
-    const auto& slot = audition.slot (library::PreviewEngine::browserSlot);
-    if (row (i).candidate)
-    {
-        const juce::File file (row (i).path);
-        if (slot.assetId.empty() && slot.file == file && slot.sound != nullptr)
+    const auto r = row (i);
+    audition.toggleBrowser (previewKey (r), [&audition, r] {
+        // From the start: at once when the sound is prepared, else as soon as it is.
+        const auto& slot = audition.slot (library::PreviewEngine::browserSlot);
+        if (r.candidate)
+        {
+            const juce::File file (r.path);
+            if (slot.assetId.empty() && slot.file == file && slot.sound != nullptr)
+                audition.play (1u << library::PreviewEngine::browserSlot);
+            else
+                audition.previewFile (file);
+            return;
+        }
+        if (slot.assetId == r.id && slot.sound != nullptr)
             audition.play (1u << library::PreviewEngine::browserSlot);
         else
-            audition.previewFile (file);
-        return;
-    }
-    if (slot.assetId == row (i).id && slot.sound != nullptr)
-        audition.play (1u << library::PreviewEngine::browserSlot);
-    else
-        audition.preview (row (i).id);
+            audition.preview (r.id);
+    });
+    inspector->updateTransport();
+    inspector->repaint();
+    candidateInspector->repaint();
 }
 
 void LibraryPanel::addSelectedToTray (int slot)
@@ -2981,11 +3160,15 @@ void LibraryPanel::timerCallback()
     // The Library's answers and the preview's playheads at the display rate.
     processor.libraryService().deliver();
     processor.audition().deliver();
-    if (view == View::sounds && processor.audition().isSounding())
+    if (view == View::sounds)
     {
-        inspector->repaint();
-        candidateInspector->repaint();
-        tray->repaint();
+        inspector->updateTransport();
+        if (processor.audition().isSounding())
+        {
+            inspector->repaint();
+            candidateInspector->repaint();
+            tray->repaint();
+        }
     }
     // The Inbox, every few seconds while the window is open (reconciliation, not notifications:
     // docs/library/inbox.md). Not while a scan has the background thread.
@@ -3062,9 +3245,19 @@ void LibraryPanel::resized()
     }
     search.setBounds (bar);
     r.removeFromTop (10);
+    const int strip = view == View::sounds ? 0 : StartingStates::heightFor (static_cast<int> (states.size()), r.getWidth());
+    startingStates->setVisible (strip > 0);
+    startingStates->setBounds (r.removeFromTop (strip));
     results->setBounds (r);
     if (sheetComponent != nullptr)
         sheetComponent->setBounds (getLocalBounds());
+}
+
+bool LibraryPanel::keyStateChanged (bool isKeyDown)
+{
+    if (! isKeyDown || ! juce::KeyPress::isKeyCurrentlyDown (juce::KeyPress::spaceKey))
+        spaceHeld = false;
+    return false;
 }
 
 bool LibraryPanel::keyPressed (const juce::KeyPress& key)
@@ -3084,7 +3277,13 @@ bool LibraryPanel::keyPressed (const juce::KeyPress& key)
     }
     if (key == juce::KeyPress::spaceKey && view == View::sounds && ! search.hasKeyboardFocus (false))
     {
-        previewSelected();
+        // One physical press, one transition: the key's auto-repeat while it is held is eaten
+        // (keyStateChanged re-arms it when the key comes up).
+        if (! spaceHeld)
+        {
+            spaceHeld = true;
+            previewSelected();
+        }
         return true;
     }
     if (key == juce::KeyPress::returnKey)

@@ -1451,14 +1451,16 @@ TEST_CASE ("plugin: Library window - presets, templates and sounds; search, scop
     CHECK (p.canRestorePreviousState());
     CHECK (panel->statusText().contains ("Loaded Warm Hymn"));
 
-    // Templates (view B): the built-in starting states (read only) and the saved one.
+    // Templates (view B): the built-in starting states (read only) as STARTING STATES tiles,
+    // the saved one in the list below.
     panel->setView (Panel::View::templates);
     REQUIRE (panel->settle());
-    const int natural = rowNamed (*panel, "Natural");
-    REQUIRE (natural >= 0);
-    CHECK (panel->row (natural).isBuiltIn());
+    CHECK (rowNamed (*panel, "Natural") < 0);   // (not a list row any more: a tile)
+    REQUIRE (panel->stateCount() == OspAudioProcessor::factoryStartingStates().size());
+    CHECK (panel->state (0).name == "Natural");
+    CHECK (panel->state (0).isBuiltIn());
     REQUIRE (rowNamed (*panel, "Floating Settings") >= 0);
-    CHECK (sideCount (*panel, "all") == panel->rowCount());
+    CHECK (sideCount (*panel, "all") == panel->rowCount() + panel->stateCount());
     panel->selectRow (rowNamed (*panel, "Floating Settings"));
     snapshot ("library-templates.png");
 
@@ -8147,6 +8149,7 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "EffectiveVisualTests.inc"
 #include "AtlasRefineTests.inc"
 #include "UserMacroPluginTests.inc"
+#include "LibraryPolishTests.inc"
 
 TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives the knob, not the halo overlay) opens its modulation menu", "[ui][andor-ui][rightclick]")
 {

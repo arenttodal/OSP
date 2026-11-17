@@ -406,6 +406,101 @@ void Audition::play (unsigned slotMask)
 void Audition::stop()
 {
     engine.stop();
+    transport = Transport::stopped;
+    pausedAt = 0.0;
+}
+
+void Audition::updateTransport()
+{
+    if (transport != Transport::playing)
+        return;
+    const auto& slot = slots[static_cast<std::size_t> (library::PreviewEngine::browserSlot)];
+    const double head = engine.playheadSeconds (library::PreviewEngine::browserSlot);
+    if (head >= 0.0)
+    {
+        heard = true;
+        lastHead = head;
+        return;
+    }
+    if (slot.loading || slot.sound == nullptr)
+    {
+        readySince = 0;   // (still preparing: it plays when ready)
+        if (slot.error.isEmpty())
+            return;
+    }
+    else if (readySince == 0)
+        readySince = juce::Time::getMillisecondCounter();
+    // Ran to its end (its playhead was heard and is gone), could not be prepared, or no audio
+    // thread ever took it (a host that does not render): stopped, ready to restart.
+    if (heard || slot.error.isNotEmpty() || (readySince != 0 && juce::Time::getMillisecondCounter() - readySince > 1500))
+    {
+        transport = Transport::stopped;
+        pausedAt = 0.0;
+    }
+}
+
+void Audition::toggleBrowser (const std::string& key, const std::function<void()>& startFresh)
+{
+    constexpr unsigned mask = 1u << library::PreviewEngine::browserSlot;
+    updateTransport();
+    if (key != transportKey && transport != Transport::stopped)
+    {
+        engine.pause (mask);   // (another sound's preview: never resumed for this one)
+        transport = Transport::stopped;
+    }
+    transportKey = key;
+    switch (transport)
+    {
+        case Transport::stopped:
+            pausedAt = lastHead = 0.0;
+            heard = false;
+            readySince = 0;
+            if (startFresh != nullptr)
+                startFresh();
+            transport = Transport::playing;
+            break;
+        case Transport::playing:
+        {
+            const double head = engine.playheadSeconds (library::PreviewEngine::browserSlot);
+            pausedAt = head >= 0.0 ? head : lastHead;
+            engine.pause (mask);
+            transport = Transport::paused;
+            break;
+        }
+        case Transport::paused:
+            heard = false;
+            readySince = 0;
+            engine.playFrom (mask, pausedAt);
+            transport = Transport::playing;
+            break;
+    }
+    changed();
+}
+
+void Audition::stopBrowser()
+{
+    if (transport == Transport::stopped)
+        return;
+    engine.pause (1u << library::PreviewEngine::browserSlot);
+    transport = Transport::stopped;
+    pausedAt = 0.0;
+    changed();
+}
+
+Audition::Transport Audition::browserTransport()
+{
+    updateTransport();
+    return transport;
+}
+
+double Audition::browserPosition()
+{
+    updateTransport();
+    if (transport == Transport::paused)
+        return pausedAt;
+    if (transport == Transport::playing)
+        return std::max (0.0, engine.playheadSeconds (library::PreviewEngine::browserSlot));
+    return -1.0;
 }
 
 void Audition::setGainDb (float db)
