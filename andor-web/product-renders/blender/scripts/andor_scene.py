@@ -36,7 +36,7 @@ from mathutils import Euler, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
 p = argparse.ArgumentParser()
-p.add_argument("--camera", default="B", choices=["A", "B", "macros", "display", "corner", "hero_A", "hero_B", "knob", "knob_low", "small", "module", "corner_back", "corner_fl", "corner_br", "front_edge", "keys34", "keys_macro"])
+p.add_argument("--camera", default="B", choices=["A", "B", "macros", "display", "corner", "hero_A", "hero_B", "knob", "knob_low", "small", "module", "corner_back", "corner_fl", "corner_br", "front_edge", "keys34", "keys_macro", "wheels", "strips", "strips34", "strips_top"])
 p.add_argument("--stage", default="neutral", choices=["neutral", "dark", "gallery"])
 p.add_argument("--variant", default="shaded", choices=["shaded", "clay", "alpha"])
 p.add_argument("--res", type=int, nargs=2, default=None, help="default 2000 x 1500, or the --shot's own")
@@ -47,7 +47,8 @@ p.add_argument("--noise", type=float, default=0.012, help="adaptive-sampling noi
 p.add_argument("--bezel-height", type=float, default=0.6, help="--wheels physical: the ivory bezel's height above the panel (mm; C2 test 0.6, C2.5 studies 0.4 / 0.3)")
 p.add_argument("--wheel-finish", default="satin", choices=["c2", "satin"],
                help="--wheels physical: c2 = the C2 test's soft-touch charcoal; satin = a slightly lighter, lower-roughness crown that catches a highlight, over a darker, rougher slot")
-p.add_argument("--wheels", default="flat", choices=["flat", "physical"],
+p.add_argument("--strip-crown", type=float, default=0.02, help="--wheels strip: convex crown across the strip's width, as a fraction of the width (A 0, B 0.02, C 0.04)")
+p.add_argument("--wheels", default="flat", choices=["flat", "physical", "strip"],
                help="C2 test only: 'physical' models PITCH/MOD from the GUI (ivory bezel, slot, wheel, PITCH's orange band); default flat artwork")
 p.add_argument("--float", type=float, help="override the setup's float height (m), for floating-height studies")
 p.add_argument("--dist-scale", type=float, default=1.0, help="multiply the shot's camera distance (product-scale studies: 1/1.15, 1/1.25)")
@@ -916,7 +917,7 @@ for j, (x, rgb) in enumerate(MACRO_LED):
     led.name = f"Lens LED {j}"
     led.parent = root
     led.scale = (r, r, 0.75 * DMM)
-    led.location = (ex(x), ey(883), PANEL_TOP + MPANEL_H - 0.75 * DMM * 0.15)
+    led.location = (ex(x), ey(883 + KY), PANEL_TOP + MPANEL_H - 0.75 * DMM * 0.15)
     led.data.materials.append(m)
     for poly in led.data.polygons:
         poly.use_smooth = True
@@ -1231,7 +1232,121 @@ def wheel_solid(name, u0, u1, v_c, zc, R, a0, a1, mat, seg=72):
     return o
 
 
-if args.wheels == "physical" and APRON:
+def strip_material(k):
+    """The touch surface: satin charcoal (a capacitive sensor under a satin polymer / etched-glass
+    finish), toned from the GUI's own unlit strip: warm charcoal for PITCH, slate for MOD."""
+    rgb = (40, 38, 36) if k == 0 else (33, 38, 43)
+    nt = NT(f"Touch strip {('PITCH', 'MOD')[k]} (satin charcoal)")
+    b = nt.principled()
+    b.inputs["Base Color"].default_value = (*lin(rgb), 1)
+    b.inputs["Metallic"].default_value = 0.0
+    b.inputs["Specular IOR Level"].default_value = 0.42
+    b.inputs["Coat Weight"].default_value = 0.18
+    b.inputs["Coat Roughness"].default_value = 0.26
+    tc = nt.n("ShaderNodeTexCoord")
+    noise = nt.n("ShaderNodeTexNoise", Scale=3000.0, Detail=2.0)
+    nt.link(tc.outputs["Object"], noise.inputs["Vector"])
+    r = nt.n("ShaderNodeMapRange")
+    r.inputs["To Min"].default_value, r.inputs["To Max"].default_value = 0.36, 0.40      # very fine micro-roughness
+    nt.link(noise.outputs["Fac"], r.inputs["Value"])
+    nt.link(r.outputs[0], b.inputs["Roughness"])
+    return nt.finish(b.outputs[0])
+
+
+def strip_light_material(k):
+    """The value indication, lit within the surface: the GUI's own pixels where they are orange
+    (PITCH) or blue (MOD), added over the transparent strip so the surface's highlight stays. The
+    shape, width, gradient, rounded ends and value are the capture's; nothing is drawn here."""
+    nt = NT(f"Touch strip light {('PITCH', 'MOD')[k]}")
+    _, uv = face_uv(nt)
+    tex = nt.n("ShaderNodeTexImage")
+    tex.image, tex.interpolation, tex.extension = FACE_IMG, "Cubic", "EXTEND"
+    nt.link(uv, tex.inputs[0])
+    sep = nt.n("ShaderNodeSeparateColor")
+    nt.link(tex.outputs["Color"], sep.inputs[0])
+    warm = nt.math("SUBTRACT", sep.outputs[0], sep.outputs[2])
+    cool = nt.math("SUBTRACT", sep.outputs[2], sep.outputs[0])
+    m1 = nt.math("MULTIPLY_ADD", warm, 4.0, -0.6)
+    m2 = nt.math("MULTIPLY_ADD", cool, 4.0, -0.6)
+    mask = nt.n("ShaderNodeClamp")
+    nt.link(nt.math("MAXIMUM", m1, m2), mask.inputs[0])
+    em = nt.n("ShaderNodeEmission")
+    nt.link(tex.outputs["Color"], em.inputs["Color"])
+    nt.link(nt.math("MULTIPLY", mask.outputs[0], 1.6), em.inputs["Strength"])
+    tr = nt.n("ShaderNodeBsdfTransparent")
+    add = nt.n("ShaderNodeAddShader")
+    nt.link(tr.outputs[0], add.inputs[0])
+    nt.link(em.outputs[0], add.inputs[1])
+    return nt.finish(add.outputs[0])
+
+
+def crowned_bar(name, X0, X1, Y0, Y1, z_bot, z_edge, crown, nx=48):
+    """A bar whose top is a gentle convex arc across its width, the same along its whole length."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    w = X1 - X0
+    top0, top1, bot0, bot1 = [], [], [], []
+    for i in range(nx + 1):
+        x = X0 + w * i / nx
+        z = z_edge + crown * (1.0 - (2.0 * i / nx - 1.0) ** 2)
+        top0.append(bm.verts.new((x, Y0, z))); top1.append(bm.verts.new((x, Y1, z)))
+        bot0.append(bm.verts.new((x, Y0, z_bot))); bot1.append(bm.verts.new((x, Y1, z_bot)))
+    for i in range(nx):
+        bm.faces.new((top0[i], top0[i + 1], top1[i + 1], top1[i]))
+        bm.faces.new((bot1[i], bot1[i + 1], bot0[i + 1], bot0[i]))
+        bm.faces.new((bot0[i], bot0[i + 1], top0[i + 1], top0[i]))
+        bm.faces.new((top1[i], top1[i + 1], bot1[i + 1], bot1[i]))
+    bm.faces.new((bot0[0], top0[0], top1[0], bot1[0]))
+    bm.faces.new((bot1[-1], top1[-1], top0[-1], bot0[-1]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    PRODUCT.objects.link(o)
+    o.parent = root
+    return o
+
+
+def touch_strip(k, sl, P_, BZ_H, depth):
+    """C2.5 touch strip: one continuous, full-height sensor filling the bezel's opening (the slot),
+    rounded in plan like the GUI's strip, with a convex crown across its width along its whole length
+    (args.strip_crown x width; 0 = flat). Its crown sits just under the bezel's top. Three separate
+    objects, as the GUI's future layers: the bezel (static, built by the caller), the surface
+    (static) and the illumination (dynamic: the capture's value)."""
+    inset = 0.03 * MM                         # a hairline seam to the bezel's inner wall
+    X0, X1 = ex(sl[0]) + inset, ex(sl[2]) - inset
+    Y0, Y1 = sorted((ey(sl[1]), ey(sl[3])))
+    Y0, Y1 = Y0 + inset, Y1 - inset
+    crown = args.strip_crown * (X1 - X0)
+    peak = P_ + BZ_H - 0.06 * MM
+    edge = peak - crown
+    zb = P_ - depth + 0.02 * MM
+    names = ("PITCH", "MOD")
+    bar = crowned_bar(f"Touch strip {names[k]}", X0, X1, Y0, Y1, zb, edge, crown)
+    plan = slab(f"Touch strip plan {k}", X0, Y0, X1, Y1, 5 * PX - inset, zb - 1 * MM, peak + 1 * MM, [M_SLOT], seg=10)
+    plan.hide_render = plan.hide_viewport = True
+    bo = bar.modifiers.new("Plan", "BOOLEAN")
+    bo.operation, bo.solver, bo.object = "INTERSECT", "EXACT", plan
+    bv = bar.modifiers.new("Soft edge", "BEVEL")
+    bv.limit_method, bv.angle_limit, bv.width, bv.segments = "ANGLE", math.radians(30), 0.14 * MM, 3
+    bar.data.materials.append(strip_material(k))
+    bake(bar, lambda c, n: 0)
+    for poly in bar.data.polygons:
+        poly.use_smooth = True
+    # the illumination: the surface's top, 5 microns above it, carrying only the lit pixels
+    light = crowned_bar(f"Touch strip light {names[k]}", X0 + 0.2 * MM, X1 - 0.2 * MM, Y0 + 0.2 * MM, Y1 - 0.2 * MM,
+                        edge - 0.2 * MM, edge + 0.005 * MM, crown, nx=48)
+    lo = light.modifiers.new("Plan", "BOOLEAN")
+    lo.operation, lo.solver, lo.object = "INTERSECT", "EXACT", plan
+    light.data.materials.append(strip_light_material(k))
+    bake(light, lambda c, n: 0)
+    for poly in light.data.polygons:
+        poly.use_smooth = True
+    light.visible_shadow = False
+    bpy.data.objects.remove(plan)
+
+
+if args.wheels in ("physical", "strip") and APRON:
     P_ = PANEL_TOP
     if args.wheel_finish == "satin":
         # C2.5: the crown reads as a turned part: a touch lighter and satin, so its upper edge
@@ -1251,16 +1366,25 @@ if args.wheels == "physical" and APRON:
     ]
     panel_o = bpy.data.objects["Ceramic panel"]
     panel_o.data.materials.append(M_SLOT)
+    tray_o = bpy.data.objects["Ceramic tray"]
+    tray_o.data.materials.append(M_SLOT)
     for k, (bz, sl, band) in enumerate(WHEELS):
         cut = slab(f"Wheel slot cutter {k}", ex(sl[0]), ey(sl[3]), ex(sl[2]), ey(sl[1]), 5 * PX, P_ - SLOT_DEPTH, P_ + 3 * MM, [M_SLOT], seg=6)
         cut.hide_render = cut.hide_viewport = True
         b_ = panel_o.modifiers.new(f"Slot {k}", "BOOLEAN")
         b_.operation, b_.solver, b_.object = "DIFFERENCE", "EXACT", cut
+        # C2.5: under the wheels the panel is a 1.2 mm skin over the housing tray, so the slot goes
+        # on into the tray (C2 stopped at the tray's ivory top: the light floor seen in the slots)
+        t_ = tray_o.modifiers.new(f"Slot {k}", "BOOLEAN")
+        t_.operation, t_.solver, t_.object = "DIFFERENCE", "EXACT", cut
         bezel = slab(f"Wheel bezel {k}", ex(bz[0]), ey(bz[3]), ex(bz[2]), ey(bz[1]), 7 * PX, P_ - 0.2 * MM, P_ + BZ_H,
                      [M_FACE, M_PANEL_SIDE], bevel=min(0.22 * MM, 0.45 * BZ_H), seg=8, cutters=[cut], bevel_segments=3)
         bake(bezel, top_side(P_ + BZ_H))
         vc = (sl[1] + sl[3]) / 2
         zc = P_ + BZ_H - 0.25 * MM - R_W      # the crown 0.25 mm under the bezel's top, whatever its height
+        if args.wheels == "strip":
+            touch_strip(k, sl, P_, BZ_H, SLOT_DEPTH)
+            continue
         inset = 0.6 * MM / PX
         wheel_solid(f"Wheel {k}", sl[0] + inset + 1.2, sl[2] - inset - 1.2, vc, zc, R_W, 0, 2 * math.pi, M_WHEEL)
         for f0, f1 in ((sl[0] + inset, sl[0] + inset + 1.2), (sl[2] - inset - 1.2, sl[2] - inset)):
@@ -1280,13 +1404,14 @@ if args.wheels == "physical" and APRON:
     def in_slot(c):
         return c.z < P_ - 0.05 * MM and any(x0 <= c.x <= x1 and y0 <= c.y <= y1 for x0, x1, y0, y1 in SLOTS)
 
+    bake(tray_o, lambda c, n: len(tray_o.data.materials) - 1 if c.z < TRAY_TOP - 0.05 * MM and any(x0 <= c.x <= x1 and y0 <= c.y <= y1 for x0, x1, y0, y1 in SLOTS) else 0)
     bake(panel_o, lambda c, n: 3 if in_slot(c)
          else (0 if n.z > 0.9 and c.z > P_ - 0.05 * MM else (2 if c.y < YT_ - 1e-4 else 1)))
     for o_ in [o for o in bpy.data.objects if o.name.startswith("Wheel slot cutter")]:
         bpy.data.objects.remove(o_)
 
 # --- pose ------------------------------------------------------------------------------------
-ROT = {"A": -9.0, "hero_A": -9.0, "front_edge": 0.0}.get(args.camera, -11.0)
+ROT = {"A": -9.0, "hero_A": -9.0, "front_edge": 0.0, "strips_top": 0.0}.get(args.camera, -11.0)
 if SHOT:
     ROT = SHOT["rot"]
 root.location = (0, 0, FLOAT)
@@ -1504,32 +1629,40 @@ CAMS = {
     "B": dict(yaw=-24, pitch=54, dist=1.30, lens=85, target=T, fstop=11),               # elevated three-quarter
     "hero_A": dict(yaw=-24, pitch=27, dist=1.12, lens=75, target=T, fstop=9, shift=(0, 0.07), fit="HORIZONTAL"),   # = pass 1
     "hero_B": dict(yaw=-24, pitch=54, dist=1.16, lens=85, target=T, fstop=9, shift=(-0.035, 0.05), fit="HORIZONTAL"),
-    "macros": dict(yaw=-18, pitch=50, dist=0.64, lens=85, target=prod(493, 812, REF_PANEL_TOP + CARD_H + 4 * MM), fstop=11),
+    "macros": dict(yaw=-18, pitch=50, dist=0.64, lens=85, target=prod(493, 812 + KY, REF_PANEL_TOP + CARD_H + 4 * MM), fstop=11),
     "display": dict(yaw=-20, pitch=42, dist=0.30, lens=100, target=prod(723, 330, REF_PANEL_TOP + CARD_H), fstop=8),
     "corner": dict(yaw=38, pitch=66, dist=0.26, lens=100, target=prod(1390, 1050 + KY, REF_FRAME_TOP * 0.6), fstop=8),
     "corner_back": dict(yaw=-150, pitch=62, dist=0.26, lens=100, target=prod(40, 30, REF_FRAME_TOP * 0.6), fstop=8),
     "corner_fl": dict(yaw=-38, pitch=66, dist=0.26, lens=100, target=prod(58, 1050 + KY, REF_FRAME_TOP * 0.6), fstop=8),
     "corner_br": dict(yaw=150, pitch=62, dist=0.26, lens=100, target=prod(1408, 30, REF_FRAME_TOP * 0.6), fstop=8),
-    "knob": dict(yaw=-20, pitch=52, dist=0.21, lens=100, target=prod(493, 818, REF_PANEL_TOP + 4 * MM), fstop=11),
+    "knob": dict(yaw=-20, pitch=52, dist=0.21, lens=100, target=prod(493, 818 + KY, REF_PANEL_TOP + 4 * MM), fstop=11),
     # pass 3.5: the same knobs from a lower elevation (22 deg above the panel) to read the sidewall
-    "knob_low": dict(yaw=-20, pitch=68, dist=0.21, lens=100, target=prod(493, 818, REF_PANEL_TOP + 4 * MM), fstop=11),
+    "knob_low": dict(yaw=-20, pitch=68, dist=0.21, lens=100, target=prod(493, 818 + KY, REF_PANEL_TOP + 4 * MM), fstop=11),
     "small": dict(yaw=-20, pitch=50, dist=0.17, lens=100, target=prod(723, 520, REF_PANEL_TOP + CARD_H + 2 * MM), fstop=11),
-    "module": dict(yaw=-24, pitch=55, dist=0.20, lens=100, target=prod(60, 640, REF_PANEL_TOP + CARD_H), fstop=11),
+    "module": dict(yaw=-24, pitch=55, dist=0.20, lens=100, target=prod(60, 640 + KY, REF_PANEL_TOP + CARD_H), fstop=11),
     # checkpoint 2: the front edge straight on (product square to the camera, 8 deg above the floor)
     # and a three-quarter close-up of the key fronts and the return
     "front_edge": dict(yaw=0, pitch=82, dist=1.70, lens=135, target=prod(724, 1046 + KY, REF_FRAME_TOP * 0.55), fstop=16),
     "keys_macro": dict(yaw=-28, pitch=64, dist=0.17, lens=100, target=prod(600, 985 + KY, REF_PANEL_TOP - 3 * MM), fstop=9),
+    "strips": dict(yaw=-22, pitch=48, dist=0.15, lens=100, target=prod(86, 957 + KY, REF_PANEL_TOP), fstop=None),   # C2.5: no depth of field (geometry review)
+    "strips34": dict(yaw=-48, pitch=60, dist=0.12, lens=100, target=prod(86, 957 + KY, REF_PANEL_TOP), fstop=None),
+    "strips_top": dict(yaw=0, pitch=0.01, dist=0.30, lens=100, target=prod(86, 957 + KY, REF_PANEL_TOP), fstop=None),
+    "wheels": dict(yaw=-22, pitch=48, dist=0.15, lens=100, target=prod(86, 957 + KY, REF_PANEL_TOP), fstop=11),   # C2.5: PITCH/MOD in focus
     "keys34": dict(yaw=-32, pitch=62, dist=0.27, lens=100, target=prod(520, 985 + KY, REF_PANEL_TOP - 3 * MM), fstop=11),
 }
 if SHOT:
     sc = dict(SHOT["camera"])
     u_, v_, z_ = sc.pop("target")
+    v_ += KY if v_ > 600 else 0.0      # a target under the cards follows the current editor's trim (0 for older captures)
     sc["target"] = prod(u_, v_, REF_PANEL_TOP + z_ * MM)
     sc["dist"] *= args.dist_scale
     sc["shift"] = tuple(sc["shift"])
     scene.camera = camera(f"Camera {args.setup} {args.shot}", **sc)
 else:
     scene.camera = camera("Camera " + args.camera, **CAMS[args.camera])
+    if args.camera == "strips_top":   # C2.5: orthographic, straight down, for a like-for-like check against the GUI
+        scene.camera.data.type = "ORTHO"
+        scene.camera.data.ortho_scale = 150 * PX       # editor x 11..161 at the output's width
 
 if args.border:
     scene.render.use_border = True

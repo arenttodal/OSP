@@ -482,7 +482,7 @@
       "fstop": 11,
       "shift": [
        -0.03,
-       -0.155
+       -0.285
       ],
       "fit": "HORIZONTAL"
      },
@@ -582,7 +582,8 @@
         "why": "C2.5: a low, narrow sheen along the left teak cheek's outer face: richer timber without recolouring it"
        }
       ]
-     }
+     },
+     "note": "shift is in units of the frame width (HORIZONTAL sensor fit)"
     }
    }
   },
@@ -950,6 +951,137 @@
        }
       }
      }
+    },
+    "B1_R3": {
+     "title": "Floating B1-R3 \u00b7 fill and top line -25 % (C2.5)",
+     "res": [
+      1800,
+      2250
+     ],
+     "rot": -16.0,
+     "camera": {
+      "yaw": -36,
+      "pitch": 58,
+      "dist": 1.2,
+      "lens": 85,
+      "target": [
+       724,
+       560,
+       0
+      ],
+      "fstop": 9,
+      "shift": [
+       0.0,
+       -0.03
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "overrides": {
+      "lights": {
+       "Fill": {
+        "power": 0.6
+       },
+       "Top line": {
+        "power": 3.4
+       }
+      },
+      "note": "The Fill light (0.8 W) is too small to move the image (R1/R2: under 0.05/255); the broad Top line is the real fill on the ivory"
+     }
+    },
+    "B1_R4": {
+     "title": "Floating B1-R4 \u00b7 R3 + a smaller key (C2.5)",
+     "res": [
+      1800,
+      2250
+     ],
+     "rot": -16.0,
+     "camera": {
+      "yaw": -36,
+      "pitch": 58,
+      "dist": 1.2,
+      "lens": 85,
+      "target": [
+       724,
+       560,
+       0
+      ],
+      "fstop": 9,
+      "shift": [
+       0.0,
+       -0.03
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "overrides": {
+      "lights": {
+       "Fill": {
+        "power": 0.6
+       },
+       "Top line": {
+        "power": 3.4
+       },
+       "Key softbox": {
+        "size": [
+         0.6,
+         0.35
+        ]
+       }
+      },
+      "note": "The Fill light (0.8 W) is too small to move the image (R1/R2: under 0.05/255); the broad Top line is the real fill on the ivory"
+     }
+    },
+    "B2_115_R4": {
+     "title": "Floating B2 +15 % \u00b7 locked, with B1-R4's lighting (C2.5)",
+     "res": [
+      1440,
+      2560
+     ],
+     "rot": -26.0,
+     "camera": {
+      "yaw": -36,
+      "pitch": 58,
+      "dist": 1.183,
+      "lens": 85,
+      "target": [
+       724,
+       560,
+       0
+      ],
+      "fstop": 9,
+      "shift": [
+       0.07,
+       0.08
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "text_safe": {
+      "x": [
+       0.08,
+       0.92
+      ],
+      "y": [
+       0.14,
+       0.34
+      ]
+     },
+     "note": "C2: copy clear of the platform's top UI (14 %); the product clear of the bottom 20 % (call to action)",
+     "overrides": {
+      "lights": {
+       "Fill": {
+        "power": 0.6
+       },
+       "Top line": {
+        "power": 3.4
+       },
+       "Key softbox": {
+        "size": [
+         0.6,
+         0.35
+        ]
+       }
+      },
+      "note": "The Fill light (0.8 W) is too small to move the image (R1/R2: under 0.05/255); the broad Top line is the real fill on the ivory"
+     }
     }
    },
    "product_light_ev": -0.3,
@@ -1142,7 +1274,7 @@
       "lens": 100,
       "target": [
        560,
-       915,
+       965,
        0.0
       ],
       "fstop": 11.0,
@@ -1151,7 +1283,8 @@
        0.0
       ],
       "fit": "AUTO"
-     }
+     },
+     "note": "targets below the cards are in the reference (pre-trim) editor coordinates; the scene adds the current editor's trim"
     }
    }
   }
