@@ -38,7 +38,7 @@ UserMacroController::~UserMacroController()
 
 juce::Colour UserMacroController::colour (int macro) const
 {
-    return design::colour::macro (std::clamp (macro, 0, frame::macroCount - 1));
+    return design::colour::userMacro (std::clamp (macro, 0, frame::macroCount - 1));
 }
 
 MacroLens* UserMacroController::lens (int macro) noexcept

@@ -71,6 +71,9 @@ struct Materials
     /** The six macros' identities (colour::macro), when a product sets its own (alpha 0: ANDOR
         OSP's mineral palette). LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE, ECHO. */
     std::array<juce::Colour, 6> macros {};
+    /** The six USER macros' colours (colour::userMacro), when a product sets its own (alpha 0:
+        its CORE colours if it set those, else ANDOR OSP's frozen USER palette). */
+    std::array<juce::Colour, 6> userMacros {};
 
     /** ANDOR OSP's own. */
     static Materials osp()
@@ -173,6 +176,20 @@ namespace colour
         return colours[static_cast<std::size_t> (m)];
     }
     inline juce::Colour macro (int index) { return macro (static_cast<Macro> (juce::jlimit (0, 5, index))); }
+    /** The USER macros' own palette (lens, halo, label accent, panel), in USER macro order.
+        Frozen: the colours they had when they shared CORE's, so a CORE palette change never
+        recolours them. */
+    inline juce::Colour userMacro (int index)
+    {
+        const auto i = static_cast<std::size_t> (juce::jlimit (0, 5, index));
+        if (const auto own = detail::materials.userMacros[i]; own.getAlpha() != 0)
+            return own;
+        if (const auto core = detail::materials.macros[i]; core.getAlpha() != 0)
+            return core;   // (a product with its own CORE colours: its USER colours as before)
+        static const std::array<juce::Colour, 6> colours { juce::Colour (0xffbe7552), juce::Colour (0xffb5843a), juce::Colour (0xff7b8d69),
+                                                           juce::Colour (0xff73899c), juce::Colour (0xff96839d), juce::Colour (0xff5c9490) };
+        return colours[i];
+    }
     /** The same identity lifted for lines on the graphite displays (equal weight on dark). */
     inline juce::Colour macroOnDark (Macro m) { return macro (m).withMultipliedBrightness (1.32f).withMultipliedSaturation (1.08f); }
 
