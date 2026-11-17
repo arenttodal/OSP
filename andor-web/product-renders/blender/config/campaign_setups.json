@@ -584,6 +584,114 @@
       ]
      },
      "note": "shift is in units of the frame width (HORIZONTAL sensor fit)"
+    },
+    "A1_R1_W": {
+     "title": "Gallery A1-R1 W \u00b7 the instrument about 6 % further right, for a larger headline (C3)",
+     "res": [
+      2560,
+      1440
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -30,
+      "pitch": 52,
+      "dist": 1.87,
+      "lens": 85,
+      "target": [
+       724,
+       520,
+       0
+      ],
+      "fstop": 11,
+      "shift": [
+       -0.185,
+       -0.03
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "text_safe": {
+      "x": [
+       0.06,
+       0.48
+      ],
+      "y": [
+       0.2,
+       0.62
+      ]
+     },
+     "overrides": {
+      "floor": {
+       "rgb": [
+        0.655,
+        0.622,
+        0.573
+       ],
+       "roughness": 0.78,
+       "note": "C2.5 R1: about 12 % brighter than C2's 0.585/0.556/0.512, same hue ratios (no yellow or peach)"
+      },
+      "lights": {
+       "Key softbox": {
+        "size": [
+         1.1,
+         0.8
+        ]
+       },
+       "Overhead": {
+        "power": 2.2
+       },
+       "Fill": {
+        "power": 1.6
+       },
+       "Low rake": {
+        "power": 4.5
+       }
+      },
+      "add_lights": [
+       {
+        "name": "Detail rake",
+        "offset": [
+         -0.55,
+         0.65,
+         0.16
+        ],
+        "size": [
+         0.9,
+         0.12
+        ],
+        "power": 0.8,
+        "rgb": [
+         1.0,
+         0.96,
+         0.92
+        ],
+        "spread": 60,
+        "link": "product",
+        "why": "C2.5: grazes from behind left at about 12 % of the key, so flutes, small-knob bevels and card edges model without lifting the top surface"
+       },
+       {
+        "name": "Cheek glint",
+        "offset": [
+         -0.95,
+         -0.55,
+         0.1
+        ],
+        "size": [
+         0.6,
+         0.05
+        ],
+        "power": 2.5,
+        "rgb": [
+         1.0,
+         0.93,
+         0.85
+        ],
+        "spread": 40,
+        "link": "product",
+        "why": "C2.5: a low, narrow sheen along the left teak cheek's outer face: richer timber without recolouring it"
+       }
+      ]
+     },
+     "note": "about 6 % further right than A1-R1 with the camera 5 % further back, so the right cheek keeps its margin"
     }
    }
   },
@@ -1082,6 +1190,53 @@
       },
       "note": "The Fill light (0.8 W) is too small to move the image (R1/R2: under 0.05/255); the broad Top line is the real fill on the ivory"
      }
+    },
+    "B1_R5": {
+     "title": "Floating B1-R5 \u00b7 R4 with the key lower and more to the side (C3, one test)",
+     "res": [
+      1800,
+      2250
+     ],
+     "rot": -16.0,
+     "camera": {
+      "yaw": -36,
+      "pitch": 58,
+      "dist": 1.2,
+      "lens": 85,
+      "target": [
+       724,
+       560,
+       0
+      ],
+      "fstop": 9,
+      "shift": [
+       0.0,
+       -0.03
+      ],
+      "fit": "HORIZONTAL"
+     },
+     "overrides": {
+      "lights": {
+       "Fill": {
+        "power": 0.6
+       },
+       "Top line": {
+        "power": 3.4
+       },
+       "Key softbox": {
+        "size": [
+         0.6,
+         0.35
+        ],
+        "offset": [
+         -0.95,
+         0.35,
+         0.55
+        ]
+       }
+      },
+      "note": "The Fill light (0.8 W) is too small to move the image (R1/R2: under 0.05/255); the broad Top line is the real fill on the ivory"
+     }
     }
    },
    "product_light_ev": -0.3,
@@ -1285,6 +1440,306 @@
       "fit": "AUTO"
      },
      "note": "targets below the cards are in the reference (pre-trim) editor coordinates; the scene adds the current editor's trim"
+    },
+    "M01_sharp": {
+     "title": "M01 \u00b7 macro knobs, sharp (f/14)",
+     "res": [
+      2400,
+      2400
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -18,
+      "pitch": 60,
+      "dist": 0.2,
+      "lens": 100,
+      "target": [
+       493,
+       812,
+       5.5
+      ],
+      "fstop": 14.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M01_cine": {
+     "title": "M01 \u00b7 macro knobs, cinematic (f/8)",
+     "res": [
+      2400,
+      2400
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -18,
+      "pitch": 60,
+      "dist": 0.185,
+      "lens": 100,
+      "target": [
+       493,
+       812,
+       5.5
+      ],
+      "fstop": 8.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M02_sharp": {
+     "title": "M02 \u00b7 source controls, sharp (f/11)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -20,
+      "pitch": 57,
+      "dist": 0.24,
+      "lens": 100,
+      "target": [
+       205,
+       455,
+       4.0
+      ],
+      "fstop": 11.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M02_cine": {
+     "title": "M02 \u00b7 source controls, cinematic (f/5.6)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -20,
+      "pitch": 57,
+      "dist": 0.24,
+      "lens": 100,
+      "target": [
+       205,
+       455,
+       4.0
+      ],
+      "fstop": 5.6,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M03_sharp": {
+     "title": "M03 \u00b7 waveform display and glass, sharp (f/11)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -14,
+      "pitch": 40,
+      "dist": 0.24,
+      "lens": 100,
+      "target": [
+       723,
+       330,
+       2.0
+      ],
+      "fstop": 11.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M03_cine": {
+     "title": "M03 \u00b7 waveform display and glass, cinematic (f/5.6)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -14,
+      "pitch": 40,
+      "dist": 0.24,
+      "lens": 100,
+      "target": [
+       723,
+       330,
+       2.0
+      ],
+      "fstop": 5.6,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M04_sharp": {
+     "title": "M04 \u00b7 keyboard and front return, sharp (f/11)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -30,
+      "pitch": 63,
+      "dist": 0.26,
+      "lens": 100,
+      "target": [
+       560,
+       965,
+       0.0
+      ],
+      "fstop": 11.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M04_cine": {
+     "title": "M04 \u00b7 keyboard and front return, cinematic (f/5.6)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -30,
+      "pitch": 63,
+      "dist": 0.26,
+      "lens": 100,
+      "target": [
+       560,
+       965,
+       0.0
+      ],
+      "fstop": 5.6,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M05_sharp": {
+     "title": "M05 \u00b7 teak cheek meeting the ceramic, sharp (f/11)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -62,
+      "pitch": 62,
+      "dist": 0.17,
+      "lens": 100,
+      "target": [
+       30,
+       330,
+       -2.0
+      ],
+      "fstop": 11.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M05_cine": {
+     "title": "M05 \u00b7 teak cheek meeting the ceramic, cinematic (f/5.6)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -62,
+      "pitch": 62,
+      "dist": 0.17,
+      "lens": 100,
+      "target": [
+       30,
+       330,
+       -2.0
+      ],
+      "fstop": 5.6,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M06_sharp": {
+     "title": "M06 \u00b7 PITCH / MOD touch strips, sharp (f/11)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -40,
+      "pitch": 58,
+      "dist": 0.15,
+      "lens": 100,
+      "target": [
+       86,
+       957,
+       0.0
+      ],
+      "fstop": 11.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
+    },
+    "M06_cine": {
+     "title": "M06 \u00b7 PITCH / MOD touch strips, cinematic (f/5.6)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -40,
+      "pitch": 58,
+      "dist": 0.15,
+      "lens": 100,
+      "target": [
+       86,
+       957,
+       0.0
+      ],
+      "fstop": 5.6,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     }
     }
    }
   }

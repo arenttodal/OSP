@@ -44,18 +44,20 @@ p.add_argument("--setup", choices=["ANDOR_GALLERY", "ANDOR_FLOATING", "ANDOR_MAT
                help="Gate C: a campaign setup from config/campaign_setups.json (stage, lights, float, exposure); needs --shot")
 p.add_argument("--shot", help="Gate C: the setup's shot (camera, product rotation, resolution), e.g. A1, B2, C1")
 p.add_argument("--noise", type=float, default=0.012, help="adaptive-sampling noise threshold (masters: 0.005 keeps fine GUI text out of the denoiser's reach)")
-p.add_argument("--bezel-height", type=float, default=0.6, help="--wheels physical: the ivory bezel's height above the panel (mm; C2 test 0.6, C2.5 studies 0.4 / 0.3)")
-p.add_argument("--wheel-finish", default="satin", choices=["c2", "satin"],
-               help="--wheels physical: c2 = the C2 test's soft-touch charcoal; satin = a slightly lighter, lower-roughness crown that catches a highlight, over a darker, rougher slot")
-p.add_argument("--strip-crown", type=float, default=0.02, help="--wheels strip: convex crown across the strip's width, as a fraction of the width (A 0, B 0.02, C 0.04)")
-p.add_argument("--wheels", default="flat", choices=["flat", "physical", "strip"],
-               help="C2 test only: 'physical' models PITCH/MOD from the GUI (ivory bezel, slot, wheel, PITCH's orange band); default flat artwork")
+p.add_argument("--bezel-height", type=float, default=0.4, help="touch strips: the ivory bezel's height above the panel (mm; approved 0.4)")
+p.add_argument("--strip-crown", type=float, default=0.02, help="touch strips: convex crown across the width, as a fraction of it (approved B: 0.02)")
+p.add_argument("--wheels", default="strip", choices=["strip", "flat"],
+               help="PITCH / MOD: 'strip' = the approved full-height touch strips (needs the trimmed front body); 'flat' = the GUI artwork only (C2 and earlier)")
+p.add_argument("--pass", dest="pass_", default="beauty", choices=["beauty", "product", "product_shadow", "shadow", "background"],
+               help="C3 layers (RGBA except beauty/background): product = the product alone (the real floor still lights it, invisible to the camera); "
+                    "product_shadow = product + its shadow (the real floor as a shadow catcher); shadow = the shadow alone; background = the stage without the product")
 p.add_argument("--float", type=float, help="override the setup's float height (m), for floating-height studies")
 p.add_argument("--dist-scale", type=float, default=1.0, help="multiply the shot's camera distance (product-scale studies: 1/1.15, 1/1.25)")
 p.add_argument("--scale", type=float, default=1.0)
 p.add_argument("--samples", type=int, default=128)
 p.add_argument("--out")
-p.add_argument("--textures", default="product-renders/blender/textures")
+p.add_argument("--textures", default="product-renders/blender/textures_current",
+               help="the master is the current editor (C2.5 sync); product-renders/blender/textures rebuilds C2 and earlier")
 p.add_argument("--save-blend")
 p.add_argument("--view", default="AgX")
 p.add_argument("--look", default="AgX - Punchy")
@@ -1199,39 +1201,7 @@ if CLAY:
             o.data.materials.clear()
             o.data.materials.append(CLAY)
 
-# --- C2 test: physical PITCH / MOD wheels (from the approved GUI) ----------------------------
-def wheel_solid(name, u0, u1, v_c, zc, R, a0, a1, mat, seg=72):
-    """A wheel (or an arc of one) turning about the x axis: outer surface plus side caps.
-    u0/u1 editor px across, v_c editor px of the axle, zc the axle height, angles from +z toward the front."""
-    me = bpy.data.meshes.new(name)
-    bm = bmesh.new()
-    full = abs((a1 - a0) - 2 * math.pi) < 1e-6
-    n = seg if full else max(4, int(seg * (a1 - a0) / (2 * math.pi)) + 1)
-    rings = []
-    for x in (ex(u0), ex(u1)):
-        ring = []
-        for i in range(n):
-            a = a0 + (a1 - a0) * i / (n if full else n - 1)
-            ring.append(bm.verts.new((x, ey(v_c) - R * math.sin(a), zc + R * math.cos(a))))
-        rings.append(ring)
-    L, Rr = rings
-    m = n if full else n - 1
-    for i in range(m):
-        j = (i + 1) % n
-        bm.faces.new((L[i], L[j], Rr[j], Rr[i]))
-    if full:
-        bm.faces.new(list(reversed(L)))
-        bm.faces.new(Rr)
-    bm.normal_update()
-    bm.to_mesh(me)
-    bm.free()
-    o = obj(name, me)
-    me.materials.append(mat)
-    for poly in me.polygons:
-        poly.use_smooth = True
-    return o
-
-
+# --- PITCH / MOD: full-height capacitive touch strips (approved at C2.5: crown B, 0.4 mm bezel) ---
 def strip_material(k):
     """The touch surface: satin charcoal (a capacitive sensor under a satin polymer / etched-glass
     finish), toned from the GUI's own unlit strip: warm charcoal for PITCH, slate for MOD."""
@@ -1357,21 +1327,12 @@ def touch_strip(k, sl, P_, BZ_H, depth):
     bpy.data.objects.remove(plan)
 
 
-if args.wheels in ("physical", "strip") and APRON:
+if args.wheels == "strip" and APRON:
     P_ = PANEL_TOP
-    if args.wheel_finish == "satin":
-        # C2.5: the crown reads as a turned part: a touch lighter and satin, so its upper edge
-        # catches the key; the slot darker and rougher, so wheel and slot separate.
-        M_WHEEL = mat_solid("Wheel (charcoal, satin)", (50, 48, 45), 0.36, spec=0.45, coat=0.08, bump=0)
-        M_SLOT = mat_solid("Wheel slot (charcoal)", (24, 23, 21), 0.86, spec=0.15, bump=0)
-    else:
-        M_WHEEL = mat_solid("Wheel (charcoal, soft-touch)", (36, 34, 32), 0.58, spec=0.3, bump=0)
-        M_SLOT = mat_solid("Wheel slot (charcoal)", (30, 28, 26), 0.75, spec=0.2, bump=0)
-    M_FLANGE = mat_solid("Wheel flange", (78, 74, 68), 0.45, spec=0.35, bump=0)
-    M_PITCH = mat_solid("PITCH band (orange satin)", (214, 104, 42), 0.40, spec=0.4, coat=0.1, bump=0)
+    M_SLOT = mat_solid("Touch strip well (charcoal)", (24, 23, 21), 0.86, spec=0.15, bump=0)
     BZ_H = args.bezel_height * MM
-    SLOT_DEPTH, R_W = 5.0 * MM, 8.0 * MM
-    WHEELS = [  # bezel (editor px), slot, PITCH band (None for MOD), from web-10-hero-3L-nocaps@4x
+    SLOT_DEPTH = 5.0 * MM
+    WHEELS = [  # bezel (editor px), opening, lit range (artwork), from the editor's capture
         ((42.5, 913.75 + KY, 77.5, 1001.0 + KY), (46.0, 918.75 + KY, 74.0, 997.0 + KY), (52.5, 937.0 + KY, 65.0, 990.0 + KY)),
         ((93.75, 913.75 + KY, 128.75, 1001.0 + KY), (97.5, 918.75 + KY, 125.0, 997.0 + KY), None),
     ]
@@ -1380,30 +1341,18 @@ if args.wheels in ("physical", "strip") and APRON:
     tray_o = bpy.data.objects["Ceramic tray"]
     tray_o.data.materials.append(M_SLOT)
     for k, (bz, sl, band) in enumerate(WHEELS):
-        cut = slab(f"Wheel slot cutter {k}", ex(sl[0]), ey(sl[3]), ex(sl[2]), ey(sl[1]), 5 * PX, P_ - SLOT_DEPTH, P_ + 3 * MM, [M_SLOT], seg=6)
+        cut = slab(f"Touch strip well cutter {k}", ex(sl[0]), ey(sl[3]), ex(sl[2]), ey(sl[1]), 5 * PX, P_ - SLOT_DEPTH, P_ + 3 * MM, [M_SLOT], seg=6)
         cut.hide_render = cut.hide_viewport = True
         b_ = panel_o.modifiers.new(f"Slot {k}", "BOOLEAN")
         b_.operation, b_.solver, b_.object = "DIFFERENCE", "EXACT", cut
-        # C2.5: under the wheels the panel is a 1.2 mm skin over the housing tray, so the slot goes
-        # on into the tray (C2 stopped at the tray's ivory top: the light floor seen in the slots)
+        # under PITCH / MOD the panel is a 1.2 mm skin over the housing tray, so the well goes on
+        # into the tray (stopping on the tray's ivory top showed a light floor)
         t_ = tray_o.modifiers.new(f"Slot {k}", "BOOLEAN")
         t_.operation, t_.solver, t_.object = "DIFFERENCE", "EXACT", cut
-        bezel = slab(f"Wheel bezel {k}", ex(bz[0]), ey(bz[3]), ex(bz[2]), ey(bz[1]), 7 * PX, P_ - 0.2 * MM, P_ + BZ_H,
+        bezel = slab(f"Touch strip bezel {k}", ex(bz[0]), ey(bz[3]), ex(bz[2]), ey(bz[1]), 7 * PX, P_ - 0.2 * MM, P_ + BZ_H,
                      [M_FACE, M_PANEL_SIDE], bevel=min(0.22 * MM, 0.45 * BZ_H), seg=8, cutters=[cut], bevel_segments=3)
         bake(bezel, top_side(P_ + BZ_H))
-        vc = (sl[1] + sl[3]) / 2
-        zc = P_ + BZ_H - 0.25 * MM - R_W      # the crown 0.25 mm under the bezel's top, whatever its height
-        if args.wheels == "strip":
-            touch_strip(k, sl, P_, BZ_H, SLOT_DEPTH)
-            continue
-        inset = 0.6 * MM / PX
-        wheel_solid(f"Wheel {k}", sl[0] + inset + 1.2, sl[2] - inset - 1.2, vc, zc, R_W, 0, 2 * math.pi, M_WHEEL)
-        for f0, f1 in ((sl[0] + inset, sl[0] + inset + 1.2), (sl[2] - inset - 1.2, sl[2] - inset)):
-            wheel_solid(f"Wheel flange {k}", f0, f1, vc, zc, R_W + 0.08 * MM, 0, 2 * math.pi, M_FLANGE)
-        if band:
-            a_lo = math.asin(max(-0.999, min(0.999, (ey(band[3]) - ey(vc)) / R_W)))
-            a_hi = math.asin(max(-0.999, min(0.999, (ey(band[1]) - ey(vc)) / R_W)))
-            wheel_solid("PITCH band", band[0], band[2], vc, zc, R_W + 0.06 * MM, -a_hi, -a_lo, M_PITCH, seg=240)
+        touch_strip(k, sl, P_, BZ_H, SLOT_DEPTH)
     YT_ = ey(APRON["top"])
     # Charcoal only on the slots' own walls and floor. (C2's rule took every face below the panel
     # top left of x 135 px, which included the panel's outer side wall along the left cheek: the
@@ -1418,7 +1367,7 @@ if args.wheels in ("physical", "strip") and APRON:
     bake(tray_o, lambda c, n: len(tray_o.data.materials) - 1 if c.z < TRAY_TOP - 0.05 * MM and any(x0 <= c.x <= x1 and y0 <= c.y <= y1 for x0, x1, y0, y1 in SLOTS) else 0)
     bake(panel_o, lambda c, n: 3 if in_slot(c)
          else (0 if n.z > 0.9 and c.z > P_ - 0.05 * MM else (2 if c.y < YT_ - 1e-4 else 1)))
-    for o_ in [o for o in bpy.data.objects if o.name.startswith("Wheel slot cutter")]:
+    for o_ in [o for o in bpy.data.objects if o.name.startswith("Touch strip well cutter")]:
         bpy.data.objects.remove(o_)
 
 # --- pose ------------------------------------------------------------------------------------
@@ -1510,6 +1459,24 @@ else:
     g = slab("Grooves", -2.0, -total / 2 - 0.02, 2.0, total / 2 + 0.02, 0.0005, -0.06, -0.02, [floor_mat("Groove", (0.006, 0.005, 0.004), 0.7)], seg=1, coll=STAGE)
     g.parent = froot
     floor_objs.append(g)
+
+if args.pass_ != "beauty":
+    # C3 layers from the real stage, so the product keeps the floor's own bounce and colour
+    product_objs = [o for o in PRODUCT.all_objects]
+    if args.pass_ != "background":
+        scene.render.film_transparent = True
+        scene.render.image_settings.color_mode = "RGBA"
+    for o in floor_objs:
+        if args.pass_ == "product":
+            o.visible_camera = False
+        elif args.pass_ in ("product_shadow", "shadow"):
+            o.is_shadow_catcher = True
+    if args.pass_ == "shadow":
+        for o in product_objs:
+            o.visible_camera = False
+    elif args.pass_ == "background":
+        for o in product_objs:
+            o.hide_render = True
 
 if args.variant == "alpha":
     for o in floor_objs:
