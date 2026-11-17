@@ -43,6 +43,9 @@ enum class PedalLoopMode
 struct InstrumentVoiceStart
 {
     const InstrumentModel* model = nullptr;
+    /** The set member it plays (index into InstrumentSet::members; -1: not a set member). The
+        displays show exactly this recording (round robin, FILL), never a guess. */
+    int member = -1;
     const PitchLayer* layer = nullptr;
     int note = 60;
     int velocity = 100;
@@ -180,12 +183,15 @@ public:
     /** KEY DNA AMOUNT as this voice applies it now (smoothed; 1 without a profile). */
     double keyDnaAmountNow() const noexcept { return keyDnaAmountApplied; }
     int grainCount() const noexcept { return granularMode ? granularSource.grainCount() : 0; }
+    /** The set member this voice plays (InstrumentVoiceStart::member; -1: none). */
+    int member() const noexcept { return memberIndex; }
     /** One Shot voices: where the read head is (0..1 of the recording the display shows: a
         Note Atlas note reads inside its own region of the phrase) and how loud the note is
         now (envelope, 0..1), for the display. False for granular or idle voices. */
     bool playhead (float& where, float& level) const noexcept
     {
-        if (! active || granularMode || layer == nullptr || layer->source == nullptr)
+        // (once the recording has ended - SYNTH holding the note on - nothing reads it)
+        if (! active || granularMode || sourceEnded || layer == nullptr || layer->source == nullptr)
             return false;
         const auto frames = static_cast<double> (std::max<std::int64_t> (1, layer->source->numFrames()));
         const double read = modeEngine != nullptr && modeEngine->sourcePosition() >= 0.0 ? modeEngine->sourcePosition() : position;
@@ -285,6 +291,7 @@ private:
 
     const SincInterpolator* sinc = nullptr;
     const InstrumentModel* currentModel = nullptr;
+    int memberIndex = -1;
     const PitchLayer* layer = nullptr;
     const ContinuationModel* cont = nullptr;
     Adsr envelope;

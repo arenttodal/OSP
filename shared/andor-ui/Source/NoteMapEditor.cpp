@@ -185,7 +185,10 @@ void NoteMapEditor::refresh()
     const bool changedStage = now != instrument;
     if (! changedAtlas && ! changedStage && nowActivity == activity && nowState == loadState && nowConflicts == conflicts && nowReport == report
         && nowLoop == loopOn)
+    {
+        refreshPlayback();
         return;
+    }
     instrument = now;
     atlas = nowAtlas;
     activity = nowActivity;
@@ -203,6 +206,46 @@ void NoteMapEditor::refresh()
     }
     rebuildInspector();
     repaint();
+    refreshPlayback();
+}
+
+void NoteMapEditor::refreshPlayback()
+{
+    // The voices' own read heads (the engine's lock-free snapshot, read at the editor's rate):
+    // each names the member it plays, so the region lit is the take actually heard. Only the
+    // regions whose state changed are repainted.
+    std::vector<std::string> nowSounding;
+    std::vector<std::int64_t> nowHeads;
+    const auto current = host.currentInstrument (layer);
+    if (current != nullptr && current == instrument && current->set != nullptr && atlas != nullptr)
+    {
+        const auto& snapshot = host.grainSnapshot (layer);
+        const int count = std::clamp (snapshot.playheads.load (std::memory_order_acquire), 0, InstrumentEngine::GrainSnapshot::playheadCapacity);
+        const auto total = static_cast<double> (sourceFrames());
+        const auto& members = current->set->members;
+        for (int i = 0; i < count; ++i)
+        {
+            const auto index = static_cast<std::size_t> (i);
+            const int m = snapshot.playheadMember[index].load (std::memory_order_relaxed);
+            if (m < 0 || m >= static_cast<int> (members.size()))
+                continue;
+            const auto& id = members[static_cast<std::size_t> (m)].regionId;
+            if (std::find (nowSounding.begin(), nowSounding.end(), id) == nowSounding.end())
+                nowSounding.push_back (id);
+            nowHeads.push_back (static_cast<std::int64_t> (static_cast<double> (snapshot.playheadPosition[index].load (std::memory_order_relaxed)) * total));
+        }
+    }
+    if (nowSounding == sounding && nowHeads == heads)
+        return;
+    juce::Rectangle<float> dirty;
+    for (const auto* list : { &sounding, &nowSounding })
+        for (const auto& id : *list)
+            if (const auto r = regionBounds (id); ! r.isEmpty())
+                dirty = dirty.isEmpty() ? r : dirty.getUnion (r);
+    sounding = std::move (nowSounding);
+    heads = std::move (nowHeads);
+    if (! dirty.isEmpty())
+        repaint (dirty.expanded (3.0f).getSmallestIntegerContainer());
 }
 
 void NoteMapEditor::defaultView()
@@ -942,7 +985,9 @@ void NoteMapEditor::paintRegionFields (juce::Graphics& g, juce::Rectangle<float>
         const bool isSelected = std::find (selected.begin(), selected.end(), n->id) != selected.end();
         const bool hot = hover.noteId == n->id;
         const auto tone = colour::forPitch (n->playKey());
-        g.setColour (tone.withAlpha (colour::regionFillAlpha (tone, isSelected ? 0.38f : (hot ? 0.34f : 0.28f))));
+        // Sounding now: a little more of its own hue (as the card lights a playing region).
+        const float alpha = isSounding (n->id) ? (isSelected ? 0.46f : 0.42f) : (isSelected ? 0.38f : (hot ? 0.34f : 0.28f));
+        g.setColour (tone.withAlpha (colour::regionFillAlpha (tone, alpha)));
         g.fillRect (r.withTrimmedTop (std::max (0.0f, graph.getY() + 18.0f - r.getY())));
     }
     g.restoreState();
@@ -1123,6 +1168,25 @@ void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> grap
                 }
             }
         }
+    }
+    // The notes sounding now: their edges brighter in their own hue and a thin read head where
+    // each voice is (the card's language; the selection's outline is drawn as it was).
+    for (const auto* n : notes)
+    {
+        if (! isSounding (n->id))
+            continue;
+        const auto r = regionBounds (n->id);
+        if (r.isEmpty())
+            continue;
+        const auto tone = colour::forPitch (n->playKey());
+        g.setColour (tone.brighter (0.35f).withAlpha (0.9f));
+        g.drawRect (r.reduced (0.6f), 1.2f);
+        for (const auto frame : heads)
+            if (frame >= n->attackStart && frame <= n->sourceEnd)
+            {
+                g.setColour (colour::regionWave.withAlpha (0.9f));
+                vline (g, xForFrame (frame), r.getY() + 1.0f, r.getBottom() - 1.0f);
+            }
     }
     g.restoreState();
 }

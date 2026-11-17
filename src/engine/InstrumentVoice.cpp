@@ -55,6 +55,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     outputPeak = 0.0f;
     quietSamples = 0;
     currentModel = params.model;
+    memberIndex = params.member;
     layer = params.layer;
     active = currentModel != nullptr && layer != nullptr && layer->source != nullptr && layer->source->isValid() && sinc != nullptr;
     if (! active)

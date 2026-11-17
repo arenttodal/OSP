@@ -205,3 +205,130 @@ TEST_CASE ("note atlas: FADE IN / FADE OUT under SPEED - steps, one undo step ea
     settleEdits (p);
     CHECK (p.currentInstrument()->atlas->mapping.fadeOutMs == Approx (0.0));
 }
+
+namespace
+{
+    void processKeys (OspAudioProcessor& p, std::initializer_list<int> on, std::initializer_list<int> off, int blocks)
+    {
+        juce::AudioBuffer<float> buffer (2, 256);
+        juce::MidiBuffer midi;
+        for (const int k : on)
+            midi.addEvent (juce::MidiMessage::noteOn (1, k, static_cast<juce::uint8> (100)), 0);
+        for (const int k : off)
+            midi.addEvent (juce::MidiMessage::noteOff (1, k), 0);
+        p.processBlock (buffer, midi);
+        juce::MidiBuffer none;
+        for (int b = 1; b < blocks; ++b)
+            p.processBlock (buffer, none);
+    }
+}
+
+TEST_CASE ("note atlas: NOTES lights the regions the voices really play - the round-robin take, every chord note, FILL's source - and never moves the selection", "[plugin][atlas][notemap][playback]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    p.analyseRecording (writeRepeatedBass (tmp.dir), 0);
+    settleEdits (p);
+    setLayerParameter (p, 0, "loop", 0.0f);
+    p.prepareToPlay (48000.0, 256);
+    ui->refreshNow();
+    auto& card = ui->engineCard (0);
+    card.onNotesToggle (0, true);
+    auto* map = card.noteMapComponent();
+    REQUIRE (map != nullptr);
+    map->refresh();
+    CHECK (map->soundingNotes().empty());
+    const auto set = p.currentInstrument (0)->set;
+    REQUIRE (set != nullptr);
+    // The musician's editing selection: a note of their choosing; playing never moves it.
+    const auto first = p.currentInstrument (0)->atlas->notes.front().id;
+    map->select ({ first });
+    // Round robin: each press lights the take that plays, and only it.
+    std::set<std::string> lit;
+    for (int press = 0; press < 6; ++press)
+    {
+        processKeys (p, { 36 }, {}, 3);
+        map->refresh();
+        const int member = heldMember (p, 0, 36);
+        REQUIRE (member >= 0);
+        REQUIRE (map->soundingNotes().size() == 1);
+        CHECK (map->soundingNotes().front() == set->members[static_cast<std::size_t> (member)].regionId);
+        // The read head is inside that region.
+        REQUIRE (map->soundingHeads().size() == 1);
+        const auto* n = [&]() -> const atlas::NoteEvent* {
+            for (const auto& e : p.currentInstrument (0)->atlas->notes)
+                if (e.id == map->soundingNotes().front())
+                    return &e;
+            return nullptr;
+        }();
+        REQUIRE (n != nullptr);
+        CHECK (map->soundingHeads().front() >= n->attackStart);
+        CHECK (map->soundingHeads().front() <= n->sourceEnd);
+        lit.insert (map->soundingNotes().front());
+        processKeys (p, {}, { 36 }, 110);   // released, and its 0.4 s pluck over
+        map->refresh();
+        CHECK (map->selection() == std::vector<std::string> { first });
+    }
+    CHECK (lit.size() >= 4);   // different takes, as heard
+    // Note over: nothing stays lit.
+    processKeys (p, {}, {}, 200);
+    map->refresh();
+    CHECK (map->soundingNotes().empty());
+    // FILL: C#2 plays a C2 take; that region lights (the keyboard shows C#2 itself).
+    processKeys (p, { 37 }, {}, 3);
+    map->refresh();
+    const int filled = heldMember (p, 0, 37);
+    REQUIRE (filled >= 0);
+    REQUIRE (map->soundingNotes().size() == 1);
+    CHECK (map->soundingNotes().front() == set->members[static_cast<std::size_t> (filled)].regionId);
+    processKeys (p, {}, { 37 }, 200);
+    map->refresh();
+    CHECK (map->soundingNotes().empty());
+    CHECK (map->selection() == std::vector<std::string> { first });
+}
+
+TEST_CASE ("note atlas: a chord lights each of its notes' regions at once; another sound clears them", "[plugin][atlas][notemap][playback]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const auto rec = phraseRecording (tmp.dir, "chord.wav", { 60, 64, 67 });
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    p.loadAtlas (rec.atlas);
+    settleEdits (p);
+    p.prepareToPlay (48000.0, 256);
+    ui->refreshNow();
+    auto& card = ui->engineCard (0);
+    card.onNotesToggle (0, true);
+    auto* map = card.noteMapComponent();
+    REQUIRE (map != nullptr);
+    map->refresh();
+    processKeys (p, { 60, 64, 67 }, {}, 4);
+    map->refresh();
+    std::set<std::string> ids (map->soundingNotes().begin(), map->soundingNotes().end());
+    std::set<std::string> expected;
+    for (const auto& n : p.currentInstrument (0)->atlas->notes)
+        if (n.included)
+            expected.insert (n.id);
+    CHECK (ids == expected);
+    CHECK (map->soundingHeads().size() == 3);
+    // Another sound on the layer: no stale region.
+    juce::String error;
+    const auto other = osp::plugin::tutorial::files (osp::plugin::tutorial::Example::pluck, error);
+    REQUIRE (other.size() == 1);
+    p.loadFile (other[0], 0);
+    REQUIRE (p.waitForLoads (60000));
+    p.pollLoads();
+    ui->refreshNow();
+    if (auto* still = card.noteMapComponent())
+    {
+        still->refresh();
+        CHECK (still->soundingNotes().empty());
+    }
+}
