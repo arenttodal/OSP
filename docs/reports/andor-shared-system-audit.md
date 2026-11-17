@@ -10,7 +10,7 @@
 | ANDOR ANALOG: newest line | `feature/aux-live-input` | `e3a8090` (PR #12, 17 Nov) | Pins OSP `b522a06` (16 Nov). It is 103 commits ahead of ANALOG `main` |
 | ANDOR ANALOG: this session's branch | `claude/friendly-pascal-0y48r0` | `0beac6d` | Older; untouched |
 
-The shared UI comes in through the `external/osp` submodule (branch `claude/andor-analog-shell`). The newest ANALOG line pins `b522a06`, which is on the OSP default branch's history.
+The shared UI comes in through the `external/osp` submodule (branch `claude/andor-analog-shell`). The newest ANALOG line pins `b522a06`. (Corrected in `andor-shared-integration-c3.md`: `b522a06` itself sits on `claude/analog-learn-end`. Its identical patch is `7652f42` on the default branch.)
 
 ## 2. Compact bottom edge in ANALOG: actual status
 

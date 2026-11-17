@@ -3,6 +3,13 @@
 Measured in the current OSP editor (default branch), built locally with review-only wiring that is not committed.
 Sheets are in `gui-assets-gate2-3/`.
 
+## D2 macro status
+
+**PR:** [arenttodal/OSP#26](https://github.com/arenttodal/OSP/pull/26), open from `claude/gui-macro-knob-d2` (`3354690`) onto the default branch (`56bab47`).
+- **Scope:** only the two `macro-ivory` packs, the shadow trim in `postprocess.py`, the macro config and the `studio-sculpt` preset.
+- **macOS CI:** green.
+- **Still to do:** the Retina Mac and DAW interaction checks are manual and must happen before shipping.
+
 ## Gate 2 · `layer-ivory` (START, TUNE, PAN, LEVEL, REIMAGINED)
 
 **Current knob:** body radius 26.1 reference px, in the five-knob row of each card. It is a domed cap on a fine skirt with a short, heavy pointer near the rim. The layer colour is a vector arc; REIMAGINED's arc is spectral.
