@@ -32,7 +32,13 @@
     "material": "satin-ivory",
     "variants": ["soft-ivory", "brushed-ivory", "satin-ivory"],
     "camera": "top-down",
-    "lighting": "studio-soft",
+    "lighting": "studio-sculpt",
+    "shadow": {
+        "strength": 0.8,
+        "contactMm": 0.4,
+        "rampMm": 1.0,
+        "note": "D2 (gate 1 final): the cast shadow at 80 % beyond a 0.4 mm contact band; the knob's own pixels untouched (postprocess.shadow_trim)"
+    },
 
     "render": {
         "engine": "CYCLES",

@@ -85,6 +85,51 @@ def edge_fade(image, inner=0.82, outer=0.985):
     return out
 
 
+_SHADOW_MASKS = {}
+
+
+def shadow_trim(image, config):
+    """Lighter cast shadow, same knob (config "shadow": {"strength", "contactMm", "rampMm"}).
+
+    The camera looks straight down at a round control, so its silhouette is a known circle:
+    the body radius plus the skirt. Outside it every pixel is the shadow catcher's (black,
+    alpha = shadow density). Alpha there is scaled by `strength`, reached over `rampMm` after
+    a `contactMm` band that stays untouched (the narrow contact shadow right under the edge).
+    Pixels inside the silhouette, so all of the knob's own shading, are never changed.
+    strength 1 (the default) returns the image as it is.
+    """
+    spec = config.get("shadow") or {}
+    strength = float(spec.get("strength", 1.0))
+    if strength >= 1.0:
+        return image
+    from PIL import ImageChops
+    g = config["geometry"]
+    outer = 0.5 * g["diameter"] + (g["skirt"]["extraRadius"] if g.get("skirt", {}).get("enabled") else 0.0)
+    w, h = image.size
+    px_per_mm = w / (2.0 * outer * margin_of(config))
+    contact, ramp = float(spec.get("contactMm", 0.4)), float(spec.get("rampMm", 1.0))
+    key = (w, h, strength, contact, ramp, outer)
+    if key not in _SHADOW_MASKS:
+        mask = Image.new("L", (w, h))
+        px = mask.load()
+        cx, cy = (w - 1) / 2.0, (h - 1) / 2.0
+        for y in range(h):
+            for x in range(w):
+                d = math.hypot(x - cx, y - cy) / px_per_mm - outer - contact
+                t = min(1.0, max(0.0, d / ramp))
+                k = 1.0 - (1.0 - strength) * t * t * (3.0 - 2.0 * t)
+                px[x, y] = int(round(255.0 * k))
+        _SHADOW_MASKS[key] = mask
+    out = image.copy()
+    out.putalpha(ImageChops.multiply(image.getchannel("A"), _SHADOW_MASKS[key]))
+    return out
+
+
+def prepare(image, config):
+    """A master frame as it goes into a pack: the shadow trim, then the edge fade."""
+    return edge_fade(shadow_trim(image, config))
+
+
 def on_panel(image, colour=PANEL):
     bg = Image.new("RGBA", image.size, colour + (255,))
     bg.alpha_composite(image)
@@ -198,7 +243,7 @@ def manifest_for(config, info, side, count):
             "masterResolution": info.get("resolution"),
             "samples": info.get("samples"),
         },
-    }
+    } | ({"shadow": config["shadow"]} if (config.get("shadow") or {}).get("strength", 1.0) < 1.0 else {})
 
 
 def stage_frames(config):
@@ -211,7 +256,7 @@ def stage_frames(config):
         path = os.path.join(base, "master", f"frame_{i:03d}.png")
         if not os.path.exists(path):
             raise SystemExit(f"missing {path}: render the frames first")
-        masters.append(edge_fade(Image.open(path).convert("RGBA")))
+        masters.append(prepare(Image.open(path).convert("RGBA"), config))
     sizes = {m.size for m in masters}
     if len(sizes) != 1:
         raise SystemExit(f"frames differ in size: {sizes}")

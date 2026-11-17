@@ -10,6 +10,16 @@
                 { "name": "edge", "azimuth": 60,  "elevation": 14, "distance": 160, "size": 60,  "energy": 0.03, "color": "#fffaf2" }
             ],
             "panel": { "color": "#ece5d9", "roughness": 0.8 }
+        },
+        "studio-sculpt": {
+            "note": "The rendered macro knob (D2): the key lower and smaller than studio-soft so the 48 flutes and the bevel model; a slightly stronger edge for a fine rim. Contact shadow length at 11 mm height: about 6.9 mm, inside the 1.45 frame margin.",
+            "world": { "color": "#e9e4dc", "strength": 0.12 },
+            "lights": [
+                { "name": "key",  "azimuth": 128, "elevation": 58, "distance": 190, "size": 100, "energy": 0.30, "color": "#fffaf4" },
+                { "name": "fill", "azimuth": -40, "elevation": 45, "distance": 210, "size": 190, "energy": 0.10, "color": "#f4f2ef" },
+                { "name": "edge", "azimuth": 60,  "elevation": 14, "distance": 160, "size": 50,  "energy": 0.05, "color": "#fffaf2" }
+            ],
+            "panel": { "color": "#ece5d9", "roughness": 0.8 }
         }
     }
 }
