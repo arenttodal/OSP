@@ -98,6 +98,9 @@ struct InstrumentSet
     /** SPEED (Note Atlas sets): every note's playback rate through its recording, pitch kept
         (1 = as recorded). File sets keep 1. */
     double speed = 1.0;
+    /** FADE IN / FADE OUT (Note Atlas sets): each note's own edge fades, in ms of playback,
+        applied by One Shot voices with LOOP off. File sets keep 0 (none). */
+    double noteFadeInMs = 0.0, noteFadeOutMs = 0.0;
     /** Automatic multi-sample mapping (docs/research/multisample-mapping). Both default to the
         original behaviour, so sets saved before it keep their sound; files imported together
         since then set `cycleTakes` and clear `loudnessLayers`.

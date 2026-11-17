@@ -402,6 +402,58 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
             doubleSource.start (*layer->source, doubledGranular(), sampleRate, Prng::deriveSeed (shape.seed, 0x6772646dull, 0),
                                 &currentModel->analysis.envelope, currentModel->analysis.source.durationSeconds);
     }
+
+    // FADE IN / FADE OUT: One Shot read once through (no loop, no REIMAGINED engine, never
+    // Granular). Their lengths are output time; the note's playback is measured from where it
+    // really starts (START, REVERSE) to where it ends, at its starting rate.
+    edgeFades = false;
+    edgeElapsed = 0.0;
+    edgeOutGain = 1.0f;
+    edgeRise = 1.0f / static_cast<float> (0.005 * sampleRate);
+    edgeEndFrame = direction > 0.0 ? frames : 0.0;
+    if ((params.edgeFadeInSeconds > 0.0 || params.edgeFadeOutSeconds > 0.0) && ! granularMode && modeEngine == nullptr
+        && strategy == ContinuationStrategy::off)
+    {
+        double in = std::max (0.0, params.edgeFadeInSeconds) * sampleRate;
+        double out = std::max (0.0, params.edgeFadeOutSeconds) * sampleRate;
+        const double advance = baseIncrement * (stretching ? stretchSpeed : 1.0);
+        const double playback = advance > 0.0 ? std::abs (edgeEndFrame - position) / advance : 0.0;
+        // A note shorter than its fades: both shortened in proportion to 80 % of it, so a
+        // body is left to hear (the saved values are not changed).
+        if (in + out > 0.8 * playback && in + out > 0.0)
+        {
+            const double k = 0.8 * playback / (in + out);
+            in *= k;
+            out *= k;
+        }
+        edgeInSamples = in;
+        edgeOutSamples = out;
+        edgeFades = in >= 1.0 || out >= 1.0;
+    }
+}
+
+float InstrumentVoice::edgeGain() noexcept
+{
+    // Smoothstep: 0 at the edge, 1 inside, no step anywhere (a raised cosine's shape).
+    auto curve = [] (double x) {
+        const auto f = static_cast<float> (std::clamp (x, 0.0, 1.0));
+        return f * f * (3.0f - 2.0f * f);
+    };
+    float in = 1.0f;
+    if (edgeElapsed < edgeInSamples)
+        in = curve (edgeElapsed / edgeInSamples);
+    edgeElapsed += 1.0;
+    float target = 1.0f;
+    if (edgeOutSamples >= 1.0 && pedalState == PedalState::off)
+    {
+        // Output samples left before the recording's end, at the rate the note plays now.
+        const double advance = currentStep * (stretching ? stretchSpeed : 1.0);
+        const double remaining = advance > 0.0 ? std::max (0.0, direction * (edgeEndFrame - position)) / advance : 0.0;
+        if (remaining < edgeOutSamples)
+            target = curve (remaining / edgeOutSamples);
+    }
+    edgeOutGain = target < edgeOutGain ? target : std::min (target, edgeOutGain + edgeRise);
+    return in * edgeOutGain;
 }
 
 void InstrumentVoice::release() noexcept
@@ -1666,6 +1718,14 @@ void InstrumentVoice::render (float* left, float* right, int numSamples, double 
             }
         }
 
+        if (edgeFades && ! sourceEnded)
+        {
+            // FADE IN / OUT on the recording alone (SYNTH and the effects after it untouched),
+            // the same gain on both channels.
+            const float e = edgeGain();
+            l *= e;
+            r *= e;
+        }
         if (synthOn)
         {
             mixSynth (l, r);

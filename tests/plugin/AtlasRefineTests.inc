@@ -113,3 +113,95 @@ TEST_CASE ("note atlas: a dropped bass phrase of eight C2 takes round-robins thr
             CHECK (heard.size() >= 2);
     }
 }
+
+TEST_CASE ("note atlas: FADE IN / FADE OUT under SPEED - steps, one undo step each, dimmed with LOOP on, saved with the session", "[plugin][atlas][fades][notemap]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const auto rec = phraseRecording (tmp.dir, "fades.wav", { 60, 64, 67 });
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    p.loadAtlas (rec.atlas);
+    settleEdits (p);
+    editor->setSize (1448, juce::roundToInt (ui->instrumentHeight()));
+    setLayerParameter (p, 0, "loop", 0.0f);
+    ui->refreshNow();
+    auto& card = ui->engineCard (0);
+    card.onNotesToggle (0, true);
+    auto* map = card.noteMapComponent();
+    REQUIRE (map != nullptr);
+    map->refresh();
+    // 0 ms: longer offered, shorter and Reset not; the rows sit under SPEED.
+    CHECK (map->actions().contains ("fadein+"));
+    CHECK (map->actions().contains ("fadeout+"));
+    CHECK_FALSE (map->actions().contains ("fadein-"));
+    CHECK_FALSE (map->actions().contains ("fadeout.reset"));
+    CHECK (map->actionArea ("fadein+").getY() > map->actionArea ("speed+").getY());
+    CHECK (map->actionArea ("fadeout+").getY() > map->actionArea ("fadein+").getY());
+    CHECK (map->inspectorArea().contains (map->actionArea ("fadeout+")));
+    // Steps: fine near zero; one undo step each, named by the value.
+    p.undo().clearUndoHistory();
+    for (int i = 0; i < 4; ++i)
+    {
+        REQUIRE (map->perform ("fadeout+"));
+        settleEdits (p);
+        map->refresh();
+    }
+    CHECK (p.currentInstrument()->atlas->mapping.fadeOutMs == Approx (5.0));   // 1, 2, 3, 5 ms
+    CHECK (p.undo().getUndoDescription() == "Fade out 5 ms");
+    REQUIRE (map->perform ("fadein+"));
+    settleEdits (p);
+    map->refresh();
+    CHECK (p.currentInstrument()->atlas->mapping.fadeInMs == Approx (0.5));
+    CHECK (p.undo().getUndoDescription() == "Fade in 0.5 ms");
+    // The playing set follows.
+    CHECK (p.currentInstrument()->set->noteFadeOutMs == Approx (5.0));
+    CHECK (p.currentInstrument()->set->noteFadeInMs == Approx (0.5));
+    // Undo takes back the fade only.
+    REQUIRE (p.undo().undo());
+    settleEdits (p);
+    CHECK (p.currentInstrument()->atlas->mapping.fadeInMs == Approx (0.0));
+    CHECK (p.currentInstrument()->atlas->mapping.fadeOutMs == Approx (5.0));
+    // LOOP on: the rows stay where they are, their keys dimmed; the values are kept.
+    map->refresh();
+    const auto before = map->actionArea ("fadeout+");
+    setLayerParameter (p, 0, "loop", 1.0f);
+    ui->refreshNow();
+    map->refresh();
+    CHECK_FALSE (map->actions().contains ("fadeout-"));
+    CHECK_FALSE (map->actions().contains ("fadeout+"));
+    CHECK (map->actionArea ("fadeout+") == before);
+    CHECK (p.currentInstrument()->atlas->mapping.fadeOutMs == Approx (5.0));
+    setLayerParameter (p, 0, "loop", 0.0f);
+    ui->refreshNow();
+    map->refresh();
+    CHECK (map->actions().contains ("fadeout-"));
+    // The session keeps them; an older session (no fields) opens at 0 / 0.
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor restored;
+    restored.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    settleEdits (restored);
+    REQUIRE (restored.currentInstrument (0) != nullptr);
+    REQUIRE (restored.currentInstrument (0)->atlas != nullptr);
+    CHECK (restored.currentInstrument (0)->atlas->mapping.fadeOutMs == Approx (5.0));
+    CHECK (restored.currentInstrument (0)->set->noteFadeOutMs == Approx (5.0));
+    {
+        const auto mapping = io::noteAtlasToJson (*p.currentInstrument()->atlas)["mapping"];
+        CHECK (mapping.hasProperty ("fadeOutMs"));
+        CHECK_FALSE (mapping.hasProperty ("fadeInMs"));   // (0: not written, as SPEED at 100 %)
+        const auto olderJson = io::noteAtlasToJson (rec.atlas);
+        CHECK_FALSE (olderJson["mapping"].hasProperty ("fadeOutMs"));
+        std::string error;
+        const auto read = io::noteAtlasFromJson (olderJson, error);
+        REQUIRE (read.has_value());
+        CHECK (read->mapping.fadeInMs == 0.0);
+        CHECK (read->mapping.fadeOutMs == 0.0);
+    }
+    // Reset.
+    REQUIRE (map->perform ("fadeout.reset"));
+    settleEdits (p);
+    CHECK (p.currentInstrument()->atlas->mapping.fadeOutMs == Approx (0.0));
+}

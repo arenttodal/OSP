@@ -892,7 +892,16 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.reverse = layerSettings.reverse;
     params.follow = layerSettings.follow;
     if (const auto* set = slots[context].set; set != nullptr)
+    {
         params.speed = set->speed;   // SPEED (atlas sets; file sets keep 1)
+        // FADE IN / OUT: a note played once (LOOP off). With LOOP on the loop's own crossfades
+        // keep its edges smooth, so the values are kept but not applied.
+        if (! layerSettings.loop)
+        {
+            params.edgeFadeInSeconds = set->noteFadeInMs / 1000.0;
+            params.edgeFadeOutSeconds = set->noteFadeOutMs / 1000.0;
+        }
+    }
     params.synthesize = &slots[context].synthesizeLive;
     params.synthBlend = config.synthBlend;
     params.synthEnvelope = config.synthEnvelope;

@@ -241,6 +241,10 @@ juce::var noteAtlasToJson (const atlas::NoteAtlas& a)
     json::set (mapping, "correctTuning", a.mapping.correctTuning);
     if (a.mapping.speed != 1.0)
         json::set (mapping, "speed", a.mapping.speed);
+    if (a.mapping.fadeInMs != 0.0)
+        json::set (mapping, "fadeInMs", a.mapping.fadeInMs);
+    if (a.mapping.fadeOutMs != 0.0)
+        json::set (mapping, "fadeOutMs", a.mapping.fadeOutMs);
     json::set (root, "mapping", mapping);
 
     auto sources = json::array();
@@ -304,6 +308,8 @@ std::optional<atlas::NoteAtlas> noteAtlasFromJson (const juce::var& json, std::s
         a.mapping.maxTransposeSemitones = json::getDouble (m, "maxTransposeSemitones", a.mapping.maxTransposeSemitones);
         a.mapping.correctTuning = json::getBool (m, "correctTuning", a.mapping.correctTuning);
         a.mapping.speed = std::clamp (json::getDouble (m, "speed", 1.0), atlas::Mapping::minSpeed, atlas::Mapping::maxSpeed);
+        a.mapping.fadeInMs = std::clamp (json::getDouble (m, "fadeInMs", 0.0), 0.0, atlas::Mapping::maxFadeInMs);
+        a.mapping.fadeOutMs = std::clamp (json::getDouble (m, "fadeOutMs", 0.0), 0.0, atlas::Mapping::maxFadeOutMs);
     }
     if (const auto* list = json["sources"].getArray())
         for (const auto& s : *list)

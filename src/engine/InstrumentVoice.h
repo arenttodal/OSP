@@ -87,6 +87,10 @@ struct InstrumentVoiceStart
     /** SPEED: how fast the note moves through its recording, pitch kept (1: as recorded,
         the plain read; 0.3..2). Not in Granular or REIMAGINED modes. */
     double speed = 1.0;
+    /** FADE IN / FADE OUT (Note Atlas, LOOP off): fades at the note's own audible start and end,
+        in seconds of playback (output time, so transposition and SPEED keep their length).
+        Applied to the recording only (never SYNTH), in One Shot; 0 / 0: none. */
+    double edgeFadeInSeconds = 0.0, edgeFadeOutSeconds = 0.0;
     /** PEDAL LOOP of the layer as the note starts (kept for the note's life). */
     PedalLoopMode pedalLoop = PedalLoopMode::normal;
     /** SATELLITE of the layer (InstrumentEngine's, read each render), and with BOUNCE + NOTE
@@ -373,6 +377,13 @@ private:
     float dampingCoef = 1.0f;
     float attackRamp = 1.0f;       // soft-attack fade-in
     float attackRampStep = 0.0f;
+    // FADE IN / FADE OUT (InstrumentVoiceStart::edgeFade*): the note's edge fades, in output
+    // samples, on the recording only. edgeOutGain never jumps up (a PEDAL LOOP taking the note
+    // over mid-fade brings it back over 5 ms).
+    bool edgeFades = false;
+    double edgeInSamples = 0.0, edgeOutSamples = 0.0, edgeElapsed = 0.0, edgeEndFrame = 0.0;
+    float edgeOutGain = 1.0f, edgeRise = 0.0f;
+    float edgeGain() noexcept;
     double settleCents = 0.0;
     double settleCoef = 1.0;
     float panLeft = 1.0f, panRight = 1.0f;
