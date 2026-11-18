@@ -6,14 +6,58 @@
   "purpose": "Material montage and feature intro: a low oblique track along the fluted macro knobs in the M01 look.",
   "setup": "ANDOR_MATERIAL",
   "baseShot": "M01_sharp",
-  "seconds": 6.0,
+  "seconds": 5.0,
   "fps": 30,
   "ease": "smootherstep",
-  "draft": { "res": [1280, 720], "samples": 24, "noise": 0.03 },
+  "draft": {
+    "res": [
+      960,
+      540
+    ],
+    "samples": 16,
+    "noise": 0.05
+  },
   "keys": [
-    { "t": 0.0, "camera": { "target": [400, 818, 5.5], "fstop": 11.0, "yaw": -20.0 } },
-    { "t": 1.0, "camera": { "target": [640, 818, 5.5], "fstop": 11.0, "yaw": -16.0 } }
+    {
+      "t": 0.0,
+      "camera": {
+        "target": [
+          400,
+          818,
+          5.5
+        ],
+        "fstop": 11.0,
+        "yaw": -20.0
+      }
+    },
+    {
+      "t": 1.0,
+      "camera": {
+        "target": [
+          640,
+          818,
+          5.5
+        ],
+        "fstop": 11.0,
+        "yaw": -16.0
+      }
+    }
   ],
   "notes": "A lateral track across three macro knobs (editor x 420, 566, 712; 240 editor px, about 48 mm) at M01's 100 mm, 60 degrees, 0.2 m; focus stays on the knobs' plane all the way (f/11 between M01 cine f/8 and sharp f/14, so the fluting, bevel, pointer and cap hold). Real lights only.",
-  "stills": { "frames": { "open": 0.0, "middle": 0.5, "close": 1.0 }, "hq": { "t": 0.5, "res": [1920, 1080], "samples": 160, "noise": 0.006 } }
+  "stills": {
+    "frames": {
+      "open": 0.0,
+      "middle": 0.5,
+      "close": 1.0
+    },
+    "hq": {
+      "t": 0.5,
+      "res": [
+        1920,
+        1080
+      ],
+      "samples": 160,
+      "noise": 0.006
+    }
+  }
 }

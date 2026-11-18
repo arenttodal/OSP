@@ -49,9 +49,9 @@ $P marketing/motion/scripts/review_gate.py --gate D1 --shots D01 D02 D03
 
 | Shot | Config | Base (approved) | Move | Length | Draft |
 |---|---|---|---|---|---|
-| D01 Gallery reveal | `D01_gallery_reveal.json` | ANDOR_GALLERY A1-R1 W (85 mm, f/11) | push in with a shallow arc: yaw −37° to −30°, pitch 54.5° to 52°, distance ×1.08 to ×1. It ends on the approved hero, which is also the end poster. Portrait reframe test on A1M-R1 | 7 s | 1280 × 720 |
-| D02 Dark orbit | `D02_dark_orbit.json` | ANDOR_FLOATING B1-R4 (85 mm, f/9) | 12° orbit: yaw −42° to −30°, pitch 59° to 57°. The middle frame is the approved B1-R4. Vertical reference on B2 +15 % (B2_115_R4) | 7 s | 960 × 1200 (4:5) |
-| D03 Macro glide | `D03_macro_glide.json` | ANDOR_MATERIAL M01 (100 mm, 0.2 m) | lateral track across three macro knobs (editor x 400 to 640) at f/11, focus on the knobs' plane | 6 s | 1280 × 720 |
+| D01 Gallery reveal | `D01_gallery_reveal.json` | ANDOR_GALLERY A1-R1 W (85 mm, f/11) | push in with a shallow arc: yaw −37° to −30°, pitch 54.5° to 52°, distance ×1.08 to ×1. It ends on the approved hero, which is also the end poster. Portrait reframe test on A1M-R1 | 6 s | 960 × 540 |
+| D02 Dark orbit | `D02_dark_orbit.json` | ANDOR_FLOATING B1-R4 (85 mm, f/9) | 12° orbit: yaw −42° to −30°, pitch 59° to 57°. The middle frame is the approved B1-R4. Vertical reference on B2 +15 % (B2_115_R4) | 6 s | 960 × 1200 (4:5) |
+| D03 Macro glide | `D03_macro_glide.json` | ANDOR_MATERIAL M01 (100 mm, 0.2 m) | lateral track across three macro knobs (editor x 400 to 640) at f/11, focus on the knobs' plane | 5 s | 960 × 540 |
 
 The review set is in `review/D1/`. Nothing here is final. Full-resolution masters, D04–D08 and
 any publishing wait for creative approval (Gate D2/D3).

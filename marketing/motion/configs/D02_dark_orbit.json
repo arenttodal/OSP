@@ -6,20 +6,82 @@
   "purpose": "Paid ads and closing shot: the floating instrument in the B1-R4 architectural dark scene, a shallow camera orbit with its shadow rendered in every frame.",
   "setup": "ANDOR_FLOATING",
   "baseShot": "B1_R4",
-  "seconds": 7.0,
+  "seconds": 6.0,
   "fps": 30,
   "ease": "smootherstep",
-  "draft": { "res": [960, 1200], "samples": 24, "noise": 0.03 },
+  "draft": {
+    "res": [
+      960,
+      1200
+    ],
+    "samples": 16,
+    "noise": 0.05
+  },
   "keys": [
-    { "t": 0.0, "camera": { "yaw": -42.0, "pitch": 59.0 } },
-    { "t": 1.0, "camera": { "yaw": -30.0, "pitch": 57.0 } }
+    {
+      "t": 0.0,
+      "camera": {
+        "yaw": -42.0,
+        "pitch": 59.0
+      }
+    },
+    {
+      "t": 1.0,
+      "camera": {
+        "yaw": -30.0,
+        "pitch": 57.0
+      }
+    }
   ],
   "notes": "12 degrees of orbit about the shot's own focus point (from 6 degrees before the approved B1-R4 angle to 6 after it); the product and its float never move, so the floor shadow is the scene's own, path-traced per frame. No spin. The middle frame is the approved B1-R4 framing.",
-  "stills": { "frames": { "open": 0.0, "middle": 0.5, "close": 1.0 }, "hq": { "t": 0.5, "res": [1440, 1800], "samples": 160, "noise": 0.006 } },
+  "stills": {
+    "frames": {
+      "open": 0.0,
+      "middle": 0.5,
+      "close": 1.0
+    },
+    "hq": {
+      "t": 0.5,
+      "res": [
+        1440,
+        1800
+      ],
+      "samples": 160,
+      "noise": 0.006
+    }
+  },
   "reframes": [
-    { "id": "D02-vertical-ref", "purpose": "Vertical composition reference: B2 +15 % (B2_115_R4) with the same orbit.", "baseShot": "B2_115_R4",
-      "res": [608, 1080], "samples": 24, "noise": 0.03,
-      "keys": [ { "t": 0.0, "camera": { "yaw": -42.0, "pitch": 59.0 } }, { "t": 1.0, "camera": { "yaw": -30.0, "pitch": 57.0 } } ],
-      "stillsOnly": [0.0, 0.5, 1.0] }
+    {
+      "id": "D02-vertical-ref",
+      "purpose": "Vertical composition reference: B2 +15 % (B2_115_R4) with the same orbit.",
+      "baseShot": "B2_115_R4",
+      "res": [
+        608,
+        1080
+      ],
+      "samples": 24,
+      "noise": 0.03,
+      "keys": [
+        {
+          "t": 0.0,
+          "camera": {
+            "yaw": -42.0,
+            "pitch": 59.0
+          }
+        },
+        {
+          "t": 1.0,
+          "camera": {
+            "yaw": -30.0,
+            "pitch": 57.0
+          }
+        }
+      ],
+      "stillsOnly": [
+        0.0,
+        0.5,
+        1.0
+      ]
+    }
   ]
 }
