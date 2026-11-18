@@ -19,7 +19,7 @@ This gate measures the result.
 | allocation (Pedal Loop 1.0's `[realtime]` test) | unchanged, passing |
 
 The full core suite (unit, integration, regression with every golden) passes.
-The full plugin suite on this branch: pending (running at the time of writing; updated with its result).
+The full plugin build and suite pass too: `ctest` in `build-plugin`, 10/10 (unit, integration, regression, plugin, visual references, examples).
 
 ## Listening matrix (`research-renderer --pedal-reimagined-lab`)
 

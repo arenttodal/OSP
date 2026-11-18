@@ -531,3 +531,34 @@ TEST_CASE ("pedal loop x reimagined: the mode's character stays audible while th
         CHECK (diff > 0.1 * ref);
     }
 }
+
+#include "research/PedalLoopLab.h"
+
+TEST_CASE ("pedal loop x reimagined: a short region (a percussive hit) holds in every mode, TOYBOX's legs inside it", "[unit][pedal-loop][pedal-reimagined]")
+{
+    // The lab's percussive stand-in: 0.8 s, two short regions (0.12 s each). TOYBOX's TURN legs
+    // are longer than that: while the pedal holds the note they stay inside the region.
+    const auto sources = research::pedalLabStandIns (48000.0);
+    const auto& hit = sources.back();
+    const auto model = instrument::buildComplete (hit.audio, test::analyse (hit.audio), {}, false);
+    REQUIRE (model->original.continuation.pedal.valid);
+    const double regionEnd = model->original.continuation.pedal.regions.back().endFrame / static_cast<double> (hit.audio.channels[0].size());
+    const int note = static_cast<int> (std::lround (model->rootMidi));
+    for (const auto mode : allModes)
+        for (const double amount : { 0.5, 1.0 })
+            for (const auto pedal : { PedalLoopMode::forward, PedalLoopMode::pingPong })
+            {
+                INFO (modeName (mode) << " " << amount * 100.0 << " % " << pedalName (pedal));
+                Rig rig (model, mode, amount, pedal);
+                rig.engine.setSustainPedal (true);
+                rig.engine.noteOn (note, 100);
+                rig.run (1.0);
+                rig.engine.noteOff (note);
+                double furthest = 0.0;
+                rig.run (7.0, [&] { furthest = std::max (furthest, readAt (rig, note)); });
+                REQUIRE (rig.voiceFor (note) != nullptr);
+                CHECK (rig.rmsDb (7.0, 8.0) > -65.0);
+                if (mode != ReimaginedMode::mosaic)   // (MOSAIC cannot rebuild a hit: it plays it, through the voice)
+                    CHECK (furthest < regionEnd + 0.05);
+            }
+}

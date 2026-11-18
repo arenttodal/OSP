@@ -298,6 +298,8 @@ void ToyboxEngine::planLeg() noexcept
     {
         turn (noteDir > 0.0 ? regionStart + 0.01 * srcRate : regionEnd - 0.01 * srcRate, noteDir, 0.02);
         legEnd = heads[0].pos + noteDir * legLength;
+        if (pedalHeld)
+            legEnd = std::clamp (legEnd, lowBound(), highBound());   // (a pedal region can be shorter than a leg)
         return;
     }
     if (play == ToyboxPlay::chaos)
