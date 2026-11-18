@@ -1,0 +1,1633 @@
+{
+ "schemaVersion": 1,
+ "about": "ANDOR commercial stills, Gate C3 (approved) with the Phase 4 M06 correction",
+ "repository": "arenttodal/OSP",
+ "branch": "claude/friendly-pascal-0y48r0",
+ "head": "a233b26",
+ "blender": "4.2 (bpy), Cycles CPU",
+ "sources": {
+  "scene": {
+   "file": "scripts/andor_scene.py",
+   "commit": "e50aaaf"
+  },
+  "config": {
+   "file": "config/campaign_setups.json",
+   "commit": "a233b26"
+  },
+  "textures_prep": {
+   "file": "scripts/prep_textures.py",
+   "commit": "1a0cf7e"
+  },
+  "derivatives": {
+   "file": "scripts/web_derivatives.py",
+   "commit": "2399528"
+  }
+ },
+ "textures_current_sha256": {
+  "geometry.json": "f13d38eaa767aac24531e2cc9ddc15c131de8ab52bcd2c3496e775a99fba7c7c",
+  "osp_face.png": "e2a8abc7fbd56d44a516818c4dbafdc770fc1eb0a0dcaa411628f82f4f66c92d",
+  "teak_strip.png": "cb7ecafcb641b7beeb2f2a8e9d6e9c0d44006f66da9462d76d944c8bc7b7cb62"
+ },
+ "assets": [
+  {
+   "id": "A1M_R1_mobile",
+   "master": "C3_A1M_R1_mobile_2160x4674.png",
+   "width": 2160,
+   "height": 4674,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.42 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_GALLERY",
+   "shot": "A1M_R1",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -30,
+    "pitch": 41,
+    "dist": 1.15,
+    "lens": 85,
+    "target": [
+     724,
+     540,
+     0
+    ],
+    "fstop": 11,
+    "shift": [
+     -0.03,
+     -0.285
+    ],
+    "fit": "HORIZONTAL"
+   },
+   "rot_deg": -28.0,
+   "lighting": {
+    "rig": "ANDOR_GALLERY",
+    "lights": [
+     "Key softbox",
+     "Edge strip",
+     "Overhead",
+     "Fill",
+     "Front kicker",
+     "Low rake"
+    ],
+    "overrides": {
+     "floor": {
+      "rgb": [
+       0.655,
+       0.622,
+       0.573
+      ],
+      "roughness": 0.78,
+      "note": "C2.5 R1: about 12 % brighter than C2's 0.585/0.556/0.512, same hue ratios (no yellow or peach)"
+     },
+     "lights": {
+      "Key softbox": {
+       "size": [
+        1.1,
+        0.8
+       ]
+      },
+      "Overhead": {
+       "power": 2.2
+      },
+      "Fill": {
+       "power": 1.6
+      },
+      "Low rake": {
+       "power": 4.5
+      }
+     },
+     "add_lights": [
+      {
+       "name": "Detail rake",
+       "offset": [
+        -0.55,
+        0.65,
+        0.16
+       ],
+       "size": [
+        0.9,
+        0.12
+       ],
+       "power": 0.8,
+       "rgb": [
+        1.0,
+        0.96,
+        0.92
+       ],
+       "spread": 60,
+       "link": "product",
+       "why": "C2.5: grazes from behind left at about 12 % of the key, so flutes, small-knob bevels and card edges model without lifting the top surface"
+      },
+      {
+       "name": "Cheek glint",
+       "offset": [
+        -0.95,
+        -0.55,
+        0.1
+       ],
+       "size": [
+        0.6,
+        0.05
+       ],
+       "power": 2.5,
+       "rgb": [
+        1.0,
+        0.93,
+        0.85
+       ],
+       "spread": 40,
+       "link": "product",
+       "why": "C2.5: a low, narrow sheen along the left teak cheek's outer face: richer timber without recolouring it"
+      }
+     ]
+    }
+   },
+   "samples": 128,
+   "noise_threshold": 0.006,
+   "usage": "Website mobile hero (19.5:9; crops to 9:16 top and bottom)",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2160",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2160"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_GALLERY --shot A1M_R1 --res 2160 4674 --samples 128 --noise 0.006 --out C3_A1M_R1_mobile_2160x4674.png",
+   "sha256": "995299ee8b7bb8b84db3c1aac46c803342c0ef05ce9755724a4d3d548b234b47"
+  },
+  {
+   "id": "A1_R1_W_desktop",
+   "master": "C3_A1_R1_W_desktop_3840x2160.png",
+   "width": 3840,
+   "height": 2160,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.42 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_GALLERY",
+   "shot": "A1_R1_W",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -30,
+    "pitch": 52,
+    "dist": 1.87,
+    "lens": 85,
+    "target": [
+     724,
+     520,
+     0
+    ],
+    "fstop": 11,
+    "shift": [
+     -0.17,
+     -0.03
+    ],
+    "fit": "HORIZONTAL"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_GALLERY",
+    "lights": [
+     "Key softbox",
+     "Edge strip",
+     "Overhead",
+     "Fill",
+     "Front kicker",
+     "Low rake"
+    ],
+    "overrides": {
+     "floor": {
+      "rgb": [
+       0.655,
+       0.622,
+       0.573
+      ],
+      "roughness": 0.78,
+      "note": "C2.5 R1: about 12 % brighter than C2's 0.585/0.556/0.512, same hue ratios (no yellow or peach)"
+     },
+     "lights": {
+      "Key softbox": {
+       "size": [
+        1.1,
+        0.8
+       ]
+      },
+      "Overhead": {
+       "power": 2.2
+      },
+      "Fill": {
+       "power": 1.6
+      },
+      "Low rake": {
+       "power": 4.5
+      }
+     },
+     "add_lights": [
+      {
+       "name": "Detail rake",
+       "offset": [
+        -0.55,
+        0.65,
+        0.16
+       ],
+       "size": [
+        0.9,
+        0.12
+       ],
+       "power": 0.8,
+       "rgb": [
+        1.0,
+        0.96,
+        0.92
+       ],
+       "spread": 60,
+       "link": "product",
+       "why": "C2.5: grazes from behind left at about 12 % of the key, so flutes, small-knob bevels and card edges model without lifting the top surface"
+      },
+      {
+       "name": "Cheek glint",
+       "offset": [
+        -0.95,
+        -0.55,
+        0.1
+       ],
+       "size": [
+        0.6,
+        0.05
+       ],
+       "power": 2.5,
+       "rgb": [
+        1.0,
+        0.93,
+        0.85
+       ],
+       "spread": 40,
+       "link": "product",
+       "why": "C2.5: a low, narrow sheen along the left teak cheek's outer face: richer timber without recolouring it"
+      }
+     ]
+    }
+   },
+   "samples": 128,
+   "noise_threshold": 0.006,
+   "usage": "Website desktop hero, wide-headline layout (product about 6 % further right)",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3840",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3840"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_GALLERY --shot A1_R1_W --res 3840 2160 --samples 128 --noise 0.006 --out C3_A1_R1_W_desktop_3840x2160.png",
+   "sha256": "cfb727a2fa29b3fd9337b52930533ced5fa7d7d3215f9a038b98fe943bb92e26"
+  },
+  {
+   "id": "A1_R1_desktop",
+   "master": "C3_A1_R1_desktop_3840x2160.png",
+   "width": 3840,
+   "height": 2160,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.42 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_GALLERY",
+   "shot": "A1_R1",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -30,
+    "pitch": 52,
+    "dist": 1.78,
+    "lens": 85,
+    "target": [
+     724,
+     520,
+     0
+    ],
+    "fstop": 11,
+    "shift": [
+     -0.13,
+     -0.03
+    ],
+    "fit": "HORIZONTAL"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_GALLERY",
+    "lights": [
+     "Key softbox",
+     "Edge strip",
+     "Overhead",
+     "Fill",
+     "Front kicker",
+     "Low rake"
+    ],
+    "overrides": {
+     "floor": {
+      "rgb": [
+       0.655,
+       0.622,
+       0.573
+      ],
+      "roughness": 0.78,
+      "note": "C2.5 R1: about 12 % brighter than C2's 0.585/0.556/0.512, same hue ratios (no yellow or peach)"
+     },
+     "lights": {
+      "Key softbox": {
+       "size": [
+        1.1,
+        0.8
+       ]
+      },
+      "Overhead": {
+       "power": 2.2
+      },
+      "Fill": {
+       "power": 1.6
+      },
+      "Low rake": {
+       "power": 4.5
+      }
+     },
+     "add_lights": [
+      {
+       "name": "Detail rake",
+       "offset": [
+        -0.55,
+        0.65,
+        0.16
+       ],
+       "size": [
+        0.9,
+        0.12
+       ],
+       "power": 0.8,
+       "rgb": [
+        1.0,
+        0.96,
+        0.92
+       ],
+       "spread": 60,
+       "link": "product",
+       "why": "C2.5: grazes from behind left at about 12 % of the key, so flutes, small-knob bevels and card edges model without lifting the top surface"
+      },
+      {
+       "name": "Cheek glint",
+       "offset": [
+        -0.95,
+        -0.55,
+        0.1
+       ],
+       "size": [
+        0.6,
+        0.05
+       ],
+       "power": 2.5,
+       "rgb": [
+        1.0,
+        0.93,
+        0.85
+       ],
+       "spread": 40,
+       "link": "product",
+       "why": "C2.5: a low, narrow sheen along the left teak cheek's outer face: richer timber without recolouring it"
+      }
+     ]
+    }
+   },
+   "samples": 128,
+   "noise_threshold": 0.006,
+   "usage": "Website desktop hero (live type left of the product)",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3840",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3840"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_GALLERY --shot A1_R1 --res 3840 2160 --samples 128 --noise 0.006 --out C3_A1_R1_desktop_3840x2160.png",
+   "sha256": "f825d9ad2857bfab9e984555b7f74d9c65b8d55c1caa7f268316a7d801c980b5"
+  },
+  {
+   "id": "A2_gallery",
+   "master": "C3_A2_gallery_3600x2400.png",
+   "width": 3600,
+   "height": 2400,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.42 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_GALLERY",
+   "shot": "A2",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -26,
+    "pitch": 50,
+    "dist": 1.36,
+    "lens": 85,
+    "target": [
+     724,
+     540,
+     0
+    ],
+    "fstop": 11,
+    "shift": [
+     0.02,
+     -0.01
+    ],
+    "fit": "HORIZONTAL"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_GALLERY",
+    "lights": [
+     "Key softbox",
+     "Edge strip",
+     "Overhead",
+     "Fill",
+     "Front kicker",
+     "Low rake"
+    ],
+    "overrides": null
+   },
+   "samples": 160,
+   "noise_threshold": 0.005,
+   "usage": "Gallery / product photography",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3600",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3600"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_GALLERY --shot A2 --res 3600 2400 --samples 160 --noise 0.005 --out C3_A2_gallery_3600x2400.png",
+   "sha256": "15b894e615ec070613759439a066bbe910aa77007300ed52b168f404931e5484"
+  },
+  {
+   "id": "B1_R4_feed",
+   "master": "C3_B1_R4_feed_2160x2700.png",
+   "width": 2160,
+   "height": 2700,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure 0.1 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_FLOATING",
+   "shot": "B1_R4",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -36,
+    "pitch": 58,
+    "dist": 1.2,
+    "lens": 85,
+    "target": [
+     724,
+     560,
+     0
+    ],
+    "fstop": 9,
+    "shift": [
+     0.0,
+     -0.03
+    ],
+    "fit": "HORIZONTAL"
+   },
+   "rot_deg": -16.0,
+   "lighting": {
+    "rig": "ANDOR_FLOATING",
+    "lights": [
+     "Key softbox",
+     "Rim strip",
+     "Top line",
+     "Front kicker",
+     "Fill",
+     "Floor overhead",
+     "Floor rake"
+    ],
+    "overrides": {
+     "lights": {
+      "Fill": {
+       "power": 0.6
+      },
+      "Top line": {
+       "power": 3.4
+      },
+      "Key softbox": {
+       "size": [
+        0.6,
+        0.35
+       ]
+      }
+     },
+     "note": "The Fill light (0.8 W) is too small to move the image (R1/R2: under 0.05/255); the broad Top line is the real fill on the ivory"
+    }
+   },
+   "samples": 128,
+   "noise_threshold": 0.006,
+   "usage": "Dark campaign, 4:5 feed",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2160",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2160"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_FLOATING --shot B1_R4 --res 2160 2700 --samples 128 --noise 0.006 --out C3_B1_R4_feed_2160x2700.png",
+   "sha256": "5469161edee841a76bc33285f71e7ff8e188fe923f76551e56d294f84439621f"
+  },
+  {
+   "id": "B2_115_R4_vertical",
+   "master": "C3_B2_115_R4_vertical_2160x3840.png",
+   "width": 2160,
+   "height": 3840,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure 0.1 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_FLOATING",
+   "shot": "B2_115_R4",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -36,
+    "pitch": 58,
+    "dist": 1.183,
+    "lens": 85,
+    "target": [
+     724,
+     560,
+     0
+    ],
+    "fstop": 9,
+    "shift": [
+     0.07,
+     0.08
+    ],
+    "fit": "HORIZONTAL"
+   },
+   "rot_deg": -26.0,
+   "lighting": {
+    "rig": "ANDOR_FLOATING",
+    "lights": [
+     "Key softbox",
+     "Rim strip",
+     "Top line",
+     "Front kicker",
+     "Fill",
+     "Floor overhead",
+     "Floor rake"
+    ],
+    "overrides": {
+     "lights": {
+      "Fill": {
+       "power": 0.6
+      },
+      "Top line": {
+       "power": 3.4
+      },
+      "Key softbox": {
+       "size": [
+        0.6,
+        0.35
+       ]
+      }
+     },
+     "note": "The Fill light (0.8 W) is too small to move the image (R1/R2: under 0.05/255); the broad Top line is the real fill on the ivory"
+    }
+   },
+   "samples": 128,
+   "noise_threshold": 0.006,
+   "usage": "Dark campaign, 9:16 vertical (stories, reels)",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2160",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2160"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_FLOATING --shot B2_115_R4 --res 2160 3840 --samples 128 --noise 0.006 --out C3_B2_115_R4_vertical_2160x3840.png",
+   "sha256": "b39b9ee4719fe78baa1230615e373b0f3c2259af848da4e81bdafa1f4a174e18"
+  },
+  {
+   "id": "M01_cine",
+   "master": "C3_M01_cine.png",
+   "width": 2400,
+   "height": 2400,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M01_cine",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -18,
+    "pitch": 60,
+    "dist": 0.185,
+    "lens": 100,
+    "target": [
+     493,
+     812,
+     5.5
+    ],
+    "fstop": 8.0,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": null
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: macros",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2400",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2400"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M01_cine --samples 80 --noise 0.008 --out C3_M01_cine.png",
+   "sha256": "1836750961751363812515013cb23c95a2afbcf6aad925f39e5aaf3043370eef"
+  },
+  {
+   "id": "M01_sharp",
+   "master": "C3_M01_sharp.png",
+   "width": 2400,
+   "height": 2400,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M01_sharp",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -18,
+    "pitch": 60,
+    "dist": 0.2,
+    "lens": 100,
+    "target": [
+     493,
+     812,
+     5.5
+    ],
+    "fstop": 14.0,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": null
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: macros",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2400",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2400"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M01_sharp --samples 80 --noise 0.008 --out C3_M01_sharp.png",
+   "sha256": "5af3478ea76d3e9a1e1ef3b42b1b28d236f3955598efdb6b7b961e67ec610537"
+  },
+  {
+   "id": "M02_cine",
+   "master": "C3_M02_cine.png",
+   "width": 3000,
+   "height": 2000,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M02_cine",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -20,
+    "pitch": 57,
+    "dist": 0.24,
+    "lens": 100,
+    "target": [
+     205,
+     455,
+     4.0
+    ],
+    "fstop": 5.6,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": null
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: source controls",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3000",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3000"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M02_cine --samples 80 --noise 0.008 --out C3_M02_cine.png",
+   "sha256": "9212d13e7ba90dbb87ab4a18ded49c991a4dea358b14b2169a5535c890e6128e"
+  },
+  {
+   "id": "M02_sharp",
+   "master": "C3_M02_sharp.png",
+   "width": 3000,
+   "height": 2000,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M02_sharp",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -20,
+    "pitch": 57,
+    "dist": 0.24,
+    "lens": 100,
+    "target": [
+     205,
+     455,
+     4.0
+    ],
+    "fstop": 11.0,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": null
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: source controls",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3000",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3000"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M02_sharp --samples 80 --noise 0.008 --out C3_M02_sharp.png",
+   "sha256": "add64be196667b26c4f75d9c36e59a2faa8b684b3a6854024302ba3d3544c02b"
+  },
+  {
+   "id": "M03_cine",
+   "master": "C3_M03_cine.png",
+   "width": 3000,
+   "height": 2000,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M03_cine",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -14,
+    "pitch": 40,
+    "dist": 0.24,
+    "lens": 100,
+    "target": [
+     723,
+     330,
+     2.0
+    ],
+    "fstop": 5.6,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": null
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: display",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3000",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3000"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M03_cine --samples 80 --noise 0.008 --out C3_M03_cine.png",
+   "sha256": "ef1c2fdf3d17055f47f8042f1f06e43ec6534e5380073c960662b1efa1af1520"
+  },
+  {
+   "id": "M03_sharp",
+   "master": "C3_M03_sharp.png",
+   "width": 3000,
+   "height": 2000,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M03_sharp",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -14,
+    "pitch": 40,
+    "dist": 0.24,
+    "lens": 100,
+    "target": [
+     723,
+     330,
+     2.0
+    ],
+    "fstop": 11.0,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": null
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: display",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3000",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3000"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M03_sharp --samples 80 --noise 0.008 --out C3_M03_sharp.png",
+   "sha256": "5e64e567b2f01c7a7ff9a73482f9f8f15edfb287ab3259ca3e35f70ad2e39c0c"
+  },
+  {
+   "id": "M04_cine",
+   "master": "C3_M04_cine.png",
+   "width": 3000,
+   "height": 2000,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M04_cine",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -30,
+    "pitch": 63,
+    "dist": 0.26,
+    "lens": 100,
+    "target": [
+     560,
+     965,
+     0.0
+    ],
+    "fstop": 5.6,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": null
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: keyboard",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3000",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3000"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M04_cine --samples 80 --noise 0.008 --out C3_M04_cine.png",
+   "sha256": "f28e45126b21103ead81ddf3c93380f3c87ca9f9b2cde7dd1ef588ddb67d468b"
+  },
+  {
+   "id": "M04_sharp",
+   "master": "C3_M04_sharp.png",
+   "width": 3000,
+   "height": 2000,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M04_sharp",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -30,
+    "pitch": 63,
+    "dist": 0.26,
+    "lens": 100,
+    "target": [
+     560,
+     965,
+     0.0
+    ],
+    "fstop": 11.0,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": null
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: keyboard",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3000",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3000"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M04_sharp --samples 80 --noise 0.008 --out C3_M04_sharp.png",
+   "sha256": "11716fa04e40b81de59bb58cd1780d11ba939bb8000e5232a57772131d166dc5"
+  },
+  {
+   "id": "M05_cine",
+   "master": "C3_M05_cine.png",
+   "width": 3000,
+   "height": 2000,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M05_cine",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -48,
+    "pitch": 60,
+    "dist": 0.13,
+    "lens": 100,
+    "target": [
+     24,
+     1030,
+     -4.0
+    ],
+    "fstop": 5.6,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": null
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: front-left corner (timber, ceramic)",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3000",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3000"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M05_cine --samples 80 --noise 0.008 --out C3_M05_cine.png",
+   "sha256": "3f1c3b5753c635fb44089e3a735bd95fcb2df8ddb13597e0325f7f6f03479c9f"
+  },
+  {
+   "id": "M05_sharp",
+   "master": "C3_M05_sharp.png",
+   "width": 3000,
+   "height": 2000,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M05_sharp",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -48,
+    "pitch": 60,
+    "dist": 0.13,
+    "lens": 100,
+    "target": [
+     24,
+     1030,
+     -4.0
+    ],
+    "fstop": 11.0,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": null
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: front-left corner (timber, ceramic)",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3000",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3000"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M05_sharp --samples 80 --noise 0.008 --out C3_M05_sharp.png",
+   "sha256": "6b153251d9f4b86a2d0eeaff6e04fe014c464ca9c499ece30fab59570c4c3229"
+  },
+  {
+   "id": "M06_cine",
+   "master": "C3_M06_cine.png",
+   "width": 3000,
+   "height": 2000,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M06_R1_cine",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -40,
+    "pitch": 58,
+    "dist": 0.15,
+    "lens": 100,
+    "target": [
+     86,
+     957,
+     0.0
+    ],
+    "fstop": 5.6,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": {
+     "lights": {
+      "Edge strip": {
+       "offset": [
+        0.1353,
+        1.1332,
+        0.35
+       ]
+      }
+     }
+    }
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: PITCH / MOD touch strips",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3000",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3000"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M06_R1_cine --samples 80 --noise 0.008 --out C3_M06_cine.png",
+   "sha256": "59e132220eb58d515db28f0c7dea806f1ad4327df28c59213f421c0cb91270c5"
+  },
+  {
+   "id": "M06_sharp",
+   "master": "C3_M06_sharp.png",
+   "width": 3000,
+   "height": 2000,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_MATERIAL",
+   "shot": "M06_R1_sharp",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -40,
+    "pitch": 58,
+    "dist": 0.15,
+    "lens": 100,
+    "target": [
+     86,
+     957,
+     0.0
+    ],
+    "fstop": 22.0,
+    "shift": [
+     0.0,
+     0.0
+    ],
+    "fit": "AUTO"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_MATERIAL",
+    "lights": [
+     "Grazing key",
+     "Edge strip",
+     "Overhead",
+     "Fill"
+    ],
+    "overrides": {
+     "lights": {
+      "Edge strip": {
+       "offset": [
+        0.1353,
+        1.1332,
+        0.35
+       ]
+      }
+     }
+    }
+   },
+   "samples": 80,
+   "noise_threshold": 0.008,
+   "usage": "Detail: PITCH / MOD touch strips",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3000",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3000"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M06_R1_sharp --samples 80 --noise 0.008 --out C3_M06_sharp.png",
+   "sha256": "c3553b6e5ff4a4ed583f6bb2e417b9806759e007994894e129486d92f75a2eb0"
+  },
+  {
+   "id": "background_clean",
+   "master": "C3_background_clean_4200x2800.png",
+   "width": 4200,
+   "height": 2800,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.42 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_GALLERY",
+   "shot": "A2",
+   "pass": "background",
+   "camera": {
+    "yaw": -26,
+    "pitch": 50,
+    "dist": 1.36,
+    "lens": 85,
+    "target": [
+     724,
+     540,
+     0
+    ],
+    "fstop": 11,
+    "shift": [
+     0.02,
+     -0.01
+    ],
+    "fit": "HORIZONTAL"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_GALLERY",
+    "lights": [
+     "Key softbox",
+     "Edge strip",
+     "Overhead",
+     "Fill",
+     "Front kicker",
+     "Low rake"
+    ],
+    "overrides": null
+   },
+   "samples": 64,
+   "noise_threshold": 0.01,
+   "usage": "Clean background plate without the product",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3840",
+    "avif 4200",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3840",
+    "webp 4200"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_GALLERY --shot A2 --pass background --res 4200 2800 --samples 64 --noise 0.01 --out C3_background_clean_4200x2800.png",
+   "sha256": "3c257398233ec55bf1a6285f2f8628f1d0bfb33ba9c4a0355dcfdea5b02a1366"
+  },
+  {
+   "id": "combined",
+   "master": "C3_combined_4200x2800.png",
+   "width": 4200,
+   "height": 2800,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.42 EV (baked)",
+   "alpha": false,
+   "setup": "ANDOR_GALLERY",
+   "shot": "A2",
+   "pass": "beauty",
+   "camera": {
+    "yaw": -26,
+    "pitch": 50,
+    "dist": 1.36,
+    "lens": 85,
+    "target": [
+     724,
+     540,
+     0
+    ],
+    "fstop": 11,
+    "shift": [
+     0.02,
+     -0.01
+    ],
+    "fit": "HORIZONTAL"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_GALLERY",
+    "lights": [
+     "Key softbox",
+     "Edge strip",
+     "Overhead",
+     "Fill",
+     "Front kicker",
+     "Low rake"
+    ],
+    "overrides": null
+   },
+   "samples": 96,
+   "noise_threshold": 0.008,
+   "usage": "Combined beauty pass at the transparent set's camera",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3840",
+    "avif 4200",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3840",
+    "webp 4200"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_GALLERY --shot A2 --res 4200 2800 --samples 96 --noise 0.008 --out C3_combined_4200x2800.png",
+   "sha256": "75b96d2a4815e6be0df5e31d35e55403177eccc77146c5f543c770a6ce7d2584"
+  },
+  {
+   "id": "transparent_product",
+   "master": "C3_transparent_product_4200x2800.png",
+   "width": 4200,
+   "height": 2800,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure None EV (baked)",
+   "alpha": true,
+   "setup": null,
+   "shot": null,
+   "pass": "beauty",
+   "camera": null,
+   "rot_deg": null,
+   "lighting": {
+    "rig": null,
+    "lights": [],
+    "overrides": null
+   },
+   "samples": null,
+   "noise_threshold": null,
+   "usage": "",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3840",
+    "avif 4200",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3840",
+    "webp 4200"
+   ],
+   "command": "andor_scene.py -- --out C3_transparent_product_4200x2800.png",
+   "sha256": "c93e2d0705ddd943c90eeb3f28bcf17c7d24cc850b05e5d1d9a2a6246fd5c4db"
+  },
+  {
+   "id": "transparent_product_shadow",
+   "master": "C3_transparent_product_shadow_4200x2800.png",
+   "width": 4200,
+   "height": 2800,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure None EV (baked)",
+   "alpha": true,
+   "setup": null,
+   "shot": null,
+   "pass": "beauty",
+   "camera": null,
+   "rot_deg": null,
+   "lighting": {
+    "rig": null,
+    "lights": [],
+    "overrides": null
+   },
+   "samples": null,
+   "noise_threshold": null,
+   "usage": "",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3840",
+    "avif 4200",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3840",
+    "webp 4200"
+   ],
+   "command": "andor_scene.py -- --out C3_transparent_product_shadow_4200x2800.png",
+   "sha256": "a1f9c4c19c2c41bec45e843159a4f784b63150f2c1a286ee960b35fb75afa481"
+  },
+  {
+   "id": "transparent_shadow_only",
+   "master": "C3_transparent_shadow_only_4200x2800.png",
+   "width": 4200,
+   "height": 2800,
+   "bit_depth": 16,
+   "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.42 EV (baked)",
+   "alpha": true,
+   "setup": "ANDOR_GALLERY",
+   "shot": "A2",
+   "pass": "shadow",
+   "camera": {
+    "yaw": -26,
+    "pitch": 50,
+    "dist": 1.36,
+    "lens": 85,
+    "target": [
+     724,
+     540,
+     0
+    ],
+    "fstop": 11,
+    "shift": [
+     0.02,
+     -0.01
+    ],
+    "fit": "HORIZONTAL"
+   },
+   "rot_deg": -11.0,
+   "lighting": {
+    "rig": "ANDOR_GALLERY",
+    "lights": [
+     "Key softbox",
+     "Edge strip",
+     "Overhead",
+     "Fill",
+     "Front kicker",
+     "Low rake"
+    ],
+    "overrides": null
+   },
+   "samples": 64,
+   "noise_threshold": 0.01,
+   "usage": "Shadow-only layer (black, alpha) to pair with the transparent product",
+   "derivatives": [
+    "avif 640",
+    "avif 960",
+    "avif 1280",
+    "avif 1920",
+    "avif 2560",
+    "avif 3840",
+    "avif 4200",
+    "webp 640",
+    "webp 960",
+    "webp 1280",
+    "webp 1920",
+    "webp 2560",
+    "webp 3840",
+    "webp 4200"
+   ],
+   "command": "andor_scene.py -- --setup ANDOR_GALLERY --shot A2 --pass shadow --res 4200 2800 --samples 64 --noise 0.01 --out C3_transparent_shadow_only_4200x2800.png",
+   "sha256": "aa8ab2750b901a4a4dd86bdc911349a3304ba20deda5164ae15cba38aa05c62d"
+  }
+ ]
+}
