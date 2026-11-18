@@ -134,7 +134,7 @@ enum class KnobSkin
 {
     original,   ///< every knob as before
     pilot,      ///< the pilot macro (LIFE) rendered
-    macros      ///< all six macros rendered (for comparison)
+    macros      ///< every rendered knob: the six macros and the source knobs (layer-ivory)
 };
 
 KnobSkin knobSkin() noexcept;

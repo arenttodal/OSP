@@ -509,6 +509,14 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       (`postprocess.shadow_trim`: the knob's own pixels unchanged). 129 frames, pointer error 0.21 deg; same
       frame sizes, manifest format and SpriteKnobRenderer; paint cost and decoded memory as before.
       Still to do by hand: a slow drag on a real Retina Mac and inside a DAW.
+- [x] RENDERED SOURCE KNOB, `layer-ivory` B (START, TUNE, PAN, LEVEL, REIMAGINED on every card): its own
+      geometry (`tools/blender-assets/config/layer-knob.json`: 20 mm cap, 7 mm tall, smooth sidewall, domed top,
+      fine skirt, 1 mm bevel, the current knob's short pointer), D2's light, cast shadow 55 % (0.3 mm contact,
+      0.8 mm ramp). 129 frames, pointer error 0.41 deg; runtime sizes 100 / 200 px (the body is 52 px at 1448;
+      131 px at 1810 x 2 fits the 200 px frame with its margin). Drawn by the unchanged SpriteKnobRenderer through
+      `"sprite": "layer-ivory"` on LayerKnob's dial: arcs, ticks, halos, REIMAGINED's spectral arc, values, hit areas
+      and parameters unchanged; the `original` knob skin still shows every vector knob. `[plugin][sprite-knob]`.
+      Still to do by hand: the same Retina Mac / DAW pass as D2.
 - [x] Layer knobs: each name sits as far above the dial's tick dots as the value sits below
       the lowest ones (the knob component grows upwards by `LayerKnob::labelLift`; dial and
       value unchanged). The MACROS title is gone from the macro panel.

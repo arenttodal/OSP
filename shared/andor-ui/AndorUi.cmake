@@ -74,6 +74,8 @@ if(NOT TARGET AndorUiData)
             # One zip of frames per size; SpriteKnobRenderer registers every "<name>-<size>.zip".
             ${ANDOR_UI_DIR}/Resources/knobs/macro-ivory/macro-ivory-176.zip
             ${ANDOR_UI_DIR}/Resources/knobs/macro-ivory/macro-ivory-352.zip
+            ${ANDOR_UI_DIR}/Resources/knobs/layer-ivory/layer-ivory-100.zip
+            ${ANDOR_UI_DIR}/Resources/knobs/layer-ivory/layer-ivory-200.zip
             # The ceramic skin's rendered surfaces (tools/blender-assets/skin): CeramicSkin.
             ${ANDOR_UI_DIR}/Resources/skin/ceramic-skin.zip)
 endif()
