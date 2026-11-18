@@ -1,5 +1,31 @@
 # Status
 
+> **18 Nov 2026, menu architecture, content authoring, preset navigation (branch
+> `claude/osp-menu-content`; `docs/research/menu-content/`, `docs/research/preset-navigation/`):**
+> - **Main menu:** INSTRUMENT / CONTENT / PREFERENCES / SUPPORT, with no layer items. Each
+>   source A/B/C has its own menu.
+> - **SAVE:** updates a writable user preset in place; otherwise it is Save As. Factory presets
+>   are read-only.
+> - **Save as Starting State…:** one dialog with a name and a description. The state holds no
+>   audio and the instrument is left unchanged.
+> - **Packs:**
+>   - dependencies, rights and content validation on export;
+>   - user installs are never factory;
+>   - drafts in the pack builder;
+>   - factory publishing only in `OSP_FACTORY_AUTHORING` builds.
+> - **Quick preset menu:**
+>   - grouped as COLLECTIONS, CATEGORIES (14, the empty ones hidden) and PACKS;
+>   - one column, at most 20 rows per flyout, then Browse all in the Library;
+>   - the arrows walk the collection a preset was chosen from;
+>   - categories are derived (`src/library/PresetCategory.h`), so nothing is rewritten;
+>   - tested at 50 / 500 / 5,000 presets.
+> - **USER macros** have their own frozen palette (`colour::userMacro`).
+> - **NEXT:**
+>   - approve the CORE macro palette (`docs/research/menu-content/palette/`), then re-render
+>     the beads in Blender;
+>   - pedals: keep V5 or follow the macros;
+>   - SUPPORT's user guide link needs a URL.
+
 > **17 Nov 2026, final interface polish (branch `claude/osp-final-polish`):**
 > - **Popovers stay open** through right-click, Assign to Macro, halo range drags,
 >   invert/reset, Escape and menu cancel, and knob turns.
