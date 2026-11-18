@@ -64,7 +64,8 @@ enum class Mapping
     adaptiveContour,   ///< index = round (r / R * (N - 1)): the shape stretched over the pool
     degreeCycle,       ///< index = r mod N
     contourFit,        ///< the lab's candidate: r itself while the pool is large enough (N > R), else compressed like adaptive
-    fitOctaveCycles    ///< contour-fit over the held notes only; OCTAVES repeats the whole pattern an octave higher per cycle
+    fitOctaveCycles,   ///< contour-fit over the held notes only; OCTAVES repeats the whole pattern an octave higher per cycle
+    hybrid             ///< contour-fit over the fewest octaves the gesture needs, then the whole gesture at each higher octave position that fits
 };
 const char* mappingName (Mapping m) noexcept;
 
@@ -79,8 +80,25 @@ std::vector<int> notePool (std::vector<int> held, int octaves);
 /** The notes a contour plays over a pool, one per step (an empty pool: none). */
 std::vector<int> interpret (const Contour& contour, const std::vector<int>& pool, Mapping mapping);
 
-/** One full cycle as played: one pattern length, or OCTAVES lengths for fitOctaveCycles
-    (each an octave higher; a note above 127 drops by octaves until it fits). */
+/** The hybrid's plan for one held chord: the base pool (the fewest octaves, within OCTAVES,
+    whose distinct notes hold every rank), the octave positions the whole gesture can climb to
+    (each a shift whose every used note is in the full pool, so wide voicings, duplicates and
+    the MIDI top are handled by the pool itself), and whether it had to compress. */
+struct HybridPlan
+{
+    std::vector<int> base;        ///< distinct, ascending
+    std::vector<int> positions;   ///< semitone shifts, from 0 upwards
+    int baseOctaves = 1;
+    bool compressed = false;
+};
+HybridPlan planHybrid (const std::vector<int>& held, int octaves, int maxRank);
+
+/** The note a rank plays in a given pattern cycle (-1: none, the pool is empty). */
+int noteFor (Mapping mapping, int rank, int maxRank, const std::vector<int>& held, int octaves, long long cycle);
+
+/** One full cycle as played: one pattern length, OCTAVES lengths for fitOctaveCycles (each an
+    octave higher; a note above 127 drops by octaves until it fits), one length per octave
+    position for the hybrid. */
 std::vector<int> playLine (const Contour& contour, const std::vector<int>& held, int octaves, Mapping mapping);
 
 /** How well a played line keeps the captured gesture. */
@@ -109,6 +127,9 @@ struct HeldChord
 /** One note, an interval, a major and a minor triad, a seventh, an extended chord, and the
     seventh again over two octaves. */
 std::vector<HeldChord> listeningProgression();
+/** For OCTAVES: a triad over 4 octaves, one note over 4, a seventh over 2, a six-note voicing
+    over 3; two bars each (enough cycles to hear the octave positions move). */
+std::vector<HeldChord> octavesProgression();
 
 /** The contour played over the progression on a 1/16 grid at `bpm`, GATE 75 %, the pattern's
     phase running on across chord changes (as the arpeggiator keeps its step count). */

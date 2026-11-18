@@ -120,6 +120,7 @@ const char* mappingName (Mapping m) noexcept
         case Mapping::degreeCycle: return "degree-cycle";
         case Mapping::contourFit: return "contour-fit";
         case Mapping::fitOctaveCycles: return "fit-octave-cycles";
+        case Mapping::hybrid: return "hybrid";
     }
     return "?";
 }
@@ -141,7 +142,8 @@ int mapRank (Mapping m, int r, int R, int N) noexcept
         case Mapping::adaptiveContour: return adaptive (std::min (r, R), R, N);
         case Mapping::degreeCycle: return r % N;
         case Mapping::contourFit:
-        case Mapping::fitOctaveCycles: return N > R ? std::min (r, N - 1) : adaptive (std::min (r, R), R, N);
+        case Mapping::fitOctaveCycles:
+        case Mapping::hybrid: return N > R ? std::min (r, N - 1) : adaptive (std::min (r, R), R, N);
     }
     return 0;
 }
@@ -167,22 +169,99 @@ std::vector<int> interpret (const Contour& contour, const std::vector<int>& pool
     return out;
 }
 
-std::vector<int> playLine (const Contour& contour, const std::vector<int>& held, int octaves, Mapping mapping)
+namespace
 {
-    if (mapping != Mapping::fitOctaveCycles)
-        return interpret (contour, notePool (held, octaves), mapping);
-    const auto pool = notePool (held, 1);
-    std::vector<int> out;
-    if (pool.empty())
-        return out;
-    for (int k = 0; k < std::clamp (octaves, 1, 4); ++k)
-        for (const int r : contour.ranks)
+    std::vector<int> distinct (std::vector<int> v)
+    {
+        std::sort (v.begin(), v.end());
+        v.erase (std::unique (v.begin(), v.end()), v.end());
+        return v;
+    }
+}
+
+HybridPlan planHybrid (const std::vector<int>& held, int octaves, int maxRank)
+{
+    HybridPlan plan;
+    octaves = std::clamp (octaves, 1, 4);
+    const int needed = maxRank + 1;
+    const auto full = distinct (notePool (held, octaves));
+    if (full.empty())
+        return plan;
+    // The fewest octaves whose distinct notes hold every rank.
+    plan.baseOctaves = octaves;
+    for (int b = 1; b <= octaves; ++b)
+        if (static_cast<int> (distinct (notePool (held, b)).size()) >= needed)
         {
-            int n = pool[static_cast<std::size_t> (mapRank (mapping, r, contour.maxRank, static_cast<int> (pool.size())))] + 12 * k;
+            plan.baseOctaves = b;
+            break;
+        }
+    plan.base = distinct (notePool (held, plan.baseOctaves));
+    plan.compressed = static_cast<int> (plan.base.size()) < needed;
+    // The notes the gesture uses in the base pool, then every octave shift where all of them
+    // are in the full pool.
+    std::vector<int> used;
+    for (int r = 0; r <= maxRank; ++r)
+        used.push_back (plan.base[static_cast<std::size_t> (mapRank (Mapping::contourFit, r, maxRank, static_cast<int> (plan.base.size())))]);
+    for (int shift = 0; shift <= 12 * 3; shift += 12)
+    {
+        const bool fits = std::all_of (used.begin(), used.end(), [&] (int n) { return std::binary_search (full.begin(), full.end(), n + shift); });
+        if (! fits)
+            break;   // positions are contiguous from the base upwards
+        plan.positions.push_back (shift);
+    }
+    if (plan.positions.empty())
+        plan.positions.push_back (0);
+    return plan;
+}
+
+int noteFor (Mapping mapping, int rank, int maxRank, const std::vector<int>& held, int octaves, long long cycle)
+{
+    if (held.empty())
+        return -1;
+    cycle = std::max (0LL, cycle);
+    switch (mapping)
+    {
+        case Mapping::adaptiveContour:
+        case Mapping::degreeCycle:
+        case Mapping::contourFit:
+        {
+            const auto pool = notePool (held, octaves);
+            return pool[static_cast<std::size_t> (mapRank (mapping, rank, maxRank, static_cast<int> (pool.size())))];
+        }
+        case Mapping::fitOctaveCycles:
+        {
+            const auto pool = notePool (held, 1);
+            int n = pool[static_cast<std::size_t> (mapRank (mapping, rank, maxRank, static_cast<int> (pool.size())))]
+                    + 12 * static_cast<int> (cycle % std::clamp (octaves, 1, 4));
             while (n > 127)
                 n -= 12;
-            out.push_back (n);
+            return n;
         }
+        case Mapping::hybrid:
+        {
+            const auto plan = planHybrid (held, octaves, maxRank);
+            if (plan.base.empty())
+                return -1;
+            const int n = plan.base[static_cast<std::size_t> (mapRank (mapping, rank, maxRank, static_cast<int> (plan.base.size())))];
+            return n + plan.positions[static_cast<std::size_t> (cycle % static_cast<long long> (plan.positions.size()))];
+        }
+    }
+    return -1;
+}
+
+std::vector<int> playLine (const Contour& contour, const std::vector<int>& held, int octaves, Mapping mapping)
+{
+    std::vector<int> out;
+    if (held.empty() || contour.ranks.empty())
+        return out;
+    long long cycles = 1;
+    if (mapping == Mapping::fitOctaveCycles)
+        cycles = std::clamp (octaves, 1, 4);
+    else if (mapping == Mapping::hybrid)
+        cycles = static_cast<long long> (planHybrid (held, octaves, contour.maxRank).positions.size());
+    for (long long c = 0; c < cycles; ++c)
+        for (const int r : contour.ranks)
+            out.push_back (noteFor (mapping, r, contour.maxRank, held, octaves, c));
     return out;
 }
 
@@ -252,6 +331,14 @@ std::vector<HeldChord> listeningProgression()
              { "maj7 over two octaves (C E G B)", { 48, 52, 55, 59 }, 2, 2 } };
 }
 
+std::vector<HeldChord> octavesProgression()
+{
+    return { { "major triad over 4 octaves", { 60, 64, 67 }, 4, 2 },
+             { "one note over 4 octaves", { 57 }, 4, 2 },
+             { "seventh over 2 octaves", { 50, 53, 57, 60 }, 2, 2 },
+             { "six-note voicing over 3 octaves", { 48, 52, 55, 59, 62, 66 }, 3, 2 } };
+}
+
 MidiSequence progressionSequence (const Contour& contour, const std::vector<HeldChord>& chords, Mapping mapping, double bpm)
 {
     MidiSequence s;
@@ -265,18 +352,13 @@ MidiSequence progressionSequence (const Contour& contour, const std::vector<Held
     const auto length = static_cast<long long> (contour.ranks.size());
     for (const auto& chord : chords)
     {
-        const bool cycles = mapping == Mapping::fitOctaveCycles;
-        const auto pool = notePool (chord.notes, cycles ? 1 : chord.octaves);
         for (int k = 0; k < 16 * chord.bars; ++k, ++stepIndex, t += step)
         {
             const auto i = static_cast<std::size_t> (stepIndex % length);
-            int note = pool[static_cast<std::size_t> (mapRank (mapping, contour.ranks[i], contour.maxRank, static_cast<int> (pool.size())))];
-            if (cycles)
-            {
-                note += 12 * static_cast<int> ((stepIndex / length) % std::max (1, chord.octaves));
-                while (note > 127)
-                    note -= 12;
-            }
+            // The cycle advances at the pattern's own loop boundary.
+            const int note = noteFor (mapping, contour.ranks[i], contour.maxRank, chord.notes, chord.octaves, stepIndex / length);
+            if (note < 0)
+                continue;
             s.events.push_back ({ t, MidiEvent::Type::noteOn, note, 100, 1 });
             s.events.push_back ({ t + gate, MidiEvent::Type::noteOff, note, 0, 1 });
         }
@@ -513,7 +595,6 @@ MidiSequence rhythmSequence (const RhythmPattern& pattern, const std::vector<Hel
     long long cycleStart = 0;
     for (const auto& chord : chords)
     {
-        const auto pool = notePool (chord.notes, chord.octaves);
         const long long barEnd = barStart + 16LL * chord.bars * ticksPerStep;
         // Every event whose onset falls in this chord's bars (the phase runs on across chords).
         while (true)
@@ -527,9 +608,11 @@ MidiSequence rhythmSequence (const RhythmPattern& pattern, const std::vector<Hel
                     continue;
                 if (onset >= barEnd)
                     break;
-                if (e.rest || pool.empty())
+                if (e.rest)
                     continue;
-                const int note = pool[static_cast<std::size_t> (mapRank (mapping, e.rank, pattern.maxRank, static_cast<int> (pool.size())))];
+                const int note = noteFor (mapping, e.rank, pattern.maxRank, chord.notes, chord.octaves, cycleStart / length);
+                if (note < 0)
+                    continue;
                 const double on = swungTick (onset, swing) * secondsPerTick;
                 const double off = on + gate * e.duration * secondsPerTick;
                 s.events.push_back ({ on, MidiEvent::Type::noteOn, note, e.velocity > 0 ? e.velocity : 100, 1 });
@@ -579,7 +662,7 @@ LabResult runArpPatternLab (const std::filesystem::path& outDir, bool writeAudio
     if (writeAudio)
         std::filesystem::create_directories (outDir / "audio");
 
-    const Mapping mappings[] = { Mapping::adaptiveContour, Mapping::degreeCycle, Mapping::contourFit, Mapping::fitOctaveCycles };
+    const Mapping mappings[] = { Mapping::adaptiveContour, Mapping::degreeCycle, Mapping::contourFit, Mapping::fitOctaveCycles, Mapping::hybrid };
     const std::vector<std::pair<std::string, std::vector<int>>> holds {
         { "1 note", { 60 } }, { "interval", { 60, 67 } }, { "major", { 60, 64, 67 } }, { "minor", { 57, 60, 64 } },
         { "seventh", { 50, 53, 57, 60 } }, { "extended", { 55, 59, 62, 65, 69 } }, { "six", { 48, 52, 55, 59, 62, 66 } } };
@@ -597,7 +680,9 @@ LabResult runArpPatternLab (const std::filesystem::path& outDir, bool writeAudio
        << "across chord changes. Mappings: **adaptive-contour** (the spec's default, `round (r / R * (N - 1))`),\n"
        << "**degree-cycle** (`r mod N`), and the lab's candidate **contour-fit** (`r` while the pool has more notes\n"
        << "than the gesture has ranks, otherwise adaptive), and **fit-octave-cycles** (contour-fit over the held notes\n"
-       << "only; OCTAVES repeats the whole pattern an octave higher per cycle, as the built-in styles climb).\n\n"
+       << "only; OCTAVES repeats the whole pattern an octave higher per cycle, as the built-in styles climb), and the\n"
+       << "**hybrid** (contour-fit over the fewest octaves the gesture needs, then the whole gesture at each higher octave\n"
+       << "position that fits in OCTAVES, back to the start after the top; the position moves at the pattern's loop).\n\n"
        << "Columns: direction = share of steps (around the loop) moving the same way as captured; collapsed =\n"
        << "captured ranks that share a note with another; leap = largest step played (captured); span = range played.\n\n";
 
@@ -646,6 +731,19 @@ LabResult runArpPatternLab (const std::filesystem::path& outDir, bool writeAudio
                     ++result.audioFiles;
             }
         }
+        for (const auto m : { Mapping::contourFit, Mapping::fitOctaveCycles, Mapping::hybrid })
+        {
+            const auto seq = progressionSequence (contour, octavesProgression(), m);
+            const auto stem = g.name + "-octaves-" + mappingName (m);
+            writeMidi (outDir / "midi" / (stem + ".mid"), seq, result.midiFiles);
+            if (writeAudio)
+            {
+                const auto out = renderSequence (source, 60.0, seq, config);
+                std::string error;
+                if (io::writeAudioFile (outDir / "audio" / (stem + ".wav"), out.audio, io::SampleFormat::pcm16, error))
+                    ++result.audioFiles;
+            }
+        }
         if (writeAudio)
         {
             const auto out = renderSequence (source, 60.0, capturedSequence (g), config);
@@ -672,7 +770,7 @@ LabResult runArpPatternLab (const std::filesystem::path& outDir, bool writeAudio
     };
     md << "## Rhythm: variable-duration events (Part II)\n\n"
        << "Ticks: " << ticksPerStep << " per step (one ARP RATE), shortest event " << minEventTicks << ". Durations below in steps\n"
-       << "(or ticks/" << ticksPerStep << "). Renders use contour-fit, GATE 75 % of each event's own duration.\n\n";
+       << "(or ticks/" << ticksPerStep << "). Renders use contour-fit (and `-hybrid`: the hybrid), GATE 75 % of each event's own duration.\n\n";
     struct RhythmDemo
     {
         std::string name, how;
@@ -710,14 +808,18 @@ LabResult runArpPatternLab (const std::filesystem::path& outDir, bool writeAudio
     for (const auto& d : demos)
     {
         md << "| " << d.name << " | " << d.how << " | `" << describe (d.pattern) << "` | " << static_cast<double> (d.pattern.lengthTicks()) / ticksPerStep << " steps |\n";
-        const auto seq = rhythmSequence (d.pattern, listeningProgression(), Mapping::contourFit, 120.0, 0.75, d.swing);
-        writeMidi (outDir / "midi" / (d.name + ".mid"), seq, result.midiFiles);
-        if (writeAudio)
+        for (const auto m : { Mapping::contourFit, Mapping::hybrid })
         {
-            const auto out = renderSequence (source, 60.0, seq, config);
-            std::string error;
-            if (io::writeAudioFile (outDir / "audio" / (d.name + ".wav"), out.audio, io::SampleFormat::pcm16, error))
-                ++result.audioFiles;
+            const auto seq = rhythmSequence (d.pattern, listeningProgression(), m, 120.0, 0.75, d.swing);
+            const auto stem = d.name + (m == Mapping::hybrid ? "-hybrid" : "");
+            writeMidi (outDir / "midi" / (stem + ".mid"), seq, result.midiFiles);
+            if (writeAudio)
+            {
+                const auto out = renderSequence (source, 60.0, seq, config);
+                std::string error;
+                if (io::writeAudioFile (outDir / "audio" / (stem + ".wav"), out.audio, io::SampleFormat::pcm16, error))
+                    ++result.audioFiles;
+            }
         }
     }
     md << "\n";
@@ -734,7 +836,10 @@ LabResult runArpPatternLab (const std::filesystem::path& outDir, bool writeAudio
     md << "\nListening renders (audio/): each gesture as captured, then over the progression\n";
     for (const auto& c : listeningProgression())
         md << "- " << c.name << (c.octaves > 1 ? ", OCTAVES " + std::to_string (c.octaves) : std::string()) << ", " << c.bars << " bar" << (c.bars > 1 ? "s" : "") << "\n";
-    md << "\nfor each mapping (`<gesture>-<mapping>.wav`).\n";
+    md << "\nfor each mapping (`<gesture>-<mapping>.wav`), and over the OCTAVES progression\n";
+    for (const auto& c : octavesProgression())
+        md << "- " << c.name << ", " << c.bars << " bars\n";
+    md << "\nfor contour-fit, fit-octave-cycles and the hybrid (`<gesture>-octaves-<mapping>.wav`).\n";
     result.markdown = md.str();
     return result;
 }

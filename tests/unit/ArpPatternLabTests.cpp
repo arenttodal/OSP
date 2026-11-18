@@ -236,3 +236,82 @@ TEST_CASE ("arp lab: fit-octave-cycles keeps the shape in the held notes and cli
     // Other mappings: one pattern length over the octave pool.
     CHECK (playLine (c, { 60, 64, 67 }, 3, Mapping::adaptiveContour).size() == 4);
 }
+
+TEST_CASE ("arp lab hybrid: the fewest octaves the gesture needs, then the whole gesture climbs by octave positions", "[unit][arp][arp-lab]")
+{
+    const std::vector<int> triad { 60, 64, 67 };
+    // A two-pitch motif on a triad with four octaves: compact (C E), one octave up per cycle, back after the top.
+    {
+        const auto plan = planHybrid (triad, 4, 1);
+        CHECK (plan.baseOctaves == 1);
+        CHECK (plan.positions == std::vector<int> { 0, 12, 24, 36 });
+        const auto c = extractContour (sixteenths ({ 64, 64, 71, 64 }));
+        CHECK (playLine (c, triad, 4, Mapping::hybrid) == std::vector<int> { 60, 60, 64, 60, 72, 72, 76, 72, 84, 84, 88, 84, 96, 96, 100, 96 });
+        CHECK (noteFor (Mapping::hybrid, 0, 1, triad, 4, 4) == 60);   // cycle 5: home again
+    }
+    // A five-pitch ascending motif on a triad: two octaves for its five places, then up one and two octaves.
+    {
+        const auto plan = planHybrid (triad, 4, 4);
+        CHECK (plan.baseOctaves == 2);
+        CHECK (plan.positions == std::vector<int> { 0, 12, 24 });
+        const auto c = extractContour (sixteenths ({ 60, 62, 64, 67, 69 }));
+        CHECK (playLine (c, triad, 4, Mapping::hybrid) == std::vector<int> { 60, 64, 67, 72, 76, 72, 76, 79, 84, 88, 84, 88, 91, 96, 100 });
+    }
+    // One held note, four octaves: a one-pitch motif climbs four places; a two-pitch motif needs two octaves, then climbs.
+    CHECK (planHybrid ({ 57 }, 4, 0).positions == std::vector<int> { 0, 12, 24, 36 });
+    {
+        const auto plan = planHybrid ({ 57 }, 4, 1);
+        CHECK (plan.baseOctaves == 2);
+        CHECK (plan.positions == std::vector<int> { 0, 12, 24 });
+    }
+    // Larger than the pool: contour-fit's compression, no climbing.
+    {
+        const auto plan = planHybrid (triad, 1, 4);
+        CHECK (plan.compressed);
+        CHECK (plan.positions == std::vector<int> { 0 });
+        const auto c = extractContour (sixteenths ({ 60, 62, 64, 67, 69 }));
+        CHECK (playLine (c, triad, 1, Mapping::hybrid) == playLine (c, triad, 1, Mapping::contourFit));
+    }
+    // The MIDI top: positions come from the real pool, nothing is clamped onto 127.
+    {
+        const auto plan = planHybrid ({ 115, 120 }, 4, 1);
+        CHECK (plan.positions == std::vector<int> { 0 });
+        for (int cycle = 0; cycle < 6; ++cycle)
+            for (int r = 0; r <= 1; ++r)
+            {
+                const int n = noteFor (Mapping::hybrid, r, 1, { 115, 120 }, 4, cycle);
+                CHECK ((n == 115 || n == 120));
+            }
+    }
+    // A wide voicing (C3 E5) over two octaves: the motif's notes and their octave copies are all real pool notes.
+    CHECK (planHybrid ({ 48, 76 }, 2, 1).positions == std::vector<int> { 0, 12 });
+    // Duplicates (the same pitch held twice) count once.
+    CHECK (planHybrid ({ 60, 60, 67 }, 2, 2).baseOctaves == 2);
+    // Nothing held: nothing.
+    CHECK (noteFor (Mapping::hybrid, 0, 2, {}, 4, 0) == -1);
+}
+
+TEST_CASE ("arp lab hybrid: rests, repeats and split values keep their rhythm; the position moves at the loop", "[unit][arp][arp-lab]")
+{
+    RhythmPattern p;
+    p.maxRank = 1;
+    p.events = { { 0, false, 480, 0 }, { 0, false, 480, 0 }, { 0, true, 960, 0 }, { 1, false, 960, 0 } };   // 3 steps
+    const std::vector<HeldChord> chords { { "triad", { 60, 64, 67 }, 2, 1 } };   // one bar = 16 steps
+    const auto seq = rhythmSequence (p, chords, Mapping::hybrid);
+    std::vector<int> ons;
+    std::vector<double> times;
+    for (const auto& e : seq.events)
+        if (e.type == osp::MidiEvent::Type::noteOn)
+        {
+            ons.push_back (e.note);
+            times.push_back (e.timeSeconds);
+        }
+    // Cycle 0 at home (C C E), cycle 1 an octave up (C' C' E'), cycle 2 home again; the split halves retrigger.
+    REQUIRE (ons.size() >= 9);
+    CHECK (std::vector<int> (ons.begin(), ons.begin() + 9) == std::vector<int> { 60, 60, 64, 72, 72, 76, 60, 60, 64 });
+    // The second half plays half a step after the first; the rest leaves a step of nothing.
+    const double step = 0.125;   // 1/16 at 120 BPM
+    CHECK (std::abs (times[1] - times[0] - 0.5 * step) < 1.0e-9);
+    CHECK (std::abs (times[2] - times[1] - 1.5 * step) < 1.0e-9);
+    CHECK (std::abs (times[3] - times[0] - 3.0 * step) < 1.0e-9);   // the loop boundary
+}
