@@ -1740,6 +1740,80 @@
       ],
       "fit": "AUTO"
      }
+    },
+    "M06_R1_sharp": {
+     "title": "M06 R1 \u00b7 PITCH / MOD touch strips, sharp (f/22, Edge strip +22 deg)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -40,
+      "pitch": 58,
+      "dist": 0.15,
+      "lens": 100,
+      "target": [
+       86,
+       957,
+       0.0
+      ],
+      "fstop": 22.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     },
+     "overrides": {
+      "lights": {
+       "Edge strip": {
+        "offset": [
+         0.1353,
+         1.1332,
+         0.35
+        ]
+       }
+      },
+      "why": "Phase 4 M06 correction: the Edge strip's reflection filled the satin sensors and washed out PITCH's orange; rotated 22 deg about the product's vertical axis (this shot only), so only a satin sheen stays at the sensors' upper edge. Shader, emission and composition unchanged. f/22 keeps both sensors and the PITCH / MOD labels in focus."
+     }
+    },
+    "M06_R1_cine": {
+     "title": "M06 R1 \u00b7 PITCH / MOD touch strips, cinematic (f/5.6, Edge strip +22 deg)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -40,
+      "pitch": 58,
+      "dist": 0.15,
+      "lens": 100,
+      "target": [
+       86,
+       957,
+       0.0
+      ],
+      "fstop": 5.6,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     },
+     "overrides": {
+      "lights": {
+       "Edge strip": {
+        "offset": [
+         0.1353,
+         1.1332,
+         0.35
+        ]
+       }
+      },
+      "why": "Phase 4 M06 correction: the Edge strip's reflection filled the satin sensors and washed out PITCH's orange; rotated 22 deg about the product's vertical axis (this shot only), so only a satin sheen stays at the sensors' upper edge. Shader, emission and composition unchanged."
+     }
     }
    }
   }

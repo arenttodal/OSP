@@ -99,7 +99,18 @@
 | Transparent set | As in section 3 |
 | Details | M01–M05 as intended |
 
-**One observation for review, M06 (touch strips):**
+**M06, corrected in Phase 4** (approved; `renders/review_gate_c3/05_m06_correction_before_after.jpg`):
+- **Cause:** low-resolution tests, each with one light switched off, showed the cause was the MATERIAL rig's **Edge strip** (back right), not the grazing key. Its broad reflection filled both satin sensors.
+- **Fix:** the new shots `M06_R1_sharp` and `M06_R1_cine` rotate only that light 22° about the product's vertical axis, for this shot only. Rotations of 15° and 30° were also tested: 15° left PITCH pale at the top, and 30° lost nearly all the sheen.
+- **Result:**
+  - PITCH shows the editor's own warm orange gradient;
+  - a fine satin sheen stays along the top of both sensors, showing the 2 % crown;
+  - MOD is dark charcoal-blue and readable.
+- **Unchanged:** the shader, emission, saturation, composition, strip geometry and the 0.4 mm bezel.
+- **Depth of field:** the sharp variant moves from f/11 to f/22, so both sensors and the PITCH and MOD labels are in focus. The cinematic variant stays at f/5.6.
+- **Re-rendered:** only the two M06 masters and their 24 derivatives. The C3 originals are kept in the archive as `C3_M06_*` v1.
+
+**The original observation, for the record:**
 - **What it shows:** at this close, shallow viewing angle, the satin sensor reflects the soft key across its whole face. So the lit PITCH segment reads as pale salmon rather than the GUI's orange.
 - **Why it isn't fixed here:**
   - The approved surface (strip B) is correct, and it reads correctly in every full-product master.
