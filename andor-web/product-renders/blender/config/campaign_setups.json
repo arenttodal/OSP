@@ -1814,6 +1814,85 @@
       },
       "why": "Phase 4 M06 correction: the Edge strip's reflection filled the satin sensors and washed out PITCH's orange; rotated 22 deg about the product's vertical axis (this shot only), so only a satin sheen stays at the sensors' upper edge. Shader, emission and composition unchanged."
      }
+    },
+    "M06_R2_sharp": {
+     "title": "M06 R2 \u00b7 PITCH / MOD touch strips, sharp (f/45, focus between strips and labels, Edge strip +28 deg)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -40,
+      "pitch": 58,
+      "dist": 0.15,
+      "lens": 100,
+      "target": [
+       86,
+       957,
+       0.0
+      ],
+      "fstop": 45.0,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO",
+      "focus": [
+       78,
+       966,
+       0.0
+      ]
+     },
+     "overrides": {
+      "lights": {
+       "Edge strip": {
+        "offset": [
+         0.0161,
+         1.1412,
+         0.35
+        ]
+       }
+      },
+      "why": "Phase 5 R2 (owner review: PITCH label soft, top of the orange sensor pale). Verified R1: f/22 at 150 mm focus gives ~3 mm depth of field centred on the strip, the label lies outside it. R2: Edge strip +28 deg (this shot only) for a more saturated orange with the satin sheen kept; shader, emission, geometry and composition unchanged. f/45 (Cycles has no diffraction) and a focus point between the strips and their labels: PITCH label 8x sharper, MOD 4x, bezels crisp."
+     }
+    },
+    "M06_R2_cine": {
+     "title": "M06 R2 \u00b7 PITCH / MOD touch strips, cinematic (f/5.6, Edge strip +28 deg)",
+     "res": [
+      3000,
+      2000
+     ],
+     "rot": -11.0,
+     "camera": {
+      "yaw": -40,
+      "pitch": 58,
+      "dist": 0.15,
+      "lens": 100,
+      "target": [
+       86,
+       957,
+       0.0
+      ],
+      "fstop": 5.6,
+      "shift": [
+       0.0,
+       0.0
+      ],
+      "fit": "AUTO"
+     },
+     "overrides": {
+      "lights": {
+       "Edge strip": {
+        "offset": [
+         0.0161,
+         1.1412,
+         0.35
+        ]
+       }
+      },
+      "why": "Phase 5 R2 (owner review: PITCH label soft, top of the orange sensor pale). Verified R1: f/22 at 150 mm focus gives ~3 mm depth of field centred on the strip, the label lies outside it. R2: Edge strip +28 deg (this shot only) for a more saturated orange with the satin sheen kept; shader, emission, geometry and composition unchanged. Selective focus kept (f/5.6 on the strips)."
+     }
     }
    }
   }

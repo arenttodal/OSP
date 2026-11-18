@@ -58,9 +58,9 @@ for line in open(batch):
         for i in range(1, 7):
             for v in ("sharp", "cine"):
                 renders[f"C3_M0{i}_{v}"] = ["--setup", "ANDOR_MATERIAL", "--shot", f"M0{i}_{v}", "--samples", "80", "--noise", "0.008"]
-# Phase 4: M06 re-rendered from its R1 shots (Edge strip +22 deg; sharp at f/22).
+# Phase 5: M06 from its R2 shots (Edge strip +28 deg; sharp at f/45 with a focus point between strips and labels).
 for v in ("sharp", "cine"):
-    renders[f"C3_M06_{v}"] = ["--setup", "ANDOR_MATERIAL", "--shot", f"M06_R1_{v}", "--samples", "80", "--noise", "0.008"]
+    renders[f"C3_M06_{v}"] = ["--setup", "ANDOR_MATERIAL", "--shot", f"M06_R2_{v}", "--samples", "80", "--noise", "0.008"]
 
 
 def opt(args, k, n=1):

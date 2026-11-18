@@ -99,6 +99,38 @@
 | Transparent set | As in section 3 |
 | Details | M01–M05 as intended |
 
+**M06, R2 (Phase 5: verified against the originals after owner review)**
+(`renders/review_gate_c3/06_m06_C3_R1_R2_full.jpg`, `07_m06_C3_R1_R2_sharp_100pct.jpg`)
+
+**R1, verified by rebuilding the scene and reading back the camera and light:**
+- **Sharp:** 100 mm at 150 mm focus distance, f/22. The Edge strip sits at 83.2° azimuth (C3: 61.2°), the intended +22°.
+- **Cinematic:** f/5.6, same rig.
+
+**The softness the owner saw was depth of field:**
+- At this magnification f/22 gives only about 3 mm of total depth of field (thin-lens estimate), centred on the strip.
+- The PITCH label lies outside that.
+- The top of the orange sensor was paled by the remaining Edge-strip sheen over the GUI's own light-to-deep gradient.
+
+**R2 changes the camera and that one light only** (shots `M06_R2_sharp` / `M06_R2_cine`):
+- **Sharp:** f/45, plus a new opt-in camera `focus` point (`andor_scene.py`) between the strips and their labels, so the framing is unchanged. Cycles has no diffraction, so stopping down costs nothing.
+- **Both:** the Edge strip at +28°.
+- **Unchanged:** shader, emission, saturation, geometry and composition.
+
+**Measured on the 3000 × 2000 masters:**
+
+| | PITCH label sharpness (Laplacian variance) | MOD label | Orange saturation, top / bottom |
+|---|---|---|---|
+| C3 (f/11) | 0.8 | 1.4 | 0.05 / 0.17 |
+| R1 (f/22, +22°) | 0.8 | 2.0 | 0.16 / 0.31 |
+| **R2 (f/45, focus, +28°)** | **1.8** | **6.2** | **0.21 / 0.36** |
+
+**Result:**
+- A satin sheen still traces the crown.
+- MOD stays dark and readable.
+- The cinematic variant keeps its selective focus at f/5.6.
+
+**Re-rendered:** only the two M06 masters and their 24 derivatives. The kit's `andor-osp_detail-touch-strips_{sharp,cinematic}` files are verified pixel-identical to the R2 masters. C3 and R1 are archived.
+
 **M06, corrected in Phase 4** (approved; `renders/review_gate_c3/05_m06_correction_before_after.jpg`):
 - **Cause:** low-resolution tests, each with one light switched off, showed the cause was the MATERIAL rig's **Edge strip** (back right), not the grazing key. Its broad reflection filled both satin sensors.
 - **Fix:** the new shots `M06_R1_sharp` and `M06_R1_cine` rotate only that light 22° about the product's vertical axis, for this shot only. Rotations of 15° and 30° were also tested: 15° left PITCH pale at the top, and 30° lost nearly all the sheen.

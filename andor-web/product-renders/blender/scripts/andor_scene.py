@@ -1583,7 +1583,7 @@ if SETUP:
 
 
 # --- cameras ---------------------------------------------------------------------------------
-def camera(name, yaw, pitch, dist, lens, target, fstop=None, shift=(0.0, 0.0), fit="AUTO"):
+def camera(name, yaw, pitch, dist, lens, target, fstop=None, shift=(0.0, 0.0), fit="AUTO", focus=None):
     cd = bpy.data.cameras.new(name)
     cd.lens, cd.sensor_fit, cd.sensor_width = lens, fit, 36
     cd.shift_x, cd.shift_y = shift
@@ -1596,7 +1596,9 @@ def camera(name, yaw, pitch, dist, lens, target, fstop=None, shift=(0.0, 0.0), f
     cd.clip_start = 0.005          # macro cameras sit closer than Blender's default 0.1 m near plane
     if fstop:
         cd.dof.use_dof = True
-        cd.dof.focus_distance = (Vector(target) - o.location).length
+        # Phase 5: an optional focus point (default: the target), so a shot keeps its framing while the
+        # plane of focus sits elsewhere (M06: between the touch strips and their PITCH / MOD labels).
+        cd.dof.focus_distance = (Vector(focus if focus is not None else target) - o.location).length
         cd.dof.aperture_fstop = fstop
         cd.dof.aperture_blades = 9
     return o
@@ -1634,6 +1636,10 @@ if SHOT:
     u_, v_, z_ = sc.pop("target")
     v_ += KY if v_ > 600 else 0.0      # a target under the cards follows the current editor's trim (0 for older captures)
     sc["target"] = prod(u_, v_, REF_PANEL_TOP + z_ * MM)
+    if "focus" in sc:
+        fu, fv, fz = sc.pop("focus")
+        fv += KY if fv > 600 else 0.0
+        sc["focus"] = prod(fu, fv, REF_PANEL_TOP + fz * MM)
     sc["dist"] *= args.dist_scale
     sc["shift"] = tuple(sc["shift"])
     scene.camera = camera(f"Camera {args.setup} {args.shot}", **sc)

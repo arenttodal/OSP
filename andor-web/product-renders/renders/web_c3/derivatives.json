@@ -2375,7 +2375,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 8342,
+  "bytes": 8378,
   "file": "C3_M06_cine-640.webp"
  },
  {
@@ -2388,7 +2388,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 4887,
+  "bytes": 4895,
   "file": "C3_M06_cine-640.avif"
  },
  {
@@ -2401,7 +2401,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 13348,
+  "bytes": 13004,
   "file": "C3_M06_cine-960.webp"
  },
  {
@@ -2414,7 +2414,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 6925,
+  "bytes": 6924,
   "file": "C3_M06_cine-960.avif"
  },
  {
@@ -2427,7 +2427,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 18582,
+  "bytes": 18502,
   "file": "C3_M06_cine-1280.webp"
  },
  {
@@ -2440,7 +2440,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 9313,
+  "bytes": 9388,
   "file": "C3_M06_cine-1280.avif"
  },
  {
@@ -2453,7 +2453,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 31444,
+  "bytes": 30222,
   "file": "C3_M06_cine-1920.webp"
  },
  {
@@ -2466,7 +2466,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 14218,
+  "bytes": 14122,
   "file": "C3_M06_cine-1920.avif"
  },
  {
@@ -2479,7 +2479,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 44688,
+  "bytes": 45240,
   "file": "C3_M06_cine-2560.webp"
  },
  {
@@ -2492,7 +2492,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 19867,
+  "bytes": 19594,
   "file": "C3_M06_cine-2560.avif"
  },
  {
@@ -2505,7 +2505,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 55832,
+  "bytes": 55692,
   "file": "C3_M06_cine-3000.webp"
  },
  {
@@ -2518,7 +2518,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 23640,
+  "bytes": 23381,
   "file": "C3_M06_cine-3000.avif"
  },
  {
@@ -2531,7 +2531,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 12820,
+  "bytes": 16014,
   "file": "C3_M06_sharp-640.webp"
  },
  {
@@ -2544,7 +2544,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 7498,
+  "bytes": 9022,
   "file": "C3_M06_sharp-640.avif"
  },
  {
@@ -2557,7 +2557,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 20224,
+  "bytes": 24206,
   "file": "C3_M06_sharp-960.webp"
  },
  {
@@ -2570,7 +2570,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 10732,
+  "bytes": 12779,
   "file": "C3_M06_sharp-960.avif"
  },
  {
@@ -2583,7 +2583,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 27564,
+  "bytes": 32534,
   "file": "C3_M06_sharp-1280.webp"
  },
  {
@@ -2596,7 +2596,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 14473,
+  "bytes": 17261,
   "file": "C3_M06_sharp-1280.avif"
  },
  {
@@ -2609,7 +2609,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 44784,
+  "bytes": 53322,
   "file": "C3_M06_sharp-1920.webp"
  },
  {
@@ -2622,7 +2622,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 21624,
+  "bytes": 25959,
   "file": "C3_M06_sharp-1920.avif"
  },
  {
@@ -2635,7 +2635,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 66150,
+  "bytes": 75582,
   "file": "C3_M06_sharp-2560.webp"
  },
  {
@@ -2648,7 +2648,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 29344,
+  "bytes": 34752,
   "file": "C3_M06_sharp-2560.avif"
  },
  {
@@ -2661,7 +2661,7 @@
    "quality": 86,
    "method": 6
   },
-  "bytes": 80994,
+  "bytes": 92644,
   "file": "C3_M06_sharp-3000.webp"
  },
  {
@@ -2674,7 +2674,7 @@
    "quality": 62,
    "speed": 4
   },
-  "bytes": 34426,
+  "bytes": 40303,
   "file": "C3_M06_sharp-3000.avif"
  },
  {

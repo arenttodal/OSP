@@ -3,7 +3,7 @@
  "about": "ANDOR commercial stills, Gate C3 (approved) with the Phase 4 M06 correction",
  "repository": "arenttodal/OSP",
  "branch": "claude/friendly-pascal-0y48r0",
- "head": "a233b26",
+ "head": "0bdc1ee",
  "blender": "4.2 (bpy), Cycles CPU",
  "sources": {
   "scene": {
@@ -1231,7 +1231,7 @@
    "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
    "alpha": false,
    "setup": "ANDOR_MATERIAL",
-   "shot": "M06_R1_cine",
+   "shot": "M06_R2_cine",
    "pass": "beauty",
    "camera": {
     "yaw": -40,
@@ -1263,8 +1263,8 @@
      "lights": {
       "Edge strip": {
        "offset": [
-        0.1353,
-        1.1332,
+        0.0161,
+        1.1412,
         0.35
        ]
       }
@@ -1288,8 +1288,8 @@
     "webp 2560",
     "webp 3000"
    ],
-   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M06_R1_cine --samples 80 --noise 0.008 --out C3_M06_cine.png",
-   "sha256": "59e132220eb58d515db28f0c7dea806f1ad4327df28c59213f421c0cb91270c5"
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M06_R2_cine --samples 80 --noise 0.008 --out C3_M06_cine.png",
+   "sha256": "3920bcea4b23d6e4afe7e4281b4f11d8708dd6b51dc71b071bf834e4fefecde1"
   },
   {
    "id": "M06_sharp",
@@ -1300,7 +1300,7 @@
    "colour": "sRGB display; Blender AgX view transform, look 'AgX - Punchy', exposure -0.45 EV (baked)",
    "alpha": false,
    "setup": "ANDOR_MATERIAL",
-   "shot": "M06_R1_sharp",
+   "shot": "M06_R2_sharp",
    "pass": "beauty",
    "camera": {
     "yaw": -40,
@@ -1312,12 +1312,17 @@
      957,
      0.0
     ],
-    "fstop": 22.0,
+    "fstop": 45.0,
     "shift": [
      0.0,
      0.0
     ],
-    "fit": "AUTO"
+    "fit": "AUTO",
+    "focus": [
+     78,
+     966,
+     0.0
+    ]
    },
    "rot_deg": -11.0,
    "lighting": {
@@ -1332,8 +1337,8 @@
      "lights": {
       "Edge strip": {
        "offset": [
-        0.1353,
-        1.1332,
+        0.0161,
+        1.1412,
         0.35
        ]
       }
@@ -1357,8 +1362,8 @@
     "webp 2560",
     "webp 3000"
    ],
-   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M06_R1_sharp --samples 80 --noise 0.008 --out C3_M06_sharp.png",
-   "sha256": "c3553b6e5ff4a4ed583f6bb2e417b9806759e007994894e129486d92f75a2eb0"
+   "command": "andor_scene.py -- --setup ANDOR_MATERIAL --shot M06_R2_sharp --samples 80 --noise 0.008 --out C3_M06_sharp.png",
+   "sha256": "f4eeb8a7fa8ca4a37bc64cb2f0c3064838576386985bb6a92cad20185df02a5b"
   },
   {
    "id": "background_clean",
