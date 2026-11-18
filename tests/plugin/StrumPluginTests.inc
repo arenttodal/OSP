@@ -268,3 +268,36 @@ TEST_CASE ("plugin strum: no allocation on the audio thread while strumming in e
     }
     CHECK (allocations == 0);
 }
+
+TEST_CASE ("plugin strum: STRUM costs next to nothing on the audio thread", "[plugin][arp][strum]")
+{
+    // The busiest case: CHORD at 1/32 over four octaves with 16 notes held (64 a step), strummed
+    // RANDOM at its widest (limited by the step), against the same chord unstrummed.
+    auto timeIt = [] (bool strum) {
+        OspAudioProcessor p;
+        arpOn (p, 5, 3, 150.0f, 4);
+        p.setParameterValue ("arp.strum.on", strum ? 1.0f : 0.0f);
+        p.setParameterValue ("arp.strum.direction", 2.0f);
+        p.setParameterValue ("arp.strum.ms", 500.0f);
+        p.prepareToPlay (48000.0, 128);
+        juce::AudioBuffer<float> buffer (2, 128);
+        double total = 0.0;
+        const int blocks = 48000 * 4 / 128;
+        for (int i = 0; i < blocks; ++i)
+        {
+            juce::MidiBuffer midi;
+            if (i == 0)
+                for (int n = 0; n < 16; ++n)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 40 + n * 2, static_cast<juce::uint8> (90)), 0);
+            buffer.clear();
+            const auto t0 = std::chrono::steady_clock::now();
+            p.processBlock (buffer, midi);
+            total += std::chrono::duration<double, std::micro> (std::chrono::steady_clock::now() - t0).count();
+        }
+        return total / blocks;
+    };
+    const double off = timeIt (false), on = timeIt (true);
+    const double budget = 1.0e6 * 128 / 48000.0;
+    std::printf ("STRUM stage: chord %.2f us, strummed %.2f us per 128-sample block (%.3f %% of real time)\n", off, on, 100.0 * (on - off) / budget);
+    CHECK (on - off < 0.02 * budget);
+}
