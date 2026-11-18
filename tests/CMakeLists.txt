@@ -75,6 +75,7 @@ add_executable(osp_tests
     integration/ReimaginedModesTests.cpp
     regression/GoldenTests.cpp
     regression/UnifiedBaselineTests.cpp
+    regression/ArpStyleBaselineTests.cpp
     investigation/StereoInvestigation.cpp
     investigation/Phase2Measurements.cpp
 )
