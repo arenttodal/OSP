@@ -61,6 +61,18 @@ const char* arp::patternName (ArpPattern pattern) noexcept
     return "UP";
 }
 
+const char* arp::strumDirectionName (StrumDirection direction) noexcept
+{
+    switch (direction)
+    {
+        case StrumDirection::up: return "UP";
+        case StrumDirection::down: return "DOWN";
+        case StrumDirection::random: return "RANDOM";
+        case StrumDirection::alternate: return "ALTERNATE";
+    }
+    return "UP";
+}
+
 const char* arp::rateName (ArpRate rate) noexcept
 {
     switch (rate)
@@ -108,11 +120,16 @@ void Arpeggiator::reset() noexcept
     offTime.fill (never);
     sounding = 0;
     eventCount = 0;
+    clearPending();
+    chordSteps = 0;
+    strumSpreadPlayed = strumSpreadRequested = 0;
 }
 
 void Arpeggiator::restartPattern() noexcept
 {
     phraseCounter = 0;
+    clearPending();
+    chordSteps = 0;
     if (running)
     {
         stepCount = 0;
@@ -174,7 +191,10 @@ void Arpeggiator::beginBlock (const Settings& s, const HostTiming& timing, int n
         // are not caught up.
         const double tolerance = std::max (64.0, 0.01 * blockSize) / samplesPerQuarter();
         if (! hadSync || std::abs (ppqStart - expectedPpq) > tolerance)
+        {
             syncGridTo (0);
+            clearPending();   // a loop or a jump: no strummed note from before it plays after it
+        }
         expectedPpq = ppqStart + blockSize / samplesPerQuarter();
         hadSync = true;
     }
@@ -192,6 +212,10 @@ void Arpeggiator::beginBlock (const Settings& s, const HostTiming& timing, int n
         enterModulatedClock();
     else if (! modulated && modClock)
         leaveModulatedClock();
+
+    // STRUM off, or a pattern without chords: nothing strummed is left waiting.
+    if (! strumApplies())
+        clearPending();
 
     if (wantEnabled != enabled)
     {
@@ -231,6 +255,7 @@ void Arpeggiator::handOverToArp() noexcept
         if (heldNotes[static_cast<std::size_t> (i)].down)
             emit (blockStart, Event::Kind::noteOff, heldNotes[static_cast<std::size_t> (i)].note, 0, heldNotes[static_cast<std::size_t> (i)].channel);
     running = false;
+    clearPending();
     sequenceDirty = true;
     if (held > 0)
         startPhrase (0);
@@ -242,6 +267,7 @@ void Arpeggiator::handBackToKeys() noexcept
     // given back to the engine. (Notes only the pedal kept are not restarted.)
     endSounding (blockStart);
     running = false;
+    clearPending();
     if (pedal)
         emit (blockStart, Event::Kind::sustainOn, 0, 0, 1);
     for (int i = 0; i < held; ++i)
@@ -293,6 +319,7 @@ void Arpeggiator::allNotesOff (int offset) noexcept
     held = 0;
     pedal = false;
     sequenceDirty = true;
+    clearPending();
     endSounding (blockStart + cursor);
     running = false;
 }
@@ -331,6 +358,7 @@ void Arpeggiator::releaseHeld (int note, int channel) noexcept
         heldNotes[static_cast<std::size_t> (found)].down = false;
         return;
     }
+    dropPendingFrom (heldNotes[static_cast<std::size_t> (found)].note);
     std::move (heldNotes.begin() + found + 1, heldNotes.begin() + held, heldNotes.begin() + found);
     --held;
 }
@@ -339,8 +367,12 @@ void Arpeggiator::dropSustained() noexcept
 {
     int kept = 0;
     for (int i = 0; i < held; ++i)
+    {
         if (heldNotes[static_cast<std::size_t> (i)].down)
             heldNotes[static_cast<std::size_t> (kept++)] = heldNotes[static_cast<std::size_t> (i)];
+        else
+            dropPendingFrom (heldNotes[static_cast<std::size_t> (i)].note);
+    }
     held = kept;
 }
 
@@ -352,7 +384,10 @@ void Arpeggiator::heldChanged (int offset) noexcept
     if (held > 0 && ! running)
         startPhrase (offset);
     else if (held == 0)
+    {
         running = false;   // the notes still sounding finish their gate
+        clearPending();    // (those not yet started never start)
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -663,6 +698,8 @@ void Arpeggiator::startPhrase (int offset) noexcept
     stepCount = 0;
     cycleOrigin = 0;
     modClock = false;
+    chordSteps = 0;
+    clearPending();
     previousIndex = -1;
     phraseSeed = Prng::deriveSeed (baseSeed, phraseCounter++, 0x417270);
     for (auto& h : history)
@@ -688,8 +725,23 @@ void Arpeggiator::advanceTo (int offset) noexcept
                     offNote = n;
                 }
         const std::int64_t step = nextStepTime();
-        if (std::min (off, step) >= endTime)
+        // A strummed note-on waiting (the first in strum order at the earliest time).
+        std::int64_t strum = never;
+        int strumIndex = -1;
+        for (int i = 0; i < pendingCount; ++i)
+            if (pending[static_cast<std::size_t> (i)].time < strum)
+            {
+                strum = pending[static_cast<std::size_t> (i)].time;
+                strumIndex = i;
+            }
+        if (std::min ({ off, step, strum }) >= endTime)
             break;
+        if (strum < off && strum < step)   // at one sample: note-offs, then the step, then strummed notes
+        {
+            cursor = static_cast<int> (std::max (strum, blockStart + cursor) - blockStart);
+            firePending (strumIndex);
+            continue;
+        }
         if (off <= step)   // a note-off before a note-on at the same sample
         {
             const std::int64_t at = std::max (off, blockStart + cursor);
@@ -762,6 +814,48 @@ void Arpeggiator::fireStep (std::int64_t time) noexcept
     const int count = stepNotes (patternStep (stepCount), previousIndex, notes, index);
     const auto gateSamples = std::max<std::int64_t> (1, std::llround (settings.gate * stepSamples() / rateMultiplier));
 
+    // STRUM: a chord's notes one after another over the spread (the first on the step), each
+    // with its own gate from its own onset. Off, one note, or no room: the chord as below.
+    clearPending();   // (none should be left; a step never inherits the last one's)
+    if (strumApplies() && count > 1)
+    {
+        strumSpreadRequested = settings.strumSync ? std::llround (settings.strumQuarters * samplesPerQuarter())
+                                                  : std::llround (std::clamp (settings.strumMs, 0.0, arp::maxStrumMs) * 0.001 * sampleRate);
+        strumSpreadPlayed = strumSpread();
+    }
+    if (strumApplies() && count > 1 && strumSpreadPlayed > 0)
+    {
+        std::array<int, maxHeld> order;
+        strumOrder (notes, count, order);
+        ++chordSteps;
+        int lowNote = 128, highNote = -1;
+        for (int k = 0; k < count; ++k)
+        {
+            auto s = notes[static_cast<std::size_t> (order[static_cast<std::size_t> (k)])];
+            lowNote = std::min (lowNote, static_cast<int> (s.note));
+            highNote = std::max (highNote, static_cast<int> (s.note));
+            const int velocity = settings.velocityScale == 1.0 ? static_cast<int> (s.velocity)
+                                                               : static_cast<int> (std::lround (settings.velocityScale * s.velocity));
+            s.velocity = static_cast<std::uint8_t> (std::clamp (velocity, 1, 127));
+            if (k == 0)
+            {
+                playNote (time, s, gateSamples);
+                continue;
+            }
+            auto& p = pending[static_cast<std::size_t> (pendingCount++)];
+            p.time = time + (strumSpreadPlayed * k) / (count - 1);
+            p.gate = gateSamples;
+            p.note = s.note;
+            p.velocity = s.velocity;
+            p.channel = s.channel;
+            p.source = static_cast<std::uint8_t> (std::clamp (static_cast<int> (s.note) - 12 * std::max (0, index), 0, 127));
+        }
+        history[static_cast<std::size_t> (stepCount % displaySteps)] = { static_cast<std::int8_t> (lowNote), static_cast<std::int8_t> (highNote) };
+        previousIndex = index;
+        ++stepCount;
+        return;
+    }
+
     // A pitch still sounding (gate above 100 %) ends right before it plays again: the engine
     // ends every voice of a pitch on its note-off, so the old note-off must not reach the new one.
     for (int i = 0; i < count; ++i)
@@ -792,6 +886,91 @@ void Arpeggiator::fireStep (std::int64_t time) noexcept
                                                                               : std::array<std::int8_t, 2> { -1, -1 };
     previousIndex = index;
     ++stepCount;
+}
+
+// ---------------------------------------------------------------------------------------------
+// STRUM
+
+std::int64_t Arpeggiator::strumSpread() const noexcept
+{
+    // The room before the next step: one step at the current speed, plus the change of SWING's
+    // delay from this step to the next (the step being fired still has the pre-increment count;
+    // on the host's grid, the boundary just fired).
+    const std::int64_t k = synced && ! modClock ? gridIndex : stepCount;
+    const double step = stepSamples() / rateMultiplier;
+    const double room = step * (1.0 + swingSteps (k + 1) - swingSteps (k));
+    const double margin = std::max (1.0, 0.001 * sampleRate);   // 1 ms
+    const auto limit = static_cast<std::int64_t> (std::floor (room - margin));
+    return std::clamp<std::int64_t> (strumSpreadRequested, 0, std::max<std::int64_t> (0, limit));
+}
+
+void Arpeggiator::strumOrder (const std::array<Step, maxHeld>& notes, int count, std::array<int, maxHeld>& order) const noexcept
+{
+    for (int i = 0; i < count; ++i)
+        order[static_cast<std::size_t> (i)] = i;
+    // By pitch (an insertion sort: stable, bounded, no allocation).
+    for (int i = 1; i < count; ++i)
+    {
+        const int moving = order[static_cast<std::size_t> (i)];
+        int j = i;
+        for (; j > 0 && notes[static_cast<std::size_t> (order[static_cast<std::size_t> (j - 1)])].note > notes[static_cast<std::size_t> (moving)].note; --j)
+            order[static_cast<std::size_t> (j)] = order[static_cast<std::size_t> (j - 1)];
+        order[static_cast<std::size_t> (j)] = moving;
+    }
+    bool descending = false;
+    switch (settings.strumDirection)
+    {
+        case StrumDirection::up: break;
+        case StrumDirection::down: descending = true; break;
+        case StrumDirection::alternate: descending = chordSteps % 2 == 1; break;   // up first in a phrase
+        case StrumDirection::random:
+        {
+            // A Fisher-Yates shuffle from the phrase's seed and the step: the same bounce, the same strums.
+            Prng prng (Prng::deriveSeed (phraseSeed, static_cast<std::uint64_t> (stepCount), 0x5354524d));
+            for (int i = count - 1; i > 0; --i)
+                std::swap (order[static_cast<std::size_t> (i)], order[static_cast<std::size_t> (prng.nextBelow (static_cast<std::uint64_t> (i + 1)))]);
+            return;
+        }
+    }
+    if (descending)
+        std::reverse (order.begin(), order.begin() + count);
+}
+
+void Arpeggiator::playNote (std::int64_t time, const Step& note, std::int64_t gateSamples) noexcept
+{
+    const auto n = static_cast<std::size_t> (note.note);
+    if (offTime[n] != never && emit (time, Event::Kind::noteOff, static_cast<int> (n), 0, offChannel[n]))
+    {
+        offTime[n] = never;
+        --sounding;
+    }
+    if (offTime[n] == never && emit (time, Event::Kind::noteOn, note.note, note.velocity, note.channel))
+    {
+        offTime[n] = time + gateSamples;
+        offChannel[n] = note.channel;
+        ++sounding;
+    }
+}
+
+void Arpeggiator::firePending (int index) noexcept
+{
+    if (index < 0 || index >= pendingCount)
+        return;
+    const auto p = pending[static_cast<std::size_t> (index)];
+    // Keep the rest in order (strum order breaks ties at one sample).
+    std::move (pending.begin() + index + 1, pending.begin() + pendingCount, pending.begin() + index);
+    --pendingCount;
+    const auto at = std::max (p.time, blockStart + cursor);
+    playNote (at, { p.note, p.velocity, p.channel }, p.gate);
+}
+
+void Arpeggiator::dropPendingFrom (int heldNote) noexcept
+{
+    int kept = 0;
+    for (int i = 0; i < pendingCount; ++i)
+        if (pending[static_cast<std::size_t> (i)].source != heldNote)
+            pending[static_cast<std::size_t> (kept++)] = pending[static_cast<std::size_t> (i)];
+    pendingCount = kept;
 }
 
 // ---------------------------------------------------------------------------------------------

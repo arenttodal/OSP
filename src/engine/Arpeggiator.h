@@ -47,9 +47,22 @@ enum class ArpRate
     sixteenthTriplet
 };
 
+/** STRUM's order of a chord's notes (by pitch). The order is the parameter's choice order:
+    append only. */
+enum class StrumDirection
+{
+    up = 0,      ///< lowest to highest
+    down,        ///< highest to lowest
+    random,      ///< a reproducible shuffle per chord step, every note once
+    alternate    ///< up, down, up, ... from the phrase's start
+};
+
 namespace arp
 {
     constexpr int patternCount = 18;
+    constexpr int strumDirectionCount = 4;
+    constexpr double maxStrumMs = 500.0;
+    const char* strumDirectionName (StrumDirection direction) noexcept;   ///< "UP", "DOWN", "RANDOM", "ALTERNATE"
     constexpr int rateCount = 10;
     constexpr double minGate = 0.10, maxGate = 1.50;
     constexpr double maxSwing = 1.0;   ///< 100 %: every second step half a step late (a dotted feel)
@@ -108,6 +121,16 @@ public:
         /** OCTAVES moved by modulation: a new count waits for the start of the next cycle,
             and that cycle starts from the pattern's beginning. */
         bool octavesAtCycle = false;
+
+        /** STRUM (CHORD only): the chord's notes start one after another instead of together.
+            The spread is the time from the first note-on to the last, whatever the number of
+            notes; it never reaches the next step (the effective spread is shortened, the
+            setting is not). Off, at zero spread, or for any other pattern: the chord as before. */
+        bool strum = false;
+        StrumDirection strumDirection = StrumDirection::up;
+        bool strumSync = false;        ///< SYNC: strumQuarters of the tempo; FREE: strumMs
+        double strumMs = 20.0;         ///< 0 .. maxStrumMs
+        double strumQuarters = 0.125;  ///< the SYNC spread as a note value, in quarters (1/32)
     };
 
     struct Event
@@ -159,6 +182,14 @@ public:
     bool isRunning() const noexcept { return running; }
     bool isSynced() const noexcept { return synced; }
     int heldCount() const noexcept { return held; }
+    /** STRUM can change what plays: on, and the pattern makes chords. */
+    bool strumApplies() const noexcept { return settings.strum && settings.pattern == ArpPattern::chord; }
+    /** The last strummed chord's spread as played and as asked for, in samples (the panel shows
+        when the step was too short for the setting). */
+    std::int64_t lastStrumSpread() const noexcept { return strumSpreadPlayed; }
+    std::int64_t lastStrumRequested() const noexcept { return strumSpreadRequested; }
+    /** Strummed note-ons waiting to play (tests). */
+    int pendingStrumCount() const noexcept { return pendingCount; }
     int soundingCount() const noexcept { return sounding; }
     bool pedalIsDown() const noexcept { return pedal; }
 
@@ -217,6 +248,20 @@ private:
     void startPhrase (int offset) noexcept;
     void fireStep (std::int64_t time) noexcept;
 
+    // STRUM
+    /** The spread a chord step may take, in samples: the setting, shortened to end a margin
+        before the next step is due (rate, its modulation and swing). */
+    std::int64_t strumSpread() const noexcept;
+    /** Orders the step's notes for STRUM (indices into `notes`). */
+    void strumOrder (const std::array<Step, maxHeld>& notes, int count, std::array<int, maxHeld>& order) const noexcept;
+    /** Plays one note of a step now: a pitch still sounding ends first, then the note-on and
+        its note-off at the gate. */
+    void playNote (std::int64_t time, const Step& note, std::int64_t gateSamples) noexcept;
+    void firePending (int index) noexcept;
+    void clearPending() noexcept { pendingCount = 0; }
+    /** Drops the waiting strummed notes of a released key (its octave copies too). */
+    void dropPendingFrom (int heldNote) noexcept;
+
     // output
     bool emit (std::int64_t time, Event::Kind kind, int note, int velocity, int channel) noexcept;
     void endSounding (std::int64_t time) noexcept;
@@ -270,6 +315,17 @@ private:
 
     std::array<Event, maxEvents> events {};
     int eventCount = 0;
+
+    // STRUM: note-ons waiting inside a step (never past the next one), in strum order.
+    struct PendingOn
+    {
+        std::int64_t time = 0, gate = 0;
+        std::uint8_t note = 0, velocity = 0, channel = 1, source = 0;   ///< source: the held key it came from
+    };
+    std::array<PendingOn, maxHeld> pending {};
+    int pendingCount = 0;
+    std::int64_t chordSteps = 0;   ///< strummed chord steps in this phrase (ALTERNATE)
+    std::int64_t strumSpreadPlayed = 0, strumSpreadRequested = 0;
 };
 
 } // namespace osp
