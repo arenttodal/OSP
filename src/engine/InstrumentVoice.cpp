@@ -381,13 +381,26 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     // PEDAL LOOP: One Shot notes read forward through the voice's own path, on a recording with
     // a loop region. FORWARD where the layer's LOOP already holds the note changes nothing (the
     // continuation walk is the better forward loop); Ping-Pong under SPEED plays as Forward.
+    // A REIMAGINED engine (TAPE FRAME, TOYBOX, MOSAIC, MIRAGE) loops what it reads itself, the
+    // voice only forwarding the pedal (docs/research/pedal-reimagined); MOSAIC's plain read of
+    // the recording (its dry part) loops here as well.
     pedalMode = params.pedalLoop;
-    if (granularMode || modeEngine != nullptr || direction < 0.0 || ! cont->pedal.valid)
-        pedalMode = PedalLoopMode::normal;
-    if (pedalMode == PedalLoopMode::pingPong && stretching)
-        pedalMode = PedalLoopMode::forward;
-    if (pedalMode == PedalLoopMode::forward && strategy != ContinuationStrategy::off)
-        pedalMode = PedalLoopMode::normal;
+    enginePedal = false;
+    if (modeEngine != nullptr)
+    {
+        pedalMode = modeEngine->pedalLoopMode();
+        enginePedal = pedalMode != PedalLoopMode::normal;
+    }
+    else
+    {
+        if (granularMode || direction < 0.0 || ! cont->pedal.valid)
+            pedalMode = PedalLoopMode::normal;
+        if (pedalMode == PedalLoopMode::pingPong && stretching)
+            pedalMode = PedalLoopMode::forward;
+        if (pedalMode == PedalLoopMode::forward && strategy != ContinuationStrategy::off)
+            pedalMode = PedalLoopMode::normal;
+    }
+    voicePedal = pedalMode != PedalLoopMode::normal && (modeEngine == nullptr || modeEngine->wantsDryRead());
     pedalTurnFrames = std::max (0.0, params.pedalTurnSeconds) * src.sampleRate();
     pedalTurnCorrelation = std::clamp (params.pedalTurnCorrelation, 0.0f, 1.0f);
     if (granularMode)
@@ -477,7 +490,11 @@ void InstrumentVoice::release() noexcept
         }
     }
     if (modeEngine != nullptr)
+    {
+        if (enginePedal)
+            modeEngine->pedal (false);   // the loop lets go where it is; the envelope releases
         modeEngine->release();
+    }
 
     if (granularMode)
     {
@@ -791,6 +808,10 @@ void InstrumentVoice::setPedal (bool down) noexcept
 {
     if (! active || released || pedalMode == PedalLoopMode::normal)
         return;
+    if (enginePedal)
+        modeEngine->pedal (down);
+    if (! voicePedal)
+        return;
     pedalWanted = down;
     if (! crossfading)
         pedalUpdate();
@@ -798,7 +819,7 @@ void InstrumentVoice::setPedal (bool down) noexcept
 
 void InstrumentVoice::pedalUpdate() noexcept
 {
-    if (crossfading || pedalMode == PedalLoopMode::normal)
+    if (crossfading || ! voicePedal)
         return;
     if (pedalWanted && ! released && pedalState == PedalState::off)
         pedalArm();
@@ -1817,6 +1838,15 @@ void InstrumentVoice::startModeEngine (const InstrumentVoiceStart& params) noexc
     note.velocity = std::clamp (params.velocity, 1, 127) / 127.0;
     note.note = params.note;
     note.seed = shape.seed;
+    // PEDAL LOOP: what the note asks of the engine (it answers with pedalLoopMode()). One Shot,
+    // forward, regions to loop; a Forward loop where the layer's LOOP already holds the note
+    // stays with the LOOP (Pedal Loop 1.0's precedence).
+    note.pedalLoop = params.pedalLoop;
+    if (granularMode || direction < 0.0 || ! cont->pedal.valid
+        || (note.pedalLoop == PedalLoopMode::forward && params.strategy != ContinuationStrategy::off))
+        note.pedalLoop = PedalLoopMode::normal;
+    note.pedalTurnFrames = std::max (0.0, params.pedalTurnSeconds) * layer->source->sampleRate();
+    note.pedalTurnCorrelation = std::clamp (params.pedalTurnCorrelation, 0.0f, 1.0f);
     ReimaginedControl control;
     control.amount = modReimagined != 0.0f ? std::clamp (modeLive->amount + static_cast<double> (modReimagined), 0.0, 1.0) : modeLive->amount;
     control.settings = &modeLive->settings;
@@ -1866,6 +1896,11 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
             modeStep = currentStep * modeEngine->stepFactor();
             if (synthAmountLive != nullptr)
                 synthControl (controlInterval);
+            if (pedalMode == PedalLoopMode::forward && pedalState == PedalState::looping)
+            {
+                trendOut = trendGainAt (position);
+                trendIn = crossfading && xIsPedal ? trendGainAt (xPosition) : trendOut;
+            }
         }
         const int n = std::min (modeCountdown, numSamples - done);
         const bool dry = ! granularMode && modeEngine->wantsDryRead();
@@ -1890,7 +1925,8 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
                 float l = 0.0f, r = 0.0f;
                 if (! dryEnded)
                 {
-                    if (! crossfading && hasPending && (direction > 0.0 ? position >= pending.fromFrame : position <= pending.fromFrame))
+                    // (The read's direction includes a Ping-Pong pedal loop's, as in render().)
+                    if (! crossfading && hasPending && (direction * ppDir > 0.0 ? position >= pending.fromFrame : position <= pending.fromFrame))
                         beginCrossfade();
                     if ((tailEndPosition > 0.0 && position >= tailEndPosition) || (direction > 0.0 ? position >= endPosition : position <= 0.0))
                         dryEnded = true;
@@ -1903,17 +1939,36 @@ void InstrumentVoice::renderMode (float* left, float* right, int numSamples, dou
                         float l2, r2, gOut, gIn;
                         readFrame (xPosition, modeStep, l2, r2);
                         crossfadeGains (static_cast<float> (xProgress / xLength), xCorrelation, gOut, gIn);
+                        if (xIsPedal)
+                        {
+                            gOut *= loopGain * trendOut;
+                            gIn *= xInGain * trendIn;
+                        }
                         l = l * gOut + l2 * gIn;
                         r = r * gOut + r2 * gIn;
-                        xPosition += direction * modeStep;
+                        xPosition += direction * xDir * modeStep;
                         xProgress += modeStep;
                     }
-                    position += direction * modeStep;
+                    else if (loopGain != 1.0f || trendOut != 1.0f)
+                    {
+                        l *= loopGain * trendOut;
+                        r *= loopGain * trendOut;
+                    }
+                    position += direction * ppDir * modeStep;
+                    if (pedalMode == PedalLoopMode::pingPong && pedalState != PedalState::off && ! crossfading && ! hasPending)
+                        reflectPedal();
                     if (crossfading && xProgress >= xLength)
                     {
+                        // The pedal loop's moves end as in render() (and the latest pedal wins).
                         crossfading = false;
-                        position = xPosition;
-                        scheduleNextJump();
+                        if (xIsPedal)
+                            finishPedalCrossfade();
+                        else
+                            position = xPosition;
+                        if (voicePedal)
+                            pedalUpdate();
+                        if (! crossfading)
+                            scheduleNextJump();
                     }
                 }
                 dryL[static_cast<std::size_t> (k)] = l;

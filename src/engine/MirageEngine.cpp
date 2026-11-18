@@ -64,6 +64,7 @@ bool MirageEngine::start (const ReimaginedNote& n, const ReimaginedControl& c) n
         direction = n.reverse ? -1.0 : 1.0;
         heads = { n.startFrame, n.startFrame };
     }
+    fold.configure (n.granular ? PedalLoopMode::normal : n.pedalLoop, n.pedalTurnFrames, n.pedalTurnCorrelation);
     control (c);
     amount = std::clamp (c.amount, 0.0, 1.0);
     return true;
@@ -132,6 +133,17 @@ float MirageEngine::heldAt (int channel, double pos) const noexcept
     return s0 + (s1 - s0) * static_cast<float> (x - k) * (1.0f - hold);
 }
 
+float MirageEngine::foldedAt (int channel, double pos) const noexcept
+{
+    if (! fold.engaged())
+        return heldAt (channel, pos);
+    const auto taps = fold.map (pos);
+    float sum = 0.0f;
+    for (int t = 0; t < taps.count; ++t)
+        sum += taps.gain[static_cast<std::size_t> (t)] * heldAt (channel, taps.pos[static_cast<std::size_t> (t)]);
+    return sum;
+}
+
 void MirageEngine::render (const float* dryL, const float* dryR, float* outL, float* outR, int n) noexcept
 {
     const bool stereo = note.source->numChannels() > 1;
@@ -164,8 +176,8 @@ void MirageEngine::render (const float* dryL, const float* dryR, float* outL, fl
         }
         else
         {
-            l = heldAt (0, heads[0]);
-            r = stereo ? heldAt (1, heads[0]) : l;
+            l = foldedAt (0, heads[0]);
+            r = stereo ? foldedAt (1, heads[0]) : l;
             if (fade < 1.0)
             {
                 float gOut, gIn;
@@ -177,7 +189,14 @@ void MirageEngine::render (const float* dryL, const float* dryR, float* outL, fl
                 fade = std::min (1.0, fade + fadeStep);
             }
             heads[0] += direction * step;
-            if (loops && fade >= 1.0)
+            if (fold.configuredLoop() != PedalLoopMode::normal)
+            {
+                // PEDAL LOOP: the latest pedal; a finished release moves the read where it went on.
+                const double moved = fold.follow (note.model->original.continuation.pedal, heads[0], note.source->sampleRate(), soundEnd - 4.0);
+                heads[0] += moved;
+                heads[1] += moved;
+            }
+            if (loops && fade >= 1.0 && ! fold.engaged())
             {
                 // Loop points (crossfaded, 15 ms): forwards past the end, backwards past the start.
                 if (direction > 0.0 && heads[0] >= loopEnd)
@@ -195,8 +214,8 @@ void MirageEngine::render (const float* dryL, const float* dryR, float* outL, fl
                     fadeStep = 1.0 / (0.015 * rate);
                 }
             }
-            if (direction > 0.0 ? heads[0] >= soundEnd : heads[0] <= 0.0)
-                done = true;
+            if (! fold.holding() && (direction > 0.0 ? fold.position (heads[0]) >= soundEnd : heads[0] <= 0.0))
+                done = true;   // (never while a pedal loop holds the note)
         }
         envelope += envCoef * (0.5f * std::abs (l + r) - envelope);
         if (quantStep > 0.0f)

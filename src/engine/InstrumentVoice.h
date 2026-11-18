@@ -14,6 +14,7 @@
 #include "engine/MirageEngine.h"
 #include "engine/MosaicEngine.h"
 #include "engine/NoteShape.h"
+#include "engine/PedalLoopMode.h"
 #include "engine/ReimaginedEngine.h"
 #include "engine/Shaping.h"
 #include "engine/TapeFrameEngine.h"
@@ -30,15 +31,6 @@
 
 namespace osp
 {
-
-/** PEDAL LOOP (Pedal Loop 1.0, docs/research/pedal-loop): what the sustain pedal does to a
-    One Shot note. Saved as a choice index: append only. */
-enum class PedalLoopMode
-{
-    normal,    ///< the sustain pedal as it always was
-    forward,   ///< the pedal holds the note in a forward loop
-    pingPong   ///< the pedal holds the note in a forward/reverse loop
-};
 
 struct InstrumentVoiceStart
 {
@@ -266,8 +258,8 @@ public:
     /** PEDAL LOOP diagnostics (tests, the lab): the mode this note plays with (Normal when
         the note cannot loop), whether it loops now, its read direction and region. */
     PedalLoopMode pedalLoopMode() const noexcept { return pedalMode; }
-    bool pedalLooping() const noexcept { return pedalState == PedalState::looping; }
-    bool pedalArmed() const noexcept { return pedalState != PedalState::off; }
+    bool pedalLooping() const noexcept { return pedalState == PedalState::looping || (enginePedal && modeEngine->pedalLooping()); }
+    bool pedalArmed() const noexcept { return pedalState != PedalState::off || (enginePedal && modeEngine->pedalArmed()); }
     double readDirection() const noexcept { return direction * ppDir; }
     double readHead() const noexcept { return position; }
     int pedalRegionIndex() const noexcept { return pedalState != PedalState::off ? pedalRegion : -1; }
@@ -348,6 +340,9 @@ private:
     PedalLoopMode pedalMode = PedalLoopMode::normal;
     PedalState pedalState = PedalState::off;
     bool pedalWanted = false;         ///< the latest pedal state for this note
+    /** PEDAL LOOP x REIMAGINED: the note's engine loops its own reading (it gets the pedal), and
+        whether the voice's own read loops too (no engine, or MOSAIC's dry part). */
+    bool enginePedal = false, voicePedal = false;
     int pedalRegion = -1;
     double ppDir = 1.0;               ///< read direction multiplier (-1: Ping-Pong reading back)
     double xDir = 1.0;                ///< the incoming crossfade stream's (ppDir takes it at the end)
