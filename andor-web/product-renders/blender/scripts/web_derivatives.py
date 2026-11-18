@@ -14,6 +14,7 @@ import sys
 from PIL import Image
 
 src, out = sys.argv[1:3]
+only = sys.argv[3:]  # optional master names: process just these (keeps memory low; rows still cover every master)
 os.makedirs(out, exist_ok=True)
 WIDTHS = [640, 960, 1280, 1920, 2560, 3840]
 WEBP = {"quality": 86, "method": 6}
@@ -26,18 +27,26 @@ for name in sorted(os.listdir(src)):
         continue
     im = Image.open(os.path.join(src, name))
     alpha = im.mode in ("RGBA", "LA")
-    im = im.convert("RGBA" if alpha else "RGB")
     base = os.path.splitext(name)[0]
+    work = not only or name in only or base in only
+    if work:
+        im = im.convert("RGBA" if alpha else "RGB")
     widths = [w for w in WIDTHS if w < im.width] + [im.width]
     for w in sorted(set(widths)):
         h = round(im.height * w / im.width)
-        r = im if w == im.width else im.resize((w, h), Image.LANCZOS)
+        r = None
         for fmt, opts in (("webp", WEBP), ("avif", AVIF)):
             path = os.path.join(out, f"{base}-{w}.{fmt}")
-            r.save(path, fmt.upper(), **opts)
+            # Resumable: a file already written is kept (an interrupted run is rerun per master).
+            if work and not os.path.exists(path):
+                if r is None:
+                    r = im if w == im.width else im.resize((w, h), Image.LANCZOS)
+                r.save(path, fmt.upper(), **opts)
+            if not os.path.exists(path):
+                continue
             rows.append({"master": name, "format": fmt, "width": w, "height": h, "alpha": alpha,
                          "settings": opts, "bytes": os.path.getsize(path), "file": os.path.basename(path)})
-    if alpha:
+    if alpha and work and not os.path.exists(os.path.join(out, f"alpha_check_{base}.jpg")):
         tile = im.resize((1400, round(im.height * 1400 / im.width)), Image.LANCZOS)
         sheet = Image.new("RGB", (tile.width * 3, tile.height))
         for i, rgb in enumerate(BACKS.values()):

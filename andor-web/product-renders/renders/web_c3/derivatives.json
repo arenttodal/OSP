@@ -1,0 +1,3590 @@
+[
+ {
+  "master": "C3_A1M_R1_mobile_2160x4674.png",
+  "format": "webp",
+  "width": 640,
+  "height": 1385,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 25302,
+  "file": "C3_A1M_R1_mobile_2160x4674-640.webp"
+ },
+ {
+  "master": "C3_A1M_R1_mobile_2160x4674.png",
+  "format": "avif",
+  "width": 640,
+  "height": 1385,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 15619,
+  "file": "C3_A1M_R1_mobile_2160x4674-640.avif"
+ },
+ {
+  "master": "C3_A1M_R1_mobile_2160x4674.png",
+  "format": "webp",
+  "width": 960,
+  "height": 2077,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 47814,
+  "file": "C3_A1M_R1_mobile_2160x4674-960.webp"
+ },
+ {
+  "master": "C3_A1M_R1_mobile_2160x4674.png",
+  "format": "avif",
+  "width": 960,
+  "height": 2077,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 29788,
+  "file": "C3_A1M_R1_mobile_2160x4674-960.avif"
+ },
+ {
+  "master": "C3_A1M_R1_mobile_2160x4674.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 2770,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 73312,
+  "file": "C3_A1M_R1_mobile_2160x4674-1280.webp"
+ },
+ {
+  "master": "C3_A1M_R1_mobile_2160x4674.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 2770,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 44857,
+  "file": "C3_A1M_R1_mobile_2160x4674-1280.avif"
+ },
+ {
+  "master": "C3_A1M_R1_mobile_2160x4674.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 4155,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 124832,
+  "file": "C3_A1M_R1_mobile_2160x4674-1920.webp"
+ },
+ {
+  "master": "C3_A1M_R1_mobile_2160x4674.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 4155,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 75307,
+  "file": "C3_A1M_R1_mobile_2160x4674-1920.avif"
+ },
+ {
+  "master": "C3_A1M_R1_mobile_2160x4674.png",
+  "format": "webp",
+  "width": 2160,
+  "height": 4674,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 147046,
+  "file": "C3_A1M_R1_mobile_2160x4674-2160.webp"
+ },
+ {
+  "master": "C3_A1M_R1_mobile_2160x4674.png",
+  "format": "avif",
+  "width": 2160,
+  "height": 4674,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 89539,
+  "file": "C3_A1M_R1_mobile_2160x4674-2160.avif"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 640,
+  "height": 360,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 12794,
+  "file": "C3_A1_R1_W_desktop_3840x2160-640.webp"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 640,
+  "height": 360,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 7171,
+  "file": "C3_A1_R1_W_desktop_3840x2160-640.avif"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 960,
+  "height": 540,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 23802,
+  "file": "C3_A1_R1_W_desktop_3840x2160-960.webp"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 960,
+  "height": 540,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 13527,
+  "file": "C3_A1_R1_W_desktop_3840x2160-960.avif"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 720,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 36294,
+  "file": "C3_A1_R1_W_desktop_3840x2160-1280.webp"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 720,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 21575,
+  "file": "C3_A1_R1_W_desktop_3840x2160-1280.avif"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1080,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 67378,
+  "file": "C3_A1_R1_W_desktop_3840x2160-1920.webp"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1080,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 40677,
+  "file": "C3_A1_R1_W_desktop_3840x2160-1920.avif"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1440,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 101106,
+  "file": "C3_A1_R1_W_desktop_3840x2160-2560.webp"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1440,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 60973,
+  "file": "C3_A1_R1_W_desktop_3840x2160-2560.avif"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 3840,
+  "height": 2160,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 172384,
+  "file": "C3_A1_R1_W_desktop_3840x2160-3840.webp"
+ },
+ {
+  "master": "C3_A1_R1_W_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 3840,
+  "height": 2160,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 104166,
+  "file": "C3_A1_R1_W_desktop_3840x2160-3840.avif"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 640,
+  "height": 360,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 13956,
+  "file": "C3_A1_R1_desktop_3840x2160-640.webp"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 640,
+  "height": 360,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 7723,
+  "file": "C3_A1_R1_desktop_3840x2160-640.avif"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 960,
+  "height": 540,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 25494,
+  "file": "C3_A1_R1_desktop_3840x2160-960.webp"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 960,
+  "height": 540,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 14673,
+  "file": "C3_A1_R1_desktop_3840x2160-960.avif"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 720,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 39056,
+  "file": "C3_A1_R1_desktop_3840x2160-1280.webp"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 720,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 23198,
+  "file": "C3_A1_R1_desktop_3840x2160-1280.avif"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1080,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 71978,
+  "file": "C3_A1_R1_desktop_3840x2160-1920.webp"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1080,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 43819,
+  "file": "C3_A1_R1_desktop_3840x2160-1920.avif"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1440,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 107274,
+  "file": "C3_A1_R1_desktop_3840x2160-2560.webp"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1440,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 64758,
+  "file": "C3_A1_R1_desktop_3840x2160-2560.avif"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "webp",
+  "width": 3840,
+  "height": 2160,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 181590,
+  "file": "C3_A1_R1_desktop_3840x2160-3840.webp"
+ },
+ {
+  "master": "C3_A1_R1_desktop_3840x2160.png",
+  "format": "avif",
+  "width": 3840,
+  "height": 2160,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 109497,
+  "file": "C3_A1_R1_desktop_3840x2160-3840.avif"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 20266,
+  "file": "C3_A2_gallery_3600x2400-640.webp"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 11383,
+  "file": "C3_A2_gallery_3600x2400-640.avif"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 37068,
+  "file": "C3_A2_gallery_3600x2400-960.webp"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 21859,
+  "file": "C3_A2_gallery_3600x2400-960.avif"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 58276,
+  "file": "C3_A2_gallery_3600x2400-1280.webp"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 34867,
+  "file": "C3_A2_gallery_3600x2400-1280.avif"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 102678,
+  "file": "C3_A2_gallery_3600x2400-1920.webp"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 62250,
+  "file": "C3_A2_gallery_3600x2400-1920.avif"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 146156,
+  "file": "C3_A2_gallery_3600x2400-2560.webp"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 89533,
+  "file": "C3_A2_gallery_3600x2400-2560.avif"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "webp",
+  "width": 3600,
+  "height": 2400,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 222770,
+  "file": "C3_A2_gallery_3600x2400-3600.webp"
+ },
+ {
+  "master": "C3_A2_gallery_3600x2400.png",
+  "format": "avif",
+  "width": 3600,
+  "height": 2400,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 133612,
+  "file": "C3_A2_gallery_3600x2400-3600.avif"
+ },
+ {
+  "master": "C3_B1_R4_feed_2160x2700.png",
+  "format": "webp",
+  "width": 640,
+  "height": 800,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 35728,
+  "file": "C3_B1_R4_feed_2160x2700-640.webp"
+ },
+ {
+  "master": "C3_B1_R4_feed_2160x2700.png",
+  "format": "avif",
+  "width": 640,
+  "height": 800,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 15532,
+  "file": "C3_B1_R4_feed_2160x2700-640.avif"
+ },
+ {
+  "master": "C3_B1_R4_feed_2160x2700.png",
+  "format": "webp",
+  "width": 960,
+  "height": 1200,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 71672,
+  "file": "C3_B1_R4_feed_2160x2700-960.webp"
+ },
+ {
+  "master": "C3_B1_R4_feed_2160x2700.png",
+  "format": "avif",
+  "width": 960,
+  "height": 1200,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 28486,
+  "file": "C3_B1_R4_feed_2160x2700-960.avif"
+ },
+ {
+  "master": "C3_B1_R4_feed_2160x2700.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 1600,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 106148,
+  "file": "C3_B1_R4_feed_2160x2700-1280.webp"
+ },
+ {
+  "master": "C3_B1_R4_feed_2160x2700.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 1600,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 44519,
+  "file": "C3_B1_R4_feed_2160x2700-1280.avif"
+ },
+ {
+  "master": "C3_B1_R4_feed_2160x2700.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 2400,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 165326,
+  "file": "C3_B1_R4_feed_2160x2700-1920.webp"
+ },
+ {
+  "master": "C3_B1_R4_feed_2160x2700.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 2400,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 71792,
+  "file": "C3_B1_R4_feed_2160x2700-1920.avif"
+ },
+ {
+  "master": "C3_B1_R4_feed_2160x2700.png",
+  "format": "webp",
+  "width": 2160,
+  "height": 2700,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 188910,
+  "file": "C3_B1_R4_feed_2160x2700-2160.webp"
+ },
+ {
+  "master": "C3_B1_R4_feed_2160x2700.png",
+  "format": "avif",
+  "width": 2160,
+  "height": 2700,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 86426,
+  "file": "C3_B1_R4_feed_2160x2700-2160.avif"
+ },
+ {
+  "master": "C3_B2_115_R4_vertical_2160x3840.png",
+  "format": "webp",
+  "width": 640,
+  "height": 1138,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 33702,
+  "file": "C3_B2_115_R4_vertical_2160x3840-640.webp"
+ },
+ {
+  "master": "C3_B2_115_R4_vertical_2160x3840.png",
+  "format": "avif",
+  "width": 640,
+  "height": 1138,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 14750,
+  "file": "C3_B2_115_R4_vertical_2160x3840-640.avif"
+ },
+ {
+  "master": "C3_B2_115_R4_vertical_2160x3840.png",
+  "format": "webp",
+  "width": 960,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 70166,
+  "file": "C3_B2_115_R4_vertical_2160x3840-960.webp"
+ },
+ {
+  "master": "C3_B2_115_R4_vertical_2160x3840.png",
+  "format": "avif",
+  "width": 960,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 28844,
+  "file": "C3_B2_115_R4_vertical_2160x3840-960.avif"
+ },
+ {
+  "master": "C3_B2_115_R4_vertical_2160x3840.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 2276,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 105754,
+  "file": "C3_B2_115_R4_vertical_2160x3840-1280.webp"
+ },
+ {
+  "master": "C3_B2_115_R4_vertical_2160x3840.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 2276,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 45034,
+  "file": "C3_B2_115_R4_vertical_2160x3840-1280.avif"
+ },
+ {
+  "master": "C3_B2_115_R4_vertical_2160x3840.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 3413,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 169742,
+  "file": "C3_B2_115_R4_vertical_2160x3840-1920.webp"
+ },
+ {
+  "master": "C3_B2_115_R4_vertical_2160x3840.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 3413,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 72023,
+  "file": "C3_B2_115_R4_vertical_2160x3840-1920.avif"
+ },
+ {
+  "master": "C3_B2_115_R4_vertical_2160x3840.png",
+  "format": "webp",
+  "width": 2160,
+  "height": 3840,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 193808,
+  "file": "C3_B2_115_R4_vertical_2160x3840-2160.webp"
+ },
+ {
+  "master": "C3_B2_115_R4_vertical_2160x3840.png",
+  "format": "avif",
+  "width": 2160,
+  "height": 3840,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 85213,
+  "file": "C3_B2_115_R4_vertical_2160x3840-2160.avif"
+ },
+ {
+  "master": "C3_M01_cine.png",
+  "format": "webp",
+  "width": 640,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 12156,
+  "file": "C3_M01_cine-640.webp"
+ },
+ {
+  "master": "C3_M01_cine.png",
+  "format": "avif",
+  "width": 640,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 7228,
+  "file": "C3_M01_cine-640.avif"
+ },
+ {
+  "master": "C3_M01_cine.png",
+  "format": "webp",
+  "width": 960,
+  "height": 960,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 19124,
+  "file": "C3_M01_cine-960.webp"
+ },
+ {
+  "master": "C3_M01_cine.png",
+  "format": "avif",
+  "width": 960,
+  "height": 960,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 10448,
+  "file": "C3_M01_cine-960.avif"
+ },
+ {
+  "master": "C3_M01_cine.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 27742,
+  "file": "C3_M01_cine-1280.webp"
+ },
+ {
+  "master": "C3_M01_cine.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 13685,
+  "file": "C3_M01_cine-1280.avif"
+ },
+ {
+  "master": "C3_M01_cine.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1920,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 46164,
+  "file": "C3_M01_cine-1920.webp"
+ },
+ {
+  "master": "C3_M01_cine.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1920,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 20978,
+  "file": "C3_M01_cine-1920.avif"
+ },
+ {
+  "master": "C3_M01_cine.png",
+  "format": "webp",
+  "width": 2400,
+  "height": 2400,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 60322,
+  "file": "C3_M01_cine-2400.webp"
+ },
+ {
+  "master": "C3_M01_cine.png",
+  "format": "avif",
+  "width": 2400,
+  "height": 2400,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 26889,
+  "file": "C3_M01_cine-2400.avif"
+ },
+ {
+  "master": "C3_M01_sharp.png",
+  "format": "webp",
+  "width": 640,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 15300,
+  "file": "C3_M01_sharp-640.webp"
+ },
+ {
+  "master": "C3_M01_sharp.png",
+  "format": "avif",
+  "width": 640,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 9556,
+  "file": "C3_M01_sharp-640.avif"
+ },
+ {
+  "master": "C3_M01_sharp.png",
+  "format": "webp",
+  "width": 960,
+  "height": 960,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 24690,
+  "file": "C3_M01_sharp-960.webp"
+ },
+ {
+  "master": "C3_M01_sharp.png",
+  "format": "avif",
+  "width": 960,
+  "height": 960,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 13890,
+  "file": "C3_M01_sharp-960.avif"
+ },
+ {
+  "master": "C3_M01_sharp.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 34172,
+  "file": "C3_M01_sharp-1280.webp"
+ },
+ {
+  "master": "C3_M01_sharp.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 17926,
+  "file": "C3_M01_sharp-1280.avif"
+ },
+ {
+  "master": "C3_M01_sharp.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1920,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 57498,
+  "file": "C3_M01_sharp-1920.webp"
+ },
+ {
+  "master": "C3_M01_sharp.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1920,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 26825,
+  "file": "C3_M01_sharp-1920.avif"
+ },
+ {
+  "master": "C3_M01_sharp.png",
+  "format": "webp",
+  "width": 2400,
+  "height": 2400,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 74472,
+  "file": "C3_M01_sharp-2400.webp"
+ },
+ {
+  "master": "C3_M01_sharp.png",
+  "format": "avif",
+  "width": 2400,
+  "height": 2400,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 33728,
+  "file": "C3_M01_sharp-2400.avif"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 13658,
+  "file": "C3_M02_cine-640.webp"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 8238,
+  "file": "C3_M02_cine-640.avif"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 21056,
+  "file": "C3_M02_cine-960.webp"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 11948,
+  "file": "C3_M02_cine-960.avif"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 29512,
+  "file": "C3_M02_cine-1280.webp"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 15968,
+  "file": "C3_M02_cine-1280.avif"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 46904,
+  "file": "C3_M02_cine-1920.webp"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 24296,
+  "file": "C3_M02_cine-1920.avif"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 66436,
+  "file": "C3_M02_cine-2560.webp"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 32790,
+  "file": "C3_M02_cine-2560.avif"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "webp",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 80722,
+  "file": "C3_M02_cine-3000.webp"
+ },
+ {
+  "master": "C3_M02_cine.png",
+  "format": "avif",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 38828,
+  "file": "C3_M02_cine-3000.avif"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 18386,
+  "file": "C3_M02_sharp-640.webp"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 11376,
+  "file": "C3_M02_sharp-640.avif"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 28756,
+  "file": "C3_M02_sharp-960.webp"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 16787,
+  "file": "C3_M02_sharp-960.avif"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 39252,
+  "file": "C3_M02_sharp-1280.webp"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 22113,
+  "file": "C3_M02_sharp-1280.avif"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 64000,
+  "file": "C3_M02_sharp-1920.webp"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 33602,
+  "file": "C3_M02_sharp-1920.avif"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 89926,
+  "file": "C3_M02_sharp-2560.webp"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 44609,
+  "file": "C3_M02_sharp-2560.avif"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "webp",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 104738,
+  "file": "C3_M02_sharp-3000.webp"
+ },
+ {
+  "master": "C3_M02_sharp.png",
+  "format": "avif",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 52605,
+  "file": "C3_M02_sharp-3000.avif"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 12970,
+  "file": "C3_M03_cine-640.webp"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 9552,
+  "file": "C3_M03_cine-640.avif"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 21352,
+  "file": "C3_M03_cine-960.webp"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 15054,
+  "file": "C3_M03_cine-960.avif"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 31228,
+  "file": "C3_M03_cine-1280.webp"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 21122,
+  "file": "C3_M03_cine-1280.avif"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 51166,
+  "file": "C3_M03_cine-1920.webp"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 31841,
+  "file": "C3_M03_cine-1920.avif"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 71270,
+  "file": "C3_M03_cine-2560.webp"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 42083,
+  "file": "C3_M03_cine-2560.avif"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "webp",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 86538,
+  "file": "C3_M03_cine-3000.webp"
+ },
+ {
+  "master": "C3_M03_cine.png",
+  "format": "avif",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 48588,
+  "file": "C3_M03_cine-3000.avif"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 14980,
+  "file": "C3_M03_sharp-640.webp"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 10705,
+  "file": "C3_M03_sharp-640.avif"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 24872,
+  "file": "C3_M03_sharp-960.webp"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 17247,
+  "file": "C3_M03_sharp-960.avif"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 36210,
+  "file": "C3_M03_sharp-1280.webp"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 24170,
+  "file": "C3_M03_sharp-1280.avif"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 57780,
+  "file": "C3_M03_sharp-1920.webp"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 36827,
+  "file": "C3_M03_sharp-1920.avif"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 80592,
+  "file": "C3_M03_sharp-2560.webp"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 48020,
+  "file": "C3_M03_sharp-2560.avif"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "webp",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 97562,
+  "file": "C3_M03_sharp-3000.webp"
+ },
+ {
+  "master": "C3_M03_sharp.png",
+  "format": "avif",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 55333,
+  "file": "C3_M03_sharp-3000.avif"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 14576,
+  "file": "C3_M04_cine-640.webp"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 8078,
+  "file": "C3_M04_cine-640.avif"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 22532,
+  "file": "C3_M04_cine-960.webp"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 12177,
+  "file": "C3_M04_cine-960.avif"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 30392,
+  "file": "C3_M04_cine-1280.webp"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 16196,
+  "file": "C3_M04_cine-1280.avif"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 48178,
+  "file": "C3_M04_cine-1920.webp"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 25108,
+  "file": "C3_M04_cine-1920.avif"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 69538,
+  "file": "C3_M04_cine-2560.webp"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 33347,
+  "file": "C3_M04_cine-2560.avif"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "webp",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 84550,
+  "file": "C3_M04_cine-3000.webp"
+ },
+ {
+  "master": "C3_M04_cine.png",
+  "format": "avif",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 39252,
+  "file": "C3_M04_cine-3000.avif"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 17582,
+  "file": "C3_M04_sharp-640.webp"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 9743,
+  "file": "C3_M04_sharp-640.avif"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 26840,
+  "file": "C3_M04_sharp-960.webp"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 14734,
+  "file": "C3_M04_sharp-960.avif"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 35978,
+  "file": "C3_M04_sharp-1280.webp"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 19730,
+  "file": "C3_M04_sharp-1280.avif"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 57392,
+  "file": "C3_M04_sharp-1920.webp"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 30519,
+  "file": "C3_M04_sharp-1920.avif"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 80418,
+  "file": "C3_M04_sharp-2560.webp"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 40356,
+  "file": "C3_M04_sharp-2560.avif"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "webp",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 98302,
+  "file": "C3_M04_sharp-3000.webp"
+ },
+ {
+  "master": "C3_M04_sharp.png",
+  "format": "avif",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 46991,
+  "file": "C3_M04_sharp-3000.avif"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 6552,
+  "file": "C3_M05_cine-640.webp"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 3585,
+  "file": "C3_M05_cine-640.avif"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 10654,
+  "file": "C3_M05_cine-960.webp"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 5206,
+  "file": "C3_M05_cine-960.avif"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 15290,
+  "file": "C3_M05_cine-1280.webp"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 7032,
+  "file": "C3_M05_cine-1280.avif"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 25726,
+  "file": "C3_M05_cine-1920.webp"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 11084,
+  "file": "C3_M05_cine-1920.avif"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 39128,
+  "file": "C3_M05_cine-2560.webp"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 15629,
+  "file": "C3_M05_cine-2560.avif"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "webp",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 49494,
+  "file": "C3_M05_cine-3000.webp"
+ },
+ {
+  "master": "C3_M05_cine.png",
+  "format": "avif",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 19066,
+  "file": "C3_M05_cine-3000.avif"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 7686,
+  "file": "C3_M05_sharp-640.webp"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 4219,
+  "file": "C3_M05_sharp-640.avif"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 12616,
+  "file": "C3_M05_sharp-960.webp"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 6187,
+  "file": "C3_M05_sharp-960.avif"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 18348,
+  "file": "C3_M05_sharp-1280.webp"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 8316,
+  "file": "C3_M05_sharp-1280.avif"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 31738,
+  "file": "C3_M05_sharp-1920.webp"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 13217,
+  "file": "C3_M05_sharp-1920.avif"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 46240,
+  "file": "C3_M05_sharp-2560.webp"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 18343,
+  "file": "C3_M05_sharp-2560.avif"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "webp",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 58214,
+  "file": "C3_M05_sharp-3000.webp"
+ },
+ {
+  "master": "C3_M05_sharp.png",
+  "format": "avif",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 22093,
+  "file": "C3_M05_sharp-3000.avif"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 8172,
+  "file": "C3_M06_cine-640.webp"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 4900,
+  "file": "C3_M06_cine-640.avif"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 13096,
+  "file": "C3_M06_cine-960.webp"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 6809,
+  "file": "C3_M06_cine-960.avif"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 18892,
+  "file": "C3_M06_cine-1280.webp"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 9288,
+  "file": "C3_M06_cine-1280.avif"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 30490,
+  "file": "C3_M06_cine-1920.webp"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 14243,
+  "file": "C3_M06_cine-1920.avif"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 45802,
+  "file": "C3_M06_cine-2560.webp"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 19836,
+  "file": "C3_M06_cine-2560.avif"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "webp",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 56774,
+  "file": "C3_M06_cine-3000.webp"
+ },
+ {
+  "master": "C3_M06_cine.png",
+  "format": "avif",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 23809,
+  "file": "C3_M06_cine-3000.avif"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 10452,
+  "file": "C3_M06_sharp-640.webp"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 6047,
+  "file": "C3_M06_sharp-640.avif"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 16184,
+  "file": "C3_M06_sharp-960.webp"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 8527,
+  "file": "C3_M06_sharp-960.avif"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 22674,
+  "file": "C3_M06_sharp-1280.webp"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 11543,
+  "file": "C3_M06_sharp-1280.avif"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 38430,
+  "file": "C3_M06_sharp-1920.webp"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 17247,
+  "file": "C3_M06_sharp-1920.avif"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 53746,
+  "file": "C3_M06_sharp-2560.webp"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 24115,
+  "file": "C3_M06_sharp-2560.avif"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "webp",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 66396,
+  "file": "C3_M06_sharp-3000.webp"
+ },
+ {
+  "master": "C3_M06_sharp.png",
+  "format": "avif",
+  "width": 3000,
+  "height": 2000,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 28324,
+  "file": "C3_M06_sharp-3000.avif"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 1466,
+  "file": "C3_background_clean_4200x2800-640.webp"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 931,
+  "file": "C3_background_clean_4200x2800-640.avif"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 2804,
+  "file": "C3_background_clean_4200x2800-960.webp"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 1505,
+  "file": "C3_background_clean_4200x2800-960.avif"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 4516,
+  "file": "C3_background_clean_4200x2800-1280.webp"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 2208,
+  "file": "C3_background_clean_4200x2800-1280.avif"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 8680,
+  "file": "C3_background_clean_4200x2800-1920.webp"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 3555,
+  "file": "C3_background_clean_4200x2800-1920.avif"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 14152,
+  "file": "C3_background_clean_4200x2800-2560.webp"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 5013,
+  "file": "C3_background_clean_4200x2800-2560.avif"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "webp",
+  "width": 3840,
+  "height": 2560,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 28626,
+  "file": "C3_background_clean_4200x2800-3840.webp"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "avif",
+  "width": 3840,
+  "height": 2560,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 7938,
+  "file": "C3_background_clean_4200x2800-3840.avif"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "webp",
+  "width": 4200,
+  "height": 2800,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 33704,
+  "file": "C3_background_clean_4200x2800-4200.webp"
+ },
+ {
+  "master": "C3_background_clean_4200x2800.png",
+  "format": "avif",
+  "width": 4200,
+  "height": 2800,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 9169,
+  "file": "C3_background_clean_4200x2800-4200.avif"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 20256,
+  "file": "C3_combined_4200x2800-640.webp"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 11499,
+  "file": "C3_combined_4200x2800-640.avif"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 37300,
+  "file": "C3_combined_4200x2800-960.webp"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 21914,
+  "file": "C3_combined_4200x2800-960.avif"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 58742,
+  "file": "C3_combined_4200x2800-1280.webp"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 35349,
+  "file": "C3_combined_4200x2800-1280.avif"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 104024,
+  "file": "C3_combined_4200x2800-1920.webp"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 62991,
+  "file": "C3_combined_4200x2800-1920.avif"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 149634,
+  "file": "C3_combined_4200x2800-2560.webp"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 90597,
+  "file": "C3_combined_4200x2800-2560.avif"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "webp",
+  "width": 3840,
+  "height": 2560,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 243130,
+  "file": "C3_combined_4200x2800-3840.webp"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "avif",
+  "width": 3840,
+  "height": 2560,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 144223,
+  "file": "C3_combined_4200x2800-3840.avif"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "webp",
+  "width": 4200,
+  "height": 2800,
+  "alpha": false,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 272880,
+  "file": "C3_combined_4200x2800-4200.webp"
+ },
+ {
+  "master": "C3_combined_4200x2800.png",
+  "format": "avif",
+  "width": 4200,
+  "height": 2800,
+  "alpha": false,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 160246,
+  "file": "C3_combined_4200x2800-4200.avif"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 26674,
+  "file": "C3_transparent_product_4200x2800-640.webp"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 15584,
+  "file": "C3_transparent_product_4200x2800-640.avif"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 46858,
+  "file": "C3_transparent_product_4200x2800-960.webp"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 28136,
+  "file": "C3_transparent_product_4200x2800-960.avif"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 71780,
+  "file": "C3_transparent_product_4200x2800-1280.webp"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 43017,
+  "file": "C3_transparent_product_4200x2800-1280.avif"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 124338,
+  "file": "C3_transparent_product_4200x2800-1920.webp"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 75185,
+  "file": "C3_transparent_product_4200x2800-1920.avif"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 181298,
+  "file": "C3_transparent_product_4200x2800-2560.webp"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 105733,
+  "file": "C3_transparent_product_4200x2800-2560.avif"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "webp",
+  "width": 3840,
+  "height": 2560,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 288130,
+  "file": "C3_transparent_product_4200x2800-3840.webp"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "avif",
+  "width": 3840,
+  "height": 2560,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 164288,
+  "file": "C3_transparent_product_4200x2800-3840.avif"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "webp",
+  "width": 4200,
+  "height": 2800,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 297348,
+  "file": "C3_transparent_product_4200x2800-4200.webp"
+ },
+ {
+  "master": "C3_transparent_product_4200x2800.png",
+  "format": "avif",
+  "width": 4200,
+  "height": 2800,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 174601,
+  "file": "C3_transparent_product_4200x2800-4200.avif"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 45440,
+  "file": "C3_transparent_product_shadow_4200x2800-640.webp"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 14291,
+  "file": "C3_transparent_product_shadow_4200x2800-640.avif"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 87422,
+  "file": "C3_transparent_product_shadow_4200x2800-960.webp"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 25641,
+  "file": "C3_transparent_product_shadow_4200x2800-960.avif"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 140530,
+  "file": "C3_transparent_product_shadow_4200x2800-1280.webp"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 39634,
+  "file": "C3_transparent_product_shadow_4200x2800-1280.avif"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 256860,
+  "file": "C3_transparent_product_shadow_4200x2800-1920.webp"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 69524,
+  "file": "C3_transparent_product_shadow_4200x2800-1920.avif"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 425038,
+  "file": "C3_transparent_product_shadow_4200x2800-2560.webp"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 97873,
+  "file": "C3_transparent_product_shadow_4200x2800-2560.avif"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "webp",
+  "width": 3840,
+  "height": 2560,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 789034,
+  "file": "C3_transparent_product_shadow_4200x2800-3840.webp"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "avif",
+  "width": 3840,
+  "height": 2560,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 154666,
+  "file": "C3_transparent_product_shadow_4200x2800-3840.avif"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "webp",
+  "width": 4200,
+  "height": 2800,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 870460,
+  "file": "C3_transparent_product_shadow_4200x2800-4200.webp"
+ },
+ {
+  "master": "C3_transparent_product_shadow_4200x2800.png",
+  "format": "avif",
+  "width": 4200,
+  "height": 2800,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 172196,
+  "file": "C3_transparent_product_shadow_4200x2800-4200.avif"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "webp",
+  "width": 640,
+  "height": 427,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 30910,
+  "file": "C3_transparent_shadow_only_4200x2800-640.webp"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "avif",
+  "width": 640,
+  "height": 427,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 2266,
+  "file": "C3_transparent_shadow_only_4200x2800-640.avif"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "webp",
+  "width": 960,
+  "height": 640,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 61732,
+  "file": "C3_transparent_shadow_only_4200x2800-960.webp"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "avif",
+  "width": 960,
+  "height": 640,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 2961,
+  "file": "C3_transparent_shadow_only_4200x2800-960.avif"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "webp",
+  "width": 1280,
+  "height": 853,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 101086,
+  "file": "C3_transparent_shadow_only_4200x2800-1280.webp"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "avif",
+  "width": 1280,
+  "height": 853,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 3769,
+  "file": "C3_transparent_shadow_only_4200x2800-1280.avif"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "webp",
+  "width": 1920,
+  "height": 1280,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 192304,
+  "file": "C3_transparent_shadow_only_4200x2800-1920.webp"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "avif",
+  "width": 1920,
+  "height": 1280,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 5379,
+  "file": "C3_transparent_shadow_only_4200x2800-1920.avif"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "webp",
+  "width": 2560,
+  "height": 1707,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 332226,
+  "file": "C3_transparent_shadow_only_4200x2800-2560.webp"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "avif",
+  "width": 2560,
+  "height": 1707,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 6595,
+  "file": "C3_transparent_shadow_only_4200x2800-2560.avif"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "webp",
+  "width": 3840,
+  "height": 2560,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 656308,
+  "file": "C3_transparent_shadow_only_4200x2800-3840.webp"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "avif",
+  "width": 3840,
+  "height": 2560,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 9659,
+  "file": "C3_transparent_shadow_only_4200x2800-3840.avif"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "webp",
+  "width": 4200,
+  "height": 2800,
+  "alpha": true,
+  "settings": {
+   "quality": 86,
+   "method": 6
+  },
+  "bytes": 712036,
+  "file": "C3_transparent_shadow_only_4200x2800-4200.webp"
+ },
+ {
+  "master": "C3_transparent_shadow_only_4200x2800.png",
+  "format": "avif",
+  "width": 4200,
+  "height": 2800,
+  "alpha": true,
+  "settings": {
+   "quality": 62,
+   "speed": 4
+  },
+  "bytes": 10583,
+  "file": "C3_transparent_shadow_only_4200x2800-4200.avif"
+ }
+]
