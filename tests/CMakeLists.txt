@@ -28,6 +28,7 @@ add_executable(osp_tests
     unit/PerformanceTests.cpp
     unit/DynamicsTests.cpp
     unit/PedalLoopTests.cpp
+    unit/PedalReimaginedTests.cpp
     unit/AbyssReverbTests.cpp
     unit/VintageBloomTests.cpp
     unit/EchoAscendTests.cpp
