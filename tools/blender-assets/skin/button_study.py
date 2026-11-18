@@ -74,7 +74,8 @@ def strip_bezel():
 
 def strip_sensor():
     R.catcher(STRIP, "housing")
-    sensor = {"preset": "M5-graphite-powder-coat", "baseColor": "#121110", "roughness": 0.38, "coat": 0.25, "coatRoughness": 0.3}
+    sensor = {"preset": "M5-graphite-powder-coat", "baseColor": "#131617", "roughness": 0.42, "coat": 0.05, "coatRoughness": 0.32,
+              "specular": 0.14}   # Phase 5: calibrated to the editor's own MOD sensor (sRGB ~50/53/53, luminance 52)
     R.forms.slab("sensor", STRIP, 6, R.BASE_TOP["housing"], 0.28, 0.12, R.material(sensor), segments=8)   # inside the bezel, its top 0.12 mm below the bezel's
 
 
