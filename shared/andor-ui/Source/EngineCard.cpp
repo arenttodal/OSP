@@ -1170,6 +1170,7 @@ LayerKnob::LayerKnob (InstrumentHost& p, int layer, const juce::String& c, const
     dial->getProperties().set ("bipolar", parameter != nullptr && parameter->getNormalisableRange().start < 0.0f);
     dial->getProperties().set ("paramId", id);   // a modulation drop target
     dial->getProperties().set ("haloGap", 2.0);
+    dial->getProperties().set ("sprite", "layer-ivory");   // the rendered source knob (only its cap; arcs, ticks, halos stay vector)
     dial->setTitle ("Layer " + InstrumentHost::layerName (layer) + " " + caption);
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.apvts(), id, *dial);
     if (parameter != nullptr)
@@ -1195,6 +1196,7 @@ LayerKnob::LayerKnob (InstrumentHost& p, int layer, const juce::String& control,
     dial->getProperties().set ("bipolar", control == "tune" || control == "pan");
     dial->getProperties().set ("paramId", id);   // a modulation drop target
     dial->getProperties().set ("haloGap", 2.0);  // its caption sits close above: a nearer halo
+    dial->getProperties().set ("sprite", "layer-ivory");   // the rendered source knob (only its cap; arcs, ticks, halos stay vector)
     dial->setTitle ("Layer " + InstrumentHost::layerName (layer) + " " + caption);
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (processor.apvts(), id, *dial);
     if (parameter != nullptr)

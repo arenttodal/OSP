@@ -575,3 +575,141 @@ TEST_CASE ("plugin: rendered knob comparison screenshots (original vs rendered, 
     CHECK (meta.slot >= 0);
     closeUp ("mod-meta");
 }
+
+TEST_CASE ("plugin: the rendered source knob (layer-ivory) is embedded whole and turns like the drawn knob", "[plugin][sprite-knob]")
+{
+    SpriteKnobLibrary library;
+    auto* asset = library.find ("layer-ivory");
+    REQUIRE (asset != nullptr);
+    const auto& info = asset->info();
+    CHECK (info.frameCount == 129);
+    CHECK (info.angleStart == Approx (osp::plugin::OspLookAndFeel::rotaryStart).margin (1.0e-5));
+    CHECK (info.angleEnd == Approx (osp::plugin::OspLookAndFeel::rotaryEnd).margin (1.0e-5));
+    // Its own sizes for its own body (about 52 px at 1448; 131 px at 1810 x 2 fits in 200).
+    REQUIRE (info.levels.size() == 2);
+    CHECK (info.levels[0] == 100);
+    CHECK (info.levels[1] == 200);
+    for (int level = 0; level < 2; ++level)
+    {
+        const int side = info.levels[static_cast<size_t> (level)];
+        for (int i = 0; i < info.frameCount; ++i)
+        {
+            const auto frame = asset->storedFrame (level, i);
+            REQUIRE (frame.isValid());
+            REQUIRE (frame.getWidth() == side);
+            CHECK (frame.getPixelAt (0, 0).getAlpha() == 0);
+            CHECK (frame.getPixelAt (side - 1, side - 1).getAlpha() == 0);
+            CHECK (frame.getPixelAt (side / 2, side / 2 + side / 8).getAlpha() == 255);
+        }
+    }
+    const int last = info.frameCount - 1;
+    CHECK (asset->frameForAngle (osp::plugin::OspLookAndFeel::rotaryStart) == 0);
+    CHECK (asset->frameForAngle (osp::plugin::OspLookAndFeel::rotaryEnd) == last);
+    float worst = 0.0f;
+    for (int i = 0; i <= last; ++i)
+    {
+        const float seen = indicatorAngle (asset->storedFrame (1, i));
+        REQUIRE (! std::isnan (seen));
+        worst = std::max (worst, angleDistance (seen, asset->angleOfFrame (i)));
+    }
+    UNSCOPED_INFO ("layer-ivory: largest indicator error " << juce::radiansToDegrees (worst) << " degrees");
+    CHECK (juce::radiansToDegrees (worst) < 3.0f);
+    asset->release();
+}
+
+TEST_CASE ("plugin: the source cards' five knobs show layer-ivory, sharing one asset; parameters untouched", "[plugin][sprite-knob]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const ScopedSkin restore (KnobSkin::macros);
+    OspAudioProcessor p;
+    juce::Array<juce::File> files;
+    files.add (writeSource (tmp.dir, "A.wav", testsignals::vowel (midiToHz (60), 2.0, 48000.0, 3)));
+    p.addLayers (files);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (e.get());
+    REQUIRE (ui != nullptr);
+    e->setSize (1448, juce::roundToInt (ui->instrumentHeight()));
+    ui->refreshNow();   // the loaded layer's card is built on the editor's refresh
+    ui->refreshNow();
+    auto& la = dynamic_cast<osp::plugin::OspLookAndFeel&> (e->getLookAndFeel());
+    auto* asset = la.spriteKnobs().find ("layer-ivory");
+    REQUIRE (asset != nullptr);
+    juce::StringArray rendered;
+    std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+        if (auto* s = dynamic_cast<juce::Slider*> (&c); s != nullptr && s->isVisible()
+            && s->getProperties()["sprite"].toString() == "layer-ivory")
+        {
+            CHECK (spriteFor (*s, la.spriteKnobs()) == asset);
+            rendered.add (s->getProperties()["paramId"].toString());
+        }
+        for (auto* child : c.getChildren())
+            walk (*child);
+    };
+    walk (*e);
+    // START, TUNE, PAN, LEVEL and REIMAGINED on the loaded card.
+    CHECK (rendered.size() >= 5);
+    // The vector skin is still one switch away (looks only).
+    {
+        const ScopedSkin original (KnobSkin::original);
+        juce::Slider probe;
+        probe.getProperties().set ("sprite", "layer-ivory");
+        CHECK (spriteFor (probe, la.spriteKnobs()) == nullptr);
+    }
+    asset->release();
+    e->createComponentSnapshot (e->getLocalBounds(), true, 2.0f);
+    CHECK (asset->usage().sizedFrames > 0);
+}
+
+TEST_CASE ("plugin: layer-ivory screenshots in the real editor (three layers, values, original vs rendered)", "[.][layer-knob-shots]")
+{
+    const auto dirName = juce::SystemStats::getEnvironmentVariable ("OSP_LAYER_KNOB_SHOTS", {});
+    REQUIRE (dirName.isNotEmpty());
+    const juce::File dir (dirName);
+    dir.createDirectory();
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    juce::Array<juce::File> files;
+    files.add (writeSource (tmp.dir, "A.wav", testsignals::vowel (midiToHz (60), 2.4, 48000.0, 3)));
+    files.add (writeSource (tmp.dir, "B.wav", testsignals::pluck (220.0, 2.6, 48000.0, 4)));
+    files.add (writeSource (tmp.dir, "C.wav", testsignals::vowel (midiToHz (48), 2.4, 48000.0, 5)));
+    for (const auto skin : { KnobSkin::original, KnobSkin::macros })
+    {
+        const ScopedSkin restore (skin);
+        OspAudioProcessor p;
+        p.addLayers (files);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (e.get());
+        REQUIRE (ui != nullptr);
+        // Values across the turn on the three cards (bipolar TUNE / PAN off centre too).
+        p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (0, "start"), 0.0f);
+        p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (1, "tune"), 7.0f);
+        p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (2, "pan"), -40.0f);
+        p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (1, "level"), -6.0f);
+        p.setParameterValue ("reimagined", 24.0f);
+        for (const int width : { 1086, 1448, 1810 })
+        {
+            e->setSize (width, juce::roundToInt (ui->instrumentHeight() * width / 1448.0));
+            ui->refreshNow();
+            ui->refreshNow();
+            for (const float scale : { 1.0f, 2.0f })
+            {
+                const auto image = e->createComponentSnapshot (e->getLocalBounds(), true, scale);
+                juce::FileOutputStream out (dir.getChildFile (juce::String (skin == KnobSkin::original ? "original" : "rendered") + "-"
+                                                              + juce::String (width) + "@" + juce::String (juce::roundToInt (scale)) + "x.png"));
+                REQUIRE (out.openedOk());
+                out.setPosition (0);
+                out.truncate();
+                juce::PNGImageFormat().writeImageToStream (image, out);
+            }
+        }
+    }
+}
