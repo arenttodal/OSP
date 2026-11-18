@@ -147,6 +147,48 @@ const juce::StringArray& InstrumentHost::arpRateNames()
     return names;
 }
 
+const juce::StringArray& InstrumentHost::strumDirectionNames()
+{
+    static const juce::StringArray names = [] {
+        juce::StringArray n;
+        for (int i = 0; i < arp::strumDirectionCount; ++i)
+            n.add (arp::strumDirectionName (static_cast<StrumDirection> (i)));
+        return n;
+    }();
+    return names;
+}
+
+const juce::StringArray& InstrumentHost::strumDivisionNames()
+{
+    static const juce::StringArray names = [] {
+        juce::StringArray n;
+        for (int i = 0; i < arp::strumDivisionCount; ++i)
+            n.add (arp::strumDivisionName (i));
+        return n;
+    }();
+    return names;
+}
+
+void InstrumentHost::StrumReader::attach (juce::AudioProcessorValueTreeState& state, const juce::String& ns, int shown)
+{
+    on = state.getRawParameterValue (ids::arpStrum (ns, shown, "on"));
+    direction = state.getRawParameterValue (ids::arpStrum (ns, shown, "direction"));
+    sync = state.getRawParameterValue (ids::arpStrum (ns, shown, "sync"));
+    ms = state.getRawParameterValue (ids::arpStrum (ns, shown, "ms"));
+    division = state.getRawParameterValue (ids::arpStrum (ns, shown, "division"));
+}
+
+void InstrumentHost::StrumReader::applyTo (Arpeggiator::Settings& settings) const noexcept
+{
+    settings.strum = on != nullptr && on->load() >= 0.5f;
+    if (! settings.strum)
+        return;
+    settings.strumDirection = static_cast<StrumDirection> (direction != nullptr ? std::clamp (juce::roundToInt (direction->load()), 0, arp::strumDirectionCount - 1) : 0);
+    settings.strumSync = sync != nullptr && sync->load() >= 0.5f;
+    settings.strumMs = ms != nullptr ? static_cast<double> (ms->load()) : 20.0;
+    settings.strumQuarters = arp::strumDivisionQuarters (division != nullptr ? juce::roundToInt (division->load()) : arp::defaultStrumDivision);
+}
+
 InstrumentHost::ModCurves InstrumentHost::defaultModulationCurves()
 {
     return { mod::defaultLfoCurve(), mod::defaultLfoCurve(), mod::defaultEnvCurve(), mod::defaultEnvCurve(), mod::straightCurve(), mod::straightCurve(),

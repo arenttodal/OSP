@@ -63,6 +63,12 @@ namespace arp
     constexpr int strumDirectionCount = 4;
     constexpr double maxStrumMs = 500.0;
     const char* strumDirectionName (StrumDirection direction) noexcept;   ///< "UP", "DOWN", "RANDOM", "ALTERNATE"
+    /** STRUM's SYNC spreads (the parameter's choice order: append only): 1/64, 1/32, 1/16,
+        1/8, 1/4, then the triplets 1/32T 1/16T 1/8T and the dotted 1/16D 1/8D. */
+    constexpr int strumDivisionCount = 10;
+    constexpr int defaultStrumDivision = 1;   ///< 1/32
+    double strumDivisionQuarters (int index) noexcept;
+    const char* strumDivisionName (int index) noexcept;
     constexpr int rateCount = 10;
     constexpr double minGate = 0.10, maxGate = 1.50;
     constexpr double maxSwing = 1.0;   ///< 100 %: every second step half a step late (a dotted feel)

@@ -73,6 +73,18 @@ const char* arp::strumDirectionName (StrumDirection direction) noexcept
     return "UP";
 }
 
+double arp::strumDivisionQuarters (int index) noexcept
+{
+    static constexpr double quarters[strumDivisionCount] { 0.0625, 0.125, 0.25, 0.5, 1.0, 0.125 * 2.0 / 3.0, 0.25 * 2.0 / 3.0, 0.5 * 2.0 / 3.0, 0.375, 0.75 };
+    return quarters[std::clamp (index, 0, strumDivisionCount - 1)];
+}
+
+const char* arp::strumDivisionName (int index) noexcept
+{
+    static constexpr const char* names[strumDivisionCount] { "1/64", "1/32", "1/16", "1/8", "1/4", "1/32T", "1/16T", "1/8T", "1/16D", "1/8D" };
+    return names[std::clamp (index, 0, strumDivisionCount - 1)];
+}
+
 const char* arp::rateName (ArpRate rate) noexcept
 {
     switch (rate)

@@ -896,6 +896,7 @@ private:
     LiveParam arpLinkParam {};
     std::array<LiveParam, 3> arpCardParams {};
     std::array<LiveParam, 2> arpLanePatternParams {}, arpLaneRateParams {}, arpLaneOctavesParams {};
+    std::array<InstrumentHost::StrumReader, 3> strumReaders {};   ///< STRUM per card (A, B, C)
     LiveParam mpeParam {};
     // A/B layers: blend, then per layer source mode and POS, SIZE, DENS, TUNE, SPREAD.
     LiveParam blendParam {};

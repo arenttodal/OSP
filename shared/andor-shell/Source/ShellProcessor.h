@@ -514,6 +514,7 @@ private:
     std::atomic<float>* cardLinkParam = nullptr;
     std::array<std::atomic<float>*, 3> cardOnParams {};
     std::array<std::atomic<float>*, 2> lanePatternParams {}, laneRateParams {}, laneOctavesParams {};
+    std::array<InstrumentHost::StrumReader, 3> strumReaders {};   ///< STRUM per card (cardArpeggiator)
     std::array<std::uint8_t, 3> laneMask {};      ///< the cards each lane plays (0: idle)
     std::uint8_t passMask = 0;                    ///< the cards that hold the keys
     int laneConfig = 0;                           ///< 0: the one arpeggiator; else LINK and the cards
