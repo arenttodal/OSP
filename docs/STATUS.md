@@ -1,5 +1,19 @@
 # Status
 
+> **18 Nov 2026, Ceramic skin cache: settle eviction, per-editor claims, live-resize stretching
+> (branch `claude/ceramic-cache-settle`; `docs/reports/ceramic-cache-settle.md`):**
+> - **Budget:** 96 MB (was 192 MB / 160 images).
+> - **Live resize:** an on-screen editor's ceramic pieces are stretched from its settled
+>   composition; nothing is composed for a size in passing.
+> - **Settle:** 500 ms after the last resize (`EditorCacheScope`) the editor repaints at the exact
+>   size and drops its claim on sizes it no longer draws.
+> - **Several editors:** a piece is evicted only when no open editor still uses it.
+> - **Measured** (live-resize sweep, against the old LRU): average paint 174–187 ms instead of
+>   461–471 ms; no pieces composed instead of 18.6 s; cache 32 MB instead of 64–96 MB; settled
+>   process memory +92 MB instead of +185 MB.
+> - **Unchanged:** offscreen drawing (snapshots, visual regressions).
+> - **NEXT:** measure in a host on macOS, and ANALOG with its overlay pack.
+
 > **17 Nov 2026, Library & Preset Browser polish (branch `claude/osp-library-polish`;
 > `docs/research/library-polish/`, before/after shots):**
 > - **Space:** plays, pauses (keeping the position) and resumes the selected sound.

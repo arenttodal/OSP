@@ -510,11 +510,18 @@ ShellEditor::~ShellEditor()
 
 void ShellEditor::paint (juce::Graphics& g)
 {
+    cacheScope.beginPaint();   // the ceramic pieces this paint draws are this editor's
     g.fillAll (design::draw::surround());
+}
+
+void ShellEditor::paintOverChildren (juce::Graphics&)
+{
+    cacheScope.endPaint();
 }
 
 void ShellEditor::resized()
 {
+    cacheScope.resized();
     frame::fit (*this, content, instrumentHeight(), &overflow);
     modOverlay.setBounds (content.getLocalBounds());
     if (bankTab != nullptr)

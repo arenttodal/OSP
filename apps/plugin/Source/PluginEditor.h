@@ -84,6 +84,7 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void paintOverChildren (juce::Graphics&) override;
     bool keyPressed (const juce::KeyPress& key) override;
     /** A wheel no knob took scrolls the instrument while the window is shorter than it. */
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
@@ -387,6 +388,8 @@ private:
     int learnNotesSeen = -1;   ///< the processor's played-note count Learn has seen
     void createLearn();
     void tickLearn();
+    /** This editor's share of the ceramic cache (last: released first). */
+    skin::EditorCacheScope cacheScope { *this };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessorEditor)
 };

@@ -9,7 +9,7 @@ TEST_CASE ("plugin: the ceramic cache honours its budget and drops the sizes a r
     REQUIRE (pieces != nullptr);
     pieces->release();
     const auto defaultBudget = pieces->budgetBytes();
-    CHECK (defaultBudget == 192u * 1024u * 1024u);   // unchanged unless OSP_SKIN_CACHE_MB is set
+    CHECK (defaultBudget == 96u * 1024u * 1024u);   // Phase 5 default (OSP_SKIN_CACHE_MB overrides it)
     auto paint = [&] (float scale) {
         juce::Image image (juce::Image::ARGB, juce::roundToInt (500 * scale), juce::roundToInt (300 * scale), true);
         juce::Graphics g (image);
@@ -190,5 +190,170 @@ TEST_CASE ("plugin: ceramic skin memory investigation (OSP_SKIN_MEMORY_REPORT)",
             line (juce::String (budgetMB) + "," + (evictOnSettle ? "1" : "0") + ",after_editor_destroyed,"
                   + (released ? "released" : "kept") + ",,,,,,,," + juce::String (skinmemory::residentMB() - rss0, 1) + ",,");
         }
+    juce::File (reportPath).replaceWithText (out);
+}
+
+TEST_CASE ("plugin: two open editors of different sizes keep their pieces when one resizes and settles", "[plugin][ceramic]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const ScopedLook ceramic (skin::Look::ceramic);
+    // These editors stand for two windows on screen (a headless editor never claims or stretches).
+    struct OnScreen { OnScreen() { skin::EditorCacheScope::setTreatOffscreenAsOnScreen (true); } ~OnScreen() { skin::EditorCacheScope::setTreatOffscreenAsOnScreen (false); } } onScreen;
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    OspAudioProcessor pa, pb;
+    std::unique_ptr<juce::AudioProcessorEditor> ea (pa.createEditorIfNeeded()), eb (pb.createEditorIfNeeded());
+    auto* ua = dynamic_cast<Editor*> (ea.get());
+    auto* ub = dynamic_cast<Editor*> (eb.get());
+    REQUIRE (ua != nullptr);
+    REQUIRE (ub != nullptr);
+    auto* pieces = skin::active();
+    REQUIRE (pieces != nullptr);
+    pieces->release();
+    auto size = [] (juce::AudioProcessorEditor& e, Editor& u, int w) { e.setSize (w, juce::roundToInt (u.instrumentHeight() * w / 1448.0)); u.refreshNow(); };
+    auto paint = [] (juce::AudioProcessorEditor& e) { auto img = e.createComponentSnapshot (e.getLocalBounds(), true, 2.0f); juce::ignoreUnused (img); };
+    size (*ea, *ua, 1448);
+    size (*eb, *ub, 1086);
+    paint (*ea);
+    paint (*eb);
+    const auto both = pieces->usage();
+    REQUIRE (both.composedImages > 0);
+    // B again: everything it shows is cached.
+    paint (*eb);
+    CHECK (pieces->usage().misses == both.misses);
+    // A is resized: while it is being dragged its pieces are stretched, no new size composed.
+    size (*ea, *ua, 1629);
+    CHECK (pieces->isResizing (ea.get()));
+    const auto beforeDrag = pieces->usage();
+    paint (*ea);
+    const auto dragged = pieces->usage();
+    // (the stretch composes at most each piece's rendered size once; never one per window size)
+    size (*ea, *ua, 1700);
+    paint (*ea);
+    CHECK (pieces->usage().misses == dragged.misses);
+    juce::ignoreUnused (beforeDrag);
+    // A settles: it repaints exactly at 1700 and drops what only it used (its 1448 pieces).
+    // (the editor's settle timer does these three steps; there is no message loop in a test)
+    pieces->setResizing (ea.get(), false);
+    pieces->beginGeneration (ea.get());
+    paint (*ea);
+    const auto released = pieces->evictStale (ea.get());
+    CHECK (released > 0);
+    CHECK (! pieces->isResizing (ea.get()));
+    // B is untouched: nothing it shows was evicted.
+    const auto before = pieces->usage().misses;
+    paint (*eb);
+    CHECK (pieces->usage().misses == before);
+    // A closes: its claims go, B's pieces stay.
+    const auto beforeClose = pieces->usage().composedImages;
+    ea.reset();
+    CHECK (pieces->usage().composedImages < beforeClose);
+    const auto missesAfter = pieces->usage().misses;
+    paint (*eb);
+    CHECK (pieces->usage().misses == missesAfter);
+}
+
+TEST_CASE ("plugin: ceramic settle behaviour measured (OSP_SKIN_SETTLE_REPORT)", "[.][skin-settle]")
+{
+    const auto reportPath = juce::SystemStats::getEnvironmentVariable ("OSP_SKIN_SETTLE_REPORT", {});
+    REQUIRE (reportPath.isNotEmpty());
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const ScopedLook ceramic (skin::Look::ceramic);
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    juce::String out;
+    struct OnScreen { OnScreen() { skin::EditorCacheScope::setTreatOffscreenAsOnScreen (true); } ~OnScreen() { skin::EditorCacheScope::setTreatOffscreenAsOnScreen (false); } } onScreen;
+    out << "mode,phase,paints,avg_paint_ms,max_paint_ms,misses,compose_ms,cache_mb,peak_mb,rss_trimmed_mb\n";
+    // Three modes: "lru" is the cache before this change (no per-editor claims, the plain LRU
+    // budget, every passing size composed); "compose-every-size" keeps the claims but never
+    // settles (a stress case: nothing may be evicted while the open editor claims it);
+    // "settle" is the change (stretch while resizing, exact after settling, stale sizes evicted).
+    for (const int mode : { 0, 1, 2 })
+    {
+        const bool live = mode == 2;
+        skin::EditorCacheScope::setTreatOffscreenAsOnScreen (mode != 0);
+        const juce::String modeName = mode == 0 ? "lru" : mode == 1 ? "compose-every-size" : "settle";
+        skinmemory::trim();
+        const double rss0 = skinmemory::residentMB();
+        OspAudioProcessor p;
+        std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<Editor*> (e.get());
+        REQUIRE (ui != nullptr);
+        auto* pieces = skin::active();
+        REQUIRE (pieces != nullptr);
+        pieces->release();
+        auto paintAt = [&] (int w) {
+            e->setSize (w, juce::roundToInt (ui->instrumentHeight() * w / 1448.0));
+            if (! live)
+                pieces->setResizing (e.get(), false);   // the old behaviour: compose every size
+            ui->refreshNow();
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            auto img = e->createComponentSnapshot (e->getLocalBounds(), true, 2.0f);
+            juce::ignoreUnused (img);
+            return juce::Time::getMillisecondCounterHiRes() - t0;
+        };
+        auto row = [&] (const juce::String& phase, int n, double avg, double mx, const skin::Pieces::Usage& u0) {
+            const auto u = pieces->usage();
+            skinmemory::trim();
+            out << modeName << "," << phase << "," << n << "," << juce::String (avg, 1) << ","
+                << juce::String (mx, 1) << "," << juce::String ((juce::int64) (u.misses - u0.misses)) << ","
+                << juce::String ((u.composeSeconds - u0.composeSeconds) * 1000.0, 1) << "," << juce::String (skinmemory::mb (u.bytes), 1) << ","
+                << juce::String (skinmemory::mb (u.peakBytes), 1) << "," << juce::String (skinmemory::residentMB() - rss0, 1) << "\n";
+        };
+        auto u0 = pieces->usage();
+        const double open = paintAt (1448);
+        row ("open_1448", 1, open, open, u0);
+        u0 = pieces->usage();
+        double sum = 0, mx = 0;
+        int n = 0;
+        for (int round = 0; round < 3; ++round)
+            for (int w = 869; w <= 1810; w += 47)
+            {
+                const double t = paintAt (w);
+                sum += t; mx = std::max (mx, t); ++n;
+            }
+        row ("live_resize_sweep", n, sum / n, mx, u0);
+        u0 = pieces->usage();
+        e->setSize (1448, juce::roundToInt (ui->instrumentHeight()));
+        ui->refreshNow();
+        if (live)
+        {
+            // the settle timer's step, then the repaint it asks for
+            pieces->setResizing (e.get(), false);
+            pieces->beginGeneration (e.get());
+        }
+        const auto t0 = juce::Time::getMillisecondCounterHiRes();
+        auto settled = e->createComponentSnapshot (e->getLocalBounds(), true, 2.0f);
+        const double st = juce::Time::getMillisecondCounterHiRes() - t0;
+        if (live)
+            pieces->evictStale (e.get());
+        row ("settled_1448", 1, st, st, u0);
+        // Visual quality: the stretched frame against the exact one at the same size.
+        if (live)
+        {
+            pieces->setResizing (e.get(), true);
+            auto stretched = e->createComponentSnapshot (e->getLocalBounds(), true, 2.0f);
+            pieces->setResizing (e.get(), false);
+            int maxDiff = 0;
+            double sumDiff = 0;
+            for (int y = 0; y < settled.getHeight(); y += 2)
+                for (int x = 0; x < settled.getWidth(); x += 2)
+                {
+                    const auto a = settled.getPixelAt (x, y), b = stretched.getPixelAt (x, y);
+                    const int d = std::max ({ std::abs (a.getRed() - b.getRed()), std::abs (a.getGreen() - b.getGreen()), std::abs (a.getBlue() - b.getBlue()) });
+                    maxDiff = std::max (maxDiff, d);
+                    sumDiff += d;
+                }
+            out << "settle,stretched_vs_exact_1448,1," << juce::String (sumDiff / ((settled.getWidth() / 2) * (settled.getHeight() / 2)), 3)
+                << "," << maxDiff << ",,,,,\n";
+        }
+        e.reset();
+        skinmemory::trim();
+        out << modeName << ",after_close,0,,,,,," << ",," << juce::String (skinmemory::residentMB() - rss0, 1) << "\n";
+    }
     juce::File (reportPath).replaceWithText (out);
 }

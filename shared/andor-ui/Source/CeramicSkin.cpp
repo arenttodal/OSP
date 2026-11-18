@@ -3,6 +3,7 @@
 #include "BinaryData.h"
 #include "Design.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 
@@ -13,9 +14,18 @@ namespace
 {
     constexpr int manifestSchema = 1;
     constexpr size_t maxCachedImages = 160;
-    constexpr size_t maxCachedBytes = 192u * 1024u * 1024u;
+    // Phase 5: 96 MB (about two and a half window sizes at 2x). The measured working set is one
+    // size (36.7 MB at 2x for 1448); a larger budget only retained the sizes a resize passed
+    // through (docs/reports/ceramic-skin-memory.md).
+    constexpr size_t maxCachedBytes = 96u * 1024u * 1024u;
 
-    /** The default byte budget: 192 MB, or OSP_SKIN_CACHE_MB (measurements in a host). */
+    const void*& painterState()
+    {
+        static const void* editor = nullptr;
+        return editor;
+    }
+
+    /** The default byte budget: 96 MB (maxCachedBytes), or OSP_SKIN_CACHE_MB (measurements in a host). */
     size_t defaultBudgetBytes()
     {
         const auto mb = juce::SystemStats::getEnvironmentVariable ("OSP_SKIN_CACHE_MB", {}).getIntValue();
@@ -304,6 +314,8 @@ juce::Image Pieces::composed (const Piece& p, int pw, int ph, float physicalScal
         order.remove (key);
         order.push_back (key);
         found->second.used = generation;
+        if (const auto* who = painterState(); who != nullptr)
+            found->second.users[who] = editorGeneration[who];
         ++stats.hits;
         return found->second.image;
     }
@@ -392,15 +404,32 @@ juce::Image Pieces::composed (const Piece& p, int pw, int ph, float physicalScal
 
     // Bounded: the oldest go first (a resizing window passes through many sizes).
     const size_t bytes = static_cast<size_t> (pw) * static_cast<size_t> (ph) * 4u;
-    while (! order.empty() && (cache.size() >= maxImages || cachedBytes + bytes > maxBytes))
+    // Over budget: the least recently used piece that no open editor still claims goes first. A
+    // piece an open editor shows is never evicted by the budget (the editors' working set may
+    // briefly exceed it; their settle steps drop what they no longer show).
+    while (cache.size() >= maxImages || cachedBytes + bytes > maxBytes)
     {
-        const auto oldest = cache.find (order.front());
+        auto victim = order.end();
+        for (auto it = order.begin(); it != order.end(); ++it)
+            if (const auto f = cache.find (*it); f != cache.end() && f->second.users.empty())
+            {
+                victim = it;
+                break;
+            }
+        if (victim == order.end())
+            break;
+        const auto oldest = cache.find (*victim);
         cachedBytes -= static_cast<size_t> (oldest->second.image.getWidth()) * static_cast<size_t> (oldest->second.image.getHeight()) * 4u;
         cache.erase (oldest);
-        order.pop_front();
+        order.erase (victim);
         ++stats.evictions;
     }
-    cache.emplace (key, Entry { out, generation });
+    {
+        Entry entry { out, generation, {} };
+        if (const auto* who = painterState(); who != nullptr)
+            entry.users[who] = editorGeneration[who];
+        cache.emplace (key, std::move (entry));
+    }
     order.push_back (key);
     cachedBytes += bytes;
     stats.peakBytes = std::max (stats.peakBytes, cachedBytes);
@@ -417,13 +446,34 @@ bool Pieces::draw (juce::Graphics& g, const juce::String& name, juce::Rectangle<
         return false;
     const float scale = std::max (0.01f, g.getInternalContext().getPhysicalPixelScaleFactor());
     const auto outer = target.expanded (p->margin);
+    // A window being resized (Phase 5): stretch the image this editor already has at its last
+    // settled scale (a cache hit: nothing is composed while the window is dragged); the exact size
+    // is composed once the resize settles. Outside a resize, the paint records that scale.
+    float s = scale;
+    bool fromSettled = false;
+    if (const auto* who = painterState(); who != nullptr)
+    {
+        if (isResizing (who))
+        {
+            moving = true;
+            if (const auto it = settledScale.find (who); it != settledScale.end())
+            {
+                s = it->second;
+                fromSettled = true;
+            }
+        }
+        else
+            settledScale[who] = scale;
+    }
     if (moving)
     {
         // A size in passing (an animation): the piece composed once at its rendered size,
         // its nine slices stretched while drawing (no new composition per frame).
-        const int rw = std::max (1, juce::roundToInt ((p->rect.getWidth() + 2.0f * p->margin) * scale));
-        const int rh = std::max (1, juce::roundToInt ((p->rect.getHeight() + 2.0f * p->margin) * scale));
-        const auto image = composed (*p, rw, rh, scale, face);
+        const float w0 = fromSettled ? outer.getWidth() : p->rect.getWidth() + 2.0f * p->margin;
+        const float h0 = fromSettled ? outer.getHeight() : p->rect.getHeight() + 2.0f * p->margin;
+        const int rw = std::max (1, juce::roundToInt (w0 * s));
+        const int rh = std::max (1, juce::roundToInt (h0 * s));
+        const auto image = composed (*p, rw, rh, s, face);
         if (! image.isValid())
             return false;
         if (p->insets[0] + p->insets[2] >= p->rect.getWidth() - 1.0e-3f && p->insets[1] + p->insets[3] >= p->rect.getHeight() - 1.0e-3f)
@@ -435,10 +485,10 @@ bool Pieces::draw (juce::Graphics& g, const juce::String& name, juce::Rectangle<
             g.drawImage (image, outer);
             return true;
         }
-        const float sx[4] = { 0.0f, (p->margin + p->insets[0]) * scale, static_cast<float> (rw) - (p->margin + p->insets[2]) * scale, static_cast<float> (rw) };
-        const float sy[4] = { 0.0f, (p->margin + p->insets[1]) * scale, static_cast<float> (rh) - (p->margin + p->insets[3]) * scale, static_cast<float> (rh) };
-        const float dx[4] = { outer.getX(), outer.getX() + sx[1] / scale, outer.getRight() - (static_cast<float> (rw) - sx[2]) / scale, outer.getRight() };
-        const float dy[4] = { outer.getY(), outer.getY() + sy[1] / scale, outer.getBottom() - (static_cast<float> (rh) - sy[2]) / scale, outer.getBottom() };
+        const float sx[4] = { 0.0f, (p->margin + p->insets[0]) * s, static_cast<float> (rw) - (p->margin + p->insets[2]) * s, static_cast<float> (rw) };
+        const float sy[4] = { 0.0f, (p->margin + p->insets[1]) * s, static_cast<float> (rh) - (p->margin + p->insets[3]) * s, static_cast<float> (rh) };
+        const float dx[4] = { outer.getX(), outer.getX() + sx[1] / s, outer.getRight() - (static_cast<float> (rw) - sx[2]) / s, outer.getRight() };
+        const float dy[4] = { outer.getY(), outer.getY() + sy[1] / s, outer.getBottom() - (static_cast<float> (rh) - sy[2]) / s, outer.getBottom() };
         juce::Graphics::ScopedSaveState state (g);
         g.setOpacity (opacity);
         g.setImageResamplingQuality (juce::Graphics::mediumResamplingQuality);
@@ -528,7 +578,159 @@ void Pieces::release()
     cachedBytes = 0;
 }
 
+void Pieces::setPainter (const void* editor) noexcept { painterState() = editor; }
+const void* Pieces::painter() noexcept { return painterState(); }
+
+void Pieces::setResizing (const void* editor, bool resizing)
+{
+    if (overlay != nullptr)
+        overlay->setResizing (editor, resizing);
+    const auto it = std::find (resizingEditors.begin(), resizingEditors.end(), editor);
+    if (resizing && it == resizingEditors.end())
+        resizingEditors.push_back (editor);
+    else if (! resizing && it != resizingEditors.end())
+        resizingEditors.erase (it);
+}
+
+bool Pieces::isResizing (const void* editor) const
+{
+    return std::find (resizingEditors.begin(), resizingEditors.end(), editor) != resizingEditors.end();
+}
+
+std::uint64_t Pieces::beginGeneration (const void* editor)
+{
+    if (overlay != nullptr)
+        overlay->beginGeneration (editor);
+    return ++editorGeneration[editor];
+}
+
+size_t Pieces::evictUnclaimed (const void* droppedEditor)
+{
+    // Only pieces that had a claim and lost the last one: a piece drawn with no editor named
+    // (a test, an offscreen snapshot) is left to the budget.
+    size_t released = 0;
+    for (auto it = order.begin(); it != order.end();)
+    {
+        const auto found = cache.find (*it);
+        if (found == cache.end())
+        {
+            it = order.erase (it);
+            continue;
+        }
+        auto& users = found->second.users;
+        bool dropped = false;
+        if (const auto u = users.find (droppedEditor); u != users.end()
+            && (editorGeneration.count (droppedEditor) == 0 || u->second < editorGeneration[droppedEditor]))
+        {
+            users.erase (u);
+            dropped = true;
+        }
+        if (dropped && users.empty())
+        {
+            const auto b = static_cast<size_t> (found->second.image.getWidth()) * static_cast<size_t> (found->second.image.getHeight()) * 4u;
+            cachedBytes -= b;
+            released += b;
+            cache.erase (found);
+            it = order.erase (it);
+            ++stats.evictions;
+        }
+        else
+            ++it;
+    }
+    return released;
+}
+
+size_t Pieces::evictStale (const void* editor)
+{
+    size_t released = overlay != nullptr ? overlay->evictStale (editor) : 0;
+    return released + evictUnclaimed (editor);
+}
+
+size_t Pieces::releaseEditor (const void* editor)
+{
+    size_t released = overlay != nullptr ? overlay->releaseEditor (editor) : 0;
+    editorGeneration.erase (editor);   // every claim it holds is now older than "no generation"
+    settledScale.erase (editor);
+    setResizing (editor, false);
+    released += evictUnclaimed (editor);
+    if (painterState() == editor)
+        painterState() = nullptr;
+    return released;
+}
+
 Pieces* Pieces::current() noexcept { return currentPieces(); }
+
+//==============================================================================
+EditorCacheScope::EditorCacheScope (juce::Component& e, int ms) : editor (e), settleMs (ms) {}
+
+EditorCacheScope::~EditorCacheScope()
+{
+    stopTimer();
+    if (auto* p = active())
+        p->releaseEditor (&editor);
+}
+
+namespace
+{
+    bool& treatOffscreenAsOnScreen()
+    {
+        static bool flag = false;
+        return flag;
+    }
+}
+
+void EditorCacheScope::setTreatOffscreenAsOnScreen (bool treat) noexcept { treatOffscreenAsOnScreen() = treat; }
+
+bool EditorCacheScope::onScreen() const
+{
+    return treatOffscreenAsOnScreen() || editor.getPeer() != nullptr;
+}
+
+void EditorCacheScope::beginPaint()
+{
+    Pieces::setPainter (onScreen() ? &editor : nullptr);
+    painted = true;
+}
+
+void EditorCacheScope::endPaint()
+{
+    if (pendingEvict)
+    {
+        pendingEvict = false;
+        if (auto* p = active())
+            p->evictStale (&editor);
+    }
+    Pieces::setPainter (nullptr);
+}
+
+void EditorCacheScope::resized()
+{
+    // The first layouts (before anything was painted) are not a resize in passing; an offscreen
+    // editor has no live resize (and no message loop to settle it in a headless run).
+    if (! painted || ! onScreen())
+        return;
+    if (auto* p = active())
+        p->setResizing (&editor, true);
+    startTimer (settleMs);
+}
+
+void EditorCacheScope::timerCallback()
+{
+    stopTimer();
+    settleNow();
+}
+
+void EditorCacheScope::settleNow()
+{
+    stopTimer();
+    if (auto* p = active())
+    {
+        p->setResizing (&editor, false);
+        p->beginGeneration (&editor);
+        pendingEvict = true;
+    }
+    editor.repaint();
+}
 
 namespace
 {
