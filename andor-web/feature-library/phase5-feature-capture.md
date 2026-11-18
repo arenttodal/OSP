@@ -106,3 +106,20 @@ appear.
 - No development switches or research tools: the knob-skin toggle, SYNTH's blend-law audition,
   the polyphonic lab and Memo Lab.
 - Screenshots and headless sequences are labelled as such. They never stand in for a DAW recording with sound.
+
+## 4. Workflow test run (18 Nov 2026): the synthetic signals, labelled `-workflow-test`
+
+The capture code ran end to end on the trial build (D2 line plus the pilot packs). This proves the workflow. None of these files is flagship material.
+
+| | What the log recorded (`capture-log.txt`) |
+|---|---|
+| F1 | 8 notes found; keys A3 ×1, C4 ×2, E4 ×1, G4 ×2, A4 ×1, C5 ×1. The repeated C4 lit a different take on each press. The gap key A♯3 played a neighbour's take (FILL) |
+| F2 | The CAPTURE page with the input level and the scrolling take. **GRAB LAST 10 s** (the page's own key) kept the take: 7 notes mapped, then played on the keys |
+| F3 | DROP A SOUND → one sound → five notes five octaves apart |
+| F4 | LINK off. A plays nothing (the pad), B CHORD 1/8, C UP & DOWN 1/16 ×3. ARP panel open with EDIT A / B / C |
+| F5 | Granular. KEY DNA: SIZE long → short, DENS sparse → dense, POS variation 0.5, PAN ramp, individuality 0.6 |
+| F6 | SYNTHESIZE 0 / 100 Analog / 50 Analog / 100 Imprint (imprint 80) |
+
+**F6 is audible, not visible:** the four full-editor screenshots look almost the same, because the display shows the source waveform in all four. On screen, the difference shows only in the SYNTH chip and its value. **F6 therefore needs the owner's level-matched DAW recording** (shot list above). Screenshots alone cannot carry it.
+
+**The files** (30 PNG at 2×) are in the Package E zip, under `feature-capture-workflow-test/`.
