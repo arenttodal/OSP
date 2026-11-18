@@ -197,6 +197,10 @@ namespace visualstates
         if (arpOpen)
             result.push_back ({ "arp-satellite", "SATELLITE's key on the arpeggiator's title row (absent without SATELLITE)",
                                 osp::plugin::ArpInlinePanel::satelliteKeyArea().translated (arpPanel.getX(), arpPanel.getY() - sourceTrim) });
+        // STRUM's key beside it (ANDOR OSP and every shell product; absent in a reference render).
+        if (arpOpen)
+            result.push_back ({ "arp-strum", "STRUM's key beside SATELLITE (absent in the reference parity render)",
+                                osp::plugin::ArpInlinePanel::strumKeyArea().translated (arpPanel.getX(), arpPanel.getY() - sourceTrim) });
         return result;
     }
 }

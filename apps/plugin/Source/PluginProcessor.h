@@ -181,6 +181,8 @@ public:
     // SATELLITE: each layer's own stereo motion (the per-card arpeggiator's companion).
     juce::String satelliteParameterId (int card) const override { return satelliteFieldId (card, "enabled"); }
     std::unique_ptr<MiniPanel> createSatellitePanel (int card) override;
+    bool hasStrum() const override { return true; }
+    bool isKeyHeld (int note) const override { return keyboardState.isNoteOnForChannels (0xffff, note); }
     /** SUB's panel (the shared V7 popover) on `sub.*`; it lights the keys held now (the
         keyboard state before the arpeggiator: what SUB plays). Message thread. */
     std::unique_ptr<MiniPanel> createSubPanel();

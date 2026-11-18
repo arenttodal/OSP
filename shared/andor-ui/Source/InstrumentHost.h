@@ -657,6 +657,14 @@ public:
     virtual juce::String satelliteParameterId (int /*card*/) const { return {}; }
     /** SATELLITE's panel, showing card 0..2 (none by default: InstrumentHost.cpp). */
     virtual std::unique_ptr<MiniPanel> createSatellitePanel (int card);
+    /** STRUM's key on the ARP title row (beside SATELLITE): the product has STRUM's parameters
+        (InstrumentHost::addStrumParameters; ANDOR OSP and every shell product). Off: no key. */
+    virtual bool hasStrum() const { return false; }
+    /** STRUM's panel, showing card 0..2 (the shared StrumPanel on ids::arpStrum). */
+    virtual std::unique_ptr<MiniPanel> createStrumPanel (int card);
+    /** A key held now (the on-screen keyboard and incoming MIDI; message thread): STRUM's
+        picture draws the chord being played. */
+    virtual bool isKeyHeld (int /*note*/) const { return false; }
     /** Where the audio has card 0..2 now (SATELLITE's panel marker): -1 .. +1 across and ORBIT's
         rear 0 .. 1; false while the card does not move. */
     virtual bool satelliteView (int card, float& x, float& rear) const

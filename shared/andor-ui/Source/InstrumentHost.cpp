@@ -1,6 +1,7 @@
 #include "InstrumentHost.h"
 #include "ShapingPopups.h"
 #include "AndorParameters.h"
+#include "StrumPanel.h"
 #include "ShapingPopups.h"
 
 #include "engine/Dampen.h"
@@ -761,6 +762,13 @@ std::optional<ShaperPattern> InstrumentHost::readShaperPatternFile (const juce::
 std::unique_ptr<MiniPanel> InstrumentHost::createSatellitePanel (int)
 {
     return nullptr;   // (none by default: a product that moves its cards supplies its panel)
+}
+
+std::unique_ptr<MiniPanel> InstrumentHost::createStrumPanel (int card)
+{
+    if (! hasStrum())
+        return nullptr;
+    return std::make_unique<StrumPanel> (*this, card, [this] (int note) { return isKeyHeld (note); });
 }
 
 juce::String InstrumentHost::destName (mod::Dest dest) const

@@ -196,6 +196,8 @@ public:
     {
         return ! referenceParity && product().satellite && product().satellite->parameterId != nullptr ? product().satellite->parameterId (card) : juce::String();
     }
+    bool hasStrum() const override { return ! referenceParity; }
+    bool isKeyHeld (int note) const override { return keyboardState.isNoteOnForChannels (0xffff, note); }
     std::unique_ptr<osp::plugin::MiniPanel> createSatellitePanel (int card) override
     {
         return ! referenceParity && product().satellite && product().satellite->panel != nullptr ? product().satellite->panel (*this, card) : nullptr;
