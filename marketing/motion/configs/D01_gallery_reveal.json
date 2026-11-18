@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "D01",
+  "title": "Gallery reveal",
+  "version": "D01.v1",
+  "purpose": "Website hero and flagship reveal: the whole instrument settles into the approved A1-R1 W hero composition on the light editorial gallery.",
+  "setup": "ANDOR_GALLERY",
+  "baseShot": "A1_R1_W",
+  "seconds": 7.0,
+  "fps": 30,
+  "ease": "smootherstep",
+  "draft": { "res": [1280, 720], "samples": 24, "noise": 0.03 },
+  "keys": [
+    { "t": 0.0, "camera": { "yaw": -37.0, "pitch": 54.5, "distScale": 1.08 } },
+    { "t": 1.0, "camera": {} }
+  ],
+  "notes": "Slow push with a shallow lateral arc (7 degrees of yaw, 2.5 of pitch, 8 % closer); the product, lights and shadow never move. The closing frame is the approved A1-R1 W still: it doubles as the end poster.",
+  "stills": { "frames": { "open": 0.0, "middle": 0.5, "close": 1.0 }, "hq": { "t": 1.0, "res": [1920, 1080], "samples": 160, "noise": 0.006 } },
+  "reframes": [
+    { "id": "D01-portrait", "purpose": "Portrait reframe test (mobile hero): its own composition, not a crop.", "baseShot": "A1M_R1",
+      "res": [608, 1316], "samples": 24, "noise": 0.03,
+      "keys": [ { "t": 0.0, "camera": { "yaw": -37.0, "pitch": 43.5, "distScale": 1.08 } }, { "t": 1.0, "camera": {} } ],
+      "stillsOnly": [0.0, 0.5, 1.0] }
+  ]
+}
