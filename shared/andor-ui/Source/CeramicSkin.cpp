@@ -15,6 +15,13 @@ namespace
     constexpr size_t maxCachedImages = 160;
     constexpr size_t maxCachedBytes = 192u * 1024u * 1024u;
 
+    /** The default byte budget: 192 MB, or OSP_SKIN_CACHE_MB (measurements in a host). */
+    size_t defaultBudgetBytes()
+    {
+        const auto mb = juce::SystemStats::getEnvironmentVariable ("OSP_SKIN_CACHE_MB", {}).getIntValue();
+        return mb > 0 ? static_cast<size_t> (mb) * 1024u * 1024u : maxCachedBytes;
+    }
+
     Look lookFromEnvironment()
     {
         const auto value = juce::SystemStats::getEnvironmentVariable ("OSP_SKIN", {}).trim().toLowerCase();
@@ -160,9 +167,14 @@ juce::Image resampleArea (const juce::Image& sourceImage, juce::Rectangle<float>
 }
 
 //==============================================================================
-Pieces::Pieces (const void* data, size_t size) { read (data, size); }
+Pieces::Pieces (const void* data, size_t size)
+    : maxBytes (defaultBudgetBytes()), maxImages (maxCachedImages)
+{
+    read (data, size);
+}
 
 Pieces::Pieces()
+    : maxBytes (defaultBudgetBytes()), maxImages (maxCachedImages)
 {
     int size = 0;
     if (const auto* data = BinaryData::getNamedResource ("ceramicskin_zip", size); data != nullptr && size > 0)
@@ -244,6 +256,7 @@ Pieces* Pieces::overlayPack() const
         if (m.pack != nullptr && m.packSize > 0)
         {
             overlay = std::make_unique<Pieces> (m.pack, m.packSize);
+            overlay->setBudget (maxBytes, maxImages);
             overlay->isOverlay = true;
         }
     }
@@ -290,8 +303,12 @@ juce::Image Pieces::composed (const Piece& p, int pw, int ph, float physicalScal
     {
         order.remove (key);
         order.push_back (key);
-        return found->second;
+        found->second.used = generation;
+        ++stats.hits;
+        return found->second.image;
     }
+    ++stats.misses;
+    const auto composeStart = juce::Time::getHighResolutionTicks();
 
     // The nearest level at least as fine as the screen, else the finest.
     const Level* level = &p.levels.back();
@@ -375,16 +392,19 @@ juce::Image Pieces::composed (const Piece& p, int pw, int ph, float physicalScal
 
     // Bounded: the oldest go first (a resizing window passes through many sizes).
     const size_t bytes = static_cast<size_t> (pw) * static_cast<size_t> (ph) * 4u;
-    while (! order.empty() && (cache.size() >= maxCachedImages || cachedBytes + bytes > maxCachedBytes))
+    while (! order.empty() && (cache.size() >= maxImages || cachedBytes + bytes > maxBytes))
     {
         const auto oldest = cache.find (order.front());
-        cachedBytes -= static_cast<size_t> (oldest->second.getWidth()) * static_cast<size_t> (oldest->second.getHeight()) * 4u;
+        cachedBytes -= static_cast<size_t> (oldest->second.image.getWidth()) * static_cast<size_t> (oldest->second.image.getHeight()) * 4u;
         cache.erase (oldest);
         order.pop_front();
+        ++stats.evictions;
     }
-    cache.emplace (key, out);
+    cache.emplace (key, Entry { out, generation });
     order.push_back (key);
     cachedBytes += bytes;
+    stats.peakBytes = std::max (stats.peakBytes, cachedBytes);
+    stats.composeSeconds += juce::Time::highResolutionTicksToSeconds (juce::Time::getHighResolutionTicks() - composeStart);
     return out;
 }
 
@@ -448,7 +468,55 @@ bool Pieces::draw (juce::Graphics& g, const juce::String& name, juce::Rectangle<
 
 Pieces::Usage Pieces::usage() const
 {
-    return { static_cast<int> (cache.size()), cachedBytes };
+    auto u = stats;
+    u.composedImages = static_cast<int> (cache.size());
+    u.bytes = cachedBytes;
+    u.overlayBytes = overlay != nullptr ? overlay->cachedBytes : 0;
+    return u;
+}
+
+void Pieces::setBudget (size_t newMaxBytes, size_t newMaxImages)
+{
+    maxBytes = newMaxBytes;
+    maxImages = std::max<size_t> (1, newMaxImages);
+    if (overlay != nullptr)
+        overlay->setBudget (newMaxBytes, newMaxImages);
+    while (! order.empty() && (cache.size() > maxImages || cachedBytes > maxBytes))
+    {
+        const auto oldest = cache.find (order.front());
+        cachedBytes -= static_cast<size_t> (oldest->second.image.getWidth()) * static_cast<size_t> (oldest->second.image.getHeight()) * 4u;
+        cache.erase (oldest);
+        order.pop_front();
+        ++stats.evictions;
+    }
+}
+
+std::uint64_t Pieces::beginGeneration() noexcept
+{
+    if (overlay != nullptr)
+        overlay->beginGeneration();
+    return ++generation;
+}
+
+size_t Pieces::evictUnusedSince (std::uint64_t since)
+{
+    size_t released = overlay != nullptr ? overlay->evictUnusedSince (overlay->generation) : 0;
+    for (auto it = order.begin(); it != order.end();)
+    {
+        const auto found = cache.find (*it);
+        if (found != cache.end() && found->second.used < since)
+        {
+            const auto b = static_cast<size_t> (found->second.image.getWidth()) * static_cast<size_t> (found->second.image.getHeight()) * 4u;
+            cachedBytes -= b;
+            released += b;
+            cache.erase (found);
+            it = order.erase (it);
+            ++stats.evictions;
+        }
+        else
+            ++it;
+    }
+    return released;
 }
 
 void Pieces::release()

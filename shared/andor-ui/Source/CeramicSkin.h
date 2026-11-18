@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <list>
@@ -101,9 +103,26 @@ public:
     {
         int composedImages = 0;
         size_t bytes = 0;
+        // Instrumentation (the ceramic-skin memory investigation): since the pieces were read.
+        std::uint64_t hits = 0, misses = 0, evictions = 0;
+        size_t peakBytes = 0;
+        double composeSeconds = 0.0;     ///< time spent composing on misses (resampling, tinting)
+        size_t overlayBytes = 0;         ///< the product overlay pack's own cache (not in `bytes`)
     };
     Usage usage() const;
     void release();
+
+    /** The cache's budget (default 192 MB / 160 images; the product overlay pack follows it).
+        OSP_SKIN_CACHE_MB overrides the default bytes at start (for measurements in a host). */
+    void setBudget (size_t maxBytes, size_t maxImages);
+    size_t budgetBytes() const noexcept { return maxBytes; }
+
+    /** Stale size variants (opt-in, for when a resize settles): starts a generation; every
+        composed image used from now on is marked with it. */
+    std::uint64_t beginGeneration() noexcept;
+    /** Drops every composed image not used since `generation` began (what the window no
+        longer shows: the sizes it passed through). Returns the bytes released. */
+    size_t evictUnusedSince (std::uint64_t generation);
 
     /** The product's own pieces (design::Materials::pack) that replace these by name, when it
         has some: find, draw, composed and decode then answer from them for those names. */
@@ -144,8 +163,16 @@ private:
     std::unique_ptr<juce::MemoryInputStream> stream;
     std::unique_ptr<juce::ZipFile> zip;
     std::map<juce::String, Piece> pieces;
-    std::map<Key, juce::Image> cache;
+    struct Entry
+    {
+        juce::Image image;
+        std::uint64_t used = 0;   ///< the generation it was last drawn in
+    };
+    std::map<Key, Entry> cache;
     std::list<Key> order;   ///< least recently used first
+    size_t maxBytes = 0, maxImages = 0;
+    std::uint64_t generation = 0;
+    mutable Usage stats;
     bool isOverlay = false;
     mutable std::unique_ptr<Pieces> overlay;   ///< (made when the materials name a pack)
     mutable const void* overlayData = nullptr;
