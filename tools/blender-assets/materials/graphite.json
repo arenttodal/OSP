@@ -13,6 +13,19 @@
             "sheen": 0.0,
             "subsurface": 0.0,
             "grain": { "kind": "powder", "size": 0.04, "height": 0.0006, "detail": 2.0 }
+        },
+        "satin-graphite-g1": {
+            "label": "Satin Graphite G1 (a touch lighter at the rim)",
+            "baseColor": "#3a3936",
+            "rim": { "color": "#57554f", "width": 0.9 },
+            "roughness": 0.42,
+            "roughnessVariation": 0.03,
+            "specular": 0.45,
+            "coat": 0.12,
+            "coatRoughness": 0.26,
+            "sheen": 0.0,
+            "subsurface": 0.0,
+            "grain": { "kind": "powder", "size": 0.04, "height": 0.0006, "detail": 2.0 }
         }
     }
 }

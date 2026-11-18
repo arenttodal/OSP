@@ -152,6 +152,24 @@ def knob_material(name, finish, indicator, info, ink):
     colour.data_type = "RGBA"
     # ShaderNodeMix carries float, vector and colour sockets of the same names: by index.
     colour.inputs[6].default_value = _rgba(finish["baseColor"])
+    rim = finish.get("rim")
+    if rim:
+        # Opt-in (mini-graphite G1): the cap a touch lighter over its outer `width` mm and down the
+        # sidewall, so a dark cap's silhouette reads on a dark display. Unset: no change.
+        xy = _node(nodes, "ShaderNodeCombineXYZ", (200, 500))
+        links.new(x, xy.inputs["X"])
+        links.new(y, xy.inputs["Y"])
+        rho_node = nodes.new("ShaderNodeVectorMath")
+        rho_node.operation = "LENGTH"
+        rho_node.location = (350, 500)
+        links.new(xy.outputs["Vector"], rho_node.inputs[0])
+        fac = _smooth(nodes, links, rho_node.outputs["Value"], info["rt"] - rim["width"], info["rt"], 0.0, 1.0, (500, 500))
+        base = _node(nodes, "ShaderNodeMix", (550, 350))
+        base.data_type = "RGBA"
+        base.inputs[6].default_value = _rgba(finish["baseColor"])
+        base.inputs[7].default_value = _rgba(rim["color"])
+        links.new(fac, base.inputs[0])
+        links.new(base.outputs[2], colour.inputs[6])
     colour.inputs[7].default_value = _rgba(ink["color"])
     links.new(mask, colour.inputs[0])
     links.new(colour.outputs[2], bsdf.inputs["Base Color"])

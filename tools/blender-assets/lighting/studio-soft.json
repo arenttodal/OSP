@@ -80,6 +80,17 @@
                 "color": "#ece5d9",
                 "roughness": 0.8
             }
+        },
+        "studio-sculpt-edge": {
+            "note": "mini-graphite G2 (exploratory): studio-sculpt with a stronger, wider edge light and a second, opposite edge, so a dark cap is outlined without lifting the cap itself.",
+            "world": { "color": "#e9e4dc", "strength": 0.12 },
+            "lights": [
+                { "name": "key", "azimuth": 128, "elevation": 58, "distance": 190, "size": 100, "energy": 0.3, "color": "#fffaf4" },
+                { "name": "fill", "azimuth": -40, "elevation": 45, "distance": 210, "size": 190, "energy": 0.1, "color": "#f4f2ef" },
+                { "name": "edge", "azimuth": 60, "elevation": 14, "distance": 160, "size": 70, "energy": 0.14, "color": "#fffaf2" },
+                { "name": "edge2", "azimuth": -120, "elevation": 16, "distance": 160, "size": 60, "energy": 0.08, "color": "#f6f4f2" }
+            ],
+            "panel": { "color": "#ece5d9", "roughness": 0.8 }
         }
     }
 }
