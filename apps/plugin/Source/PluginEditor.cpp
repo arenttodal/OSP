@@ -223,6 +223,12 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     presetBar.onChange = [this] { updateStatus(); timerCallback(); };
     presetBar.onSaveStartingState = [this] { saveStartingState(); };
     presetBar.onOpenLibrary = [this] { openLibrary(); };
+    presetBar.onBrowseLibrary = [this] (const juce::String& scope, bool startingStates) {
+        // Browse all ...: the Library on that collection (Keys selects Keys).
+        openLibrary (startingStates ? LibraryPanel::View::templates : LibraryPanel::View::presets);
+        if (libraryPanel != nullptr)
+            libraryPanel->selectScope (scope);
+    };
     content.addAndMakeVisible (presetBar);
     savePresetButton.onClick = [this] { saveInstrument(); };
     content.addAndMakeVisible (savePresetButton);

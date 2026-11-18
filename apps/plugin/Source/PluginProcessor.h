@@ -71,6 +71,19 @@ public:
     int getNumPrograms() override;
     int getCurrentProgram() override { return currentProgram; }
     void setCurrentProgram (int index) override;
+    /** The quick preset menu groups presets (collections, categories, packs); see presetList. */
+    bool groupsPresets() const override { return groupPresets; }
+    /** False: the quick menu's one flat list, as before (comparisons). */
+    void setGroupsPresets (bool group) noexcept { groupPresets = group; }
+    /** The collection the arrows walk ("all", "states", "favourites", "recent", "category:<name>",
+        "pack:<id>"): set when a preset is chosen from one (the quick menu, the Library). */
+    void setBrowseContext (const juce::String& context);
+    juce::String browseContext() const;
+    /** The entries of a collection, in the order the arrows walk them. */
+    std::vector<PresetEntry> presetsIn (const juce::String& context) const;
+    /** Re-reads the Library's preset metadata now (the quick menu reads a copy, refreshed when it
+        is older than a second). */
+    void refreshPresetIndex() const;
     /** Whether a new instance opens on the first built-in state (true; the headless tests turn
         it off so their processors start from the parameters' defaults). */
     static void setNewInstancesOpenOnFirstState (bool shouldOpen) noexcept;
@@ -993,6 +1006,21 @@ private:
     double pitchBendSemitones = 0.0;
     bool hostWasPlaying = false;     // audio thread: transport start resets performance memory
     int currentProgram = 0;
+    /** The Library's presets and Starting States with their metadata (message thread). */
+    struct PresetMeta
+    {
+        juce::String name, category, packId, packName;
+        juce::File file;
+        bool favourite = false, state = false;
+        std::int64_t lastUsed = 0;
+    };
+    mutable std::vector<PresetMeta> presetIndexCache;
+    mutable std::set<juce::String> presetIndexTrashed;   ///< files the Library has in its trash
+    mutable juce::uint32 presetIndexTime = 0;
+    mutable bool presetIndexRead = false;
+    juce::String browsing;                      ///< the arrows' collection (empty: from what is loaded)
+    bool groupPresets = true;
+    std::vector<juce::String> browsingOrder;    ///< "recent" keeps the order it was chosen in
     juce::File lastPresetFile;
     juce::File lastStartingStateFile;
     juce::String presetNameOverride;   ///< INIT, Reset or a user starting state while it is the last one opened

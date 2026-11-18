@@ -49,6 +49,7 @@ add_executable(osp_tests
     unit/CaptureBufferTests.cpp
     unit/ImprintTests.cpp
     library/CatalogTests.cpp
+    library/PresetCategoryTests.cpp
     library/ImportTests.cpp
     library/PreviewTests.cpp
     library/DiscoveryTests.cpp

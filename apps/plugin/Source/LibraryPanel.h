@@ -246,6 +246,7 @@ private:
     void loadRow (const LibraryRow& row);
     void loadSound (const std::string& assetId, int layer);
     void renameRow (const LibraryRow& row);
+    juce::String browseContextFor (const LibraryRow& row) const;
     void trashRow (const LibraryRow& row);
     void restoreRow (const LibraryRow& row);
     void setFavourite (const LibraryRow& row, bool favourite);

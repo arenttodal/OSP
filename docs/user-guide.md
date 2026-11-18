@@ -195,7 +195,7 @@ real round-robin set.
 | **SPACE** | The room: how much of it you hear. Popup: ROOM, HALL, PLATE, SPRING; PRE-DELAY, SIZE, DECAY, DAMP, MOD, WIDTH and the room's EQ (LOW CUT, HIGH CUT; drag the two handles on the picture). |
 | **AMP ENVELOPE** (A D S R) | The instrument's one envelope, for every layer: a short attack and decay with low sustain makes a pluck, a slow attack a swell, full sustain a held tone. Drag the points or turn the knobs. A release of 0.2 s or more lets the recording's own ending play when you let go. |
 | **VOLUME** (top right) | The instrument's output level: drag the thin slider, double-click for 0 dB. |
-| Preset (top) | ‹ › step through the starting states (Natural, Alive, Floating, Broken, Frozen, Dream, Wide, and your own: settings that keep your sounds) and your presets; click the name for the list, ♡ marks a favourite. At the top of the list: **INIT** (an empty patch: no sounds, every setting at its default), **Reset settings** (defaults, the sounds stay) and **Save starting state…** (every setting and the number of slots, no audio; it appears under Starting states and applies to whatever sounds are loaded, keeping empty slots for the rest). |
+| Preset (top) | Click the name for the quick preset menu:<br>- Open Library…, Back to previous patch, INIT (an empty patch) and Reset settings (defaults, the sounds stay);<br>- **COLLECTIONS:** Starting States (the built-in Natural … Wide and your own, plus Save Starting State…), Favorites, Recently Used, All Presets;<br>- **CATEGORIES:** Arpeggios, Bass, Bells & Mallets, Keys, Leads, Pads, Percussion, Plucks, Strings, Synths, Textures, Voices, FX, Uncategorized (only the ones with presets);<br>- **PACKS:** each installed pack.<br>Each list is alphabetical with the loaded one ticked. It shows at most 20 rows, then **Browse all … in the Library** opens the Library on that collection. ‹ › step through the collection you chose from: Keys, Favorites, a pack, or all presets. They only walk the Starting States when you picked one from there. ♡ marks a favourite. A preset's category is the one you gave it when saving; otherwise a name such as "Keys – Felt Upright" lists it under Keys. Nothing is renamed or moved. |
 | Clear all sources (⋮ menu) | Removes every sound but keeps the A/B/C slots and every setting: drop new sounds into the empty cards and they play with the same layer controls, blend or mix and macros. |
 
 Click a macro's name for its popup: each one shows what it does (the reverb's tail, the
@@ -481,7 +481,8 @@ it back. Every edit is one undo step; the pattern is saved with the project and 
     they ask for a name and save a new preset.
 - **⋮ → Save as…** always saves a new preset (`.osppreset`: settings plus which sample(s)).
   Presets live in `Documents/OSP/Presets` as ordinary files. **Previous / Next preset** step
-  through them; the preset name's list and the Library show them all.
+  through the collection the loaded preset was chosen from (a category, Favorites, a pack, or
+  all presets); the preset name's menu and the Library show them all.
 - **⋮ → Open instrument…** opens a preset or a portable instrument.
 - **⋮ → Export portable instrument…** (CONTENT) writes one `.ospinstrument` file with the
   recordings, their analysis and the settings. Open it on another computer and it sounds the

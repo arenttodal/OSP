@@ -8,6 +8,7 @@
 #include "io/ContentHash.h"
 #include "library/Classifier.h"
 #include "library/FolderScan.h"
+#include "library/PresetCategory.h"
 #include "library/SoundImport.h"
 
 namespace osp::plugin
@@ -29,7 +30,13 @@ namespace
     constexpr int detailHeight = 128;
 
     const juce::StringArray soundTypes { "Bass", "Keys", "Pluck", "Pad", "Percussion", "Vocal", "Texture", "Other" };
-    const juce::StringArray presetCategories { "Keys", "Pads", "Basses", "Plucks", "Rhythmic", "Textures", "Evolving", "FX", "Experimental" };
+    /** The preset categories: the quick menu's (library::presetCategories), one list. */
+    const juce::StringArray presetCategories = [] {
+        juce::StringArray list;
+        for (const auto c : library::presetCategories)
+            list.add (juce::String (std::string (c)));
+        return list;
+    }();
     const juce::StringArray templateCategories { "Evolving", "Rhythmic", "Granular", "Keys", "Basses", "Textured", "FX" };
 
     juce::String originName (Origin o)
@@ -1919,6 +1926,11 @@ void LibraryPanel::query()
         q.trashedOnly = true, builtIns = false;
     else if (key.startsWith ("collection:"))
         q.collection = key.fromFirstOccurrenceOf ("collection:", false, false).toStdString(), builtIns = false;
+    // Presets: a category is the listed one (library::canonicalCategory: the stored value, an
+    // older alias or the name's prefix), the same as the quick menu's; filtered as rows are read.
+    std::string listedCategory;
+    if (key.startsWith ("category:") && view == View::presets)
+        listedCategory = key.fromFirstOccurrenceOf ("category:", false, false).toStdString(), builtIns = false, q.limit = 20000;
     else if (key.startsWith ("category:"))
         q.category = key.fromFirstOccurrenceOf ("category:", false, false).toStdString(), builtIns = false;
     if (view == View::sounds)
@@ -1951,7 +1963,7 @@ void LibraryPanel::query()
     };
     juce::Component::SafePointer<LibraryPanel> safe (this);
     processor.libraryService().request<Answer> (
-        [q, factoryNames, type, fixedCategories, currentView, candidates, key, lengthChoice, sortChoice] (library::Catalog& c) {
+        [q, factoryNames, type, fixedCategories, currentView, candidates, key, lengthChoice, sortChoice, listedCategory] (library::Catalog& c) {
             Answer a;
             if (candidates)
             {
@@ -2043,6 +2055,8 @@ void LibraryPanel::query()
                 }
             for (const auto& asset : candidates ? std::vector<library::Asset> {} : c.search (q))
             {
+                if (! listedCategory.empty() && library::canonicalCategory (asset.category, asset.name) != listedCategory)
+                    continue;
                 LibraryRow r;
                 r.id = asset.id;
                 r.type = asset.type;
@@ -2112,12 +2126,26 @@ void LibraryPanel::query()
             a.side.push_back ({ "header:categories", sounds ? "Types" : "Categories", -1 });
             auto categories = fixedCategories;
             std::map<juce::String, int> counts;
-            for (const auto& [name, n] : c.categoryCounts (type))
+            if (currentView == View::presets)
             {
-                counts[juce::String (name).toLowerCase()] = n;
-                if (! categories.contains (juce::String (name), true))
-                    categories.add (juce::String (name));
+                // The listed categories (the quick menu's), counted as listed (the quick menu hides
+                // empty ones; the Library lists them all, as it always has).
+                library::SearchQuery every;
+                every.type = type;
+                every.limit = 20000;
+                for (const auto& asset : c.search (every))
+                    ++counts[juce::String (std::string (library::canonicalCategory (asset.category, asset.name))).toLowerCase()];
+                categories.clear();
+                for (const auto name : library::presetCategories)
+                    categories.add (juce::String (std::string (name)));
             }
+            else
+                for (const auto& [name, n] : c.categoryCounts (type))
+                {
+                    counts[juce::String (name).toLowerCase()] = n;
+                    if (! categories.contains (juce::String (name), true))
+                        categories.add (juce::String (name));
+                }
             for (const auto& name : categories)
                 a.side.push_back ({ "category:" + name, name, counts[name.toLowerCase()] });
             return a;
@@ -2374,6 +2402,8 @@ void LibraryPanel::loadRow (const LibraryRow& r)
     }
     else
         ok = r.type == AssetType::templateState ? processor.loadStartingState (r.file) : processor.loadPreset (r.file);
+        if (ok)
+            processor.setBrowseContext (browseContextFor (r));
     if (! ok)
     {
         setStatus (r.name + " could not be opened (the file may be damaged or from a newer version).");
@@ -2384,6 +2414,22 @@ void LibraryPanel::loadRow (const LibraryRow& r)
     setStatus ("Loaded " + r.name, true);
     if (onPatchChanged != nullptr)
         onPatchChanged();
+}
+
+juce::String LibraryPanel::browseContextFor (const LibraryRow& r) const
+{
+    // The preset arrows walk what the Library was showing (the same collections as the quick menu).
+    if (r.type == AssetType::templateState)
+        return "states";
+    if (scopeKey == "favourites" || scopeKey == "recent")
+        return scopeKey;
+    if (scopeKey.startsWith ("category:"))
+        return scopeKey;
+    if (scopeKey == "packs" || scopeKey == "factory")
+        return "origin:pack";
+    if (scopeKey == "user")
+        return "origin:user";
+    return "all";
 }
 
 void LibraryPanel::renameRow (const LibraryRow& r)
@@ -2703,6 +2749,11 @@ namespace
             cancel.onClick = [this] { panel.closeSheet(); };
             save.onClick = [this] { commit(); };
             updateType();
+            // A modified preset keeps its category by default.
+            if (! asTemplate)
+                for (const auto& e : proc.presetList())
+                    if (e.file != juce::File() && e.file == proc.currentPresetFile() && e.category.isNotEmpty() && e.category != "Uncategorized")
+                        category.setText (e.category, juce::dontSendNotification);
         }
         void updateType()
         {

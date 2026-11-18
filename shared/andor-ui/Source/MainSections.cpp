@@ -1,4 +1,5 @@
 #include "MainSections.h"
+#include "library/PresetCategory.h"
 #include "Binding.h"
 #include "ValueFormat.h"
 
@@ -789,64 +790,11 @@ void PresetBar::mouseUp (const juce::MouseEvent& e)
         case Part::favourite: processor.toggleFavourite(); break;
         case Part::name:
         {
-            juce::PopupMenu menu;
-            const auto list = processor.presetList();
-            const auto current = processor.presetDisplayName();
-            juce::Component::SafePointer<PresetBar> safe (this);
-            auto opened = [safe] {
-                if (safe == nullptr)
-                    return;
-                safe->refresh();
-                if (safe->onChange != nullptr)
-                    safe->onChange();
-            };
-            if (onOpenLibrary != nullptr)
-            {
-                menu.addItem (juce::String::fromUTF8 ("Open Library\xe2\x80\xa6"), [safe] {
-                    if (safe != nullptr && safe->onOpenLibrary != nullptr)
-                        safe->onOpenLibrary();
-                });
-                menu.addSeparator();
-            }
-            // Loading replaced the whole patch: the one before it is a click away.
-            if (processor.canRestorePreviousState())
-            {
-                const auto what = processor.previousStateDescription().fromFirstOccurrenceOf ("Before ", false, false);
-                const auto label = what.isEmpty() || what == "restoring" ? juce::String ("Back to the previous patch") : "Back to the patch before " + what;
-                menu.addItem (label, [safe, opened] { if (safe != nullptr) safe->processor.restorePreviousState(), opened(); });
-                menu.addSeparator();
-            }
-            // Starting states (settings only, the sounds stay): INIT empties the patch, Reset
-            // returns every setting to its default, then the built-in and the saved ones.
-            menu.addSectionHeader ("Starting states");
-            menu.addItem ("INIT", true, current == "INIT", [safe, opened] { if (safe != nullptr) safe->processor.initPatch(), opened(); });
-            menu.addItem ("Reset settings", true, false, [safe, opened] { if (safe != nullptr) safe->processor.resetSettings(), opened(); });
-            menu.addSeparator();
-            bool presetsHeader = false;
-            for (const auto& entry : list)
-            {
-                if (! entry.startingState && ! presetsHeader)
-                {
-                    menu.addItem (juce::String::fromUTF8 ("Save starting state\xe2\x80\xa6"), [safe] {
-                        if (safe != nullptr && safe->onSaveStartingState != nullptr)
-                            safe->onSaveStartingState();
-                    });
-                    menu.addSectionHeader ("Presets");
-                    presetsHeader = true;
-                }
-                menu.addItem (entry.name, true, entry.name == current, [safe, entry, opened] {
-                    if (safe == nullptr)
-                        return;
-                    safe->processor.openPresetEntry (entry);
-                    opened();
-                });
-            }
-            if (! presetsHeader)
-                menu.addItem (juce::String::fromUTF8 ("Save starting state\xe2\x80\xa6"), [safe] {
-                    if (safe != nullptr && safe->onSaveStartingState != nullptr)
-                        safe->onSaveStartingState();
-                });
-            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withDeletionCheck (*this));
+            // One column always: a long collection scrolls, never spreads into columns.
+            auto options = juce::PopupMenu::Options().withTargetComponent (this).withDeletionCheck (*this);
+            if (processor.groupsPresets())
+                options = options.withMaximumNumColumns (1);   // (grouped: a long flyout scrolls, never spreads)
+            presetMenu().showMenuAsync (options);
             return;
         }
         case Part::none: return;
@@ -854,6 +802,199 @@ void PresetBar::mouseUp (const juce::MouseEvent& e)
     refresh();
     if (onChange != nullptr)
         onChange();
+}
+
+juce::PopupMenu PresetBar::presetMenu()
+{
+    if (! processor.groupsPresets())
+    {
+        juce::PopupMenu menu;
+        const auto list = processor.presetList();
+        const auto current = processor.presetDisplayName();
+        juce::Component::SafePointer<PresetBar> safe (this);
+        auto opened = [safe] {
+            if (safe == nullptr)
+                return;
+            safe->refresh();
+            if (safe->onChange != nullptr)
+                safe->onChange();
+        };
+        if (onOpenLibrary != nullptr)
+        {
+            menu.addItem (juce::String::fromUTF8 ("Open Library\xe2\x80\xa6"), [safe] {
+                if (safe != nullptr && safe->onOpenLibrary != nullptr)
+                    safe->onOpenLibrary();
+            });
+            menu.addSeparator();
+        }
+        // Loading replaced the whole patch: the one before it is a click away.
+        if (processor.canRestorePreviousState())
+        {
+            const auto what = processor.previousStateDescription().fromFirstOccurrenceOf ("Before ", false, false);
+            const auto label = what.isEmpty() || what == "restoring" ? juce::String ("Back to the previous patch") : "Back to the patch before " + what;
+            menu.addItem (label, [safe, opened] { if (safe != nullptr) safe->processor.restorePreviousState(), opened(); });
+            menu.addSeparator();
+        }
+        // Starting states (settings only, the sounds stay): INIT empties the patch, Reset
+        // returns every setting to its default, then the built-in and the saved ones.
+        menu.addSectionHeader ("Starting states");
+        menu.addItem ("INIT", true, current == "INIT", [safe, opened] { if (safe != nullptr) safe->processor.initPatch(), opened(); });
+        menu.addItem ("Reset settings", true, false, [safe, opened] { if (safe != nullptr) safe->processor.resetSettings(), opened(); });
+        menu.addSeparator();
+        bool presetsHeader = false;
+        for (const auto& entry : list)
+        {
+            if (! entry.startingState && ! presetsHeader)
+            {
+                menu.addItem (juce::String::fromUTF8 ("Save starting state\xe2\x80\xa6"), [safe] {
+                    if (safe != nullptr && safe->onSaveStartingState != nullptr)
+                        safe->onSaveStartingState();
+                });
+                menu.addSectionHeader ("Presets");
+                presetsHeader = true;
+            }
+            menu.addItem (entry.name, true, entry.name == current, [safe, entry, opened] {
+                if (safe == nullptr)
+                    return;
+                safe->processor.openPresetEntry (entry);
+                opened();
+            });
+        }
+        if (! presetsHeader)
+            menu.addItem (juce::String::fromUTF8 ("Save starting state\xe2\x80\xa6"), [safe] {
+                if (safe != nullptr && safe->onSaveStartingState != nullptr)
+                    safe->onSaveStartingState();
+            });
+        return menu;
+    }
+    // Grouped (ANDOR OSP): the global actions, then COLLECTIONS (Starting States, Favorites,
+    // Recently Used, All Presets), CATEGORIES (only those with presets) and PACKS. Each list is
+    // alphabetical with the loaded one ticked, at most flyoutRows long; the rest is a click away
+    // in the Library (Browse all ...). Nothing loads on hover.
+    juce::PopupMenu menu;
+    const auto list = processor.presetList();
+    const auto current = processor.presetDisplayName();
+    juce::Component::SafePointer<PresetBar> safe (this);
+    auto opened = [safe] {
+        if (safe == nullptr)
+            return;
+        safe->refresh();
+        if (safe->onChange != nullptr)
+            safe->onChange();
+    };
+    const auto ellipsis = juce::String::fromUTF8 ("\xe2\x80\xa6");
+    if (onOpenLibrary != nullptr)
+        menu.addItem ("Open Library" + ellipsis, [safe] {
+            if (safe != nullptr && safe->onOpenLibrary != nullptr)
+                safe->onOpenLibrary();
+        });
+    if (processor.canRestorePreviousState())
+    {
+        const auto what = processor.previousStateDescription().fromFirstOccurrenceOf ("Before ", false, false);
+        menu.addItem (what.isEmpty() || what == "restoring" ? juce::String ("Back to previous patch") : "Back to the patch before " + what,
+                      [safe, opened] { if (safe != nullptr) safe->processor.restorePreviousState(), opened(); });
+    }
+    menu.addItem ("INIT", true, current == "INIT", [safe, opened] { if (safe != nullptr) safe->processor.initPatch(), opened(); });
+    menu.addItem ("Reset settings", [safe, opened] { if (safe != nullptr) safe->processor.resetSettings(), opened(); });
+
+    // A collection's flyout: its first flyoutRows (alphabetical), then Browse all ... (the Library).
+    auto flyout = [&] (std::vector<InstrumentHost::PresetEntry> entries, const juce::String& context, const juce::String& scope, bool states) {
+        juce::PopupMenu sub;
+        if (context != "recent" && context != "states")
+            std::stable_sort (entries.begin(), entries.end(), [] (const auto& a, const auto& b) { return a.name.compareNatural (b.name) < 0; });
+        if (context == "recent")
+            std::stable_sort (entries.begin(), entries.end(), [] (const auto& a, const auto& b) { return a.lastUsed > b.lastUsed; });
+        const int shown = std::min (static_cast<int> (entries.size()), flyoutRows);
+        for (int i = 0; i < shown; ++i)
+        {
+            auto e = entries[static_cast<std::size_t> (i)];
+            e.context = context;
+            sub.addItem (e.name, true, e.name == current, [safe, e, opened] {
+                if (safe == nullptr)
+                    return;
+                safe->processor.openPresetEntry (e);
+                opened();
+            });
+        }
+        if (static_cast<int> (entries.size()) > shown)
+        {
+            sub.addSeparator();
+            sub.addItem ("Browse all " + juce::String (entries.size()) + " in the Library" + ellipsis, [safe, scope, states] {
+                if (safe != nullptr && safe->onBrowseLibrary != nullptr)
+                    safe->onBrowseLibrary (scope, states);
+            });
+        }
+        return sub;
+    };
+    std::vector<InstrumentHost::PresetEntry> states, presets, favourites, recent;
+    std::map<juce::String, std::vector<InstrumentHost::PresetEntry>> byCategory;
+    std::map<juce::String, std::pair<juce::String, std::vector<InstrumentHost::PresetEntry>>> byPack;   // id -> (name, entries)
+    for (const auto& e : list)
+    {
+        if (e.startingState)
+        {
+            states.push_back (e);
+            continue;
+        }
+        presets.push_back (e);
+        if (e.favourite)
+            favourites.push_back (e);
+        if (e.lastUsed > 0)
+            recent.push_back (e);
+        byCategory[e.category.isNotEmpty() ? e.category : juce::String ("Uncategorized")].push_back (e);
+        if (e.packId.isNotEmpty())
+        {
+            auto& p = byPack[e.packId];
+            p.first = e.packName.isNotEmpty() ? e.packName : e.packId;
+            p.second.push_back (e);
+        }
+    }
+
+    menu.addSeparator();
+    menu.addSectionHeader ("COLLECTIONS");
+    {
+        auto sub = flyout (states, "states", "all", true);
+        sub.addSeparator();
+        sub.addItem ("Save Starting State" + ellipsis, [safe] {
+            if (safe != nullptr && safe->onSaveStartingState != nullptr)
+                safe->onSaveStartingState();
+        });
+        menu.addSubMenu ("Starting States", sub);
+    }
+    menu.addSubMenu ("Favorites", flyout (favourites, "favourites", "favourites", false), ! favourites.empty());
+    menu.addSubMenu ("Recently Used", flyout (recent, "recent", "recent", false), ! recent.empty());
+    menu.addSubMenu ("All Presets", flyout (presets, "all", "all", false), ! presets.empty());
+
+    // Categories in their fixed order; empty ones hidden.
+    bool header = false;
+    for (const auto name : library::presetCategories)
+    {
+        const juce::String category (name.data(), name.size());
+        const auto found = byCategory.find (category);
+        if (found == byCategory.end() || found->second.empty())
+            continue;
+        if (! header)
+        {
+            menu.addSeparator();
+            menu.addSectionHeader ("CATEGORIES");
+            header = true;
+        }
+        menu.addSubMenu (category, flyout (found->second, "category:" + category, "category:" + category, false));
+    }
+    if (! byPack.empty())
+    {
+        menu.addSeparator();
+        menu.addSectionHeader ("PACKS");
+        juce::PopupMenu packs;
+        std::vector<std::pair<juce::String, juce::String>> order;   // (name, id)
+        for (const auto& [id, p] : byPack)
+            order.push_back ({ p.first, id });
+        std::sort (order.begin(), order.end(), [] (const auto& a, const auto& b) { return a.first.compareNatural (b.first) < 0; });
+        for (const auto& [packName, id] : order)
+            packs.addSubMenu (packName, flyout (byPack[id].second, "pack:" + id, "packs", false));
+        menu.addSubMenu ("Packs", packs);
+    }
+    return menu;
 }
 
 SavePresetButton::SavePresetButton() : juce::Button ("Save preset")
