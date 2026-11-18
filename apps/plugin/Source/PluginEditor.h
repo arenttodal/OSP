@@ -198,6 +198,8 @@ public:
     void openMainMenu() { showMenu(); }
     HeaderMix& headerMixControl() noexcept { return headerMix; }
     EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
+    /** The header's preset bar (tests, snapshots). */
+    PresetBar& presetBarComponent() noexcept { return presetBar; }
     /** A source (0..3 a tab, 4 the mod wheel) dragged to / released at a point (instrument
         coordinates): what the tabs' and the wheel's drag does (tests drive it directly). Returns the route's slot on release, or -1. */
     void dragModulation (int source, juce::Point<float> where);
@@ -263,6 +265,7 @@ private:
         OspAudioProcessorEditor& editor;
     };
 
+    SharedMenuLook menuLook;   // (every menu in the look: see SharedMenuLook)
     OspLookAndFeel lookAndFeel;
     OspAudioProcessor& ospProcessor;
 

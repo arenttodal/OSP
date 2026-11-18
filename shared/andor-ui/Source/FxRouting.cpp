@@ -1,4 +1,6 @@
 #include "FxRouting.h"
+
+#include "MenuIcons.h"
 #include "FxIdentity.h"
 #include "FxPresets.h"
 #include "FxParameters.h"
@@ -766,6 +768,8 @@ juce::PopupMenu FxRoutingView::settingsMenu()
         folder.createDirectory();
         folder.revealToUser();
     });
+    menuicons::decorate (m, { { "Restore original", menuicons::Kind::reset }, { "Save FX chain", menuicons::Kind::save },
+                              { "Load FX chain", menuicons::Kind::open }, { "Show chains folder", menuicons::Kind::reveal } });
     return m;
 }
 

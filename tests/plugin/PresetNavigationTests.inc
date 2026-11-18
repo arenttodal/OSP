@@ -149,7 +149,7 @@ TEST_CASE ("preset navigation: the arrows walk the collection a preset was chose
         item->action();
     };
     // From Keys: Keys only, wrapping.
-    open ("Keys", "Keys - Beta");
+    open ("Keys", "Beta");   // (a category's flyout drops its own "Keys - " prefix: display only)
     CHECK (p.presetDisplayName() == "Keys - Beta");
     CHECK (p.browseContext() == "category:Keys");
     p.stepPresetList (1);

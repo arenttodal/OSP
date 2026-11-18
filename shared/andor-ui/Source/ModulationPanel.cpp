@@ -1,4 +1,6 @@
 #include "ModulationPanel.h"
+
+#include "MenuIcons.h"
 #include "Binding.h"
 
 #include "ArpSection.h"
@@ -1514,6 +1516,7 @@ juce::PopupMenu ModulationPanel::sourceMenu (int source)
             menu.addItem ("Apply to AMP", true, p.velocityAppliesToAmp(), [&p] { p.setVelocityAppliesToAmp (! p.velocityAppliesToAmp()); });
         menu.addSeparator();
         menu.addItem ("Routes...", [safe, source] { if (safe != nullptr && safe->onShowRoutes != nullptr) safe->onShowRoutes (source); });
+        menuicons::decorate (menu, { { "Edit curve", menuicons::Kind::settings }, { "Reset curve", menuicons::Kind::reset }, { "Routes", menuicons::Kind::list } });
         return menu;
     }
     if (source < 2)

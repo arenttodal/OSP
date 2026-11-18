@@ -1,4 +1,6 @@
 #include "MainSections.h"
+
+#include "MenuIcons.h"
 #include "library/PresetCategory.h"
 #include "Binding.h"
 #include "ValueFormat.h"
@@ -804,6 +806,22 @@ void PresetBar::mouseUp (const juce::MouseEvent& e)
         onChange();
 }
 
+namespace
+{
+    /** A preset's name as its category's flyout shows it: without a leading "<category> - "
+        (or its singular, "Pad - " under Pads) already said by the flyout. Display only. */
+    juce::String withoutCategoryPrefix (const juce::String& name, const juce::String& category)
+    {
+        const auto dash = name.indexOf (" - ");
+        if (dash <= 0)
+            return name;
+        const auto head = name.substring (0, dash).trim();
+        const bool same = head.equalsIgnoreCase (category) || (category.endsWithIgnoreCase ("s") && head.equalsIgnoreCase (category.dropLastCharacters (1)));
+        const auto rest = name.substring (dash + 3).trim();
+        return same && rest.isNotEmpty() ? rest : name;
+    }
+}
+
 juce::PopupMenu PresetBar::presetMenu()
 {
     if (! processor.groupsPresets())
@@ -819,9 +837,12 @@ juce::PopupMenu PresetBar::presetMenu()
             if (safe->onChange != nullptr)
                 safe->onChange();
         };
+        // Actions with their icons; the presets keep the icon column (labels aligned), plain.
+        using menuicons::Kind;
+        const auto ellipsis = juce::String::fromUTF8 ("\xe2\x80\xa6");
         if (onOpenLibrary != nullptr)
         {
-            menu.addItem (juce::String::fromUTF8 ("Open Library\xe2\x80\xa6"), [safe] {
+            menuicons::addItem (menu, Kind::library, "Open Library" + ellipsis, true, [safe] {
                 if (safe != nullptr && safe->onOpenLibrary != nullptr)
                     safe->onOpenLibrary();
             });
@@ -830,30 +851,36 @@ juce::PopupMenu PresetBar::presetMenu()
         // Loading replaced the whole patch: the one before it is a click away.
         if (processor.canRestorePreviousState())
         {
-            const auto what = processor.previousStateDescription().fromFirstOccurrenceOf ("Before ", false, false);
-            const auto label = what.isEmpty() || what == "restoring" ? juce::String ("Back to the previous patch") : "Back to the patch before " + what;
-            menu.addItem (label, [safe, opened] { if (safe != nullptr) safe->processor.restorePreviousState(), opened(); });
+            menuicons::addItem (menu, Kind::previous, "Previous patch", true, [safe, opened] { if (safe != nullptr) safe->processor.restorePreviousState(), opened(); });
             menu.addSeparator();
         }
+        auto plain = [&] (const juce::String& text, bool ticked, std::function<void()> action, Kind kind = Kind::blank) {
+            juce::PopupMenu::Item item (text);
+            item.setTicked (ticked).setImage (menuicons::make (kind)).setAction (std::move (action));
+            menu.addItem (std::move (item));
+        };
+        auto saveState = [&] {
+            menuicons::addItem (menu, Kind::startingState, "Save starting state" + ellipsis, true, [safe] {
+                if (safe != nullptr && safe->onSaveStartingState != nullptr)
+                    safe->onSaveStartingState();
+            });
+        };
         // Starting states (settings only, the sounds stay): INIT empties the patch, Reset
         // returns every setting to its default, then the built-in and the saved ones.
         menu.addSectionHeader ("Starting states");
-        menu.addItem ("INIT", true, current == "INIT", [safe, opened] { if (safe != nullptr) safe->processor.initPatch(), opened(); });
-        menu.addItem ("Reset settings", true, false, [safe, opened] { if (safe != nullptr) safe->processor.resetSettings(), opened(); });
+        plain ("INIT", current == "INIT", [safe, opened] { if (safe != nullptr) safe->processor.initPatch(), opened(); }, Kind::init);
+        plain ("Reset settings", false, [safe, opened] { if (safe != nullptr) safe->processor.resetSettings(), opened(); }, Kind::reset);
         menu.addSeparator();
         bool presetsHeader = false;
         for (const auto& entry : list)
         {
             if (! entry.startingState && ! presetsHeader)
             {
-                menu.addItem (juce::String::fromUTF8 ("Save starting state\xe2\x80\xa6"), [safe] {
-                    if (safe != nullptr && safe->onSaveStartingState != nullptr)
-                        safe->onSaveStartingState();
-                });
+                saveState();
                 menu.addSectionHeader ("Presets");
                 presetsHeader = true;
             }
-            menu.addItem (entry.name, true, entry.name == current, [safe, entry, opened] {
+            plain (entry.name, entry.name == current, [safe, entry, opened] {
                 if (safe == nullptr)
                     return;
                 safe->processor.openPresetEntry (entry);
@@ -861,10 +888,7 @@ juce::PopupMenu PresetBar::presetMenu()
             });
         }
         if (! presetsHeader)
-            menu.addItem (juce::String::fromUTF8 ("Save starting state\xe2\x80\xa6"), [safe] {
-                if (safe != nullptr && safe->onSaveStartingState != nullptr)
-                    safe->onSaveStartingState();
-            });
+            saveState();
         return menu;
     }
     // Grouped (ANDOR OSP): the global actions, then COLLECTIONS (Starting States, Favorites,
@@ -883,19 +907,22 @@ juce::PopupMenu PresetBar::presetMenu()
             safe->onChange();
     };
     const auto ellipsis = juce::String::fromUTF8 ("\xe2\x80\xa6");
+    // The actions carry their icons; collections, categories and packs keep the icon column
+    // (labels aligned), presets in the flyouts stay plain.
+    using menuicons::Kind;
     if (onOpenLibrary != nullptr)
-        menu.addItem ("Open Library" + ellipsis, [safe] {
+        menuicons::addItem (menu, Kind::library, "Open Library" + ellipsis, true, [safe] {
             if (safe != nullptr && safe->onOpenLibrary != nullptr)
                 safe->onOpenLibrary();
         });
     if (processor.canRestorePreviousState())
+        menuicons::addItem (menu, Kind::previous, "Previous patch", true, [safe, opened] { if (safe != nullptr) safe->processor.restorePreviousState(), opened(); });
     {
-        const auto what = processor.previousStateDescription().fromFirstOccurrenceOf ("Before ", false, false);
-        menu.addItem (what.isEmpty() || what == "restoring" ? juce::String ("Back to previous patch") : "Back to the patch before " + what,
-                      [safe, opened] { if (safe != nullptr) safe->processor.restorePreviousState(), opened(); });
+        juce::PopupMenu::Item init ("INIT");
+        init.setTicked (current == "INIT").setImage (menuicons::make (Kind::init)).setAction ([safe, opened] { if (safe != nullptr) safe->processor.initPatch(), opened(); });
+        menu.addItem (std::move (init));
     }
-    menu.addItem ("INIT", true, current == "INIT", [safe, opened] { if (safe != nullptr) safe->processor.initPatch(), opened(); });
-    menu.addItem ("Reset settings", [safe, opened] { if (safe != nullptr) safe->processor.resetSettings(), opened(); });
+    menuicons::addItem (menu, Kind::reset, "Reset settings", true, [safe, opened] { if (safe != nullptr) safe->processor.resetSettings(), opened(); });
 
     // A collection's flyout: its first flyoutRows (alphabetical), then Browse all ... (the Library).
     auto flyout = [&] (std::vector<InstrumentHost::PresetEntry> entries, const juce::String& context, const juce::String& scope, bool states) {
@@ -909,7 +936,8 @@ juce::PopupMenu PresetBar::presetMenu()
         {
             auto e = entries[static_cast<std::size_t> (i)];
             e.context = context;
-            sub.addItem (e.name, true, e.name == current, [safe, e, opened] {
+            sub.addItem (context.startsWith ("category:") ? withoutCategoryPrefix (e.name, context.fromFirstOccurrenceOf ("category:", false, false)) : e.name,
+                         true, e.name == current, [safe, e, opened] {
                 if (safe == nullptr)
                     return;
                 safe->processor.openPresetEntry (e);
@@ -959,11 +987,11 @@ juce::PopupMenu PresetBar::presetMenu()
             if (safe != nullptr && safe->onSaveStartingState != nullptr)
                 safe->onSaveStartingState();
         });
-        menu.addSubMenu ("Starting States", sub);
+        menu.addSubMenu ("Starting States", sub, true, menuicons::make (Kind::startingState));
     }
-    menu.addSubMenu ("Favorites", flyout (favourites, "favourites", "favourites", false), ! favourites.empty());
-    menu.addSubMenu ("Recently Used", flyout (recent, "recent", "recent", false), ! recent.empty());
-    menu.addSubMenu ("All Presets", flyout (presets, "all", "all", false), ! presets.empty());
+    menu.addSubMenu ("Favorites", flyout (favourites, "favourites", "favourites", false), ! favourites.empty(), menuicons::make (Kind::favourite));
+    menu.addSubMenu ("Recently Used", flyout (recent, "recent", "recent", false), ! recent.empty(), menuicons::make (Kind::recent));
+    menu.addSubMenu ("All Presets", flyout (presets, "all", "all", false), ! presets.empty(), menuicons::make (Kind::list));
 
     // Categories in their fixed order; empty ones hidden.
     bool header = false;
@@ -979,7 +1007,7 @@ juce::PopupMenu PresetBar::presetMenu()
             menu.addSectionHeader ("CATEGORIES");
             header = true;
         }
-        menu.addSubMenu (category, flyout (found->second, "category:" + category, "category:" + category, false));
+        menu.addSubMenu (category, flyout (found->second, "category:" + category, "category:" + category, false), true, menuicons::make (Kind::blank));
     }
     if (! byPack.empty())
     {
@@ -992,7 +1020,7 @@ juce::PopupMenu PresetBar::presetMenu()
         std::sort (order.begin(), order.end(), [] (const auto& a, const auto& b) { return a.first.compareNatural (b.first) < 0; });
         for (const auto& [packName, id] : order)
             packs.addSubMenu (packName, flyout (byPack[id].second, "pack:" + id, "packs", false));
-        menu.addSubMenu ("Packs", packs);
+        menu.addSubMenu ("Packs", packs, true, menuicons::make (Kind::package));
     }
     return menu;
 }

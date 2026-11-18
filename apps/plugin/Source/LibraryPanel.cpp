@@ -1,5 +1,7 @@
 #include "LibraryPanel.h"
 
+#include "MenuIcons.h"
+
 #include "Design.h"
 #include "LibraryCapture.h"
 #include "OspLookAndFeel.h"
@@ -2485,6 +2487,22 @@ void LibraryPanel::restoreRow (const LibraryRow& r)
     refresh();
 }
 
+namespace
+{
+    /** The row menu's actions with their icons (shared menu look, docs/research/menu-visual). */
+    void decorateRowMenu (juce::PopupMenu& menu)
+    {
+        using osp::plugin::menuicons::Kind;
+        osp::plugin::menuicons::decorate (menu, { { "Play / Pause", Kind::play }, { "Preview", Kind::play }, { "Load into*", Kind::importIn },
+                                                  { "Load starting state", Kind::startingState }, { "Load", Kind::importIn }, { "Trim / Slice", Kind::trim },
+                                                  { "Duplicate", Kind::saveAs }, { "Export*", Kind::exportOut }, { "Rename", Kind::rename },
+                                                  { "Describe", Kind::rename }, { "Move to Trash", Kind::remove }, { "Restore", Kind::previous },
+                                                  { "Show in Finder", Kind::reveal }, { "Add to favourites", Kind::favourite },
+                                                  { "Remove from favourites", Kind::favourite }, { "Replace with the selected sound", Kind::replace },
+                                                  { "Import*", Kind::importIn } });
+    }
+}
+
 void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
 {
     if (index < 0 || index >= rowCount())
@@ -2521,13 +2539,13 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
             menu.addItem (r.rejected ? "Bring back" : "Set aside (nothing is deleted)", [safe, aside = ! r.rejected] { if (safe != nullptr) safe->setSelectedAside (aside); });
         }
         menu.addItem ("Show in Finder", [file = juce::File (r.path)] { file.revealToUser(); });
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
+        decorateRowMenu (menu), menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
         return;
     }
     if (r.trashed)
     {
         menu.addItem ("Restore", [safe, r] { if (safe != nullptr) safe->restoreRow (r); });
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
+        decorateRowMenu (menu), menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
         return;
     }
     if (r.type == AssetType::sound)
@@ -2545,7 +2563,7 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
         menu.addItem (r.type == AssetType::templateState ? "Load starting state" : "Load", [safe, r] { if (safe != nullptr) safe->loadRow (r); });
         if (r.isBuiltIn())
         {
-            menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
+            decorateRowMenu (menu), menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
             return;
         }
         menu.addItem ("Duplicate", [safe, r] {
@@ -2617,7 +2635,7 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
     menu.addItem (juce::String::fromUTF8 ("Rename\xe2\x80\xa6"), [safe, r] { if (safe != nullptr) safe->renameRow (r); });
     menu.addSeparator();
     menu.addItem ("Move to Trash", [safe, r] { if (safe != nullptr) safe->trashRow (r); });
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
+    decorateRowMenu (menu), menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
 }
 
 std::string LibraryPanel::previewKey (const LibraryRow& r)

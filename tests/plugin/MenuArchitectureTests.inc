@@ -22,7 +22,8 @@ namespace
             const auto& item = it.getItem();
             if (item.isSeparator)
                 continue;
-            out.push_back ({ item.text, item.shortcutKeyDescription, item.isSectionHeader, item.isEnabled, item.action });
+            // (a source menu's identity, a custom item, opens it as its header did)
+            out.push_back ({ item.text, item.shortcutKeyDescription, item.isSectionHeader || item.customComponent != nullptr, item.isEnabled, item.action });
         }
         return out;
     }

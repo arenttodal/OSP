@@ -1,5 +1,26 @@
 # Status
 
+> **18 Nov 2026, shared menu visual refinement (branch `claude/menu-visual`, on
+> `claude/osp-menu-content`; `docs/research/menu-visual/`):**
+> - **Every menu takes the ANDOR look.** Until now, no menu set a look of its own, so in a DAW
+>   and in the standalone they were desktop windows in JUCE's default dark look.
+>   `SharedMenuLook` now makes one shared OspLookAndFeel the default look while an editor is
+>   open. It applies to OSP and the shell products alike.
+> - **Ceramic card:**
+>   - `#F7F0E6`, 8 px corners, a soft two-layer shadow in a translucent window (opaque square
+>     fallback where windows cannot be translucent);
+>   - 28 px rows, quiet small-capital section labels;
+>   - sage `#DDE3D4` rounded hover;
+>   - each card sits on its anchor, and submenus overlap their parent by 3 px.
+> - **Icons:** monochrome icons for actions, with warm rust for destructive ones.
+> - **Identity headers** (chip, name, file) on OSP's source menus and the shell's layer menus.
+> - **Preset dropdown:** "Previous patch"; category prefixes are dropped inside their flyouts
+>   (display only).
+> - **Library, USER macro, FX routing and mod menus:** icons for their actions.
+> - **Screenshots:** before and after for menus 1–8.
+> - **Tests:** the shared look's lifetime; the card's geometry against its anchor and a real
+>   hover-opened submenu at 100 / 150 / 200 %.
+
 > **18 Nov 2026, menu architecture, content authoring, preset navigation (branch
 > `claude/osp-menu-content`; `docs/research/menu-content/`, `docs/research/preset-navigation/`):**
 > - **Main menu:** INSTRUMENT / CONTENT / PREFERENCES / SUPPORT, with no layer items. Each

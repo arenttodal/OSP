@@ -224,6 +224,9 @@ public:
     class Tray;
     class Sheet;
 
+    /** A row's context menu at a screen point, as a right-click opens it (tests, snapshots). */
+    void showRowMenuForTest (int index, juce::Point<int> screenPoint) { showRowMenu (index, screenPoint); }
+
 private:
     friend class Sidebar;
     friend class StartingStates;

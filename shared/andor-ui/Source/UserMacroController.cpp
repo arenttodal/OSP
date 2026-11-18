@@ -1,5 +1,7 @@
 #include "UserMacroController.h"
 
+#include "MenuIcons.h"
+
 #include "Binding.h"
 #include "Design.h"
 #include "OspLookAndFeel.h"
@@ -641,6 +643,7 @@ void UserMacroController::labelMenu (int macro)
             }
         });
     });
+    menuicons::decorate (menu, { { "Edit Assignments", menuicons::Kind::list }, { "Rename", menuicons::Kind::rename }, { "Clear Assignments", menuicons::Kind::remove } });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (userRow[static_cast<std::size_t> (macro)].label.get()));
 }
 

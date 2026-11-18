@@ -143,16 +143,50 @@ public:
     juce::Font getComboBoxFont (juce::ComboBox&) override;
     void positionComboBoxText (juce::ComboBox&, juce::Label&) override;
 
+    /** ANDOR's menus (docs/research/menu-visual): a ceramic card with rounded corners and a soft
+        two-layer shadow, drawn in a translucent window where the platform has them (else the
+        same card, square, filling an opaque window); 28 px rows, a rounded sage highlight, quiet
+        small-capital section labels, monochrome action icons (menuicons::Glyph) in a column of
+        their own, shortcuts right-aligned. Every menu takes it: SharedMenuLook makes this the
+        default look while an editor is open (a menu without a look of its own is a desktop
+        window with JUCE's default look otherwise). */
     void drawPopupMenuBackground (juce::Graphics&, int width, int height) override;
+    void drawPopupMenuBackgroundWithOptions (juce::Graphics&, int width, int height, const juce::PopupMenu::Options&) override;
+    int getPopupMenuBorderSize() override;
+    int getPopupMenuBorderSizeWithOptions (const juce::PopupMenu::Options&) override;
+    void preparePopupMenuWindow (juce::Component&) override;
+    int getMenuWindowFlags() override;
     juce::Font getPopupMenuFont() override;
-    /** ANDOR's menus: one row height, text aligned under quiet section labels (small capitals,
-        a hairline above each group), a restrained highlight, shortcuts right-aligned. */
     void drawPopupMenuItem (juce::Graphics&, const juce::Rectangle<int>& area, bool isSeparator, bool isActive, bool isHighlighted, bool isTicked, bool hasSubMenu,
                             const juce::String& text, const juce::String& shortcutKeyText, const juce::Drawable* icon, const juce::Colour* textColour) override;
     void drawPopupMenuSectionHeader (juce::Graphics&, const juce::Rectangle<int>& area, const juce::String& sectionName) override;
+    /** (JUCE's rows span the whole window, its border is vertical only: the card's side inset is
+        applied here, where the menu's options say whether there is a shadow margin.) */
+    void drawPopupMenuItemWithOptions (juce::Graphics&, const juce::Rectangle<int>& area, bool isHighlighted, const juce::PopupMenu::Item&,
+                                       const juce::PopupMenu::Options&) override;
+    void drawPopupMenuSectionHeaderWithOptions (juce::Graphics&, const juce::Rectangle<int>& area, const juce::String& sectionName,
+                                                const juce::PopupMenu::Options&) override;
     void getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth, int& idealHeight) override;
-    /** The left gutter (ticks) and the row height every menu shares. */
-    static constexpr int popupGutter = 24, popupRowHeight = 24;
+    void getIdealPopupMenuSectionHeaderSizeWithOptions (const juce::String& text, int standardMenuItemHeight, int& idealWidth, int& idealHeight,
+                                                         const juce::PopupMenu::Options&) override;
+    /** The menu's metrics: the label's left edge in a plain menu (ticks in the gutter before
+        it) and in a menu with icons (the icon first, the tick at the right); the row, separator
+        and section label heights; the card's inner padding and, where the window can be
+        translucent, the shadow's margin around it. */
+    static constexpr int popupGutter = 24, popupIconGutter = 34, popupRowHeight = 28, popupSeparatorHeight = 11, popupHeaderHeight = 28;
+    static constexpr int popupPadding = 8, popupShadowMargin = 8;
+    static constexpr float popupRadius = 8.0f;
+    /** The card's colours (shared by menus drawn outside a menu window, e.g. a menu's picture). */
+    static juce::Colour popupSurface() noexcept { return juce::Colour (0xfff7f0e6); }
+    static juce::Colour popupHighlight() noexcept { return juce::Colour (0xffdde3d4); }
+    /** Whether menu windows are translucent (rounded corners, the shadow drawn here): where the
+        platform composites windows. Tests force it to see the design under a bare X server. */
+    static bool translucentMenus() noexcept;
+    /** The side inset a custom menu item (PopupMenu::CustomComponent) draws inside: the card's
+        shadow margin when it is in a menu window that has one, 0 elsewhere (e.g. a picture of a
+        menu that lays its items out inside the card itself). */
+    static int popupSideInset (const juce::Component& item) noexcept;
+    static void setTranslucentMenusForTests (bool forced) noexcept;
     void drawLabel (juce::Graphics&, juce::Label&) override;
 
     /** The knob itself (also used where no Slider exists, e.g. snapshots). */
@@ -171,6 +205,28 @@ private:
     juce::SharedResourcePointer<SpriteKnobLibrary> sprites;
     /** The ceramic skin's rendered pieces (skin::active() reaches them while this lives). */
     skin::Pieces::Holder skinPieces;
+};
+
+/**
+    While an editor holds one, every menu without a look of its own (JUCE's PopupMenu opens a
+    desktop window that takes the default look, not the editor's) is drawn by an OspLookAndFeel:
+    one shared instance is JUCE's default look from the first editor to the last (the menus,
+    alert windows and tooltips of this plug-in binary only: each binary has its own JUCE). The
+    last one dismisses open menus before the look goes.
+*/
+class SharedMenuLook final
+{
+public:
+    SharedMenuLook() = default;
+
+private:
+    struct Holder
+    {
+        Holder();
+        ~Holder();
+        OspLookAndFeel look;
+    };
+    juce::SharedResourcePointer<Holder> holder;
 };
 
 /**
