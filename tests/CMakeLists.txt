@@ -40,6 +40,7 @@ add_executable(osp_tests
     unit/SatelliteTests.cpp
     unit/DriveProcessorTests.cpp
     unit/ArpeggiatorTests.cpp
+    unit/ArpPatternLabTests.cpp
     unit/ModulationTests.cpp
     unit/LayerEqTests.cpp
     unit/SynthesizeTests.cpp

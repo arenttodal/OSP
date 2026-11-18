@@ -204,6 +204,7 @@ add_library(osp_research STATIC
     src/research/AtlasFixtures.cpp
     src/research/PhraseFixtures.cpp
     src/research/PedalLoopLab.cpp
+    src/research/ArpPatternLab.cpp
 )
 target_include_directories(osp_research PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(osp_research PUBLIC osp_dsp osp_library osp_juce_headless)
