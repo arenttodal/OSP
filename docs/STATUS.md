@@ -361,6 +361,16 @@ _Last updated: Phases 0–2 complete; Phase 3 (continuation) implemented and in 
       unchanged); 129 frames, pointer error 0.21 deg; measured in the current editor (default branch 08ebd01):
       same paint cost and memory as A. Awaiting approval; to ship on the default line (see
       docs/reports/andor-shared-system-audit.md). Small knobs, buttons and keyboard follow after it.
+      Phase 4 (18 Nov): D2 approved visually; PR #26 is the vehicle, its manual Retina Mac / DAW QA open
+      (docs/reports/knob-d2-manual-qa.md: the CI test build from the PR head, install, rollback).
+- [ ] RENDERED SOURCE KNOB layer-ivory B: approved; full pack (0.41 deg, 100 / 200 px) in PR #28 (stacked on #26).
+      Mini knobs: mini-ivory full turn + local pilot at four sites (popover at 1x needs a wider, darker pointer);
+      mini-graphite G1 recommended; buttons / touch strip exploratory (docs/reports/gui-assets-phase4.md).
+      Ceramic skin memory: branch claude/ceramic-skin-memory (no leak; the 192 MB budget only adds retention;
+      evicting stale sizes on settle recommended). ANALOG: the OSP default line is not D2-only; an isolated
+      b522a06 + D2 integration passes 10/10 with parity 0 px (docs/reports/analog-osp-dependency-audit.md).
+      Commercial stills locked (Gate C3, M06 corrected), asset manifest, website kit, feature library, Gate D
+      motion preproduction (andor-web/product-renders/documentation/).
 - [x] Layer knobs: each name sits as far above the dial's tick dots as the value sits below
       the lowest ones (the knob component grows upwards by `LayerKnob::labelLift`; dial and
       value unchanged). The MACROS title is gone from the macro panel.

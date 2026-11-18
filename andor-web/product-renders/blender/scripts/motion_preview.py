@@ -73,8 +73,10 @@ for cut in plan:
     bpy, Vector, Euler = g["bpy"], g["Vector"], g["Euler"]
     scene = bpy.context.scene
     cam = scene.camera
-    # The shot's focus point: along the camera's view at its focus distance.
-    fwd = cam.matrix_world.to_quaternion() @ Vector((0, 0, -1))
+    # The shot's focus point: along the camera's view at its focus distance (from its own
+    # rotation: matrix_world is not evaluated yet when the scene script returns).
+    bpy.context.view_layer.update()
+    fwd = cam.rotation_euler.to_quaternion() @ Vector((0, 0, -1))
     dist0 = cam.data.dof.focus_distance if cam.data.dof.use_dof else 1.0
     target = cam.location + fwd * dist0
     rel0 = cam.location - target
