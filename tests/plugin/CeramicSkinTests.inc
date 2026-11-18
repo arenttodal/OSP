@@ -44,6 +44,10 @@ namespace
             for (const char* macro : { "life", "drive", "character", "motion", "echo", "space" })
                 for (const char* lit : { "lit", "unlit" })
                     n.push_back (juce::String ("led-") + macro + "-" + lit);
+            // The USER bank's lenses (its frozen palette; pieces.py USER_MACRO_COLOURS).
+            for (int user = 1; user <= 6; ++user)
+                for (const char* lit : { "lit", "unlit" })
+                    n.push_back ("led-user-" + juce::String (user) + "-" + lit);
             return n;
         }();
         return names;

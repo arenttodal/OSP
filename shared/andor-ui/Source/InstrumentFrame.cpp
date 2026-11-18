@@ -310,6 +310,15 @@ void setUpMacro (MacroKnob& knob, int index, const MacroSpec& spec, juce::AudioP
     content.addAndMakeVisible (knob.slider);
 }
 
+void setUpUserMacro (MacroKnob& knob, int index, const MacroSpec& spec, juce::AudioProcessorValueTreeState& state, juce::Component& content)
+{
+    setUpMacro (knob, index, spec, state, content, true);
+    knob.user = true;
+    const auto colour = design::colour::userMacro (index);
+    knob.label->setAccent (colour);
+    knob.slider.getProperties().set ("arc", static_cast<juce::int64> (colour.getARGB()));
+}
+
 void setUpKeyboard (OspKeyboard& keyboard)
 {
     keyboard.setAvailableRange (21, 108);
@@ -450,13 +459,18 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
         // No panel title: the six named knobs speak for themselves.
         // Under each macro a small light: lit when the macro's own settings are in use.
         // Ceramic: a rendered glass lens in the macro's colour (its glow stays drawn).
+        // A USER knob: the USER palette, and the lens rendered in it ("led-user-N") unless the
+        // product colours its macros itself (then the CORE lens of that place, as before).
         static const char* const lensNames[] = { "life", "drive", "character", "motion", "space", "echo" };
         auto* pieces = skin::active();
         for (std::size_t i = 0; i < macros.size(); ++i)
         {
             const auto knob = macros[i].slider.getBounds().toFloat();
             const bool lit = macros[i].label != nullptr && macros[i].label->isCustomised();
-            const auto identityColour = colour::macro (static_cast<int> (i));
+            const bool user = macros[i].user;
+            const auto identityColour = user ? colour::userMacro (static_cast<int> (i)) : colour::macro (static_cast<int> (i));
+            const bool ownLens = user && materials().macros[i].getAlpha() == 0 && materials().userMacros[i].getAlpha() == 0;
+            const auto lensName = ownLens ? "led-user-" + juce::String (static_cast<int> (i) + 1) : juce::String ("led-") + lensNames[std::min<std::size_t> (i, 5)];
             const juce::Point<float> centre { knob.getCentreX(), knob.getCentreY() + 65.0f };
             if (pieces != nullptr && i < std::size (lensNames))
             {
@@ -466,7 +480,7 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
                     g.setGradientFill (halo);
                     g.fillEllipse (juce::Rectangle<float> (20.0f, 20.0f).withCentre (centre));
                 }
-                if (pieces->draw (g, juce::String ("led-") + lensNames[i] + (lit ? "-lit" : "-unlit"), juce::Rectangle<float> (9.0f, 9.0f).withCentre (centre)))
+                if (pieces->draw (g, lensName + (lit ? "-lit" : "-unlit"), juce::Rectangle<float> (9.0f, 9.0f).withCentre (centre)))
                     continue;
             }
             draw::led (g, centre, 9.0f, lit ? identityColour.withMultipliedBrightness (1.2f) : identityColour.interpolatedWith (colour::panelBottom, 0.35f), lit ? 0.8f : 0.0f);

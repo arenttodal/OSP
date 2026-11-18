@@ -50,15 +50,15 @@ void UserMacroController::setUp()
 {
     auto& content = *ed.content;
     juce::WeakReference<UserMacroController> safe (this);
-    // The second bank: six knobs in the very places of the first (the same knob, colours and
-    // light), hidden until USER is chosen. Their names open their assignments; a double-click
+    // The second bank: six knobs in the very places of the first (the same knob and light in
+    // the USER palette), hidden until USER is chosen. Their names open their assignments; a double-click
     // renames; a right-click offers both. Their lenses are grab handles.
     for (std::size_t i = 0; i < userRow.size(); ++i)
     {
         const int macro = static_cast<int> (i);
         frame::MacroSpec spec { hooks.parameterIds[i], hooks.name != nullptr ? hooks.name (host, macro) : "MACRO " + juce::String (macro + 1),
                                 "User macro " + juce::String (macro + 1) + ": click for its assignments, double-click to rename" };
-        frame::setUpMacro (userRow[i], macro, spec, *ed.parameters, content, true);
+        frame::setUpUserMacro (userRow[i], macro, spec, *ed.parameters, content);
         userRow[i].slider.setTitle ("User Macro " + juce::String (macro + 1));
         userRow[i].label->onClick = [safe, macro] {
             if (safe == nullptr)

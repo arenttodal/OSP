@@ -160,19 +160,22 @@ namespace colour
     const juce::Colour arp { 0xffc98f3e };
     const juce::Colour arpOnDark { 0xffe9b45f };
 
-    /** The six macros' identities, one natural mineral palette at about the same lightness
-        (CIE L* 56-58): LIFE rust, DRIVE ochre (the place and colour DYNAMICS had before it
-        moved into Advanced), CHARACTER moss, MOVEMENT mineral blue, SPACE muted mauve, ECHO
-        verdigris (the patina of an old tape machine's copper). They mark only the macro's
-        thin value arc, its small light, and the accents of its popover; panels, text and
-        values stay neutral. */
+    /** The six macros' identities: the harmonised CORE palette (approved 18 Nov 2026,
+        docs/research/menu-content/palette), six muted earthy hues at about the same lightness.
+        LIFE dried sage, DRIVE burnished copper, FILTER aged teal, MOVEMENT antique brass, SPACE
+        slate blue, ECHO warm clay. FILTER and MOVEMENT were two near-equal greys (moss and
+        mineral blue) before. They mark only the macro's thin value arc, its small light, and
+        the accents of its popover; panels, text and values stay neutral. The effect pedals
+        keep their own V5 enamels (FxIdentity), and the USER macros their frozen palette
+        (userMacro). The beads are rendered sprites of the same colours
+        (tools/blender-assets/skin/pieces.py MACRO_COLOURS). */
     enum class Macro { life, drive, character, movement, space, echo };
     inline juce::Colour macro (Macro m)
     {
         if (const auto own = detail::materials.macros[static_cast<std::size_t> (m)]; own.getAlpha() != 0)
             return own;   // (the product's own: ANDOR ANALOG's spore SPACE)
-        static const std::array<juce::Colour, 6> colours { juce::Colour (0xffbe7552), juce::Colour (0xffb5843a), juce::Colour (0xff7b8d69),
-                                                           juce::Colour (0xff73899c), juce::Colour (0xff96839d), juce::Colour (0xff5c9490) };
+        static const std::array<juce::Colour, 6> colours { juce::Colour (0xff879674), juce::Colour (0xffbb784e), juce::Colour (0xff518b88),
+                                                           juce::Colour (0xffb09a61), juce::Colour (0xff758899), juce::Colour (0xff94776b) };
         return colours[static_cast<std::size_t> (m)];
     }
     inline juce::Colour macro (int index) { return macro (static_cast<Macro> (juce::jlimit (0, 5, index))); }

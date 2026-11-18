@@ -2215,7 +2215,7 @@ void ShellEditor::dimMacroArc (int macro, bool on)
 
 juce::Colour ShellEditor::userMacroColour (int macro) const
 {
-    return design::colour::macro (std::clamp (macro, 0, frame::macroCount - 1));
+    return design::colour::userMacro (std::clamp (macro, 0, frame::macroCount - 1));
 }
 
 void ShellEditor::setUpUserMacros()
@@ -2231,7 +2231,7 @@ void ShellEditor::setUpUserMacros()
         const int macro = static_cast<int> (i);
         frame::MacroSpec spec { um->parameterIds[i], um->name != nullptr ? um->name (shell, macro) : "MACRO " + juce::String (macro + 1),
                                 "User macro " + juce::String (macro + 1) + ": click for its assignments, double-click to rename" };
-        frame::setUpMacro (userRow[i], macro, spec, shell.parameters, content, true);
+        frame::setUpUserMacro (userRow[i], macro, spec, shell.parameters, content);
         userRow[i].slider.setTitle ("User Macro " + juce::String (macro + 1));
         userRow[i].label->onClick = [this, macro] {
             if (closedByLabelPress == 100 + macro)

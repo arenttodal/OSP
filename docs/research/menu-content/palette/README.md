@@ -1,6 +1,10 @@
-# CORE macro palette study (Gate 2), for approval
+# CORE macro palette study (Gate 2)
 
-Nothing in this study changes the shipped palette. The captures come from the hidden test
+> **Approved 18 Nov 2026: the harmonised palette (capture 3); the pedals keep their V5
+> enamels (option a).** See "Applied" at the end. Captures 1–5 below are the study as it was
+> shown for approval; `6-core-approved` is the shipped result, with the re-rendered beads.
+
+The study itself changed nothing in the shipped palette. The captures come from the hidden test
 `osp_plugin_tests "[palette-shots]"` (`OSP_PALETTE_SHOTS=<folder>`). Each is shown at native
 size (scale 1) and at @2x.
 
@@ -64,3 +68,29 @@ Comparisons:
    - the visual references (`[design-capture]`, `osp_visual_reference`) update with the
      approved change;
    - the USER palette stays as it is.
+
+## Applied (18 Nov 2026)
+
+- **Tokens:** `design::colour::macro` = LIFE `#879674`, DRIVE `#BB784E`, FILTER `#518B88`,
+  MOVEMENT `#B09A61`, SPACE `#758899`, ECHO `#94776B`. Every product without its own macro
+  colours follows, so the ANDOR visual regression (products against OSP's render) stays at
+  parity.
+- **Beads re-rendered in Blender:**
+  - `pieces.py` `MACRO_COLOURS`, rendered with `bpy` 4.2 (`render.py --only 'led-*'`).
+  - The same build reproduces the shipped beads to rounding (max 0.5 / 255) with the old
+    colours.
+  - `pack.py --update` replaced only those pieces; every other piece in `ceramic-skin.zip`
+    is byte-identical.
+- **USER bank unchanged:**
+  - Its knobs are built with `frame::setUpUserMacro` (arc, accent and light in
+    `colour::userMacro`). Before, they took `colour::macro`.
+  - They have their own lenses (`led-user-1..6`, `pieces.py` `USER_MACRO_COLOURS`, the frozen
+    palette).
+  - `4-user-bank` against the study's capture: 0 pixels at scale 1; 6 pixels off by 1 / 255
+    at @2x (render noise in one lens).
+  - The shell's USER bank does the same (`ShellEditor::userMacroColour` is `userMacro`).
+- **Pedals:** unchanged (`5-pedals@2x`: 0 pixels).
+
+| Capture | |
+|---|---|
+| `6-core-approved` | CORE bank, harmonised palette, rendered beads |

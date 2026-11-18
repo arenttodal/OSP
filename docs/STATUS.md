@@ -19,12 +19,12 @@
 >   - the arrows walk the collection a preset was chosen from;
 >   - categories are derived (`src/library/PresetCategory.h`), so nothing is rewritten;
 >   - tested at 50 / 500 / 5,000 presets.
-> - **USER macros** have their own frozen palette (`colour::userMacro`).
-> - **NEXT:**
->   - approve the CORE macro palette (`docs/research/menu-content/palette/`), then re-render
->     the beads in Blender;
->   - pedals: keep V5 or follow the macros;
->   - SUPPORT's user guide link needs a URL.
+> - **CORE macro palette: harmonised** (approved).
+>   - LIFE sage, DRIVE copper, FILTER teal, MOVEMENT brass, SPACE slate, ECHO clay.
+>   - The beads were re-rendered in Blender (`bpy` 4.2) and swapped in with
+>     `pack.py --update`.
+>   - The USER bank keeps its frozen palette and lenses; the pedals keep V5.
+> - **NEXT:** SUPPORT's user guide link needs a URL.
 
 > **17 Nov 2026, final interface polish (branch `claude/osp-final-polish`):**
 > - **Popovers stay open** through right-click, Assign to Macro, halo range drags,
