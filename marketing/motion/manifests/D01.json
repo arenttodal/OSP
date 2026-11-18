@@ -1,0 +1,245 @@
+{
+ "schemaVersion": 1,
+ "id": "D01",
+ "title": "Gallery reveal",
+ "version": "D01.v1",
+ "purpose": "Website hero and flagship reveal: the whole instrument settles into the approved A1-R1 W hero composition on the light editorial gallery.",
+ "approval": "awaiting creative review (Gate D1)",
+ "scene": {
+  "builder": "andor-web/product-renders/blender/scripts/andor_scene.py",
+  "builderSha": "a39a92d9528e7a5d",
+  "setup": "ANDOR_GALLERY",
+  "baseShot": "A1_R1_W",
+  "setupsSha": "fffd578459cd6361",
+  "textures": "andor-web/product-renders/blender/textures_current (prep_textures.py from the current editor capture)"
+ },
+ "productBuild": {
+  "commit": "00c8c3b",
+  "branch": "claude/motion-library"
+ },
+ "camera": {
+  "keys": [
+   {
+    "t": 0.0,
+    "camera": {
+     "yaw": -37.0,
+     "pitch": 54.5,
+     "distScale": 1.08
+    }
+   },
+   {
+    "t": 1.0,
+    "camera": {}
+   }
+  ],
+  "ease": "smootherstep",
+  "base": {
+   "yaw": -30,
+   "pitch": 52,
+   "dist": 1.87,
+   "lens": 85,
+   "target": [
+    724,
+    520,
+    0
+   ],
+   "fstop": 11,
+   "shift": [
+    -0.17,
+    -0.03
+   ],
+   "fit": "HORIZONTAL"
+  },
+  "curve": "marketing/motion/media/D01/D01.v1/camera_curve.json"
+ },
+ "lens_mm": [
+  85.0
+ ],
+ "focus": "focus distance follows the shot's target every frame (dof on, f-stop per the keys)",
+ "frameRange": [
+  0,
+  179
+ ],
+ "fps": 30,
+ "seconds": 6.0,
+ "lightRig": {
+  "setup": "ANDOR_GALLERY",
+  "lights": [
+   {
+    "name": "Key softbox",
+    "offset": [
+     -1.1,
+     0.25,
+     0.95
+    ],
+    "size": [
+     1.4,
+     1.0
+    ],
+    "power": 30,
+    "rgb": [
+     1.0,
+     0.97,
+     0.93
+    ],
+    "why": "large and soft from upper left: ivory keeps its shape; a long gradient across the stone"
+   },
+   {
+    "name": "Edge strip",
+    "offset": [
+     0.55,
+     1.0,
+     0.35
+    ],
+    "size": [
+     1.6,
+     0.08
+    ],
+    "power": 22,
+    "rgb": [
+     1.0,
+     0.95,
+     0.9
+    ],
+    "spread": 120,
+    "why": "narrow, behind right: thin highlights along the teak, the ceramic edges and the knob rims",
+    "note": "C2: spread 60 -> 120, so tall frames see no hard light boundary on the stone"
+   },
+   {
+    "name": "Overhead",
+    "offset": [
+     0.05,
+     0.1,
+     1.45
+    ],
+    "size": [
+     1.8,
+     1.2
+    ],
+    "power": 3.0,
+    "rgb": [
+     1.0,
+     0.985,
+     0.97
+    ]
+   },
+   {
+    "name": "Fill",
+    "offset": [
+     1.1,
+     -0.9,
+     0.5
+    ],
+    "size": [
+     1.6,
+     1.2
+    ],
+    "power": 2.0,
+    "rgb": [
+     0.93,
+     0.96,
+     1.0
+    ]
+   },
+   {
+    "name": "Front kicker",
+    "offset": [
+     -0.1,
+     -1.1,
+     0.02
+    ],
+    "size": [
+     1.4,
+     0.06
+    ],
+    "power": 7.5,
+    "rgb": [
+     1.0,
+     0.95,
+     0.9
+    ],
+    "spread": 50,
+    "why": "a line along every key front and the lip"
+   },
+   {
+    "name": "Low rake",
+    "offset": [
+     -1.25,
+     -0.3,
+     0.3
+    ],
+    "size": [
+     1.2,
+     0.3
+    ],
+    "power": 4.5,
+    "rgb": [
+     1.0,
+     0.95,
+     0.9
+    ],
+    "spread": 70,
+    "why": "C2: grazes the lower ceramic controls, the macro knobs' skirts and the keybed, for readability without contrast"
+   }
+  ],
+  "world": {
+   "rgb": [
+    0.34,
+    0.325,
+    0.3
+   ],
+   "strength": 0.12
+  },
+  "exposure": -0.42
+ },
+ "output": {
+  "draft": {
+   "res": [
+    960,
+    540
+   ],
+   "samples": 16,
+   "noise": 0.05
+  },
+  "hq": {
+   "t": 1.0,
+   "res": [
+    1920,
+    1080
+   ],
+   "samples": 160,
+   "noise": 0.006
+  },
+  "colour": "AgX, look AgX - Punchy (andor_scene defaults), sRGB PNG / H.264 yuv420p",
+  "alpha": false
+ },
+ "render": {
+  "engine": "Cycles (CPU)",
+  "denoise": "andor_scene default",
+  "samples": 16,
+  "adaptiveThreshold": 0.05
+ },
+ "files": {
+  "frames": "marketing/motion/media/D01/D01.v1/frames",
+  "mp4": "marketing/motion/media/D01/D01.v1/D01_draft.mp4",
+  "stills": "marketing/motion/media/D01/D01.v1/stills"
+ },
+ "notes": "Slow push with a shallow lateral arc (7 degrees of yaw, 2.5 of pitch, 8 % closer); the product, lights and shadow never move. The closing frame is the approved A1-R1 W still: it doubles as the end poster.",
+ "updated": "2026-11-18T21:43:16+00:00",
+ "reframes": [
+  {
+   "id": "D01-portrait",
+   "purpose": "Portrait reframe test (mobile hero): its own composition, not a crop.",
+   "baseShot": "A1M_R1",
+   "res": [
+    608,
+    1316
+   ],
+   "stills": [
+    "marketing/motion/media/D01/D01.v1/stills/D01-portrait_000.png",
+    "marketing/motion/media/D01/D01.v1/stills/D01-portrait_050.png",
+    "marketing/motion/media/D01/D01.v1/stills/D01-portrait_100.png"
+   ]
+  }
+ ]
+}

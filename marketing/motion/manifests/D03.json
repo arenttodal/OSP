@@ -1,0 +1,199 @@
+{
+ "schemaVersion": 1,
+ "id": "D03",
+ "title": "Macro glide",
+ "version": "D03.v1",
+ "purpose": "Material montage and feature intro: a low oblique track along the fluted macro knobs in the M01 look.",
+ "approval": "awaiting creative review (Gate D1)",
+ "scene": {
+  "builder": "andor-web/product-renders/blender/scripts/andor_scene.py",
+  "builderSha": "a39a92d9528e7a5d",
+  "setup": "ANDOR_MATERIAL",
+  "baseShot": "M01_sharp",
+  "setupsSha": "fffd578459cd6361",
+  "textures": "andor-web/product-renders/blender/textures_current (prep_textures.py from the current editor capture)"
+ },
+ "productBuild": {
+  "commit": "00c8c3b",
+  "branch": "claude/motion-library"
+ },
+ "camera": {
+  "keys": [
+   {
+    "t": 0.0,
+    "camera": {
+     "target": [
+      400,
+      818,
+      5.5
+     ],
+     "fstop": 11.0,
+     "yaw": -20.0
+    }
+   },
+   {
+    "t": 1.0,
+    "camera": {
+     "target": [
+      640,
+      818,
+      5.5
+     ],
+     "fstop": 11.0,
+     "yaw": -16.0
+    }
+   }
+  ],
+  "ease": "smootherstep",
+  "base": {
+   "yaw": -18,
+   "pitch": 60,
+   "dist": 0.2,
+   "lens": 100,
+   "target": [
+    493,
+    812,
+    5.5
+   ],
+   "fstop": 14.0,
+   "shift": [
+    0.0,
+    0.0
+   ],
+   "fit": "AUTO"
+  },
+  "curve": "marketing/motion/media/D03/D03.v1/camera_curve.json"
+ },
+ "lens_mm": [
+  100.0
+ ],
+ "focus": "focus distance follows the shot's target every frame (dof on, f-stop per the keys)",
+ "frameRange": [
+  0,
+  149
+ ],
+ "fps": 30,
+ "seconds": 5.0,
+ "lightRig": {
+  "setup": "ANDOR_MATERIAL",
+  "lights": [
+   {
+    "name": "Grazing key",
+    "offset": [
+     -0.95,
+     0.3,
+     0.42
+    ],
+    "size": [
+     0.6,
+     0.4
+    ],
+    "power": 26,
+    "rgb": [
+     1.0,
+     0.96,
+     0.91
+    ],
+    "why": "low from the left: the 0.252 mm flutes and the engraved pointers read"
+   },
+   {
+    "name": "Edge strip",
+    "offset": [
+     0.55,
+     1.0,
+     0.35
+    ],
+    "size": [
+     1.6,
+     0.08
+    ],
+    "power": 18,
+    "rgb": [
+     1.0,
+     0.95,
+     0.9
+    ],
+    "spread": 60
+   },
+   {
+    "name": "Overhead",
+    "offset": [
+     0.05,
+     0.1,
+     1.45
+    ],
+    "size": [
+     1.8,
+     1.2
+    ],
+    "power": 4.0,
+    "rgb": [
+     1.0,
+     0.985,
+     0.97
+    ]
+   },
+   {
+    "name": "Fill",
+    "offset": [
+     1.1,
+     -0.9,
+     0.5
+    ],
+    "size": [
+     1.6,
+     1.2
+    ],
+    "power": 1.6,
+    "rgb": [
+     0.93,
+     0.96,
+     1.0
+    ]
+   }
+  ],
+  "world": {
+   "rgb": [
+    0.34,
+    0.325,
+    0.3
+   ],
+   "strength": 0.12
+  },
+  "exposure": -0.45
+ },
+ "output": {
+  "draft": {
+   "res": [
+    960,
+    540
+   ],
+   "samples": 16,
+   "noise": 0.05
+  },
+  "hq": {
+   "t": 0.5,
+   "res": [
+    1920,
+    1080
+   ],
+   "samples": 160,
+   "noise": 0.006
+  },
+  "colour": "AgX, look AgX - Punchy (andor_scene defaults), sRGB PNG / H.264 yuv420p",
+  "alpha": false
+ },
+ "render": {
+  "engine": "Cycles (CPU)",
+  "denoise": "andor_scene default",
+  "samples": 16,
+  "adaptiveThreshold": 0.05
+ },
+ "files": {
+  "frames": "marketing/motion/media/D03/D03.v1/frames",
+  "mp4": "marketing/motion/media/D03/D03.v1/D03_draft.mp4",
+  "stills": "marketing/motion/media/D03/D03.v1/stills"
+ },
+ "notes": "A lateral track across three macro knobs (editor x 420, 566, 712; 240 editor px, about 48 mm) at M01's 100 mm, 60 degrees, 0.2 m; focus stays on the knobs' plane all the way (f/11 between M01 cine f/8 and sharp f/14, so the fluting, bevel, pointer and cap hold). Real lights only.",
+ "updated": "2026-11-18T22:40:50+00:00"
+}

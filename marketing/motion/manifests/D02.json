@@ -1,0 +1,282 @@
+{
+ "schemaVersion": 1,
+ "id": "D02",
+ "title": "Dark orbit",
+ "version": "D02.v1",
+ "purpose": "Paid ads and closing shot: the floating instrument in the B1-R4 architectural dark scene, a shallow camera orbit with its shadow rendered in every frame.",
+ "approval": "awaiting creative review (Gate D1)",
+ "scene": {
+  "builder": "andor-web/product-renders/blender/scripts/andor_scene.py",
+  "builderSha": "a39a92d9528e7a5d",
+  "setup": "ANDOR_FLOATING",
+  "baseShot": "B1_R4",
+  "setupsSha": "fffd578459cd6361",
+  "textures": "andor-web/product-renders/blender/textures_current (prep_textures.py from the current editor capture)"
+ },
+ "productBuild": {
+  "commit": "00c8c3b",
+  "branch": "claude/motion-library"
+ },
+ "camera": {
+  "keys": [
+   {
+    "t": 0.0,
+    "camera": {
+     "yaw": -42.0,
+     "pitch": 59.0
+    }
+   },
+   {
+    "t": 1.0,
+    "camera": {
+     "yaw": -30.0,
+     "pitch": 57.0
+    }
+   }
+  ],
+  "ease": "smootherstep",
+  "base": {
+   "yaw": -36,
+   "pitch": 58,
+   "dist": 1.2,
+   "lens": 85,
+   "target": [
+    724,
+    560,
+    0
+   ],
+   "fstop": 9,
+   "shift": [
+    0.0,
+    -0.03
+   ],
+   "fit": "HORIZONTAL"
+  },
+  "curve": "marketing/motion/media/D02/D02.v1/camera_curve.json"
+ },
+ "lens_mm": [
+  85.0
+ ],
+ "focus": "focus distance follows the shot's target every frame (dof on, f-stop per the keys)",
+ "frameRange": [
+  0,
+  179
+ ],
+ "fps": 30,
+ "seconds": 6.0,
+ "lightRig": {
+  "setup": "ANDOR_FLOATING",
+  "lights": [
+   {
+    "name": "Key softbox",
+    "offset": [
+     -0.75,
+     0.55,
+     0.75
+    ],
+    "size": [
+     0.9,
+     0.5
+    ],
+    "power": 20,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "link": "product",
+    "why": "raking from upper left-behind: knobs, flutes and card bevels model; short shadows toward the viewer"
+   },
+   {
+    "name": "Rim strip",
+    "offset": [
+     0.7,
+     0.95,
+     0.25
+    ],
+    "size": [
+     1.6,
+     0.08
+    ],
+    "power": 28,
+    "rgb": [
+     1.0,
+     0.92,
+     0.84
+    ],
+    "spread": 60,
+    "link": "product",
+    "why": "separates the silhouette and the teak from the dark floor"
+   },
+   {
+    "name": "Top line",
+    "offset": [
+     -0.1,
+     -0.35,
+     1.0
+    ],
+    "size": [
+     1.4,
+     0.12
+    ],
+    "power": 4.5,
+    "rgb": [
+     1.0,
+     0.97,
+     0.93
+    ],
+    "spread": 70,
+    "link": "product",
+    "why": "a long reflection line on the ceramic top bevels and the display glass edges"
+   },
+   {
+    "name": "Front kicker",
+    "offset": [
+     -0.1,
+     -1.1,
+     0.02
+    ],
+    "size": [
+     1.4,
+     0.06
+    ],
+    "power": 7,
+    "rgb": [
+     1.0,
+     0.95,
+     0.9
+    ],
+    "spread": 50,
+    "link": "product"
+   },
+   {
+    "name": "Fill",
+    "offset": [
+     1.05,
+     -0.85,
+     0.45
+    ],
+    "size": [
+     1.6,
+     1.2
+    ],
+    "power": 0.8,
+    "rgb": [
+     0.93,
+     0.96,
+     1.0
+    ],
+    "link": "product"
+   },
+   {
+    "name": "Floor overhead",
+    "world": [
+     -0.55,
+     0.45,
+     1.5
+    ],
+    "aim": [
+     0.08,
+     -0.08,
+     0.0
+    ],
+    "size": [
+     1.0,
+     0.9
+    ],
+    "power": 34,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "link": "floor",
+    "why": "from the key's side, so the floating shadow falls where the product's light says it should"
+   },
+   {
+    "name": "Floor rake",
+    "world": [
+     -1.6,
+     0.9,
+     0.05
+    ],
+    "aim": [
+     0.4,
+     -0.2,
+     0.0
+    ],
+    "size": [
+     2.8,
+     0.18
+    ],
+    "power": 26,
+    "rgb": [
+     1.0,
+     0.84,
+     0.68
+    ],
+    "spread": 50,
+    "link": "floor"
+   }
+  ],
+  "world": {
+   "rgb": [
+    0.02,
+    0.018,
+    0.016
+   ],
+   "strength": 0.12
+  },
+  "exposure": 0.1
+ },
+ "output": {
+  "draft": {
+   "res": [
+    960,
+    1200
+   ],
+   "samples": 16,
+   "noise": 0.05
+  },
+  "hq": {
+   "t": 0.5,
+   "res": [
+    1440,
+    1800
+   ],
+   "samples": 160,
+   "noise": 0.006
+  },
+  "colour": "AgX, look AgX - Punchy (andor_scene defaults), sRGB PNG / H.264 yuv420p",
+  "alpha": false
+ },
+ "render": {
+  "engine": "Cycles (CPU)",
+  "denoise": "andor_scene default",
+  "samples": 16,
+  "adaptiveThreshold": 0.05
+ },
+ "files": {
+  "frames": "marketing/motion/media/D02/D02.v1/frames",
+  "mp4": "marketing/motion/media/D02/D02.v1/D02_draft.mp4",
+  "stills": "marketing/motion/media/D02/D02.v1/stills"
+ },
+ "notes": "12 degrees of orbit about the shot's own focus point (from 6 degrees before the approved B1-R4 angle to 6 after it); the product and its float never move, so the floor shadow is the scene's own, path-traced per frame. No spin. The middle frame is the approved B1-R4 framing.",
+ "updated": "2026-11-18T21:56:05+00:00",
+ "reframes": [
+  {
+   "id": "D02-vertical-ref",
+   "purpose": "Vertical composition reference: B2 +15 % (B2_115_R4) with the same orbit.",
+   "baseShot": "B2_115_R4",
+   "res": [
+    608,
+    1080
+   ],
+   "stills": [
+    "marketing/motion/media/D02/D02.v1/stills/D02-vertical-ref_000.png",
+    "marketing/motion/media/D02/D02.v1/stills/D02-vertical-ref_050.png",
+    "marketing/motion/media/D02/D02.v1/stills/D02-vertical-ref_100.png"
+   ]
+  }
+ ]
+}
