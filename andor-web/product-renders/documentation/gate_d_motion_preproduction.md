@@ -70,3 +70,28 @@
 | Samples | About 96 with denoising, temporally stable: fixed seed, no adaptive-noise flicker. Test 2 s first |
 | Delivery | H.264 and HEVC/AV1 MP4 for the web (muted, `playsinline`), plus a WebM fallback, the poster frames and a reduced-motion still |
 | Render cost estimate | At 1920 × 1080 / 96 spp on this 4-core machine: about 40–60 s per frame, so a 9 s D1 is about 2.5–3.5 h. A GPU render node is recommended for the finals |
+
+## Preview results (18 Nov 2026)
+
+Files: `renders/motion_preview_gate_d/`.
+
+**Per concept:**
+- the preview MP4 (12 fps);
+- opening and closing frames;
+- a storyboard sheet;
+- the camera path (`D*_camera_path.json`: target in metres, frames, move).
+
+| | Frames | Length | Notes |
+|---|---|---|---|
+| D1 Reveal | 108 at 640 × 360 | 9 s | The arc settles on the approved A1-R1 composition (product right, open space left for live type). The opening frame is wider and higher; the closing frame is 3° past A1-R1 |
+| D2 Material | 228 at 640 × 360 (six cuts) | 19 s | Timber corner, macros, display, keyboard, touch strips (the corrected M06 light: PITCH orange, satin sheen on the crown), then the full A2 view. Hard cuts in the preview |
+| D3 Floating | 96 at 512 × 640 | 8 s | The B1-R4 atmosphere. The product floats over the real floor, with its shadow and reflections rendered every frame |
+
+**Observations for review:**
+- **D1:** with A1's lens shift, the product drifts from just right of centre to the right third as the camera arcs. It reads as a calm settle onto the hero composition.
+  - If a stiller frame is wanted, halve the yaw range (−4.5° to +1.5°).
+- **D2:** the display cut shows the editor's still texture (the read heads don't move). For a living waveform, cut to the real recordings in `andor-web/feature-library/recordings/`.
+- **Motion quality:** all moves start and end at rest (smoothstep). There is no product motion and no spin.
+- **Preview noise:** at 16 samples the previews show some noise; the finals are planned at about 96 samples with denoising and a fixed seed.
+
+**Stopped here for review before final animation production, as instructed.**
