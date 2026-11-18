@@ -1,0 +1,16 @@
+skin,scenario,instances,editors_open,cold_open_ms,warm_open_ms,first_paint_ms,warm_paint_ms,resize_paint_ms,macro_mb,layer_mb,mini_mb,ceramic_mb,rss_mb
+vector,open-paint-resize,1,0,0.0,0.0,0.0,0.00,0.0,0.0,0.0,0.0,0.0,56.3
+vector,open-paint-resize,1,1,60.1,700.2,623.6,150.40,946.5,0.0,0.0,0.0,36.7,189.3
+vector,open-paint-resize,4,0,0.0,0.0,0.0,0.00,0.0,0.0,0.0,0.0,0.0,123.8
+vector,open-paint-resize,4,1,17.7,227.8,595.0,152.75,895.5,0.0,0.0,0.0,83.1,285.5
+vector,open-paint-resize,16,0,0.0,0.0,0.0,0.00,0.0,0.0,0.0,0.0,0.0,548.2
+vector,open-paint-resize,16,1,14.9,255.4,643.6,151.06,1015.1,0.0,0.0,0.0,83.1,522.2
+vector,open-paint-resize,32,0,0.0,0.0,0.0,0.00,0.0,0.0,0.0,0.0,0.0,540.1
+rendered,open-paint-resize,1,0,0.0,0.0,0.0,0.00,0.0,0.0,0.0,0.0,0.0,0.0
+rendered,open-paint-resize,1,1,18.3,541.4,552.2,134.93,835.1,1.4,0.3,0.2,36.7,2.7
+rendered,open-paint-resize,4,0,0.0,0.0,0.0,0.00,0.0,0.0,0.0,0.0,0.0,0.3
+rendered,open-paint-resize,4,1,17.6,219.6,624.3,131.25,935.3,3.1,0.6,0.3,83.1,0.2
+rendered,open-paint-resize,16,0,0.0,0.0,0.0,0.00,0.0,0.0,0.0,0.0,0.0,16.4
+rendered,open-paint-resize,16,1,23.7,215.6,540.7,147.73,841.1,3.1,0.6,0.3,83.1,1.3
+rendered,open-paint-resize,32,0,0.0,0.0,0.0,0.00,0.0,0.0,0.0,0.0,0.0,142.9
+rendered,open-paint-resize,32,1,13.8,264.2,600.3,136.61,954.1,3.1,0.6,0.3,83.1,536.8
