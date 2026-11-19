@@ -61,7 +61,9 @@
 - **Rotation:** each knob turns to `rest − (angle − base)`: the editor's recorded pointer angle relative to the master's capture angle.
 - **Agreement:** the arc and the value text are in the same frame's face texture, so pointer, arc and value cannot disagree.
 - **PITCH / MOD:** the strip's light layer samples the face texture, so the strips show the plugin's own lit pixels.
-- **Open question, measured by the test performance:** whether the editor's knob follows a macro performed by MIDI CC 20–27 (the engine follows the CC, the host parameter does not).
+- **Measured: the editor's knob does not follow a macro performed by MIDI CC 20–27.** In the test performance, CC22 sweeps CHARACTER from 31 % to 87 % (9.1–9.9 s), and the knob stays at 88 %, its last automated value. The same knob tracks host automation exactly (50.4 % at 8.29 s on the 35 → 88 % ramp). The engine follows the CC; the host parameter, and so the knob and its arc, do not.
+  - **Rule for filmed takes:** record macro moves as automation lanes, not CC 20–27, so the knobs move on screen.
+- **Capture fix:** the capture recorded no rotaries headless, because `isShowing()` is false without a window. It now checks visibility up to the editor: 28 rotaries per frame (6 macros, 15 source knobs, 3 layer reimagined, 4 ADSR minis).
 
 ## Project layout and storage (B7)
 

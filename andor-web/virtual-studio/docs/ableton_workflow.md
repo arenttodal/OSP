@@ -40,14 +40,14 @@ interface frames are the plugin's own drawing, in sync with your audio.
 | How you move it | Reaches the capture as | Notes |
 |---|---|---|
 | Mod wheel, pitch bend, sustain | MIDI in the clip | Export check above |
-| A hardware knob sent as CC 20–27 to OSP | MIDI CC, which OSP's macros follow | ✅ preferred for the six macros. See the knob note below |
+| A hardware knob sent as CC 20–27 to OSP | MIDI CC, which OSP's macros follow | Sound only: the editor's knob does **not** move (measured, see the knob note below). Not for takes where the knob is filmed |
 | Live's own automation of an OSP parameter (drawn, or recorded via Live's MIDI Map) | Plugin automation: **not** in a MIDI clip | Export as automation lanes (below) |
 | A control without a CC (e.g. source TUNE, a card's REIMAGINED for B/C) | Plugin automation | Same |
 
 **Knob note:**
 - When a CC moves a macro, OSP's sound follows the CC. The macro's *host parameter*, and so the knob drawn in the editor, may not move.
-- The technical test performance includes exactly this case (CC 22 at 9.1–9.9 s). The capture report states whether the editor's knob followed.
-- Until that is confirmed, perform macros that should *visibly* turn in the film as plugin automation, not as CC.
+- **Measured** with the technical test performance: CC 22 at 9.1–9.9 s sweeps CHARACTER from 31 % to 87 %, and the editor's knob stays at 88 %, its last automated value.
+- **Perform macros that should visibly turn in the film as plugin automation**, drawn or recorded in Live, not as CC.
 
 ## Recommended recording routine
 

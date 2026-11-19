@@ -181,10 +181,18 @@ TEST_CASE ("plugin: ANDOR Virtual Studio capture of a performance project (VS_PR
         {
             savePng (e->createComponentSnapshot (e->getLocalBounds(), true, 1.0f), outDir.getChildFile ("editor/" + num + ".png"));
             juce::Array<juce::var> knobs;
+            // Headless, nothing is "showing" (no window): a rotary counts when it and every
+            // ancestor up to the editor are visible.
+            auto visibleInEditor = [&] (juce::Component& c) {
+                for (auto* p = &c; p != nullptr && p != ui; p = p->getParentComponent())
+                    if (! p->isVisible())
+                        return false;
+                return true;
+            };
             std::function<void (juce::Component&)> walk = [&] (juce::Component& parent) {
                 for (auto* child : parent.getChildren())
                 {
-                    if (auto* s = dynamic_cast<juce::Slider*> (child); s != nullptr && s->isRotary() && s->isShowing())
+                    if (auto* s = dynamic_cast<juce::Slider*> (child); s != nullptr && s->isRotary() && visibleInEditor (*s))
                     {
                         const auto b = ui->getLocalArea (s, s->getLocalBounds()).toFloat();
                         const auto rp = s->getRotaryParameters();
