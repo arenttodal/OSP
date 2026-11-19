@@ -135,4 +135,40 @@ The format and scripts are in `performance_format.md`.
 
 ### D01–D07 drafts
 
-(Added when the batch finishes.)
+All 13 shots rendered, at 24 fps with 0.5 s handles. Each shot folder holds its master, MP4 draft, poster and manifest. Storyboards (first, ⅓, ⅔ and last frame of each move) are in `review/storyboard_<shot>.jpg`.
+
+| Shot | Size | Frames (move + handles) | Temporal residual, mean / max (levels of 255) |
+|---|---|---|---|
+| D01 approved | 960 × 540 | 144 + 24 | 0.32 / 0.41 |
+| D01 subtle | 960 × 540 | 144 + 24 | 0.23 / 0.29 |
+| D01 larger | 960 × 540 | 144 + 24 | 0.26 / 0.34 |
+| D01 W | 960 × 540 | 144 + 24 | 0.22 / 0.29 |
+| D01 mobile | 960 × 2078 | 144 + 24 | 0.17 / 0.23 |
+| D02 orbit 4:5 | 960 × 1200 | 144 + 24 | 0.90 / 1.32 |
+| D02 orbit 9:16 | 960 × 1706 | 144 + 24 | 0.77 / 1.13 |
+| D03 macro glide | 960 × 960 | 120 + 24 | 0.52 / 0.61 |
+| D04 inside the sound | 960 × 640 | 120 + 24 | 0.17 / 0.23 |
+| D05 keybed | 960 × 640 | 120 + 24 | 0.51 / 0.64 |
+| D06 material | 960 × 640 | 120 + 24 | 0.19 / 0.24 |
+| D06b source controls | 960 × 640 | 120 + 24 | 0.31 / 0.42 |
+| D07 expression | 960 × 640 | 120 + 24 | 0.24 / 0.31 |
+
+**How the residual is measured:** each frame against the mean of its two neighbours. The moves are smooth, so what remains is mostly render noise and flicker. Lower is steadier; the numbers compare shots with each other and with the final-settings test below.
+
+**Registration (no end jump):**
+- **D01 W:** its last frame against the W still differs by a mean of 0.023 levels.
+- **D01 mobile:** its last frame against the A1M-R1 still differs by 0.007 levels.
+- In both, the poster, the hold frame and the reduced-motion still are the same image.
+
+**Observations:**
+- **D01:** the three A1-R1 variants differ only in amount of move. *Subtle* reads calmer and leaves the type space steadier. *Larger* fills the frame more, at the cost of some negative space. W and mobile are their own compositions, not crops.
+- **D02:** the floating shadow is rendered every frame and moves correctly with the parallax. The 9:16 keeps B2's copy space above the instrument through the whole move. These two have the highest residual: the dark, ribbed backdrop and the soft shadow are the noisiest areas at 6 samples. That is a draft-quality effect; the final settings should lower it, as the D03 test shows for its own noisy areas.
+- **D03:** the highlight travels over the flutes as planned. The shallow focus puts the keys in bokeh, the noisiest area at 6 samples (0.52).
+- **D04:** the display shows the master's still face texture; nothing on it moves. A living waveform comes only from the PoC or a real screen recording.
+- **D05:** the keys stay stationary. The residual (0.51) comes from the out-of-focus keys in the background.
+- **D06 and D06b:** timber, ceramic and junction read clearly. The source controls (START, TUNE, PAN, LEVEL) sit under the orange display.
+- **D07:** the corrected strips are visible throughout: PITCH orange and MOD charcoal-blue, both full height.
+
+### Quality test at final settings (D03)
+
+(Added when the test frames finish.)
