@@ -1,0 +1,414 @@
+{
+ "id": "R01_MON",
+ "family": "R01 Grand Reveal",
+ "variant": "Monument",
+ "narrative": "Darkness, and the corner of the instrument close by: a rim of light on the teak cheek, a strip skimming PITCH, MOD and the first keys - C1's world. The light arrives first: the key rises across the ceramic, the long top sweep follows. Only then does the camera begin to withdraw, climb and travel right while the instrument turns on its own axis toward its rest, so the depth never flattens. The wordmark waits in the dark behind it and is uncovered by that coordinated movement; the displays wake after the light. In the last seconds the complete instrument settles in A2's three-quarter, the wordmark resolved beyond its far corner.",
+ "setup": "ANDOR_FLOATING",
+ "base_shot": "B1_R4",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 12.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 65,
+  "fstop": 9,
+  "position": [
+   [
+    0.0,
+    [
+     -0.135,
+     -0.427,
+     0.036
+    ],
+    "hold"
+   ],
+   [
+    1.6,
+    [
+     -0.135,
+     -0.427,
+     0.036
+    ],
+    [
+     0.62,
+     0.0,
+     0.3,
+     1.0
+    ]
+   ],
+   [
+    11.6,
+    [
+     0.5359,
+     -0.686,
+     0.4972
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     -0.062,
+     -0.093,
+     -0.088
+    ],
+    "hold"
+   ],
+   [
+    1.6,
+    [
+     -0.062,
+     -0.093,
+     -0.088
+    ],
+    [
+     0.62,
+     0.0,
+     0.3,
+     1.0
+    ]
+   ],
+   [
+    11.6,
+    [
+     -0.01,
+     0.0,
+     -0.09
+    ]
+   ]
+  ],
+  "focus": [
+   [
+    0.0,
+    [
+     -0.1,
+     -0.15,
+     -0.088
+    ],
+    "hold"
+   ],
+   [
+    1.6,
+    [
+     -0.1,
+     -0.15,
+     -0.088
+    ],
+    [
+     0.62,
+     0.0,
+     0.3,
+     1.0
+    ]
+   ],
+   [
+    11.6,
+    [
+     -0.01,
+     0.0,
+     -0.09
+    ]
+   ]
+  ]
+ },
+ "product": {
+  "pivot": [
+   0,
+   0,
+   0
+  ],
+  "translate": [
+   0.0,
+   0.0,
+   -0.098
+  ],
+  "turn": [
+   [
+    0.0,
+    30.0,
+    "hold"
+   ],
+   [
+    2.2,
+    30.0,
+    [
+     0.4,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    11.8,
+    0.0
+   ]
+  ]
+ },
+ "stage": {
+  "remove_lights": [
+   "Fill",
+   "Front kicker",
+   "Floor overhead"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Monument sweep",
+    "position": [
+     0.75,
+     0.35,
+     0.7
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.4,
+     0.3
+    ],
+    "power": 22,
+    "rgb": [
+     1.0,
+     0.975,
+     0.95
+    ],
+    "spread": 180,
+    "link": "product"
+   },
+   {
+    "name": "Corner strip",
+    "position": [
+     -0.2,
+     -0.48,
+     0.05
+    ],
+    "target": [
+     -0.1,
+     -0.2,
+     -0.09
+    ],
+    "size": [
+     0.03,
+     0.6
+    ],
+    "power": 0.08,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 50,
+    "link": "product"
+   }
+  ]
+ },
+ "lights": {
+  "Rim strip": {
+   "energy": [
+    [
+     0.0,
+     0.08,
+     [
+      0.5,
+      0.0,
+      0.4,
+      1.0
+     ]
+    ],
+    [
+     5.0,
+     1.0
+    ]
+   ]
+  },
+  "Corner strip": {
+   "energy": [
+    [
+     0.0,
+     1.0,
+     "hold"
+    ],
+    [
+     3.0,
+     1.0,
+     "smooth"
+    ],
+    [
+     8.0,
+     0.0
+    ]
+   ]
+  },
+  "Key softbox": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     0.8,
+     0.0,
+     [
+      0.5,
+      0.0,
+      0.4,
+      1.0
+     ]
+    ],
+    [
+     5.0,
+     1.0
+    ]
+   ]
+  },
+  "Monument sweep": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     1.5,
+     0.0,
+     [
+      0.5,
+      0.0,
+      0.4,
+      1.0
+     ]
+    ],
+    [
+     6.5,
+     1.0
+    ]
+   ]
+  },
+  "Top line": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     3.0,
+     0.0,
+     [
+      0.5,
+      0.0,
+      0.4,
+      1.0
+     ]
+    ],
+    [
+     8.5,
+     0.35
+    ]
+   ]
+  },
+  "Floor rake": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     4.0,
+     0.0,
+     [
+      0.5,
+      0.0,
+      0.4,
+      1.0
+     ]
+    ],
+    [
+     10.5,
+     0.45
+    ]
+   ]
+  }
+ },
+ "world": [
+  [
+   0.0,
+   0.05,
+   [
+    0.5,
+    0.0,
+    0.4,
+    1.0
+   ]
+  ],
+  [
+   7.0,
+   1.0
+  ]
+ ],
+ "emission": [
+  [
+   0.0,
+   0.0,
+   "hold"
+  ],
+  [
+   3.5,
+   0.0,
+   [
+    0.5,
+    0.0,
+    0.4,
+    1.0
+   ]
+  ],
+  [
+   9.0,
+   0.9
+  ]
+ ],
+ "typography": {
+  "style_layouts": {
+   "T1": [
+    "SF_A2",
+    "T1"
+   ],
+   "T2": [
+    "SF_A2",
+    "T2"
+   ],
+   "T3": [
+    "SF_A2",
+    "T3"
+   ]
+  },
+  "fade": [
+   4.5,
+   10.5
+  ],
+  "blur_from": 14.0
+ },
+ "notes": "Closing pose = style frame SF_A2 (camera, lens, lights). Each wordmark treatment is its own pass, composited through the instrument's matte on every frame; the clean master carries no type."
+}

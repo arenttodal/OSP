@@ -84,7 +84,41 @@ for shot in sorted(os.listdir(a.renders)):
         kp.append(dst)
     sheet(kp, os.path.join(d, name(shot, "keyframes", w, "jpg", fps=False)), ["opening", "quarter", "mid", "three-quarter", "closing"])
     mdir = os.path.join(a.renders, shot, "matte")
-    if shot.startswith("R01") and os.path.isdir(mdir) and len(os.listdir(mdir)) >= len(frames):
+    ty = spec.get("typography", {})
+    if "style_layouts" in ty and os.path.isdir(mdir) and len(os.listdir(mdir)) >= len(frames):
+        # Motion Gate R2: each wordmark treatment is its own pass (the clean master stays type-free),
+        # composited through the instrument's matte on every frame; it fades in and sharpens over
+        # `fade` (seconds into the move), from `blur_from` px (at 1920) to the layout's own blur.
+        sys.path.insert(0, os.path.join(HERE, "..", "..", "..", "launch-kit", "typography"))
+        from compose_style_type import compose
+        LAY = json.load(open(os.path.join(HERE, "..", "..", "..", "launch-kit", "typography", "style", "monument_layouts.json")))
+        f0, f1 = ty["fade"]
+        rec["typography_passes"] = {}
+        for key, (sf, lk) in ty["style_layouts"].items():
+            L0 = LAY[sf][lk]
+            tdir = os.path.join(a.renders, shot, "type_" + key)
+            os.makedirs(tdir, exist_ok=True)
+            occ = []
+            for f in frames:
+                t = (f - frames[0]) / 24.0
+                v = min(1.0, max(0.0, (t - f0) / (f1 - f0)))
+                v = v * v * (3 - 2 * v)
+                L = dict(L0, alpha=L0.get("alpha", 1.0) * v, blur=ty.get("blur_from", 12.0) * (1 - v) + L0.get("blur", 0) * v)
+                comp, meta = compose(Image.open(os.path.join(bdir, f"{f:04d}.png")).convert("RGB"),
+                                     Image.open(os.path.join(mdir, f"{f:04d}.png")), L)
+                comp.save(os.path.join(tdir, f"{f:04d}.png"))
+                occ.append(meta["occlusion"])
+            tmp4 = os.path.join(d, name(shot, "type-" + key.lower(), w, "mp4"))
+            encode(tdir, tmp4, frames[0])
+            sheet([os.path.join(tdir, f"{f:04d}.png") for f in picks], os.path.join(d, name(shot, "type-" + key.lower() + "-keyframes", w, "jpg", fps=False)),
+                  ["opening", "quarter", "mid", "three-quarter", "closing"])
+            rec["typography_passes"][key] = {"file": os.path.relpath(tmp4, a.out), "layout": [sf, lk],
+                                            "occlusion_at_keyframes": [occ[round(u * (len(occ) - 1))] for u in (0, 0.25, 0.5, 0.75, 1.0)]}
+        mp = os.path.join(d, name(shot, "matte", w, "mp4"))
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "24", "-start_number", str(frames[0]), "-i",
+                        os.path.join(mdir, "%04d.png"), "-vf", "alphaextract,format=yuv420p", "-c:v", "libx264", "-crf", "17", "-an", mp], check=True)
+        rec["matte"] = os.path.relpath(mp, a.out)
+    elif shot.startswith("R01") and os.path.isdir(mdir) and len(os.listdir(mdir)) >= len(frames):
         tdir = os.path.join(a.renders, shot, "typo")
         layout = "desktop" if shot.endswith("desktop") else "centre"
         ty = spec.get("typography", {})

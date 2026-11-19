@@ -30,6 +30,7 @@ a = ap.parse_args()
 V = f"v{a.version:02d}"
 LAYOUTS = json.load(open(os.path.join(TYPO, "style", "monument_layouts.json")))
 LABEL_FONT = os.path.join(TYPO, "fonts", "InterTight-300.ttf")
+ASPECT = {"SF_B3_vertical": "9x16_1080w"}
 
 
 def slug(t):
@@ -37,7 +38,7 @@ def slug(t):
 
 
 def name(fid, variant, kind, ext):
-    return f"andor-osp_{fid.replace('_', '-')}_{slug(variant)}{'-' + kind if kind else ''}_16x9_1920w_draft_{V}.{ext}"
+    return f"andor-osp_{fid.replace('_', '-')}_{slug(variant)}{'-' + kind if kind else ''}_{ASPECT.get(fid, '16x9_1920w')}_draft_{V}.{ext}"
 
 
 def sheet(items, out, cols, title):
@@ -50,7 +51,9 @@ def sheet(items, out, cols, title):
     d.text((pad, 16), title, font=fb, fill=(40, 36, 32))
     for k, (num, caption, im) in enumerate(items):
         x, y = pad + (k % cols) * (tw + pad), 56 + pad + (k // cols) * (th + cap + pad)
-        S.paste(im.convert("RGB").resize((tw, th), Image.LANCZOS), (x, y))
+        t = im.convert("RGB")
+        t.thumbnail((tw, th), Image.LANCZOS)   # a vertical frame keeps its proportions, centred in the tile
+        S.paste(t, (x + (tw - t.width) // 2, y + (th - t.height) // 2))
         d.text((x, y + th + 8), num, font=fb, fill=(40, 36, 32))
         d.text((x + 44, y + th + 13), caption, font=fs, fill=(90, 84, 78))
     S.save(out, quality=92)
@@ -93,7 +96,7 @@ for n, (fid, s) in enumerate(specs.items(), 1):
     index.append(rec)
     print("packaged", fid)
 sheet(items, os.path.join(a.out, f"andor-osp_style-frames-contact-sheet_numbered_draft_{V}.jpg"), 3,
-      "ANDOR · Art Direction Gate R2 · 12 style frames (clean, no typography)")
+      f"ANDOR · Art Direction Gate R2 · {len(items)} style frames (clean, no typography; B1 and D2 relit, B3 in three formats)")
 if typo_items:
     sheet(typo_items, os.path.join(a.out, f"andor-osp_monument-typography-sheet_draft_{V}.jpg"), 2,
           "ANDOR · Monument · the wordmark behind the instrument (Outfit ExtraBold, composited through the matte)")

@@ -74,7 +74,7 @@ Occlusion is measured on every frame and stored in `typography_meta.json`.
 |---|---|---|---|
 | Stage | DARK THEATRE | IVORY GALLERY at dusk | IVORY GALLERY, dimmed |
 | Camera | Locked, 85 mm, low three-quarter | 70 mm, a 2.5 cm push over 8 s | Locked, 85 mm, three-quarter above |
-| Reveal | A rim line, then a strip card travels along the front: curvature, walnut, then controls | A low raking light swings round, then the room's soft light rises | A broad card, seen only in reflection, glides across the surface; each knob, key and bezel flares as it passes |
+| Reveal | A rim line, then a strip card travels along the front: curvature, teak, then controls | A low raking light swings round, then the room's soft light rises | A broad card, seen only in reflection, glides across the surface; each knob, key and bezel flares as it passes |
 
 ## R03 Above the Sound (9 s)
 

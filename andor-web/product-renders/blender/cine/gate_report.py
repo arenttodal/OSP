@@ -12,6 +12,7 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 ap = argparse.ArgumentParser()
 ap.add_argument("--ids", nargs="*")
+ap.add_argument("--title", default="Creative gate R01–R03: shot sheets")
 a = ap.parse_args()
 ids = a.ids or sorted(f[:-5] for f in os.listdir(os.path.join(HERE, "shots")) if f.endswith(".json"))
 
@@ -44,7 +45,7 @@ def dist(p, t):
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(p, t)))
 
 
-print("# Creative gate R01–R03: shot sheets\n")
+print(f"# {a.title}\n")
 print("Generated from `blender/cine/shots/*.json` by `gate_report.py`.\n")
 print("**Coordinates:** metres in the product frame, from the instrument's centre at rest:")
 print("- x along the keys, to the right;")
@@ -83,11 +84,23 @@ for i in ids:
     for cd in s.get("cards", []):
         print(f"| Card: {cd['name']} | {cd['size'][0]:g} × {cd['size'][1]:g} m; position {keys(cd['position'])}; aim {keys(cd['target'])}; "
               f"strength {keys(cd.get('strength', 1))}; {'lights diffuse too' if cd.get('diffuse') else 'reflection only'} |")
+    st = s.get("stage", {})
+    if st.get("cyc"):
+        print("| Stage | seamless cyclorama (no horizon line) |")
+    for L in st.get("add_lights", []):
+        print(f"| Light: {L['name']} (added) | {L['size'][0]:g} × {L['size'][1]:g} m, {L['power']:g} W at {fmt(L['position'])}, aimed at {fmt(L['target'])} |")
+    if st.get("remove_lights"):
+        print(f"| Setup lights off | {', '.join(st['remove_lights'])} |")
+    if st.get("flags"):
+        print(f"| Flags | {', '.join(f['name'] + (' (follows the display reflection)' if f.get('mirror') else '') for f in st['flags'])} |")
     for k in ("exposure", "world", "emission"):
         if k in s:
             print(f"| {k.capitalize()} | {keys(s[k])} |")
-    if s.get("typography"):
-        print(f"| Typography | {s['typography']['wordmark']} behind the product (composited through the matte) |")
+    ty = s.get("typography")
+    if ty and "style_layouts" in ty:
+        print(f"| Typography | separate passes {', '.join(ty['style_layouts'])} (Outfit ExtraBold wordmark), through the matte; fade and sharpen {ty['fade'][0]:g}–{ty['fade'][1]:g} s |")
+    elif ty:
+        print(f"| Typography | {ty['wordmark']} behind the product (composited through the matte) |")
     if s.get("notes"):
         print(f"| Notes | {s['notes']} |")
     print()

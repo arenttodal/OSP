@@ -1,0 +1,184 @@
+{
+ "id": "R03_ENG",
+ "family": "R03 Above the Sound",
+ "variant": "Immersive flyover: the three sound engines",
+ "narrative": "We travel low along the instrument, as if over a landscape at evening: the knobs of the source cards pass close and soft in the foreground, the three displays stand sharp beyond them - A's warm waveform, B's, then C's - while the long shadows of the raking light run with us. The direction of view never changes; only the instrument passes. The third engine arrives as the movement settles.",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 10.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 50,
+  "fstop": 8,
+  "position": [
+   [
+    0.0,
+    [
+     -0.25,
+     -0.17,
+     0.095
+    ],
+    [
+     0.38,
+     0.0,
+     0.62,
+     1.0
+    ]
+   ],
+   [
+    10.0,
+    [
+     0.12,
+     -0.17,
+     0.105
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     -0.17,
+     0.06,
+     0.0
+    ],
+    [
+     0.38,
+     0.0,
+     0.62,
+     1.0
+    ]
+   ],
+   [
+    10.0,
+    [
+     0.2,
+     0.06,
+     0.0
+    ]
+   ]
+  ],
+  "focus": [
+   [
+    0.0,
+    [
+     -0.15,
+     0.06,
+     0.01
+    ],
+    [
+     0.38,
+     0.0,
+     0.62,
+     1.0
+    ]
+   ],
+   [
+    10.0,
+    [
+     0.15,
+     0.06,
+     0.01
+    ]
+   ]
+  ]
+ },
+ "stage": {
+  "hide_floor": true,
+  "cyc": {
+   "rgb": [
+    0.6,
+    0.565,
+    0.52
+   ],
+   "roughness": 0.9,
+   "radius": 1.4,
+   "wall": 2.2,
+   "height": 5.0,
+   "width": 14.0
+  },
+  "remove_lights": [
+   "Key softbox",
+   "Edge strip",
+   "Overhead",
+   "Fill",
+   "Front kicker",
+   "Low rake"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Rake",
+    "position": [
+     -0.9,
+     0.55,
+     0.13
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     0.9,
+     0.15
+    ],
+    "power": 60,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 180,
+    "link": null
+   },
+   {
+    "name": "Sky",
+    "position": [
+     0.6,
+     -0.6,
+     0.5
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.2,
+     1.2
+    ],
+    "power": 3,
+    "rgb": [
+     0.93,
+     0.96,
+     1.0
+    ],
+    "spread": 180,
+    "link": "product"
+   }
+  ]
+ },
+ "world": 0.1,
+ "exposure": -0.3,
+ "notes": "Light = style frame SF_D1; f/8 (D1: f/5.6) so more of the functional surface stays readable. The display flag follows the camera every frame. Static displays here; the performance version uses Virtual Studio frames."
+}

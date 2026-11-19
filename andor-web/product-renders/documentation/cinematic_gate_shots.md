@@ -83,7 +83,7 @@ Generated from `blender/cine/shots/*.json` by `gate_report.py`.
 
 ## R02_A: R02 Silhouette, A: dark theatre, travelling strip
 
-> Only the instrument's edge exists: a thin rim line against black. A narrow strip of light travels slowly from the timber cheek along the front, and in its passing the ceramic's curvature, the walnut grain and finally the control surface appear. The camera does not move; the light tells the story.
+> Only the instrument's edge exists: a thin rim line against black. A narrow strip of light travels slowly from the timber cheek along the front, and in its passing the ceramic's curvature, the teak grain and finally the control surface appear. The camera does not move; the light tells the story.
 
 | | |
 |---|---|

@@ -54,9 +54,9 @@
    {
     "name": "Key",
     "position": [
-     -0.9,
-     0.7,
-     0.45
+     -0.8,
+     0.5,
+     0.26
     ],
     "target": [
      0.0,
@@ -64,10 +64,10 @@
      0.0
     ],
     "size": [
-     1.8,
-     1.0
+     0.8,
+     0.45
     ],
-    "power": 55,
+    "power": 34,
     "rgb": [
      1.0,
      0.95,
@@ -91,15 +91,15 @@
     ],
     "size": [
      2.0,
-     0.1
+     0.06
     ],
-    "power": 26,
+    "power": 14,
     "rgb": [
      1.0,
      0.975,
      0.95
     ],
-    "spread": 90,
+    "spread": 60,
     "link": "product",
     "glossy_only": false
    }
@@ -123,9 +123,9 @@
     "name": "Negative fill",
     "mode": "negative",
     "position": [
-     0.75,
-     -0.35,
-     0.15
+     0.48,
+     -0.26,
+     0.1
     ],
     "target": [
      0,
@@ -133,41 +133,31 @@
      0
     ],
     "size": [
-     1.2,
-     0.8
+     1.4,
+     0.7
+    ]
+   },
+   {
+    "name": "Top flag",
+    "mode": "negative",
+    "position": [
+     0.15,
+     -0.1,
+     0.75
+    ],
+    "target": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     1.0,
+     1.0
     ]
    }
   ]
  },
- "rationale": "The ivory portrait: a seamless warm cyclorama (no horizon line), one large low key from behind left so the ceramic turns from light to shade across its width, a black negative-fill card on the right to keep the right cheek in shadow, and a long soft shadow toward the viewer.",
- "world": 0.15,
- "exposure": -0.45,
- "cards": [
-  {
-   "name": "Sweep",
-   "size": [
-    1.8,
-    0.3
-   ],
-   "strength": 30.0,
-   "color": [
-    1.0,
-    0.975,
-    0.95
-   ],
-   "mirror": {
-    "aim": [
-     0.0,
-     -0.05,
-     0.012
-    ],
-    "distance": 1.2,
-    "offset": [
-     0.0,
-     0.0
-    ]
-   },
-   "link": "product"
-  }
- ]
+ "rationale": "The ivory portrait: a seamless warm cyclorama (no horizon line). One small, low key rakes from behind left, so the ceramic turns from light to shade across its width and every knob throws a short shadow; a large black flag close on the right and another overhead keep the right half in true shadow, with only a thin strip on the right cheek. A long soft shadow falls toward the viewer.",
+ "world": 0.1,
+ "exposure": -0.15
 }

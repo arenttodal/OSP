@@ -87,6 +87,28 @@
     "floor": 0.15
    },
    "behind": true
+  },
+  "T3": {
+   "cap_height": 0.3,
+   "x": 0.045,
+   "y": 0.035,
+   "ink": [
+    160,
+    150,
+    138
+   ],
+   "alpha": 0.78,
+   "blur": 2,
+   "falloff": {
+    "centre": [
+     0.5,
+     0.42
+    ],
+    "radius": 0.6,
+    "floor": 0.22
+   },
+   "behind": true,
+   "note": "between T1 and T2: the mark spans the frame and stays readable; the instrument's far edge crosses its lower letters"
   }
  },
  "SF_A3": {

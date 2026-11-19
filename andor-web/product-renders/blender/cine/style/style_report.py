@@ -22,7 +22,7 @@ print("**Coordinates:** metres in the product frame, measured from the instrumen
 print("- x runs along the keys, to the right;")
 print("- y runs toward the back;")
 print("- z is up.\n")
-print("The Monument family stands the instrument on the walnut floor; in those frames the top surface is near z = −0.086.\n")
+print("The Monument family stands the instrument on the dark plank floor; in those frames the top surface is near z = −0.086.\n")
 print("**Renders:** 1920 × 1080, 128 samples, noise threshold 0.01, 16-bit PNG.\n")
 for n, i in enumerate(ids, 1):
     s = json.load(open(os.path.join(HERE, "specs", i + ".json")))
@@ -42,7 +42,7 @@ for n, i in enumerate(ids, 1):
         cy = st["cyc"]
         print(f"| Stage | seamless cyclorama: colour {f3(cy['rgb'])}, cove radius {cy['radius']} m, wall {cy['wall']} m behind (no horizon line) |")
     else:
-        print("| Stage | the dark walnut theatre (ANDOR FLOATING's floor) |")
+        print("| Stage | the dark plank theatre (ANDOR FLOATING's floor) |")
     if st.get("remove_lights"):
         print(f"| Setup lights off | {', '.join(st['remove_lights'])} |")
     for k, v in (s.get("lights") or {}).items():

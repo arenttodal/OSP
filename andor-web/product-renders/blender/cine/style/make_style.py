@@ -54,7 +54,7 @@ def frame(fid, family, title, setup, base, cam, stage, rationale="", **kw):
 
 
 # ------------------------------------------------------------------------------ A  MONUMENT (dark)
-# The dark theatre of R01 B, the instrument grounded on the walnut floor (not floating): mass.
+# The dark theatre of R01 B, the instrument grounded on the dark plank floor (not floating): mass.
 A_STAGE = {"remove_lights": ["Fill", "Front kicker", "Floor overhead"], "flags": [DISPLAY_FLAG]}
 A_DIM = {"Floor rake": {"energy": 0.45}, "Top line": {"energy": 0.35}}
 A_LIGHTS = lambda extra: [light("Monument sweep", [0.75, 0.35, 0.70], [0.0, 0.0, 0.0], [1.4, 0.30], 22, NEUTRAL)] + extra
@@ -64,12 +64,12 @@ frame("SF_A1", "A Monument", "Diagonal monolith", "ANDOR_FLOATING", "B1_R4",
        "focus": [-0.06, -0.05, -0.085], "shift": [0.0, -0.06]},
       dict(A_STAGE, add_lights=A_LIGHTS([])), product=dict(GROUND, turn=14.0), lights=A_DIM, exposure=0.0, emission=0.9,
       typography={"layout": "A1"},
-      rationale="The instrument as a monolith on dark walnut: seen from its front-left corner and turned 14 degrees, its long edge becomes one strong diagonal that climbs from the lower left into the dark. The timber cheek anchors the frame; the far end dissolves. The wordmark stands in the darkness beyond, and the instrument's far edge cuts across its feet: the type is behind the object, not above it.")
+      rationale="The instrument as a monolith on the dark plank floor: seen from its front-left corner and turned 14 degrees, its long edge becomes one strong diagonal that climbs from the lower left into the dark. The timber cheek anchors the frame; the far end dissolves. The wordmark stands in the darkness beyond, and the instrument's far edge cuts across its feet: the type is behind the object, not above it.")
 frame("SF_A2", "A Monument", "Plinth from above", "ANDOR_FLOATING", "B1_R4",
       {"lens": 65, "fstop": 9, "position": orbit(38, 34, 1.05, (0.0, 0.0, -0.09)), "target": [-0.01, 0.0, -0.09]},
       dict(A_STAGE, add_lights=A_LIGHTS([])), product=GROUND, lights=A_DIM, exposure=0.0, emission=0.9,
       typography={"layout": "A2"},
-      rationale='The plinth view: from above and to the right, the instrument floats as a single bright plane against the walnut and the shadowed floor beyond, its diagonal running against the planks. The quietest of the three, and the closest to a classic hero, but with mass and darkness on both sides.')
+      rationale='The plinth view: from above and to the right, the instrument floats as a single bright plane against the dark plank floor and the shadowed floor beyond, its diagonal running against the planks. The quietest of the three, and the closest to a classic hero, but with mass and darkness on both sides.')
 frame("SF_A3", "A Monument", "Corner monument", "ANDOR_FLOATING", "B1_R4",
       {"lens": 50, "fstop": 8, "position": orbit(42, 27, 0.52, (0.06, 0.0, -0.09)), "target": [0.02, 0.03, -0.09],
        "focus": [0.13, -0.08, -0.086], "shift": [0.0, -0.04]},
@@ -83,11 +83,15 @@ B_STAGE = lambda lights, flags=(): {"hide_floor": True, "cyc": CYC, "remove_ligh
                                     "add_lights": lights, "flags": [DISPLAY_FLAG] + list(flags)}
 frame("SF_B1", "B Sculpture", "Ivory three-quarter", "ANDOR_GALLERY", "A2",
       {"lens": 85, "fstop": 11, "position": orbit(-30, 20, 1.10), "target": [0.02, 0.0, 0.0], "shift": [-0.04, -0.02]},
-      B_STAGE([light("Key", [-0.90, 0.70, 0.45], [0.0, 0.0, 0.0], [1.8, 1.0], 55, WARM, link=None),
-               light("Edge strip", [0.85, 0.55, 0.30], [0.0, 0.0, 0.0], [2.0, 0.10], 26, NEUTRAL, spread=90, link="product")],
-              [{"name": "Negative fill", "mode": "negative", "position": [0.75, -0.35, 0.15], "target": [0, 0, 0], "size": [1.2, 0.8]}]),
-      world=0.15, exposure=-0.45, cards=[sweep([0.0, -0.05, 0.012], [1.8, 0.30], 30.0)],
-      rationale='The ivory portrait: a seamless warm cyclorama (no horizon line), one large low key from behind left so the ceramic turns from light to shade across its width, a black negative-fill card on the right to keep the right cheek in shadow, and a long soft shadow toward the viewer.')
+      # R2 relight: the broad key made the top read evenly. Now a small, low key from behind left
+      # rakes across the width (light to shade), a large black flag close on the right keeps that
+      # side in shadow, and only a thin strip separates the right cheek from the cyclorama.
+      B_STAGE([light("Key", [-0.80, 0.50, 0.26], [0.0, 0.0, 0.0], [0.8, 0.45], 34, WARM, link=None),
+               light("Edge strip", [0.85, 0.55, 0.30], [0.0, 0.0, 0.0], [2.0, 0.06], 14, NEUTRAL, spread=60, link="product")],
+              [{"name": "Negative fill", "mode": "negative", "position": [0.48, -0.26, 0.10], "target": [0, 0, 0], "size": [1.4, 0.7]},
+               {"name": "Top flag", "mode": "negative", "position": [0.15, -0.10, 0.75], "target": [0, 0, 0], "size": [1.0, 1.0]}]),
+      world=0.10, exposure=-0.15,
+      rationale='The ivory portrait: a seamless warm cyclorama (no horizon line). One small, low key rakes from behind left, so the ceramic turns from light to shade across its width and every knob throws a short shadow; a large black flag close on the right and another overhead keep the right half in true shadow, with only a thin strip on the right cheek. A long soft shadow falls toward the viewer.')
 frame("SF_B2", "B Sculpture", "Low profile, the curve", "ANDOR_GALLERY", "A2",
       {"lens": 85, "fstop": 11, "position": orbit(58, 12, 0.72), "target": [-0.03, 0.0, 0.0]},
       B_STAGE([light("Key", [0.10, 0.95, 0.85], [0.0, 0.0, 0.0], [2.2, 0.9], 45, WARM, link=None),
@@ -104,12 +108,24 @@ frame("SF_B3", "B Sculpture", "Overhead, long light", "ANDOR_GALLERY", "A2",
 
 # ------------------------------------------------------------------------------ C  SILHOUETTE (dark)
 C_OFF = lambda keep: {"remove_lights": [n for n in THEATRE_LIGHTS if n not in keep], "flags": [DISPLAY_FLAG]}
+# B3 in two more formats (R2 approval: B3 is a canonical campaign asset)
+B3_LIGHT = lambda: B_STAGE([light("Window", [-1.30, 0.40, 0.55], [0.0, 0.0, 0.0], [1.0, 1.6], 120, WARM, link=None)],
+                           [{"name": "Negative fill", "mode": "negative", "position": [0.65, -0.1, 0.35], "target": [0, 0, 0], "size": [1.2, 1.2]}])
+frame("SF_B3_full", "B Sculpture", "Overhead, long light: the complete instrument", "ANDOR_GALLERY", "A2",
+      {"lens": 85, "fstop": 11, "position": orbit(-8, 70, 2.25), "target": [0.06, -0.02, 0.0], "shift": [-0.14, 0.02]},
+      B3_LIGHT(), product={"turn": 22.0}, world=0.15, exposure=-0.25,
+      rationale="B3 with room: the complete instrument, off-centre to the right, its long shadow and the warm field of light to the left - the editorial photograph with space for a line of copy.")
+frame("SF_B3_vertical", "B Sculpture", "Overhead, long light: vertical", "ANDOR_GALLERY", "A2",
+      {"lens": 85, "fstop": 11, "position": orbit(-8, 72, 1.35), "target": [0.0, -0.01, 0.0], "shift": [0.0, 0.05]},
+      B3_LIGHT(), product={"turn": 64.0}, world=0.15, exposure=-0.25, aspect=[9, 16],
+      rationale="B3 composed natively for vertical: the instrument turned so its length runs down the frame on a steep diagonal, the window shadow falling across it, warm negative space above for the wordmark or a line.")
+
 frame("SF_C1", "C Silhouette", "Timber, keys and macros", "ANDOR_FLOATING", "B1_R4",
       {"lens": 85, "fstop": 8, "position": [-0.40, -0.38, 0.16], "target": [-0.10, -0.05, -0.005], "focus": [-0.17, -0.10, 0.0]},
       dict(C_OFF(["Rim strip"]),
            add_lights=[light("Strip", [-0.32, -0.40, 0.12], [-0.12, 0.0, 0.0], [0.03, 0.6], 0.8, WARM)]),
       lights={"Rim strip": {"energy": 0.25}}, world=0.05, emission=0.35, exposure=-1.3,
-      rationale='After R02 A: almost everything is darkness. One narrow strip skims the front-left corner: the walnut cheek, the PITCH and MOD strips, the first macro knobs and the keys catch it; the rest of the instrument is suggested, not shown.')
+      rationale='After R02 A: almost everything is darkness. One narrow strip skims the front-left corner: the teak cheek, the PITCH and MOD strips, the first macro knobs and the keys catch it; the rest of the instrument is suggested, not shown.')
 frame("SF_C2", "C Silhouette", "A pool of light on the controls", "ANDOR_FLOATING", "B1_R4",
       {"lens": 85, "fstop": 8, "position": orbit(18, 44, 0.80, (-0.05, -0.05, 0.0)), "target": [-0.04, -0.03, 0.0]},
       dict(C_OFF([]), add_lights=[light("Pool", [-0.08, -0.08, 0.70], [-0.06, -0.06, 0.0], [0.10, 0.10], 1.0, WARM, spread=14)]),
@@ -131,13 +147,19 @@ frame("SF_D1", "D Immersion", "The three sound engines", "ANDOR_GALLERY", "A2",
       D_STAGE(D_KEY), world=0.10, exposure=-0.3,
       rationale="The three sound engines as a landscape: the camera travels low over the source cards, the near knobs soft in the foreground, the middle display sharp, the far one receding. A low raking light draws every knob's shadow across the ceramic.")
 frame("SF_D2", "D Immersion", "The macro row", "ANDOR_GALLERY", "A2",
-      {"lens": 85, "fstop": 5.6, "position": [0.14, -0.27, 0.07], "target": [-0.07, -0.06, 0.0], "focus": [-0.04, -0.065, 0.01]},
-      D_STAGE(D_KEY), world=0.10, exposure=-0.3,
-      rationale='The macro row as architecture: six knobs recede on a diagonal, each throwing a long evening shadow across the panel; the keys run beneath them out of focus. Close enough to be inside the instrument, far enough to read what it is.')
+      # R2 relight: the raking key lights the instrument only, so the cyclorama falls dark behind the
+      # knobs (no hotspot); f/16 focused on the middle of the row keeps four to six knobs readable.
+      {"lens": 85, "fstop": 16, "position": [0.15, -0.28, 0.10], "target": [-0.075, -0.055, 0.0], "focus": [-0.08, -0.065, 0.018]},
+      {"hide_floor": True, "cyc": CYC, "remove_lights": GALLERY_LIGHTS, "flags": [DISPLAY_FLAG],
+       "add_lights": [light("Rake", [-0.90, 0.55, 0.13], [0.0, 0.0, 0.0], [0.9, 0.15], 60, WARM, link="product"),
+                      light("Sky", [0.60, -0.60, 0.50], [0.0, 0.0, 0.0], [1.2, 1.2], 2, COOL, link="product"),
+                      light("Hero kicker", [0.10, 0.25, 0.10], [-0.047, -0.065, 0.015], [0.10, 0.04], 0.6, WARM, spread=40)]},
+      world=0.06, exposure=-0.2,
+      rationale='The macro row as architecture: six knobs recede on a diagonal, each throwing a long evening shadow across the panel. The raking key lights only the instrument, so the room behind falls into a dark, warm gradient; the focus holds the middle of the row, so four to six knobs stay readable, with a thin kicker on MOVEMENT\'s far rim.')
 frame("SF_D3", "D Immersion", "Keys and expression", "ANDOR_GALLERY", "A2",
       {"lens": 50, "fstop": 8, "position": [-0.36, -0.24, 0.075], "target": [0.02, -0.07, 0.0], "focus": [-0.13, -0.115, 0.004]},
       D_STAGE(D_KEY), world=0.10, exposure=-0.3,
-      rationale='From the left end, along the instrument: the walnut cheek, the PITCH and MOD strips and the keyboard in the foreground, the macro row and the source cards rising behind into darkness. The main surface extends away from us like a street.')
+      rationale='From the left end, along the instrument: the teak cheek, the PITCH and MOD strips and the keyboard in the foreground, the macro row and the source cards rising behind into darkness. The main surface extends away from us like a street.')
 
 for s in frames:
     json.dump(s, open(os.path.join(OUT, s["id"] + ".json"), "w"), indent=1)

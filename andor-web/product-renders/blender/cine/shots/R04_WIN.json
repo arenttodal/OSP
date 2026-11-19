@@ -1,0 +1,180 @@
+{
+ "id": "R04_WIN",
+ "family": "R04 The Window Light",
+ "variant": "B3 coming to life",
+ "narrative": "The editorial photograph, breathing. From high above, the instrument lies turned in a field of warm light; a window we never see lays its long shadow across the floor. Imperceptibly the camera sinks toward it, and the window light drifts as an afternoon does: the shadow turns a few degrees, the sheen slides across the ceramic and the knobs' small shadows lengthen. Nothing else moves - until, in the performance version, the waveforms and controls begin to play.",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 9.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 11,
+  "position": [
+   [
+    0.0,
+    [
+     -0.0762,
+     -0.5419,
+     1.5035
+    ],
+    [
+     0.3,
+     0.0,
+     0.7,
+     1.0
+    ]
+   ],
+   [
+    9.0,
+    [
+     -0.0685,
+     -0.4877,
+     1.3532
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     0.06,
+     -0.02,
+     0.0
+    ]
+   ]
+  ],
+  "shift": [
+   -0.08,
+   0.0
+  ]
+ },
+ "product": {
+  "turn": 22.0
+ },
+ "stage": {
+  "hide_floor": true,
+  "cyc": {
+   "rgb": [
+    0.6,
+    0.565,
+    0.52
+   ],
+   "roughness": 0.9,
+   "radius": 1.4,
+   "wall": 2.2,
+   "height": 5.0,
+   "width": 14.0
+  },
+  "remove_lights": [
+   "Key softbox",
+   "Edge strip",
+   "Overhead",
+   "Fill",
+   "Front kicker",
+   "Low rake"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   },
+   {
+    "name": "Negative fill",
+    "mode": "negative",
+    "position": [
+     0.65,
+     -0.1,
+     0.35
+    ],
+    "target": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     1.2,
+     1.2
+    ]
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Window",
+    "position": [
+     -1.3,
+     0.4,
+     0.55
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.0,
+     1.6
+    ],
+    "power": 120,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 180,
+    "link": null
+   }
+  ]
+ },
+ "lights": {
+  "Window": {
+   "translate": [
+    [
+     0.0,
+     [
+      0.0,
+      -0.1,
+      0.0
+     ],
+     "linear"
+    ],
+    [
+     9.0,
+     [
+      0.0,
+      0.14,
+      -0.04
+     ]
+    ]
+   ],
+   "energy": [
+    [
+     0.0,
+     0.95,
+     "linear"
+    ],
+    [
+     9.0,
+     1.0
+    ]
+   ]
+  }
+ },
+ "world": 0.15,
+ "exposure": -0.25,
+ "notes": "Opening pose = style frame SF_B3. The window moves 24 cm along the wall and sinks 4 cm over the shot (linear: a sun does not ease). Displays are flagged and left static for the performance pass."
+}

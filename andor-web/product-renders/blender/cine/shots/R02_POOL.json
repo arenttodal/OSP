@@ -1,0 +1,291 @@
+{
+ "id": "R02_POOL",
+ "family": "R02 Silhouette",
+ "variant": "The pool of light",
+ "narrative": "Darkness, a faint rim. A narrow strip of light drifts in from the left and crosses the controls - PITCH and MOD, the keys, the six macros - each catching it in turn. As it passes, a pool begins to gather above the macro row: small and dim at first, widening and warming until the controls sit in one soft circle of light, the labels readable, the displays glowing faintly beyond. The camera only breathes; the light carries the shot, and it is complete only at the end.",
+ "setup": "ANDOR_FLOATING",
+ "base_shot": "B1_R4",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 9.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 8,
+  "position": [
+   [
+    0.0,
+    [
+     0.1278,
+     -0.5973,
+     0.5557
+    ],
+    [
+     0.3,
+     0.0,
+     0.7,
+     1.0
+    ]
+   ],
+   [
+    9.0,
+    [
+     0.1223,
+     -0.5802,
+     0.5384
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     -0.04,
+     -0.03,
+     0.0
+    ]
+   ]
+  ]
+ },
+ "stage": {
+  "remove_lights": [
+   "Key softbox",
+   "Top line",
+   "Front kicker",
+   "Fill",
+   "Floor overhead",
+   "Floor rake"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Strip",
+    "position": [
+     -0.42,
+     -0.3,
+     0.14
+    ],
+    "target": [
+     -0.2,
+     -0.06,
+     0.0
+    ],
+    "size": [
+     0.03,
+     0.6
+    ],
+    "power": 0.5,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 40,
+    "link": "product"
+   },
+   {
+    "name": "Pool",
+    "position": [
+     -0.08,
+     -0.08,
+     0.7
+    ],
+    "target": [
+     -0.06,
+     -0.06,
+     0.0
+    ],
+    "size": [
+     0.14,
+     0.14
+    ],
+    "power": 0.6,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 16,
+    "link": "product"
+   }
+  ]
+ },
+ "lights": {
+  "Rim strip": {
+   "energy": [
+    [
+     0.0,
+     0.08,
+     [
+      0.5,
+      0.0,
+      0.4,
+      1.0
+     ]
+    ],
+    [
+     3.0,
+     0.15
+    ]
+   ]
+  },
+  "Strip": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     [
+      0.5,
+      0.0,
+      0.4,
+      1.0
+     ]
+    ],
+    [
+     1.2,
+     1.0,
+     "hold"
+    ],
+    [
+     5.0,
+     1.0,
+     "smooth"
+    ],
+    [
+     7.5,
+     0.0
+    ]
+   ],
+   "translate": [
+    [
+     0.0,
+     [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "hold"
+    ],
+    [
+     0.6,
+     [
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.45,
+      0.0,
+      0.55,
+      1.0
+     ]
+    ],
+    [
+     6.8,
+     [
+      0.36,
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  "Pool": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     3.4,
+     0.0,
+     [
+      0.55,
+      0.0,
+      0.35,
+      1.0
+     ]
+    ],
+    [
+     8.7,
+     1.0
+    ]
+   ],
+   "translate": [
+    [
+     0.0,
+     [
+      0.0,
+      0.0,
+      -0.14
+     ],
+     "hold"
+    ],
+    [
+     3.4,
+     [
+      0.0,
+      0.0,
+      -0.14
+     ],
+     [
+      0.4,
+      0.0,
+      0.3,
+      1.0
+     ]
+    ],
+    [
+     8.7,
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  }
+ },
+ "world": 0.03,
+ "exposure": 0.0,
+ "emission": [
+  [
+   0.0,
+   0.0,
+   "hold"
+  ],
+  [
+   5.5,
+   0.0,
+   [
+    0.5,
+    0.0,
+    0.4,
+    1.0
+   ]
+  ],
+  [
+   8.8,
+   0.25
+  ]
+ ],
+ "notes": "Closing pose = style frame SF_C2, softened: Pool 0.14 m source, 16 deg spread, 0.6 W (C2: 0.10 m, 14 deg, 1.0 W). The pool rises from 0.56 m to 0.70 m as it brightens, so it widens as it forms."
+}

@@ -56,8 +56,8 @@ Numbers match the contact sheet.
 
 | # | Frame | Family | In one line |
 |---|---|---|---|
-| 01 | A1 Diagonal monolith | Monument | the instrument on walnut, one rising diagonal into the dark; the wordmark behind its far edge |
-| 02 | A2 Plinth from above | Monument | a single bright plane against walnut and shadow |
+| 01 | A1 Diagonal monolith | Monument | the instrument on the dark plank floor, one rising diagonal into the dark; the wordmark behind its far edge |
+| 02 | A2 Plinth from above | Monument | a single bright plane against the dark plank floor and shadow |
 | 03 | A3 Corner monument | Monument | the front-right corner as architecture, the far end into black |
 | 04 | B1 Ivory three-quarter | Sculpture | seamless warm cyclorama, one low key, negative fill, long soft shadow |
 | 05 | B2 Low profile, the curve | Sculpture | along the length: key fronts, knob skirts and the rounded edge against a gradient |
@@ -96,7 +96,7 @@ There are two alternatives per frame. Occlusion is measured from the matte.
 
    It needs no typography, and it animates naturally: the pool travels or grows. This is the best bridge from R02 A.
 2. **06 · B3, overhead, long light.** The most iconic still: a calm, graphic object in warm negative space, with one long shadow and clean displays. It would hold as a poster, a box or a homepage at any size. Its weakness is that it is static by nature: it is a photograph more than a shot.
-3. **02 · A2, plinth from above.** The best Monument without type. A single bright plane on a strong diagonal against the walnut, with mass and darkness on both sides. With T1, the wordmark sits naturally in the dark space.
+3. **02 · A2, plinth from above.** The best Monument without type. A single bright plane on a strong diagonal against the dark plank floor, with mass and darkness on both sides. With T1, the wordmark sits naturally in the dark space.
 
    **01 · A1** is the better typography frame. Of the three Monument endings for the Grand Reveal, A1 and A2 are the candidates.
 
@@ -138,7 +138,7 @@ B3 is worth keeping as the campaign's key still, independent of motion.
 ## Next animation gate (only after these frames are approved)
 
 1. **Grand Reveal: Monument.**
-   - Opens in darkness, close on the walnut cheek.
+   - Opens in darkness, close on the teak cheek.
    - The light arrives before the camera moves.
    - The reveal keeps developing to the last second: the instrument's diagonal is complete only at the end, and the wordmark is uncovered by the instrument's own silhouette.
    - The closing pose is the approved Monument frame.

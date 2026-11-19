@@ -85,7 +85,7 @@ shots.append({
     "id": "R02_A", "family": "R02 Silhouette", "variant": "A: dark theatre, travelling strip",
     "narrative": "Only the instrument's edge exists: a thin rim line against black. A narrow strip of light "
                  "travels slowly from the timber cheek along the front, and in its passing the ceramic's curvature, "
-                 "the walnut grain and finally the control surface appear. The camera does not move; the light "
+                 "the teak grain and finally the control surface appear. The camera does not move; the light "
                  "tells the story.",
     "setup": "ANDOR_FLOATING", "base_shot": "B1_R4", "aspect": [16, 9], "seconds": 8.0, "handles": 1.0,
     "camera": {"lens": 85, "fstop": 9.0,

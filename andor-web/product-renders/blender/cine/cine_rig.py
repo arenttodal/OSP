@@ -257,6 +257,7 @@ for name in stg.get("hide_objects", []):
         o.hide_render = True
 
 # ---- lights, cards, camera ------------------------------------------------------------------------
+bpy.context.view_layer.update()   # added lights' matrix_world must be current before it is captured below
 lights = {}
 for name, lc in spec.get("lights", {}).items():
     o = bpy.data.objects.get(name)
@@ -409,7 +410,8 @@ def apply(t):
     em_k = ev(spec.get("emission"), tt, 1.0)
     for sock, v0 in emitters:
         sock.default_value = v0 * em_k
-    return {"t": round(t, 4), "lens": round(cam_data.lens, 2), "cam": [round(x, 4) for x in cam.location],
+    return {"lights_w": {o.name: round(o.data.energy, 3) for o in bpy.data.objects if o.type == "LIGHT" and not o.hide_render},
+            "t": round(t, 4), "lens": round(cam_data.lens, 2), "cam": [round(x, 4) for x in cam.location],
             "target": [round(x, 4) for x in target], "tilt_deg": round(math.degrees(tilt), 2)}
 
 
