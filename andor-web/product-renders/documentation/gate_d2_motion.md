@@ -171,4 +171,34 @@ All 13 shots rendered, at 24 fps with 0.5 s handles. Each shot folder holds its 
 
 ### Quality test at final settings (D03)
 
-(Added when the test frames finish.)
+**What was rendered:** D03 frames 48–71 (1 s from the middle of the move, where the camera is fastest), at 1920 × 1920, 96 samples, a fixed seed and OpenImageDenoise.
+
+**Compared with:** the same frames of the 6-sample draft.
+
+**Files** (in `quality/`):
+- `quality_D03_final_1s.mp4` and `quality_D03_draft_same_frames_1s.mp4`, both 1920 px;
+- `quality_compare_D03_f60.jpg`: crops of frame 60 with the temporal residual ×20;
+- `quality_review.json`.
+
+| Temporal residual, mean (levels of 255) | Whole frame | Labels | Flutes | Keys (bokeh) |
+|---|---|---|---|---|
+| Draft, 6 samples, 960 px | 0.60 | 0.20 | 0.43 | 1.25 |
+| **Final, 96 samples, 1920 px** | **0.30** | **0.14** | **0.24** | **0.51** |
+| Final, scaled to 960 px (like for like) | 0.34 | 0.14 | 0.28 | 0.56 |
+
+**Temporal noise and flicker:**
+- At final settings, noise and flicker are about half the draft's over the whole frame, and less than half in the out-of-focus keys.
+- **The draft:** its residual map shows the denoiser's blotches crawling over the flutes and the keys.
+- **The final:** what remains is thin, even edge lines, which come from the move itself (sub-pixel motion of edges), not from noise.
+- **Two small hot spots:** the specular highlights on the black keys, and the blue LED dot. They are the only places that still flicker slightly. If they show at full size on a large screen, the fix is a few more samples or a little light clamping on those highlights.
+
+**Text stability:** the labels change least of all regions (0.14 levels). In D03 they lie outside the shallow focus by design, so what is checked is that they hold steady, not that they are sharp.
+
+**Aliasing:** the flute edges and key gaps show no stair-stepping or crawling at 1920 px. Their residual is the even edge line described above, with no sparkle.
+
+**Focus:** the focus pulls with the camera, so sharpness in the label region stays nearly constant (it varies by 3.3 % over the 24 frames, against 7 % in the draft, where noise disturbs the measure). There is no visible focus breathing.
+
+**What it means for production:**
+- **The final settings work** for the hardest shot. The remaining flicker is limited to two tiny highlights.
+- **Render cost:** about 7 minutes per 1920 px frame on this 4-core machine. The 13 shots (1,728 frames, plus handles that are copies) would take on the order of 200 hours here. Final production needs a GPU machine or a render service.
+- **D02's noisier backdrop:** a 1 s test of D02 at final settings is worth doing first.
