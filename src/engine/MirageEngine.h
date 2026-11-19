@@ -2,6 +2,7 @@
 
 #include "core/Prng.h"
 #include "engine/CharacterFilter.h"
+#include "engine/PedalFold.h"
 #include "engine/ReimaginedEngine.h"
 
 #include <array>
@@ -34,11 +35,18 @@ public:
     bool start (const ReimaginedNote& note, const ReimaginedControl& control) noexcept override;
     void control (const ReimaginedControl& control) noexcept override;
     void render (const float* dryL, const float* dryR, float* outL, float* outR, int n) noexcept override;
-    double sourcePosition() const noexcept override { return note.granular || done ? -1.0 : heads[0]; }
+    double sourcePosition() const noexcept override { return note.granular || done ? -1.0 : fold.position (heads[0]); }
     bool finished() const noexcept override { return done; }
+    PedalLoopMode pedalLoopMode() const noexcept override { return fold.configuredLoop(); }
+    void pedal (bool down) noexcept override { fold.want (down); }
+    bool pedalArmed() const noexcept override { return fold.holding(); }
+    bool pedalLooping() const noexcept override { return fold.looping (heads[0]); }
 
 private:
     float boxAt (int channel, std::int64_t k) const noexcept;
+    /** The held read at the pedal fold's taps for linear position `pos` (the plain read when
+        no pedal loop is engaged). */
+    float foldedAt (int channel, double pos) const noexcept;
     float heldAt (int channel, double pos) const noexcept;
 
     ReimaginedNote note;
@@ -64,6 +72,10 @@ private:
     int sumCount = 0;
     float heldL = 0.0f, heldR = 0.0f;
     float envelope = 0.0f, envCoef = 0.0f;
+
+    /** PEDAL LOOP (docs/research/pedal-reimagined): the heads' reads loop the recording's pedal
+        region while the pedal holds the note (LOOP off; with LOOP on, Ping-Pong). */
+    PedalFold fold;
 
     // Filter
     CharacterFilter filter;

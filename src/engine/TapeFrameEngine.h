@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Prng.h"
+#include "engine/PedalFold.h"
 #include "engine/ReimaginedEngine.h"
 
 #include <algorithm>
@@ -43,6 +44,10 @@ public:
     double sourcePosition() const noexcept override;
     double grainPositionOffset() const noexcept override { return grainOffset; }
     bool finished() const noexcept override { return done; }
+    PedalLoopMode pedalLoopMode() const noexcept override { return fold.configuredLoop(); }
+    void pedal (bool down) noexcept override { fold.want (down); }
+    bool pedalArmed() const noexcept override { return fold.holding(); }
+    bool pedalLooping() const noexcept override { return fold.looping (straightOrigin + main.t); }
 
 private:
     struct Head
@@ -58,6 +63,11 @@ private:
         down to a floor, so a held note keeps sounding. */
     double nextPassGain() const noexcept { return std::max (minPassGain, passGain * (1.0 - 0.15 * runout)); }
     static constexpr double minPassGain = 0.5;
+    /** PEDAL LOOP (docs/research/pedal-reimagined): with LOOP off the tape runs straight through
+        the recording; while the pedal holds the note its heads (main and ghosts) read the
+        recording's pedal region in a loop, each pass a little more worn. */
+    PedalFold fold;
+    int foldPasses = 0;
 
     ReimaginedNote note;
     const ReimaginedAnalysis::TapeFrame* tape = nullptr;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Prng.h"
+#include "engine/PedalFold.h"
 #include "engine/ReimaginedEngine.h"
 
 #include <array>
@@ -40,6 +41,12 @@ public:
     bool wantsDryRead() const noexcept override { return ! (mix >= 1.0f && mixStep >= 0.0f); }
     void render (const float* dryL, const float* dryR, float* outL, float* outR, int n) noexcept override;
     bool finished() const noexcept override { return done; }
+    /** PEDAL LOOP: the voice loops the plain read (the dry part); the rebuilt spectrum follows
+        the same loop on its own timeline (LOOP off; with LOOP on MOSAIC already holds the body). */
+    PedalLoopMode pedalLoopMode() const noexcept override { return requestedPedal; }
+    void pedal (bool down) noexcept override { fold.want (down); }
+    bool pedalArmed() const noexcept override { return fold.holding(); }
+    bool pedalLooping() const noexcept override { return fold.looping (seconds * sourceRate); }
 
 private:
     static constexpr int partials = ReimaginedAnalysis::maxPartials;
@@ -66,6 +73,13 @@ private:
     Prng rng;
     bool done = false;
     double seconds = 0.0;      ///< since the note started (real time)
+    /** PEDAL LOOP (docs/research/pedal-reimagined): the spectral timeline (seconds as source
+        frames) folded into the recording's pedal region while the pedal holds the note, so the
+        spectrum and its level travel the loop (Forward wraps, Ping-Pong turns) instead of
+        running out; letting go, the evolution goes on from where the loop is. */
+    PedalFold fold;
+    PedalLoopMode requestedPedal = PedalLoopMode::normal;
+    double sourceRate = 48000.0;
     double position = 0.0;     ///< spectral position (fractional frame)
     double step = 1.0;
 

@@ -730,7 +730,7 @@ static Catalog ospCatalog()
     help ("osp.source.level", "LEVEL", "How loud this layer is, from silence to +6 dB.", "osp.quickstart");
     help ("osp.source.reimagined", "REIMAGINED", "How far this layer's REIMAGINED mode transforms the recording. At 0 % the layer plays without it. Click the name to choose the mode.",
           "osp.reimagined");
-    help ("osp.source.mode", "Playback mode", "One Shot plays the recording from START; Granular builds the note from overlapping grains. The menu also holds PEDAL LOOP for One Shot.",
+    help ("osp.source.mode", "Playback mode", "One Shot plays the recording from START; Granular builds the note from overlapping grains. The menu also holds PEDAL LOOP for One Shot: the sustain pedal holds the note in a Forward or Ping-Pong loop, in every REIMAGINED mode.",
           "osp.playback");
     help ("osp.granular.position", "POS", "Where in the recording the grains are taken (START is added).", "osp.playback");
     help ("osp.granular.size", "SIZE", "How long each grain lasts, 20 to 400 ms.", "osp.playback");

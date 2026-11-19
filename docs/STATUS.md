@@ -1,5 +1,25 @@
 # Status
 
+> **18 Nov 2026, PEDAL LOOP × REIMAGINED (branch `claude/pedal-reimagined`;
+> `docs/research/pedal-reimagined/`):** PEDAL LOOP Forward and Ping-Pong now work in every
+> REIMAGINED mode at every amount, for One Shot with the layer's LOOP off.
+> - **Before:** TAPE FRAME, TOYBOX, MOSAIC and MIRAGE fell back to Normal above 0 %. Only
+>   KALEIDOSCOPE, which is the voice's own path, looped.
+> - **Shared contract:** each engine reports the pedal loop it can play and receives the pedal.
+>   `PedalFold` is one allocation-free traversal of the analysed regions, with late entry and
+>   release.
+> - **Per engine:**
+>   - TAPE FRAME and MIRAGE heads read through the fold; tape passes wear.
+>   - TOYBOX walks inside the pedal's region.
+>   - MOSAIC's spectral timeline folds; its dry part loops through the voice.
+> - **Unchanged:** Normal, an unpressed pedal and 0 % are bit-identical; goldens are unchanged.
+> - **Tests:** 216 listening-lab renders, all finite. CPU: +0.3–1.3 points of one core per 16
+>   held voices.
+> - **Limitation:** TAPE FRAME with LOOP on keeps its own rewinding tape, so Ping-Pong is not
+>   applied there.
+> - **NEXT:** listening on the real recordings (the lab takes them); the user's review of the
+>   development build (PL-R5).
+
 > **18 Nov 2026, shared menu visual refinement (branch `claude/menu-visual`, on
 > `claude/osp-menu-content`; `docs/research/menu-visual/`):**
 > - **Every menu takes the ANDOR look.** Until now, no menu set a look of its own, so in a DAW

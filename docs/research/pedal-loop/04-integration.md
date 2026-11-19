@@ -8,7 +8,8 @@
 | **Note Atlas / sets** | Each member has its own regions (analysed with its own continuation). A voice keeps its member and its loop for its life. | "Note Atlas members each loop over their own body" |
 | **SYNTH / Imprint** | A looping read never ends, so `sourceEnded` and `synthHoldsVoice` never trigger under the pedal. The oscillator follows its own envelope with no new attack. | "with SYNTH (Imprint) the oscillator carries on…" |
 | **KEY DNA, LIFE** | Fixed in the note's shape at note-on; nothing is re-rolled at a turn. | by construction (`NoteShape`) |
-| **Granular, REVERSE, REIMAGINED modes, SPEED** | Normal. The setting is kept and has no effect. Ping-Pong under SPEED plays as Forward. | "Granular and REVERSE keep Normal" |
+| **Granular, REVERSE, SPEED** | Normal. The setting is kept and has no effect. Ping-Pong under SPEED plays as Forward. | "Granular and REVERSE keep Normal" |
+| **REIMAGINED modes** | Supported in every mode at every amount since PEDAL LOOP × REIMAGINED (`docs/research/pedal-reimagined/`). KALEIDOSCOPE is the voice's own path. TAPE FRAME, TOYBOX, MIRAGE and MOSAIC loop the reading they do themselves. Exception: TAPE FRAME with LOOP on keeps its own rewinding tape. | `[pedal-reimagined]` |
 | **DAMPEN, CHARACTER, MOVEMENT, SPACE** | After the read, as before. The loop is in the source read only. | — |
 | **Arpeggiator** | Owns CC64 while it runs (existing hand-over), so its notes never loop and never stick. | existing `[arp]` tests |
 | **Steal, All Notes Off, reset** | Unchanged semantics: fade, release, kill. | "All Notes Off and a reset end looping notes" |

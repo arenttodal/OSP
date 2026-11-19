@@ -61,6 +61,10 @@ bool ToyboxEngine::start (const ReimaginedNote& n, const ReimaginedControl& c) n
         heads[0] = { n.startFrame, noteDir };
         heads[1] = heads[0];
     }
+    pedalMode = n.granular ? PedalLoopMode::normal : n.pedalLoop;
+    pedalWanted = pedalHeld = pedalTried = pedalLooped = false;
+    pedalGain = pedalGainTarget = 1.0f;
+    pedalGainStep = 0.0f;
     grainHead = 0.0;
     grainDir = n.reverse ? -1.0 : 1.0;
     grainOffset = 0.0;
@@ -213,16 +217,89 @@ void ToyboxEngine::reverseNow (bool atExtremum) noexcept
     legEnd = std::clamp (h.pos + h.dir * leg, lowBound(), highBound());
 }
 
+void ToyboxEngine::followPedal() noexcept
+{
+    if (pedalWanted && ! pedalHeld && ! pedalTried)
+    {
+        pedalTried = true;
+        const auto& model = note.model->original.continuation.pedal;
+        if (! model.valid || model.regions.empty())
+            return;
+        const double sr = note.source->sampleRate();
+        const auto& h = heads[0];
+        // The first region whose loop point is still ahead (the walk goes on to it); past every
+        // one, the last (a late pedal), unless the note has all but ended.
+        const PedalLoopRegion* chosen = nullptr;
+        for (const auto& r : model.regions)
+        {
+            const double edge = std::min (0.25 * (r.endFrame - r.startFrame), pedalMode == PedalLoopMode::forward ? r.crossfadeFrames : note.pedalTurnFrames);
+            if (h.pos < r.endFrame - edge)
+            {
+                chosen = &r;
+                break;
+            }
+        }
+        const bool late = chosen == nullptr;
+        if (late)
+        {
+            if (h.pos >= soundEnd - 0.002 * sr)
+                return;   // a note that has ended is never brought back
+            chosen = &model.regions.back();
+        }
+        savedStart = regionStart;
+        savedEnd = regionEnd;
+        savedSustains = sustains;
+        savedNoteDir = noteDir;
+        regionStart = chosen->startFrame;
+        regionEnd = chosen->endFrame;
+        sustains = true;
+        pedalHeld = true;
+        pedalLooped = late;
+        pedalLeave = regionEnd - 0.01 * sr;
+        if (late)
+        {
+            // Into the region at the level the note has here (the memory's own jump, 50 ms).
+            pedalGainTarget = std::clamp (static_cast<float> (std::pow (10.0, (model.levelAt (h.pos) - chosen->levelDb) / 20.0)), 0.02f, 1.0f);
+            pedalGainStep = (pedalGainTarget - pedalGain) / static_cast<float> (0.05 * rate);
+            turn (regionStart + 0.01 * sr, 1.0, 0.05);
+            pedalLeave = regionStart;
+        }
+        legEnd = std::clamp (legEnd, lowBound(), highBound());
+    }
+    else if (! pedalWanted && pedalHeld)
+    {
+        // Let go: the note's own region again; a FORWARD walk reading back turns the note's way.
+        pedalHeld = false;
+        regionStart = savedStart;
+        regionEnd = savedEnd;
+        sustains = savedSustains;
+        noteDir = savedNoteDir;
+        if (heads[0].dir != noteDir && (motion <= 1.0e-3 || play == ToyboxPlay::forward) && ! turnPending)
+            requestTurn (1.0);
+        legEnd = std::clamp (legEnd, lowBound(), highBound());
+    }
+}
+
 void ToyboxEngine::planLeg() noexcept
 {
     auto& h = heads[0];
     const double srcRate = note.source->sampleRate();
+    pedalLooped = pedalLooped || pedalHeld;   // (the walk turning inside the pedal's region)
+    // PEDAL LOOP Ping-Pong: at the far end of the region the walk itself turns round.
+    if (pedalHeld && pedalMode == PedalLoopMode::pingPong && h.dir == noteDir && (noteDir > 0.0 ? h.pos >= regionEnd - 1.0 : h.pos <= regionStart + 1.0))
+    {
+        noteDir = -noteDir;
+        requestTurn (1.0);
+        return;
+    }
     // The walk reached the far end of the body: a sustaining sound starts the body again
     // (backwards: from its end).
     if (sustains && h.dir == noteDir && (noteDir > 0.0 ? h.pos >= regionEnd - 1.0 : h.pos <= regionStart + 1.0))
     {
         turn (noteDir > 0.0 ? regionStart + 0.01 * srcRate : regionEnd - 0.01 * srcRate, noteDir, 0.02);
         legEnd = heads[0].pos + noteDir * legLength;
+        if (pedalHeld)
+            legEnd = std::clamp (legEnd, lowBound(), highBound());   // (a pedal region can be shorter than a leg)
         return;
     }
     if (play == ToyboxPlay::chaos)
@@ -305,8 +382,8 @@ void ToyboxEngine::render (const float* dryL, const float* dryR, float* outL, fl
                 l = std::round (l * levels) / levels;
                 r = std::round (r * levels) / levels;
             }
-            heldL = l * gainMod;
-            heldR = r * gainMod;
+            heldL = l * gainMod * pedalGain;
+            heldR = r * gainMod * pedalGain;
         }
         const float m = 0.5f * std::abs (heldL + heldR);
         fast += fastCoef * (m - fast);
@@ -343,6 +420,13 @@ void ToyboxEngine::render (const float* dryL, const float* dryR, float* outL, fl
             else if (! inRegion && h.dir != noteDir && fade >= 1.0)
                 requestTurn (1.0);   // never back into the attack (REVERSE: never forward out of the body)
         }
+        else if (pedalHeld && pedalMode == PedalLoopMode::pingPong)
+        {
+            // FWD, the pedal's Ping-Pong: a U-turn at each end of the region (at an extremum).
+            const double edge = 0.01 * note.source->sampleRate();
+            if (fade >= 1.0 && (h.dir > 0.0 ? h.pos >= regionEnd - edge : h.pos <= regionStart + edge))
+                requestTurn (1.0);
+        }
         else if (sustains && fade >= 1.0)
         {
             // FWD: a sustaining body loops (crossfaded), like a sampler's loop points.
@@ -350,6 +434,20 @@ void ToyboxEngine::render (const float* dryL, const float* dryR, float* outL, fl
                 turn (regionStart + (h.pos - regionEnd), 1.0, 0.02);
             else if (h.dir < 0.0 && h.pos <= regionStart)
                 turn (regionEnd - (regionStart - h.pos), -1.0, 0.02);
+        }
+        if (pedalMode != PedalLoopMode::normal)
+        {
+            followPedal();
+            pedalLooped = pedalLooped || (pedalHeld && h.pos >= pedalLeave);
+            if (pedalGainStep != 0.0f)
+            {
+                pedalGain += pedalGainStep;
+                if ((pedalGainStep > 0.0f) == (pedalGain >= pedalGainTarget))
+                {
+                    pedalGain = pedalGainTarget;
+                    pedalGainStep = 0.0f;
+                }
+            }
         }
         // The note ends where it plays to (a swing against it turns at its legEnd instead).
         if (h.dir == noteDir && (noteDir > 0.0 ? h.pos >= soundEnd : h.pos <= 0.0))
