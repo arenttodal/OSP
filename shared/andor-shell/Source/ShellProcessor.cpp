@@ -98,6 +98,8 @@ namespace
         // STRUM (after everything else, so nothing moves): the arpeggiator's (arp.strum.*), and
         // B's and C's with the per-card arpeggiator. Off by default: every session as it was.
         InstrumentHost::addStrumParameters (layout, productInfo().slug + ".", productInfo().strumParameterHint, productInfo().cardArpeggiator ? 3 : 1);
+        // CUSTOM (after STRUM): the arpeggiator's, and B's and C's with the per-card arpeggiator.
+        InstrumentHost::addCustomPatternParameters (layout, productInfo().slug + ".", productInfo().customPatternParameterHint, productInfo().cardArpeggiator ? 3 : 1);
         return layout;
     }
 
@@ -409,6 +411,17 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         }
     }
     hostWasPlaying = performance.playing;
+    // New custom patterns (lock-free from the message thread): A's is the arpeggiator's own
+    // (and every linked lane's), B's and C's their lanes' (the follower copies its lane).
+    customPatterns->collect ([this] (int card, const osp::arp::CustomPattern* pattern) {
+        osp::Arpeggiator* target = card == 0 ? &arpeggiator : (lanes != nullptr ? &lanes->laneArps[static_cast<std::size_t> (card - 1)] : nullptr);
+        if (target == nullptr)
+            return;
+        if (pattern != nullptr)
+            target->setCustomPattern (*pattern);
+        else
+            target->clearCustomPattern();
+    });
 
     // SHAPER CUSTOM: a changed pattern reaches the engine before the block.
     if (const auto generation = shaperGeneration.load (std::memory_order_acquire); generation != shaperGenerationSeen)

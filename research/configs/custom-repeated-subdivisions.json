@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "description": "An eight-step pattern with repeated subdivisions: split halves and quarters retrigger, the rest keeps time. Render with --fixture chords; compare with custom-off-reference (UP, the same rate) and baselines A/B with the same arp block.",
+  "arp": {
+    "enabled": true,
+    "transport": true,
+    "pattern": "up",
+    "rate": "1/16",
+    "gate": 0.75,
+    "octaves": 2,
+    "bpm": 108,
+    "swing": 0.0,
+    "custom": {
+      "mapping": "contour",
+      "events": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          0.5
+        ],
+        [
+          2,
+          0.5
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          3,
+          0.25
+        ],
+        [
+          3,
+          0.25
+        ],
+        [
+          3,
+          0.5
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          -1,
+          1
+        ],
+        [
+          1,
+          0.5
+        ],
+        [
+          2,
+          0.5
+        ]
+      ]
+    }
+  }
+}

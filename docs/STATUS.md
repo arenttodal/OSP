@@ -1,5 +1,21 @@
 # Status
 
+> **19 Nov 2026, Custom ARP CP2 (branch `claude/custom-arp`; `docs/research/custom-arp/03-cp2.md`):**
+> recorded patterns play inside the one arpeggiator, in ANDOR OSP and the ANDOR shell (ANALOG).
+> - **Mapping:** the approved hybrid as **CONTOUR**; degree-cycle as **DEGREES**. The engine
+>   picks exactly the lab's notes.
+> - **Rhythm:** variable-duration events in exact ticks (960 per step), including rests, splits
+>   and merges. Subdivisions keep their place in the swung step, and GATE is a share of each
+>   event's duration. The engine plays the lab's rhythmSequence to the sample.
+> - **Parameters:** CUSTOM per card (`arp.custom`, `arp.cardB|C.custom`, hint 36), off by
+>   default. CUSTOM on without a pattern plays the selected style unchanged.
+> - **Hand-over:** each card's pattern reaches the audio thread lock-free
+>   (`CustomPatternExchange`, `InstrumentHost::setCustomArpPattern`).
+> - **Renderer:** custom patterns render headlessly (`research/configs/custom-*.json`).
+> - The 18-style golden is unchanged; STRUM does not apply to custom patterns.
+> - **NEXT:** CP3 (the CUSTOM row, Create Pattern, recording, import, the editor) and CP4
+>   (patterns saved in sessions and presets, the library).
+
 > **18 Nov 2026, ARP STRUM (branch `claude/arp-strum`; `docs/research/arp-strum/`):** a CHORD
 > step's notes one after another, inside the one arpeggiator.
 > - **Engine:** a bounded pending note-on queue; UP / DOWN / RANDOM / ALTERNATE; FREE ms or

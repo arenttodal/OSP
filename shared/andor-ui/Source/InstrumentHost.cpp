@@ -172,6 +172,7 @@ const juce::StringArray& InstrumentHost::strumDivisionNames()
 
 void InstrumentHost::StrumReader::attach (juce::AudioProcessorValueTreeState& state, const juce::String& ns, int shown)
 {
+    custom = state.getRawParameterValue (ids::arpCustom (ns, shown));
     on = state.getRawParameterValue (ids::arpStrum (ns, shown, "on"));
     direction = state.getRawParameterValue (ids::arpStrum (ns, shown, "direction"));
     sync = state.getRawParameterValue (ids::arpStrum (ns, shown, "sync"));
@@ -181,6 +182,7 @@ void InstrumentHost::StrumReader::attach (juce::AudioProcessorValueTreeState& st
 
 void InstrumentHost::StrumReader::applyTo (Arpeggiator::Settings& settings) const noexcept
 {
+    settings.custom = custom != nullptr && custom->load() >= 0.5f;
     settings.strum = on != nullptr && on->load() >= 0.5f;
     if (! settings.strum)
         return;

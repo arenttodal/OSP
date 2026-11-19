@@ -583,9 +583,15 @@ public:
     static void addStrumParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns, int hint, int cards = 3);
     static const juce::StringArray& strumDirectionNames();
     static const juce::StringArray& strumDivisionNames();
-    /** Reads one card's STRUM parameters on the audio thread (attach on the message thread). */
+    /** CUSTOM per card (arp.custom, and B's and C's with `cards` 3), appended with `hint`
+        (ANDOR OSP 36; a shell product after STRUM). Off by default: every session as it was.
+        Which pattern each card plays is not a parameter (setCustomArpPattern). */
+    static void addCustomPatternParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns, int hint, int cards = 3);
+    /** Reads one card's STRUM and CUSTOM parameters on the audio thread (attach on the message
+        thread). */
     struct StrumReader
     {
+        std::atomic<float>* custom = nullptr;
         std::atomic<float>* on = nullptr;
         std::atomic<float>* direction = nullptr;
         std::atomic<float>* sync = nullptr;
@@ -597,6 +603,11 @@ public:
     };
     /** The card (shown, 0 A .. 2 C) whose lane arpView() shows (the one the panel edits). */
     virtual void setArpViewCard (int shown) noexcept { juce::ignoreUnused (shown); }
+    /** The custom pattern card 0 A .. 2 C plays while its CUSTOM is on (message thread; nullptr
+        clears it). It reaches the audio thread lock-free and takes over at the lane's next step. */
+    virtual void setCustomArpPattern (int card, const arp::CustomPattern* pattern) { juce::ignoreUnused (card, pattern); }
+    /** The pattern last set for the card (message thread; nullptr: none). */
+    virtual const arp::CustomPattern* customArpPattern (int card) const { juce::ignoreUnused (card); return nullptr; }
 
     // -- Live capture (a product opts in: ANDOR OSP) -----------------------------------------
     /** What the CAPTURE page shows (message thread). */

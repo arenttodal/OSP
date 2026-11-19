@@ -7,12 +7,14 @@
 #include "engine/Arpeggiator.h"
 #include "core/Prng.h"
 #include "research/ArpPatternLab.h"
+#include "research/RenderConfig.h"
 #include "support/AllocationCounter.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <optional>
@@ -567,4 +569,32 @@ TEST_CASE ("custom arp: invalid patterns are refused (capacity, durations, ranks
     a.prepare (48000.0);
     a.setCustomPattern (p);
     CHECK_FALSE (a.hasCustomPattern());
+}
+
+TEST_CASE ("custom arp: the research configs carry their patterns into the renderer's arpeggiator", "[unit][arp-custom]")
+{
+    auto load = [] (const char* name) {
+        std::string error;
+        auto config = research::loadRenderConfig (std::filesystem::path (OSP_SOURCE_DIR) / "research" / "configs" / name, error);
+        INFO (name << ": " << error);
+        REQUIRE (config.has_value());
+        return *config;
+    };
+    for (const char* name : { "custom-five-step-contour.json", "custom-five-step-degrees.json", "custom-repeated-subdivisions.json",
+                              "custom-sixteenth-thirtysecond.json", "custom-sustained-rests.json", "custom-odd-split.json" })
+    {
+        INFO (name);
+        const auto c = load (name);
+        CHECK (c.arp.settings.custom);
+        CHECK (c.arp.customPattern.valid());
+    }
+    const auto five = load ("custom-five-step-contour.json");
+    CHECK (five.arp.customPattern.count == 5);
+    CHECK (five.arp.customPattern.maxRank == 4);
+    CHECK (five.arp.customPattern.mapping == arp::CustomMapping::contour);
+    CHECK (load ("custom-five-step-degrees.json").arp.customPattern.mapping == arp::CustomMapping::degrees);
+    const auto odd = load ("custom-odd-split.json");
+    CHECK (odd.arp.customPattern.lengthTicks() == 5 * arp::ticksPerStep + arp::ticksPerStep / 2);   // 5.5 steps, the rest included
+    CHECK (odd.arp.customPattern.events[1].duration == arp::ticksPerStep / 2);
+    CHECK_FALSE (load ("custom-off-reference.json").arp.settings.custom);
 }

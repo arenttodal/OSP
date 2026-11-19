@@ -165,6 +165,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     // STRUM (version hint 35; after USER MACROS): each card's own, off by default and in every
     // session from before, so the arpeggiator plays exactly as it did.
     addStrumParameters (layout, {}, 35);
+    // CUSTOM per card (version 36, after STRUM: nothing moves). Off: every session as it was.
+    addCustomPatternParameters (layout, {}, 36);
     return layout;
 }
 
@@ -317,6 +319,7 @@ OspAudioProcessor::OspAudioProcessor()
     userMacroOffsets.assign (static_cast<std::size_t> (liveOffsets.size()), 0.0);
     userMacroTouched.assign (static_cast<std::size_t> (liveOffsets.size()), 0);
     lanes = std::make_unique<CardArpLanes>();
+    customPatterns = std::make_unique<arp::CustomPatternExchange>();
     laneHost = std::make_unique<LaneHost> (*this);
     fxReader.attach (parameters, fxParameterPrefix(), &liveOffsets);
     attackParam = liveParameter (ids::attack);
@@ -1683,6 +1686,19 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             hostWasPlaying = transportRunning;
         }
     engine.setHostTiming (timing);
+    // New custom patterns (lock-free from the message thread): A's is the arpeggiator's own
+    // (and every linked lane's), B's and C's their lanes'. Each takes over at its next step.
+    customPatterns->collect ([this] (int card, const arp::CustomPattern* pattern) {
+        if (card == 0)
+        {
+            if (pattern != nullptr)
+                arpeggiator.setCustomPattern (*pattern);
+            else
+                arpeggiator.clearCustomPattern();
+        }
+        else
+            lanes->setCustomPattern (card, pattern);
+    });
     {
         // The on-screen wheels act like the controller's.
         const float pitch = screenPitch.load(), mod = screenMod.load();

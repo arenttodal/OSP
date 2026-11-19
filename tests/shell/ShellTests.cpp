@@ -253,9 +253,10 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
         }
         const bool isOwn = line.startsWith (prefix);
         // ANDOR OSP's parameters added after products shipped (the MOD WHEEL's vibrato.*, then
-        // STRUM: arp.strum.* and a per-card product's <slug>.arp.cardB|C.strum.*) come after the
-        // product's own, so none of a product's moves; the rest of ANDOR OSP's before.
-        const bool appendedAfterProducts = id.startsWith ("vibrato.") || id.contains ("strum.");
+        // STRUM: arp.strum.* and a per-card product's <slug>.arp.cardB|C.strum.*, then CUSTOM:
+        // arp.custom and <slug>.arp.cardB|C.custom) come after the product's own, so none of a
+        // product's moves; the rest of ANDOR OSP's before.
+        const bool appendedAfterProducts = id.startsWith ("vibrato.") || id.contains ("strum.") || id == "arp.custom" || (id.contains ("arp.card") && id.endsWith (".custom"));
         orderKept = orderKept && (isOwn || ! ownStarted || appendedAfterProducts);
         if (appendedAfterProducts)
             vibratoSeen = true;

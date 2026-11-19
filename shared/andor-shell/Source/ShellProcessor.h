@@ -216,6 +216,8 @@ public:
     bool referenceSubRow() const noexcept { return referenceParity; }
     juce::String cardArpNamespace() const override { return productInfo().slug + "."; }
     void setArpViewCard (int shown) noexcept override { arpViewLane.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
+    void setCustomArpPattern (int card, const osp::arp::CustomPattern* pattern) override { customPatterns->publish (card, pattern); }
+    const osp::arp::CustomPattern* customArpPattern (int card) const override { return customPatterns->current (card); }
 
     // InstrumentHost: the macro popovers
     int editLayer() const noexcept override { return editLayerIndex.load(); }
@@ -543,6 +545,7 @@ private:
         } follower;
     };
     std::unique_ptr<CardLanes> lanes;
+    std::unique_ptr<osp::arp::CustomPatternExchange> customPatterns = std::make_unique<osp::arp::CustomPatternExchange>();   ///< (on the heap: about 25 KB)
     std::atomic<int> arpViewLane { 0 };           ///< the lane the ARP display shows
     std::array<std::atomic<int>, osp::Arpeggiator::displaySteps> arpDisplayLow {}, arpDisplayHigh {};
     std::atomic<int> arpDisplayCurrent { -1 };

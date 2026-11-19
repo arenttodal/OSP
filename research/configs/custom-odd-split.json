@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "description": "An odd-length (5.5-step) pattern with a split: it stays in phase against the bar, the split retriggers. Render with --fixture chords; compare with custom-off-reference (UP, the same rate) and baselines A/B with the same arp block.",
+  "arp": {
+    "enabled": true,
+    "transport": true,
+    "pattern": "up",
+    "rate": "1/16",
+    "gate": 0.75,
+    "octaves": 2,
+    "bpm": 108,
+    "swing": 0.3,
+    "custom": {
+      "mapping": "contour",
+      "events": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          0.5
+        ],
+        [
+          2,
+          0.5
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          -1,
+          1
+        ]
+      ]
+    }
+  }
+}

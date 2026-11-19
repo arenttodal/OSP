@@ -47,6 +47,17 @@ void CardArpLanes::restartPatterns() noexcept
         a.restartPattern();
 }
 
+void CardArpLanes::setCustomPattern (int card, const arp::CustomPattern* pattern) noexcept
+{
+    if (card < 1 || card > 2)
+        return;
+    auto& a = state->laneArps[static_cast<std::size_t> (card - 1)];
+    if (pattern != nullptr)
+        a.setCustomPattern (*pattern);
+    else
+        a.clearCustomPattern();
+}
+
 Arpeggiator& CardArpLanes::displayed (Host& host, int shownCard) noexcept
 {
     // Unlinked lanes: the card the panel edits (A's is the arpeggiator's own).
@@ -191,6 +202,7 @@ const juce::MidiBuffer& CardArpLanes::process (Host& host, const juce::MidiBuffe
             settings.strumSync = own.strumSync;
             settings.strumMs = own.strumMs;
             settings.strumQuarters = own.strumQuarters;
+            settings.custom = own.custom;
         }
         auto& a = laneArp (lane);
         a.setSeed (lane == 0 ? seed : Prng::deriveSeed (seed, static_cast<std::uint64_t> (lane), 0x4c616e65));
