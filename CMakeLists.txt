@@ -103,6 +103,7 @@ add_library(osp_dsp STATIC
     src/model/RootChoice.cpp
     src/model/PlaybackPreparation.cpp
     src/model/NoteAtlas.cpp
+    src/model/ArpPatternModel.cpp
 )
 target_include_directories(osp_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # Linked into plugin shared objects (VST3/AU bundles).
@@ -152,6 +153,7 @@ set(OSP_IO_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/AnalysisJson.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/JsonUtil.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/NoteAtlasJson.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/io/ArpPatternJson.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/PhraseAnalysisCache.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/midi/MidiFileIO.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/library/SoundImport.cpp

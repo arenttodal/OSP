@@ -43,6 +43,7 @@ add_executable(osp_tests
     unit/ArpeggiatorTests.cpp
     unit/ArpPatternLabTests.cpp
     unit/ArpCustomPatternTests.cpp
+    unit/ArpPatternModelTests.cpp
     unit/ArpStrumTests.cpp
     unit/ModulationTests.cpp
     unit/LayerEqTests.cpp
