@@ -1487,6 +1487,7 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
 
 void OspAudioProcessorEditor::paint (juce::Graphics& g)
 {
+    cacheScope.beginPaint();   // the ceramic pieces this paint draws are this editor's
     // Around the instrument when the window's shape differs from the reference's.
     g.fillAll (design::draw::surround());
 }
@@ -1501,8 +1502,14 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
     frame::paint (g, content, frame::Identity {}, arpShown, shownRow, rackShift(), sourceTrim(), design::height - sourceTrim());
 }
 
+void OspAudioProcessorEditor::paintOverChildren (juce::Graphics&)
+{
+    cacheScope.endPaint();
+}
+
 void OspAudioProcessorEditor::resized()
 {
+    cacheScope.resized();
     frame::fit (*this, content, instrumentHeight(), &overflow);
     modOverlay.setBounds (content.getLocalBounds());
     if (userMacroController != nullptr)

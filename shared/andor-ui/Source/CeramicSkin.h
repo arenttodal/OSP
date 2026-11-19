@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <list>
@@ -101,9 +103,45 @@ public:
     {
         int composedImages = 0;
         size_t bytes = 0;
+        // Instrumentation (the ceramic-skin memory investigation): since the pieces were read.
+        std::uint64_t hits = 0, misses = 0, evictions = 0;
+        size_t peakBytes = 0;
+        double composeSeconds = 0.0;     ///< time spent composing on misses (resampling, tinting)
+        size_t overlayBytes = 0;         ///< the product overlay pack's own cache (not in `bytes`)
     };
     Usage usage() const;
     void release();
+
+    /** The cache's budget (default 192 MB / 160 images; the product overlay pack follows it).
+        OSP_SKIN_CACHE_MB overrides the default bytes at start (for measurements in a host). */
+    void setBudget (size_t maxBytes, size_t maxImages);
+    size_t budgetBytes() const noexcept { return maxBytes; }
+
+    /** Stale size variants (opt-in, for when a resize settles): starts a generation; every
+        composed image used from now on is marked with it. */
+    std::uint64_t beginGeneration() noexcept;
+    /** Drops every composed image not used since `generation` began (what the window no
+        longer shows: the sizes it passed through). Returns the bytes released. */
+    size_t evictUnusedSince (std::uint64_t generation);
+
+    // Per editor (Phase 5: several editors of different sizes share these pieces). An editor
+    // names itself as the painter while it paints; every piece it draws records it as a user.
+    // After its resize settles it starts a generation, repaints, then drops its claim on the
+    // pieces it did not draw again; a piece is evicted only when no open editor still uses it.
+    /** The editor now painting (message thread; nullptr: none, e.g. a test drawing directly). */
+    static void setPainter (const void* editor) noexcept;
+    static const void* painter() noexcept;
+    /** While an editor's window is being resized its pieces are stretched from what is cached
+        (the nine-slice "moving" path: no composition per size in passing). */
+    void setResizing (const void* editor, bool resizing);
+    bool isResizing (const void* editor) const;
+    /** Starts `editor`'s generation: the pieces its next paint draws are the ones it keeps. */
+    std::uint64_t beginGeneration (const void* editor);
+    /** Drops `editor`'s claim on every piece it has not drawn since its generation began, and
+        evicts the pieces no editor claims any more. Returns the bytes released. */
+    size_t evictStale (const void* editor);
+    /** The editor closed: its claims go, and pieces no other editor uses are evicted. */
+    size_t releaseEditor (const void* editor);
 
     /** The product's own pieces (design::Materials::pack) that replace these by name, when it
         has some: find, draw, composed and decode then answer from them for those names. */
@@ -144,8 +182,21 @@ private:
     std::unique_ptr<juce::MemoryInputStream> stream;
     std::unique_ptr<juce::ZipFile> zip;
     std::map<juce::String, Piece> pieces;
-    std::map<Key, juce::Image> cache;
+    struct Entry
+    {
+        juce::Image image;
+        std::uint64_t used = 0;   ///< the generation it was last drawn in
+        std::map<const void*, std::uint64_t> users;   ///< editor -> its generation when it last drew this
+    };
+    std::map<Key, Entry> cache;
     std::list<Key> order;   ///< least recently used first
+    size_t maxBytes = 0, maxImages = 0;
+    std::uint64_t generation = 0;
+    std::map<const void*, std::uint64_t> editorGeneration;
+    std::map<const void*, float> settledScale;   ///< each editor's physical scale when last painted outside a resize
+    std::vector<const void*> resizingEditors;
+    size_t evictUnclaimed (const void* droppedEditor);
+    mutable Usage stats;
     bool isOverlay = false;
     mutable std::unique_ptr<Pieces> overlay;   ///< (made when the materials name a pack)
     mutable const void* overlayData = nullptr;
@@ -232,5 +283,33 @@ public:
 };
 /** A key's state changed: repaints it with the room its shadow needs. */
 void repaintKey (juce::Component&);
+
+/** One open editor's share of the ceramic cache (owned by the editor; message thread only).
+    beginPaint() first in the editor's paint(), endPaint() in its paintOverChildren(),
+    resized() from its resized(). While the window is being resized the pieces are stretched
+    from the cache; `settleMs` after the last resize the editor repaints at its settled size
+    and drops what only it was using, so other open editors keep theirs. */
+class EditorCacheScope final : private juce::Timer
+{
+public:
+    explicit EditorCacheScope (juce::Component& editor, int settleMs = 500);
+    ~EditorCacheScope() override;
+    void beginPaint();
+    void endPaint();
+    void resized();
+    /** For tests: the settle step now (as the timer would). */
+    void settleNow();
+    /** Live resizing and per-editor claims apply to an editor on screen (it has a peer); an
+        offscreen editor (snapshots, headless tests, visual regressions) draws as before. Tests
+        can treat offscreen editors as on screen. */
+    static void setTreatOffscreenAsOnScreen (bool) noexcept;
+
+private:
+    void timerCallback() override;
+    bool onScreen() const;
+    juce::Component& editor;
+    const int settleMs;
+    bool painted = false, pendingEvict = false;
+};
 
 } // namespace osp::plugin::skin

@@ -1,0 +1,30 @@
+# run 1
+mode,phase,paints,avg_paint_ms,max_paint_ms,misses,compose_ms,cache_mb,peak_mb,rss_trimmed_mb
+lru,open_1448,1,454.3,454.3,19,326.9,32.4,32.4,92.0
+lru,live_resize_sweep,63,461.4,740.3,1197,18551.8,64.3,96.0,132.6
+lru,settled_1448,1,517.5,517.5,19,375.1,93.5,96.0,184.3
+lru,after_close,0,,,,,,,,84.0
+compose-every-size,open_1448,1,378.0,378.0,19,267.1,32.4,32.4,64.5
+compose-every-size,live_resize_sweep,63,264.7,838.8,399,6335.8,641.0,641.0,679.4
+compose-every-size,settled_1448,1,165.7,165.7,0,0.0,641.0,641.0,701.8
+compose-every-size,after_close,0,,,,,,,,54.1
+settle,open_1448,1,496.4,496.4,19,328.6,32.4,32.4,63.3
+settle,live_resize_sweep,63,186.8,394.4,0,0.0,32.4,32.4,69.1
+settle,settled_1448,1,137.6,137.6,0,0.0,32.4,32.4,91.5
+settle,stretched_vs_exact_1448,1,0.091,192,,,,,
+settle,after_close,0,,,,,,,,52.3
+# run 2
+mode,phase,paints,avg_paint_ms,max_paint_ms,misses,compose_ms,cache_mb,peak_mb,rss_trimmed_mb
+lru,open_1448,1,474.5,474.5,19,335.3,32.4,32.4,95.0
+lru,live_resize_sweep,63,470.9,850.0,1197,18783.4,64.3,96.0,135.4
+lru,settled_1448,1,387.3,387.3,19,265.3,93.5,96.0,187.1
+lru,after_close,0,,,,,,,,86.9
+compose-every-size,open_1448,1,385.7,385.7,19,276.2,32.4,32.4,64.5
+compose-every-size,live_resize_sweep,63,260.5,785.6,399,5711.2,641.0,641.0,679.4
+compose-every-size,settled_1448,1,226.0,226.0,0,0.0,641.0,641.0,701.8
+compose-every-size,after_close,0,,,,,,,,54.1
+settle,open_1448,1,375.7,375.7,19,266.8,32.4,32.4,63.4
+settle,live_resize_sweep,63,173.6,437.5,0,0.0,32.4,32.4,69.1
+settle,settled_1448,1,150.4,150.4,0,0.0,32.4,32.4,91.6
+settle,stretched_vs_exact_1448,1,0.091,192,,,,,
+settle,after_close,0,,,,,,,,52.4

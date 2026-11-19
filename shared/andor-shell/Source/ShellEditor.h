@@ -80,6 +80,7 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void paintOverChildren (juce::Graphics&) override;
     /** A wheel no knob took scrolls the instrument while the window is shorter than it. */
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
     {
@@ -401,6 +402,8 @@ private:
     std::unique_ptr<andor::learn::LearnController> learn;
     juce::TooltipWindow tooltips { this, 700 };
     osp::plugin::frame::ScreenFit screenFit { *this, [this] { return instrumentHeight(); } };   ///< (first shown: fitted to its screen)
+    /** This editor's share of the ceramic cache (last: released first). */
+    osp::plugin::skin::EditorCacheScope cacheScope { *this };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ShellEditor)
 };
