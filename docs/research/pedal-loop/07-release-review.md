@@ -65,7 +65,7 @@ The design and every decision are in 00–06.
 
 - **Listening is pending.** Nothing here replaces the owner's ears on real piano, nyckelharpa, vocal and chord material (06).
 - **Percussive hits** loop audibly (turn energy 4–7 dB), as the spec expects: a hit has no body.
-- **REVERSE, SPEED, REIMAGINED modes and Granular keep Normal.** Ping-Pong under SPEED plays Forward.
+- **REVERSE, SPEED and Granular keep Normal.** Ping-Pong under SPEED plays Forward. *(Updated: REIMAGINED modes now loop too; see `docs/research/pedal-reimagined/`.)*
 - **A late loop on a fading note stays at the note's level.** After leaving such a loop with the key held, the tail keeps that level (it may sit a little under the original tail).
 - **Forward with the layer's LOOP on**, on a sustaining source, is Normal: the continuation walk already holds the note. Forward matters for LOOP off and for decaying sources.
 - **The pedal is the engine's single CC64.** Per-channel (MPE) pedals are not separate; that is existing behaviour.
