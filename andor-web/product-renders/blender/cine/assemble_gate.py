@@ -87,7 +87,13 @@ for shot in sorted(os.listdir(a.renders)):
     if shot.startswith("R01") and os.path.isdir(mdir) and len(os.listdir(mdir)) >= len(frames):
         tdir = os.path.join(a.renders, shot, "typo")
         layout = "desktop" if shot.endswith("desktop") else "centre"
-        subprocess.run([sys.executable, TYPO, "--beauty", bdir, "--matte", mdir, "--out", tdir, "--layout", layout], check=True)
+        ty = spec.get("typography", {})
+        extra = []
+        if "reveal" in ty:
+            extra += ["--reveal"] + [str(x) for x in ty["reveal"]]
+        if "blur_from" in ty:
+            extra += ["--blur-from", str(ty["blur_from"])]
+        subprocess.run([sys.executable, TYPO, "--beauty", bdir, "--matte", mdir, "--out", tdir, "--layout", layout] + extra, check=True)
         tmp4 = os.path.join(d, name(shot, "typography", w, "mp4"))
         encode(tdir, tmp4, frames[0])
         rec["typography_preview"] = os.path.relpath(tmp4, a.out)

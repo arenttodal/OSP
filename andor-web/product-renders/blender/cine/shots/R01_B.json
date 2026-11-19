@@ -168,6 +168,11 @@
  },
  "typography": {
   "wordmark": "ANDOR",
-  "behind_product": true
+  "behind_product": true,
+  "reveal": [
+   0.03,
+   0.4
+  ],
+  "blur_from": 0.012
  }
 }

@@ -39,11 +39,13 @@
 
 **The wordmark** is placed from the closing frame, so it ends fully readable above the instrument. During the move it is:
 - discovered in the defocused wall: blurred, then sharpening as the camera withdraws;
-- faded in over 15–62 % of the move;
-- uncovered as the instrument descends;
+- faded in over 3–40 % of the move, so it is seen while the instrument still covers part of it;
+- uncovered as the instrument descends (in A and C the instrument covers the lower part of the letters until about 40 % of the move);
 - printed on the wall: the ink darkens the wall's own light, so light gradients pass through the letters.
 
 Occlusion is measured on every frame and stored in `typography_meta.json`.
+
+**B is the exception.** In the DARK THEATRE the instrument stays below the wordmark for the whole move (measured occlusion 0 on every frame), so in B the wordmark rises out of darkness rather than out from behind the instrument. To get a real occlusion in B, the opening camera would have to be raised; that is an option for review, not a change made here.
 
 | | A: ivory editorial | B: dark sculptural | C: architectural |
 |---|---|---|---|

@@ -32,7 +32,7 @@ shots.append({
     "product": {"pivot": [0, 0, 0], "tilt": [[0.0, 0.0, SLOW_SETTLE], [10.4, 18.0]],
                 "translate": [[0.0, [0, 0, 0.035], SLOW_SETTLE], [10.4, [0, 0, 0.052]]]},
     "lights": {"Key softbox": {"orbit": [[0.0, -14.0, GENTLE], [11.0, 4.0]]}},
-    "typography": {"wordmark": "ANDOR", "behind_product": True},
+    "typography": {"wordmark": "ANDOR", "behind_product": True, "reveal": [0.03, 0.40], "blur_from": 0.012},
     "notes": "Floats 3.5-5 cm above the ivory floor so the tilt never meets it; the contact shadow is rendered every frame.",
 })
 shots.append(dict(shots[-1], id="R01_A_desktop", variant="A: desktop website composition (headline space left)",
@@ -55,7 +55,7 @@ shots.append({
     "lights": {"Key softbox": {"energy": [[0.0, 0.15, GENTLE], [8.0, 1.0]]},
                "Top line": {"energy": [[0.0, 0.3, GENTLE], [7.0, 1.0]]},
                "Fill": {"energy": [[0.0, 0.0, GENTLE], [9.0, 1.0]]}},
-    "typography": {"wordmark": "ANDOR", "behind_product": True},
+    "typography": {"wordmark": "ANDOR", "behind_product": True, "reveal": [0.03, 0.40], "blur_from": 0.012},
 })
 shots.append({
     "id": "R01_C", "family": "R01 Grand Reveal", "variant": "C: architectural scale",
@@ -70,7 +70,7 @@ shots.append({
     "product": {"pivot": [0, 0, 0], "tilt": [[0.0, 0.0, SLOW_SETTLE], [10.4, 20.0]],
                 "translate": [[0.0, [0, 0, 0.035], SLOW_SETTLE], [10.4, [0, 0, 0.05]]]},
     "lights": {"Key softbox": {"orbit": [[0.0, 10.0, GENTLE], [11.0, -4.0]]}},
-    "typography": {"wordmark": "ANDOR", "behind_product": True},
+    "typography": {"wordmark": "ANDOR", "behind_product": True, "reveal": [0.03, 0.40], "blur_from": 0.012},
 })
 
 # ---------------------------------------------------------------- R02 SILHOUETTE (8 s + handles)
