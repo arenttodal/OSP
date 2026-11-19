@@ -1,0 +1,95 @@
+{
+ "id": "SF_C1",
+ "family": "C Silhouette",
+ "variant": "Timber, keys and macros",
+ "setup": "ANDOR_FLOATING",
+ "base_shot": "B1_R4",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 1.0,
+ "handles": 0.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 8,
+  "position": [
+   -0.4,
+   -0.38,
+   0.16
+  ],
+  "target": [
+   -0.1,
+   -0.05,
+   -0.005
+  ],
+  "focus": [
+   -0.17,
+   -0.1,
+   0.0
+  ]
+ },
+ "stage": {
+  "remove_lights": [
+   "Key softbox",
+   "Top line",
+   "Front kicker",
+   "Fill",
+   "Floor overhead",
+   "Floor rake"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Strip",
+    "position": [
+     -0.32,
+     -0.4,
+     0.12
+    ],
+    "target": [
+     -0.12,
+     0.0,
+     0.0
+    ],
+    "size": [
+     0.03,
+     0.6
+    ],
+    "power": 0.8,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 180,
+    "link": "product",
+    "glossy_only": false
+   }
+  ]
+ },
+ "rationale": "After R02 A: almost everything is darkness. One narrow strip skims the front-left corner: the walnut cheek, the PITCH and MOD strips, the first macro knobs and the keys catch it; the rest of the instrument is suggested, not shown.",
+ "lights": {
+  "Rim strip": {
+   "energy": 0.25
+  }
+ },
+ "world": 0.05,
+ "emission": 0.35,
+ "exposure": -1.3
+}

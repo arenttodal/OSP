@@ -1,0 +1,128 @@
+{
+ "id": "SF_D3",
+ "family": "D Immersion",
+ "variant": "Keys and expression",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 1.0,
+ "handles": 0.0,
+ "camera": {
+  "lens": 50,
+  "fstop": 8,
+  "position": [
+   -0.36,
+   -0.24,
+   0.075
+  ],
+  "target": [
+   0.02,
+   -0.07,
+   0.0
+  ],
+  "focus": [
+   -0.13,
+   -0.115,
+   0.004
+  ]
+ },
+ "stage": {
+  "hide_floor": true,
+  "cyc": {
+   "rgb": [
+    0.6,
+    0.565,
+    0.52
+   ],
+   "roughness": 0.9,
+   "radius": 1.4,
+   "wall": 2.2,
+   "height": 5.0,
+   "width": 14.0
+  },
+  "remove_lights": [
+   "Key softbox",
+   "Edge strip",
+   "Overhead",
+   "Fill",
+   "Front kicker",
+   "Low rake"
+  ],
+  "add_lights": [
+   {
+    "name": "Rake",
+    "position": [
+     -0.9,
+     0.55,
+     0.13
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     0.9,
+     0.15
+    ],
+    "power": 60,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 180,
+    "link": null,
+    "glossy_only": false
+   },
+   {
+    "name": "Sky",
+    "position": [
+     0.6,
+     -0.6,
+     0.5
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.2,
+     1.2
+    ],
+    "power": 3,
+    "rgb": [
+     0.93,
+     0.96,
+     1.0
+    ],
+    "spread": 180,
+    "link": "product",
+    "glossy_only": false
+   }
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ]
+ },
+ "rationale": "From the left end, along the instrument: the walnut cheek, the PITCH and MOD strips and the keyboard in the foreground, the macro row and the source cards rising behind into darkness. The main surface extends away from us like a street.",
+ "world": 0.1,
+ "exposure": -0.3
+}

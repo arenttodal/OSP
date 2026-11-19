@@ -1,0 +1,61 @@
+{
+ "id": "SF_C3",
+ "family": "C Silhouette",
+ "variant": "The outline",
+ "setup": "ANDOR_FLOATING",
+ "base_shot": "B1_R4",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 1.0,
+ "handles": 0.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 9,
+  "position": [
+   -0.3468,
+   -0.6522,
+   0.1302
+  ],
+  "target": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "shift": [
+   0.0,
+   -0.08
+  ]
+ },
+ "stage": {
+  "remove_lights": [
+   "Key softbox",
+   "Top line",
+   "Front kicker",
+   "Fill",
+   "Floor overhead",
+   "Floor rake"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ]
+ },
+ "rationale": "The outline: only a rim behind the instrument. The knobs' silhouettes along the top edge and a hairline along the ceramic are enough to recognise it; below it, darkness as negative space.",
+ "world": 0.03,
+ "emission": 0.08,
+ "exposure": -0.2
+}

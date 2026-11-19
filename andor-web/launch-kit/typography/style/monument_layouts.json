@@ -1,0 +1,136 @@
+{
+ "SF_A1": {
+  "T1": {
+   "cap_height": 0.215,
+   "x": 0.31,
+   "y": 0.165,
+   "ink": [
+    168,
+    158,
+    146
+   ],
+   "alpha": 0.92,
+   "blur": 1.5,
+   "falloff": {
+    "centre": [
+     0.55,
+     0.45
+    ],
+    "radius": 0.55,
+    "floor": 0.3
+   },
+   "behind": true,
+   "note": "the mark stands in the dark beyond the instrument; its far edge cuts the letters' feet"
+  },
+  "T2": {
+   "cap_height": 0.66,
+   "x": -0.05,
+   "y": -0.02,
+   "ink": [
+    150,
+    141,
+    130
+   ],
+   "alpha": 0.55,
+   "blur": 3,
+   "falloff": {
+    "centre": [
+     0.45,
+     0.55
+    ],
+    "radius": 0.6,
+    "floor": 0.15
+   },
+   "behind": true,
+   "note": "monumental scale: larger than the frame, the instrument laid across its lower half"
+  }
+ },
+ "SF_A2": {
+  "T1": {
+   "cap_height": 0.195,
+   "x": 0.37,
+   "y": 0.12,
+   "ink": [
+    168,
+    158,
+    146
+   ],
+   "alpha": 0.92,
+   "blur": 1.5,
+   "falloff": {
+    "centre": [
+     0.55,
+     0.4
+    ],
+    "radius": 0.5,
+    "floor": 0.3
+   },
+   "behind": true
+  },
+  "T2": {
+   "cap_height": 0.72,
+   "x": 0.18,
+   "y": -0.06,
+   "ink": [
+    150,
+    141,
+    130
+   ],
+   "alpha": 0.42,
+   "blur": 3,
+   "falloff": {
+    "centre": [
+     0.55,
+     0.5
+    ],
+    "radius": 0.6,
+    "floor": 0.15
+   },
+   "behind": true
+  }
+ },
+ "SF_A3": {
+  "T1": {
+   "cap_height": 0.24,
+   "x": 0.04,
+   "y": 0.05,
+   "ink": [
+    168,
+    158,
+    146
+   ],
+   "alpha": 0.92,
+   "blur": 1.5,
+   "falloff": {
+    "centre": [
+     0.35,
+     0.3
+    ],
+    "radius": 0.55,
+    "floor": 0.3
+   },
+   "behind": true
+  },
+  "T2": {
+   "cap_height": 0.58,
+   "x": -0.03,
+   "y": -0.1,
+   "ink": [
+    150,
+    141,
+    130
+   ],
+   "alpha": 0.45,
+   "blur": 3,
+   "falloff": {
+    "centre": [
+     0.4,
+     0.4
+    ],
+    "radius": 0.6,
+    "floor": 0.15
+   },
+   "behind": true
+  }
+ }
+}

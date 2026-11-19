@@ -1,0 +1,122 @@
+{
+ "id": "SF_B3",
+ "family": "B Sculpture",
+ "variant": "Overhead, long light",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 1.0,
+ "handles": 0.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 11,
+  "position": [
+   -0.0762,
+   -0.5419,
+   1.5035
+  ],
+  "target": [
+   0.06,
+   -0.02,
+   0.0
+  ],
+  "shift": [
+   -0.08,
+   0.0
+  ]
+ },
+ "stage": {
+  "hide_floor": true,
+  "cyc": {
+   "rgb": [
+    0.6,
+    0.565,
+    0.52
+   ],
+   "roughness": 0.9,
+   "radius": 1.4,
+   "wall": 2.2,
+   "height": 5.0,
+   "width": 14.0
+  },
+  "remove_lights": [
+   "Key softbox",
+   "Edge strip",
+   "Overhead",
+   "Fill",
+   "Front kicker",
+   "Low rake"
+  ],
+  "add_lights": [
+   {
+    "name": "Window",
+    "position": [
+     -1.3,
+     0.4,
+     0.55
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.0,
+     1.6
+    ],
+    "power": 120,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 180,
+    "link": null,
+    "glossy_only": false
+   }
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   },
+   {
+    "name": "Negative fill",
+    "mode": "negative",
+    "position": [
+     0.65,
+     -0.1,
+     0.35
+    ],
+    "target": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     1.2,
+     1.2
+    ]
+   }
+  ]
+ },
+ "rationale": "From above, turned off-axis: a single low window light from the left lays a long, soft shadow across the cyclorama, the instrument becomes a graphic object in a field of warm negative space. The displays are flagged so the waveforms read clean.",
+ "product": {
+  "turn": 22.0
+ },
+ "world": 0.15,
+ "exposure": -0.25
+}

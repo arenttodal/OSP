@@ -155,6 +155,107 @@ root.parent = pivot
 root.matrix_parent_inverse = pivot.matrix_world.inverted()
 pivot.rotation_mode = "QUATERNION"
 
+# ---- stage additions (Art Direction Gate R2): cyclorama, extra lights, flags -----------------------
+# All optional and additive: a spec without a `stage` block renders exactly as before.
+PRODUCT_C, STAGE_C = g["PRODUCT"], g["STAGE"]
+stg = spec.get("stage", {})
+FLOOR_NAMES = ("Gallery floor", "Studio floor", "Plank", "Grooves")
+if stg.get("hide_floor"):
+    for o in bpy.data.objects:
+        if o.type == "MESH" and not _under_root(o) and o.name.startswith(FLOOR_NAMES):
+            o.hide_render = True
+
+
+def _plane(name, w, h, coll):
+    me = bpy.data.meshes.new(name)
+    me.from_pydata([(-w / 2, -h / 2, 0), (w / 2, -h / 2, 0), (w / 2, h / 2, 0), (-w / 2, h / 2, 0)], [], [(0, 1, 2, 3)])
+    o = bpy.data.objects.new(name, me)
+    coll.objects.link(o)
+    return o
+
+
+def _matte_mat(name, rgb, rough, spec_level=0.25):
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    b = mat.node_tree.nodes["Principled BSDF"]
+    b.inputs["Base Color"].default_value = (*rgb, 1)
+    b.inputs["Roughness"].default_value = rough
+    b.inputs["Specular IOR Level"].default_value = spec_level
+    return mat
+
+
+cyc = stg.get("cyc")
+if cyc:
+    # A seamless cyclorama: floor, a large-radius cove and the wall in one smooth surface, so there
+    # is no horizon line. It stands on the real floor plane (world z = 0), `wall` metres behind the
+    # product centre in the direction `yaw_deg` (0 = the product's back), its cove of `radius`.
+    R, wall, hgt, wid = cyc.get("radius", 1.2), cyc.get("wall", 1.6), cyc.get("height", 4.0), cyc.get("width", 12.0)
+    prof = [(-6.0, 0.0)]
+    for i in range(33):
+        a = math.pi / 2 * i / 32
+        prof.append((wall - R + R * math.sin(a), R - R * math.cos(a)))
+    prof.append((wall, hgt))
+    qy = Q_ROT @ Quaternion((0, 0, 1), math.radians(cyc.get("yaw_deg", 0.0)))
+    base = Vector((CENTER.x, CENTER.y, 0.0))
+    verts, faces = [], []
+    xs = [-wid / 2, wid / 2]
+    for y, z in prof:
+        for x in xs:
+            verts.append(tuple(base + qy @ Vector((x, y, z))))
+    for i in range(len(prof) - 1):
+        a = 2 * i
+        faces.append((a, a + 1, a + 3, a + 2))
+    me = bpy.data.meshes.new("Cyclorama")
+    me.from_pydata(verts, [], faces)
+    for p in me.polygons:
+        p.use_smooth = True
+    co = bpy.data.objects.new("Cyclorama", me)
+    STAGE_C.objects.link(co)
+    me.materials.append(_matte_mat("Cyclorama", cyc.get("rgb", [0.62, 0.59, 0.55]), cyc.get("roughness", 0.85), cyc.get("specular", 0.2)))
+
+
+def _link(name):
+    return {"product": PRODUCT_C, "stage": STAGE_C}.get(name)
+
+
+for L in stg.get("add_lights", []):
+    d = bpy.data.lights.new(L["name"], "AREA")
+    d.shape, d.size, d.size_y = "RECTANGLE", L["size"][0], L["size"][1]
+    d.energy, d.color, d.spread = L["power"], tuple(L.get("rgb", [1, 1, 1])), math.radians(L.get("spread", 180))
+    o = bpy.data.objects.new(L["name"], d)
+    scene.collection.objects.link(o)
+    o.location = P(L["position"])
+    o.rotation_euler = (P(L["target"]) - o.location).to_track_quat("-Z", "Y").to_euler()
+    o.visible_camera = False
+    if L.get("glossy_only"):
+        o.visible_diffuse = False
+    if _link(L.get("link")) is not None:
+        o.light_linking.receiver_collection = _link(L.get("link"))
+for name in stg.get("remove_lights", []):
+    o = bpy.data.objects.get(name)
+    if o is not None and o.type == "LIGHT":
+        o.data.energy = 0.0
+        o.hide_render = True
+
+# Black flags. mode "reflection": seen only in reflections (a card just off frame, as on set);
+# "negative": a real flag, it absorbs bounce and blocks light; neither ever appears in frame.
+# mirror: true places the flag where the display glass reflects the camera (recomputed per
+# frame), so the waveforms read clean instead of mirroring the studio.
+flags = []
+for fl in stg.get("flags", []):
+    o = _plane(fl["name"], fl["size"][0], fl["size"][1], STAGE_C)
+    o.data.materials.append(_matte_mat(fl["name"], [0.004, 0.004, 0.004], 0.95, 0.0))
+    o.visible_camera = False
+    neg = fl.get("mode", "reflection") == "negative"
+    o.visible_shadow = neg
+    o.visible_diffuse = neg
+    o.visible_transmission = False
+    flags.append((o, fl))
+for name in stg.get("hide_objects", []):
+    o = bpy.data.objects.get(name)
+    if o is not None:
+        o.hide_render = True
+
 # ---- lights, cards, camera ------------------------------------------------------------------------
 lights = {}
 for name, lc in spec.get("lights", {}).items():
@@ -181,6 +282,8 @@ for cd in spec.get("cards", []):
     o.visible_camera = False
     o.visible_diffuse = cd.get("diffuse", False)
     o.visible_shadow = False
+    if cd.get("link") == "product":   # seen only in the instrument (not in a glossy floor)
+        o.light_linking.receiver_collection = g["PRODUCT"]
     cards.append((o, cd, em))
 cam_data = bpy.data.cameras.new("Cine camera")
 cam = bpy.data.objects.new("Cine camera", cam_data)
@@ -217,6 +320,7 @@ for o in product_objs:
             if sock.default_value > 0:
                 emitters.append((sock, sock.default_value))
 print("cine: emitters", len(emitters), "world", world_base)
+print("cine: lights", [(o.name, round(o.data.energy, 2)) for o in bpy.data.objects if o.type == "LIGHT" and not o.hide_render])
 
 
 def look(o, target, roll_deg=0.0):
@@ -259,13 +363,41 @@ def apply(t):
         tr = Q_ROT @ Vector(ev(lc.get("translate"), tt, [0, 0, 0]))
         o.matrix_world = Matrix.Translation(tr) @ Matrix.Translation(CENTER) @ Matrix.Rotation(a, 4, "Z") @ Matrix.Translation(-CENTER) @ m0
     for o, cd, em in cards:
-        o.location = P(ev(cd["position"], tt))
-        look(o, P(ev(cd["target"], tt)))
+        if cd.get("mirror") is None:
+            o.location = P(ev(cd["position"], tt))
+            look(o, P(ev(cd["target"], tt)))
         em.inputs["Strength"].default_value = ev(cd.get("strength"), tt, 1.0)
     cam_data.lens = ev(cs["lens"], tt)
     cam.location = P(ev(cs["position"], tt))
     target = P(ev(cs["target"], tt))
     look(cam, target, ev(cs.get("roll"), tt, 0.0))
+    q_world = pivot.rotation_quaternion
+
+    def mirrored(aim, distance, offset=(0.0, 0.0)):
+        # where the instrument's top surface reflects the camera at `aim` (a product-frame point on
+        # it): start there, follow the mirrored view ray `distance` metres; offset tilts the ray
+        # (radians, about the surface's x and y) so a highlight lands beside the aim, not on it
+        p0 = pivot.location + q_world @ (P(aim) - P(pivot_local))
+        n = q_world @ (Q_ROT @ Vector((0, 0, 1)))
+        d = (p0 - cam.location).normalized()
+        r = d - 2 * d.dot(n) * n
+        if offset[0] or offset[1]:
+            r = (Quaternion(q_world @ (Q_ROT @ Vector((1, 0, 0))), offset[0]) @ Quaternion(q_world @ (Q_ROT @ Vector((0, 1, 0))), offset[1])) @ r
+        return p0, p0 + r * distance
+
+    for o, cd, em in cards:
+        mc = cd.get("mirror")
+        if mc is not None:
+            p0, o.location = mirrored(mc["aim"], mc.get("distance", 1.0), mc.get("offset", (0.0, 0.0)))
+            look(o, p0)
+    for o, fl in flags:
+        if fl.get("mirror"):
+            # the display glass reflects black instead of the studio
+            p0, o.location = mirrored(fl.get("aim", [0.0, 0.03, 0.02]), fl.get("distance", 0.9))
+            o.rotation_euler = (p0 - o.location).to_track_quat("Z", "Y").to_euler()
+        else:
+            o.location = P(ev(fl["position"], tt))
+            o.rotation_euler = (P(ev(fl["target"], tt)) - o.location).to_track_quat("Z", "Y").to_euler()
     if cam_data.dof.use_dof:
         cam_data.dof.aperture_fstop = ev(cs["fstop"], tt)
         cam_data.dof.focus_distance = (P(ev(cs.get("focus", cs["target"]), tt)) - cam.location).length

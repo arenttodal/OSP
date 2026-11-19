@@ -1,5 +1,12 @@
 # First creative gate: R01 Grand Reveal, R02 Silhouette, R03 Above the Sound
 
+> **Reviewed (Art Direction Gate R2).** The rig is kept; these compositions are not approved for production.
+> - **R01 A, B, C and A desktop** are archived as *technical studies*.
+> - **R02 A** continues as the lighting concept, with a closer composition. **R02 C** is kept as a secondary material study; **R02 B** is not prioritised.
+> - **R03** is to be reworked.
+>
+> Animation is paused until the style frames (`art_direction_gate_r2.md`) are approved.
+
 **Scope:**
 - Three signature shots, each with three alternatives, plus the R01 desktop website composition.
 - Each comes with:

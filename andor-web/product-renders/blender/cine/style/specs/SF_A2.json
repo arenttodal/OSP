@@ -1,0 +1,99 @@
+{
+ "id": "SF_A2",
+ "family": "A Monument",
+ "variant": "Plinth from above",
+ "setup": "ANDOR_FLOATING",
+ "base_shot": "B1_R4",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 1.0,
+ "handles": 0.0,
+ "camera": {
+  "lens": 65,
+  "fstop": 9,
+  "position": [
+   0.5359,
+   -0.686,
+   0.4972
+  ],
+  "target": [
+   -0.01,
+   0.0,
+   -0.09
+  ]
+ },
+ "stage": {
+  "remove_lights": [
+   "Fill",
+   "Front kicker",
+   "Floor overhead"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Monument sweep",
+    "position": [
+     0.75,
+     0.35,
+     0.7
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.4,
+     0.3
+    ],
+    "power": 22,
+    "rgb": [
+     1.0,
+     0.975,
+     0.95
+    ],
+    "spread": 180,
+    "link": "product",
+    "glossy_only": false
+   }
+  ]
+ },
+ "rationale": "The plinth view: from above and to the right, the instrument floats as a single bright plane against the walnut and the shadowed floor beyond, its diagonal running against the planks. The quietest of the three, and the closest to a classic hero, but with mass and darkness on both sides.",
+ "product": {
+  "translate": [
+   0.0,
+   0.0,
+   -0.098
+  ]
+ },
+ "lights": {
+  "Floor rake": {
+   "energy": 0.45
+  },
+  "Top line": {
+   "energy": 0.35
+  }
+ },
+ "exposure": 0.0,
+ "emission": 0.9,
+ "typography": {
+  "layout": "A2"
+ }
+}

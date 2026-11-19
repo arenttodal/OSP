@@ -1,0 +1,173 @@
+{
+ "id": "SF_B1",
+ "family": "B Sculpture",
+ "variant": "Ivory three-quarter",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 1.0,
+ "handles": 0.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 11,
+  "position": [
+   -0.5168,
+   -0.8952,
+   0.3762
+  ],
+  "target": [
+   0.02,
+   0.0,
+   0.0
+  ],
+  "shift": [
+   -0.04,
+   -0.02
+  ]
+ },
+ "stage": {
+  "hide_floor": true,
+  "cyc": {
+   "rgb": [
+    0.6,
+    0.565,
+    0.52
+   ],
+   "roughness": 0.9,
+   "radius": 1.4,
+   "wall": 2.2,
+   "height": 5.0,
+   "width": 14.0
+  },
+  "remove_lights": [
+   "Key softbox",
+   "Edge strip",
+   "Overhead",
+   "Fill",
+   "Front kicker",
+   "Low rake"
+  ],
+  "add_lights": [
+   {
+    "name": "Key",
+    "position": [
+     -0.9,
+     0.7,
+     0.45
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.8,
+     1.0
+    ],
+    "power": 55,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 180,
+    "link": null,
+    "glossy_only": false
+   },
+   {
+    "name": "Edge strip",
+    "position": [
+     0.85,
+     0.55,
+     0.3
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     2.0,
+     0.1
+    ],
+    "power": 26,
+    "rgb": [
+     1.0,
+     0.975,
+     0.95
+    ],
+    "spread": 90,
+    "link": "product",
+    "glossy_only": false
+   }
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   },
+   {
+    "name": "Negative fill",
+    "mode": "negative",
+    "position": [
+     0.75,
+     -0.35,
+     0.15
+    ],
+    "target": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     1.2,
+     0.8
+    ]
+   }
+  ]
+ },
+ "rationale": "The ivory portrait: a seamless warm cyclorama (no horizon line), one large low key from behind left so the ceramic turns from light to shade across its width, a black negative-fill card on the right to keep the right cheek in shadow, and a long soft shadow toward the viewer.",
+ "world": 0.15,
+ "exposure": -0.45,
+ "cards": [
+  {
+   "name": "Sweep",
+   "size": [
+    1.8,
+    0.3
+   ],
+   "strength": 30.0,
+   "color": [
+    1.0,
+    0.975,
+    0.95
+   ],
+   "mirror": {
+    "aim": [
+     0.0,
+     -0.05,
+     0.012
+    ],
+    "distance": 1.2,
+    "offset": [
+     0.0,
+     0.0
+    ]
+   },
+   "link": "product"
+  }
+ ]
+}

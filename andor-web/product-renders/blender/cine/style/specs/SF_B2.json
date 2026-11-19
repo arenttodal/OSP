@@ -1,0 +1,169 @@
+{
+ "id": "SF_B2",
+ "family": "B Sculpture",
+ "variant": "Low profile, the curve",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 1.0,
+ "handles": 0.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 11,
+  "position": [
+   0.5973,
+   -0.3732,
+   0.1497
+  ],
+  "target": [
+   -0.03,
+   0.0,
+   0.0
+  ]
+ },
+ "stage": {
+  "hide_floor": true,
+  "cyc": {
+   "rgb": [
+    0.6,
+    0.565,
+    0.52
+   ],
+   "roughness": 0.9,
+   "radius": 1.4,
+   "wall": 2.2,
+   "height": 5.0,
+   "width": 14.0
+  },
+  "remove_lights": [
+   "Key softbox",
+   "Edge strip",
+   "Overhead",
+   "Fill",
+   "Front kicker",
+   "Low rake"
+  ],
+  "add_lights": [
+   {
+    "name": "Key",
+    "position": [
+     0.1,
+     0.95,
+     0.85
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     2.2,
+     0.9
+    ],
+    "power": 45,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 180,
+    "link": null,
+    "glossy_only": false
+   },
+   {
+    "name": "Top strip",
+    "position": [
+     0.3,
+     -0.1,
+     0.75
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     2.2,
+     0.12
+    ],
+    "power": 10,
+    "rgb": [
+     1.0,
+     0.975,
+     0.95
+    ],
+    "spread": 70,
+    "link": "product",
+    "glossy_only": false
+   }
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   },
+   {
+    "name": "Negative fill",
+    "mode": "negative",
+    "position": [
+     0.55,
+     -0.55,
+     0.12
+    ],
+    "target": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     1.4,
+     0.6
+    ]
+   }
+  ]
+ },
+ "rationale": "The curve: low over the right end, along the instrument's length. Every key front, knob skirt and the rounded ceramic edge catches the light from behind; the cyclorama falls from dark to warm grey behind it, so the silhouette reads against a gradient, not a line.",
+ "world": 0.15,
+ "exposure": -0.35,
+ "cards": [
+  {
+   "name": "Sweep",
+   "size": [
+    1.8,
+    0.15
+   ],
+   "strength": 40.0,
+   "color": [
+    1.0,
+    0.975,
+    0.95
+   ],
+   "mirror": {
+    "aim": [
+     0.0,
+     -0.06,
+     0.012
+    ],
+    "distance": 1.2,
+    "offset": [
+     0.0,
+     0.0
+    ]
+   },
+   "link": "product"
+  }
+ ]
+}
