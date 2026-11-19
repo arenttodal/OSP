@@ -103,6 +103,7 @@ public:
 
 private:
     class Key;
+    int keyRowCount() const;
     juce::TextLayout layoutText (const juce::String& text, juce::Font font, juce::Colour colour, float width) const;
     int textHeight (const juce::String& text, juce::Font font) const;
     Content content;

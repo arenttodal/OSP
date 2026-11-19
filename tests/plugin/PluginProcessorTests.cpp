@@ -1971,6 +1971,12 @@ TEST_CASE ("plugin: Library packs and backup - export a pack and a backup on one
 
 TEST_CASE ("plugin: Library publishing - a collection published with the publisher's id and version as a factory pack; it installs at startup beside the user's own presets", "[plugin][library][library-packs]")
 {
+    // (an authoring build: a customer build never publishes factory packs - see the next test)
+    struct Authoring
+    {
+        Authoring() { osp::plugin::LibraryPanel::setFactoryAuthoring (true); }
+        ~Authoring() { osp::plugin::LibraryPanel::setFactoryAuthoring (false); }
+    } authoring;
     TempDir tmp;
     const auto shipped = tmp.dir.getChildFile ("Bundle/Resources/Factory");
     REQUIRE (shipped.createDirectory());
@@ -2522,6 +2528,10 @@ TEST_CASE ("plugin: editor builds, shows the instrument and can be snapshotted",
 
 int main (int argc, char* argv[])
 {
+    // Processors made here start from the parameters' defaults (the built-in states' own tests
+    // turn the first-state opening back on where they check it).
+    OspAudioProcessor::setNewInstancesOpenOnFirstState (false);
+
     // Isolated sample store per run so tests never touch the user's library.
     const auto store = juce::File::getSpecialLocation (juce::File::tempDirectory)
                            .getChildFile ("osp-plugin-test-store-" + juce::String (juce::Random::getSystemRandom().nextInt64()));
@@ -8152,6 +8162,18 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "AtlasRefineTests.inc"
 #include "UserMacroPluginTests.inc"
 #include "LibraryPolishTests.inc"
+#include "PopoverMacroTests.inc"
+#include "PedalLedTests.inc"
+#include "FinalPolishTests.inc"
+#include "FinalPolishShots.inc"
+#include "BuiltInStatesTests.inc"
+#include "MenuShots.inc"
+#include "MenuArchitectureTests.inc"
+#include "PaletteStudyShots.inc"
+#include "StartingStateAuthoringTests.inc"
+#include "PackAuthoringTests.inc"
+#include "PresetNavigationTests.inc"
+#include "MenuVisualShots.inc"
 
 TEST_CASE ("plugin: a plain right-click on a knob itself (the press a host gives the knob, not the halo overlay) opens its modulation menu", "[ui][andor-ui][rightclick]")
 {
@@ -8513,14 +8535,14 @@ TEST_CASE ("plugin: keyboard utility keys - LIBRARY, SETTINGS and INFO (no AUX k
         CHECK_FALSE (keys.isActive (UA::info));
         CHECK (values() == before);
 
-        // The menu: no Advanced settings, no Toggle Info; Learn holds Tutorials / Reset Tutorials.
+        // The menu: no Advanced settings, no Toggle Info; SUPPORT holds Tutorials / Reset Tutorials.
         juce::PopupMenu shown;
         editor->showMenuForTest = [&] (juce::PopupMenu& m) { shown = m; };
         editor->openMainMenu();
         juce::StringArray texts;
         for (juce::PopupMenu::MenuItemIterator it (shown, true); it.next();)
             texts.add (it.getItem().text);
-        CHECK (texts.contains ("Learn"));
+        CHECK (texts.contains ("SUPPORT"));
         CHECK (texts.contains (juce::String::fromUTF8 ("Tutorials\xe2\x80\xa6")));
         CHECK (texts.contains (juce::String::fromUTF8 ("Reset Tutorials\xe2\x80\xa6")));
         for (const auto& gone : { "Advanced settings", "Advanced Settings", "Toggle Info", "Show AUX", "Hide AUX" })

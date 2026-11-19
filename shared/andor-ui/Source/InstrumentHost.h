@@ -373,7 +373,19 @@ public:
         int program = -1;         ///< a starting state, or -1
         juce::File file;          ///< a preset file, or a user starting state (startingState)
         bool startingState = false;
+        // What a host that groups its presets knows of each (the Library's metadata):
+        juce::String category;    ///< the listed category (one of the product's list), else empty
+        juce::String packId, packName;   ///< the pack it came with, else empty
+        bool favourite = false;
+        std::int64_t lastUsed = 0;       ///< seconds since 1970; 0: never
+        /** The collection it was chosen from ("all", "states", "favourites", "recent",
+            "category:<name>", "pack:<id>", "origin:<factory|user|pack>"): the arrows then walk
+            that collection. Empty: the whole list. */
+        juce::String context;
     };
+    /** True: the quick preset menu groups the presets (collections, categories, packs) and the
+        arrows follow the collection a preset was chosen from. False: one flat list (as before). */
+    virtual bool groupsPresets() const { return false; }
     virtual juce::String presetDisplayName() const = 0;
     virtual void stepPresetList (int delta) = 0;
     virtual std::vector<PresetEntry> presetList() const = 0;

@@ -107,6 +107,10 @@ bool TapeFrameEngine::start (const ReimaginedNote& n, const ReimaginedControl& c
             ghosts[g].gain = 0.0f;
         }
     }
+    // PEDAL LOOP: the straight tape (LOOP off) only; the spliced tape's own rewinding passes
+    // are its sustain (LOOP on).
+    fold.configure (tape != nullptr && ! n.granular && straight ? n.pedalLoop : PedalLoopMode::normal, n.pedalTurnFrames, n.pedalTurnCorrelation);
+    foldPasses = 0;
     control (c);
     amount = std::clamp (c.amount, 0.0, 1.0);
     return true;
@@ -196,17 +200,37 @@ void TapeFrameEngine::readTape (Head& head, double readStep, bool sinc, float& l
     {
         // The recording itself, no splices.
         const double pos = straightOrigin + head.t;
-        if (head.t < 0.0 || pos >= static_cast<double> (note.source->numFrames()))
+        if (head.t < 0.0 || (! fold.engaged() && pos >= static_cast<double> (note.source->numFrames())))
         {
             l = r = 0.0f;
             return;
         }
-        if (sinc)
-            reimagined::readSinc (note, pos, readStep, l, r);
-        else
+        auto readAt = [&] (double at, float& a, float& b) {
+            if (sinc)
+                reimagined::readSinc (note, at, readStep, a, b);
+            else
+            {
+                a = reimagined::readHermite (*note.source, 0, at);
+                b = note.source->numChannels() > 1 ? reimagined::readHermite (*note.source, 1, at) : a;
+            }
+        };
+        if (! fold.engaged())
         {
-            l = reimagined::readHermite (*note.source, 0, pos);
-            r = note.source->numChannels() > 1 ? reimagined::readHermite (*note.source, 1, pos) : l;
+            readAt (pos, l, r);
+            return;
+        }
+        // PEDAL LOOP: the head's place on the tape, folded into the loop region.
+        const auto taps = fold.map (pos);
+        l = r = 0.0f;
+        for (int k = 0; k < taps.count; ++k)
+        {
+            const double at = taps.pos[static_cast<std::size_t> (k)];
+            if (at < 0.0 || at >= static_cast<double> (note.source->numFrames()))
+                continue;
+            float a, b;
+            readAt (at, a, b);
+            l += taps.gain[static_cast<std::size_t> (k)] * a;
+            r += taps.gain[static_cast<std::size_t> (k)] * b;
         }
         return;
     }
@@ -304,9 +328,29 @@ void TapeFrameEngine::render (const float* dryL, const float* dryR, float* outL,
                 }
             }
             main.t += direction * readStep;
-            if (direction > 0.0 ? main.t >= end : main.t <= 0.0)
+            if (fold.configuredLoop() != PedalLoopMode::normal)
             {
-                done = true;
+                // PEDAL LOOP: the latest pedal; a finished release moves the heads to where the
+                // tape went on. Each completed pass wears the tape a little more.
+                const double moved = fold.follow (note.model->original.continuation.pedal, straightOrigin + main.t, srcRate,
+                                                  straightOrigin + straightEnd - 4.0);
+                if (moved != 0.0)
+                {
+                    main.t += moved;
+                    for (auto& g : ghosts)
+                        g.t += moved;
+                }
+                const int passes = fold.holding() ? fold.passes (straightOrigin + main.t) : foldPasses;
+                if (passes > foldPasses)
+                {
+                    foldPasses = passes;
+                    passGain = nextPassGain();
+                }
+            }
+            const double played = fold.engaged() ? fold.position (straightOrigin + main.t) - straightOrigin : main.t;
+            if (! fold.holding() && (direction > 0.0 ? played >= end : main.t <= 0.0))
+            {
+                done = true;   // (never while a pedal loop holds the note)
                 outL[i] = outR[i] = 0.0f;
                 continue;
             }
@@ -317,7 +361,7 @@ void TapeFrameEngine::render (const float* dryL, const float* dryR, float* outL,
                 {
                     auto& head = ghosts[g];
                     head.gain = std::min (1.0f, head.gain + 1.0f / static_cast<float> (0.05 * rate));
-                    if (head.t >= 0.0 && head.t < end)
+                    if (head.t >= 0.0 && (head.t < end || fold.engaged()))
                     {
                         float gl, gr;
                         readTape (head, readStep * ghostSpeed[g], false, gl, gr);
@@ -349,7 +393,7 @@ double TapeFrameEngine::sourcePosition() const noexcept
     if (tape == nullptr || note.granular || done)
         return -1.0;
     if (straight)
-        return straightOrigin + main.t;
+        return fold.position (straightOrigin + main.t);
     const auto& s = tape->splices[std::min (main.splice, tape->splices.size() - 1)];
     return s.sourceFrame + (main.t - s.frameStart);
 }

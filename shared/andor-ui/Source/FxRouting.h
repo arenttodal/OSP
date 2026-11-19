@@ -98,6 +98,9 @@ public:
     bool remove (fx::InstanceId id);
 
     juce::PopupMenu settingsMenu();
+    /** What the view's timer does (8 Hz): follow the route, the subtitles and every effect's
+        ON state. Public for tests on hosts whose message loop they cannot run. */
+    void syncNow();
     /** FX CHAIN presets (the gear): the route and its new effects' settings, as a file. */
     bool saveChain (const juce::String& name);
     bool loadChain (const juce::File& file);
@@ -135,6 +138,12 @@ private:
     fx::Graph route() const;
     juce::String subtitleOf (fx::InstanceId id) const;
     juce::String signature() const;
+    /** The effect's real state, read now: its ON parameter (a new effect) or its node's bypass (a
+        built-in one). The tiles' own flag is a cache of this, made at layout. */
+    bool liveBypassed (fx::InstanceId id) const;
+    /** Brings every tile's bypass (its light, its veiled motif, its knobs) to the effect's real
+        state: after a click on the light, automation, undo, a preset or a chain. True: changed. */
+    bool refreshBypass();
     int tileAt (juce::Point<int> p) const;
     int gapAt (juce::Point<int> p) const;
     void paintTile (juce::Graphics&, const Tile&, bool ghost = false) const;

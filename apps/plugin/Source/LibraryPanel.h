@@ -134,6 +134,10 @@ public:
     void addSelectedToTray (int slot);
     void commitTray();
     void openSaveSheet();
+    /** The Save to Library sheet as a Starting State (true) or a preset (main menu entries). */
+    void openSaveSheet (bool startingState);
+    /** Install pack...: a file chooser, then the pack's confirmation (the main menu and the ⋯ menu). */
+    void chooseAndInstallPack();
     /** ANDOR Learn: the Save... key (it opens the save sheet). */
     juce::Component& saveKey() noexcept { return saveButton; }
     void openSettingsSheet();
@@ -166,14 +170,34 @@ public:
         licence (remembered per collection), and whether it is a factory pack. Expansion packs
         for sale, and the core pack built into OSP's installer, are made here. */
     void openPublishSheet (const std::string& collectionId, const juce::String& name);
+    /** Create content pack...: a new collection as the pack's draft content, and its details sheet. */
+    void createPackDraft();
     /** The export behind both: `fields` carries everything but the records. */
     void exportCollection (const std::string& collectionId, library::PackExport fields, const juce::File& out);
+    /** Official factory publishing: only in an authoring build (CMake OSP_FACTORY_AUTHORING=ON).
+        A customer build never offers it, and a factory mark asked for anyway is dropped: its packs
+        are ordinary packs. (Tests switch it to exercise the authoring path.) */
+    static bool factoryAuthoring() noexcept;
+    static void setFactoryAuthoring (bool enabled) noexcept;
     /** The sheet showing now (empty: none) - "save", "settings", "missing", "prompt", "choice", "publish",
         "scan", "trim". */
     juce::String openSheetName() const;
     juce::Component* sheet() const noexcept { return sheetComponent.get(); }
     void closeSheet();
     juce::String statusText() const { return status; }
+    /** The preset detail card's parts (tests and screenshots), in the card's coordinates. */
+    struct DetailLayout
+    {
+        juce::Rectangle<float> artwork, name, heart;
+        juce::Rectangle<int> load, more;
+        float nameWidth = 0.0f;
+        bool truncated = false;
+    };
+    DetailLayout detailLayout() const;
+    /** The sound inspector's ROOT NOTE selector and TYPE dropdown (tests and screenshots). */
+    class RootNoteSelector* rootNoteSelector() const noexcept;
+    juce::ComboBox* typeDropdown() const noexcept;
+    juce::Component* detailCard() const noexcept;
 
     /** A sound dragged from the results: its asset id. */
     static juce::var dragDescription (const std::string& assetId) { return "osp-sound:" + juce::String (assetId); }
@@ -200,6 +224,9 @@ public:
     class Tray;
     class Sheet;
 
+    /** A row's context menu at a screen point, as a right-click opens it (tests, snapshots). */
+    void showRowMenuForTest (int index, juce::Point<int> screenPoint) { showRowMenu (index, screenPoint); }
+
 private:
     friend class Sidebar;
     friend class StartingStates;
@@ -222,6 +249,7 @@ private:
     void loadRow (const LibraryRow& row);
     void loadSound (const std::string& assetId, int layer);
     void renameRow (const LibraryRow& row);
+    juce::String browseContextFor (const LibraryRow& row) const;
     void trashRow (const LibraryRow& row);
     void restoreRow (const LibraryRow& row);
     void setFavourite (const LibraryRow& row, bool favourite);

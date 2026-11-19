@@ -1450,6 +1450,8 @@ namespace
         {
             auto* w = new juce::AlertWindow ("Save FX preset", "A name for these settings:", juce::MessageBoxIconType::NoIcon);
             w->addTextEditor ("name", current() == "Default" ? juce::String ("My ") + fx::typeName (id.type) : current());
+            if (auto* field = w->getTextEditor ("name"))
+                styleTextField (*field);
             w->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
             w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
             w->enterModalState (true, juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer<PresetBar> (this), w] (int result) {

@@ -1527,15 +1527,16 @@ namespace
 
         void paint (juce::Graphics& g) override
         {
-            const auto r = getLocalBounds().toFloat();
+            // (Inside the card: the menu window's shadow margin is not the item's to draw on.)
+            const auto r = getLocalBounds().reduced (OspLookAndFeel::popupSideInset (*this), 0).toFloat();
             if (isItemHighlighted())
             {
                 g.setColour (findColour (juce::PopupMenu::highlightedBackgroundColourId));
-                g.fillRoundedRectangle (r.reduced (3.0f, 1.0f), 4.0f);
+                g.fillRoundedRectangle (r.reduced (4.0f, 1.0f), 5.0f);
             }
             // (Inactive: the same item, quieter - PEDAL LOOP while Granular plays.)
             const auto ink = findColour (juce::PopupMenu::textColourId).withMultipliedAlpha (live ? 1.0f : 0.45f);
-            const auto icon = juce::Rectangle<float> (14.0f, r.getCentreY() - 8.0f, 16.0f, 16.0f);
+            const auto icon = juce::Rectangle<float> (r.getX() + 12.0f, r.getCentreY() - 8.0f, 16.0f, 16.0f);
             if (mode == 1)
                 icons::drawGranularIcon (g, icon, ink.withAlpha (0.88f));
             else if (mode == 0)
@@ -1755,7 +1756,7 @@ std::unique_ptr<juce::Component> ModeSelector::createMenuPicture()
         {
             auto* d = new Drawn (separator, "PEDAL LOOP");
             picture->items.add (d);
-            const int h = separator ? 8 : 24;
+            const int h = separator ? OspLookAndFeel::popupSeparatorHeight : OspLookAndFeel::popupHeaderHeight;
             d->setBounds (border, y, width, h);
             picture->addAndMakeVisible (d);
             y += h;

@@ -189,6 +189,14 @@ public:
     std::function<void()> onChange;   ///< a preset or starting state was opened
     std::function<void()> onSaveStartingState;   ///< "Save starting state..." (the editor asks for a name)
     std::function<void()> onOpenLibrary;         ///< "Open Library..." (the menu's first item)
+    /** "Browse all ... in the Library": the Library opened on that collection (a Library scope:
+        "all", "favourites", "recent", "category:<name>", "packs"; `startingStates`: its Starting
+        States). */
+    std::function<void (const juce::String& scope, bool startingStates)> onBrowseLibrary;
+    /** The quick preset menu as the name's click opens it (tests: its items and actions). */
+    juce::PopupMenu presetMenu();
+    /** The most rows a collection's flyout lists before Browse all. */
+    static constexpr int flyoutRows = 20;
     void refresh();
     void paint (juce::Graphics&) override;
     void mouseUp (const juce::MouseEvent&) override;

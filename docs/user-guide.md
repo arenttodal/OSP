@@ -32,13 +32,19 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
   alternates them too. Takes that are only louder or softer stay takes. Velocity layers come
   from dynamics words in the names (pp, mf, ff, soft, hard, …). The card's **⋮ → Samples**
   shows and corrects the result. Sessions saved before this keep the sound they had.
-- **⋮ → Add layer…** does the same from a file browser: one file is one layer, several
+- **⋮ → Add source…** does the same from a file browser: one file is one layer, several
   files are one multi-sample layer.
-- **Remove** a layer from its card's **⋮** menu (it asks once more). The layers after it
-  move up (A + C never stays: it becomes A + B). **⋮ → Restore removed layer** brings it
-  back.
-- Click a card to make it the **edited** layer (its letter is in colour); the menu acts on
-  it. All layers stay visible and playable.
+- **Remove** a layer from its card's **⋮** menu (**Remove source**, it asks once more). The
+  layers after it move up (A + C never stays: it becomes A + B). **⋮ → Restore removed
+  source** brings it back.
+- Each card's **⋮** menu acts on that card's source only, and names it ("SOURCE B · file"):
+  - **SOURCE:** Load / Replace audio…, Load example, Record audio…;
+  - **AUDIO:** Root, Map notes… or Notes / Detect notes again / Play as one sample, Samples,
+    Reveal source file;
+  - **MANAGEMENT:** Reset source settings, Remove source.
+
+  Click a card to make it the **edited** layer (its letter is in colour). All layers stay
+  visible and playable.
 
 Every layer plays every note you play, through the same LIFE, DRIVE, CHARACTER,
 MOVEMENT, ECHO, SPACE, dynamics and envelope: one instrument, not three. Only how far each source departs
@@ -189,8 +195,8 @@ real round-robin set.
 | **SPACE** | The room: how much of it you hear. Popup: ROOM, HALL, PLATE, SPRING; PRE-DELAY, SIZE, DECAY, DAMP, MOD, WIDTH and the room's EQ (LOW CUT, HIGH CUT; drag the two handles on the picture). |
 | **AMP ENVELOPE** (A D S R) | The instrument's one envelope, for every layer: a short attack and decay with low sustain makes a pluck, a slow attack a swell, full sustain a held tone. Drag the points or turn the knobs. A release of 0.2 s or more lets the recording's own ending play when you let go. |
 | **VOLUME** (top right) | The instrument's output level: drag the thin slider, double-click for 0 dB. |
-| Preset (top) | ‹ › step through the starting states (Natural, Alive, Floating, Broken, Frozen, Dream, Wide, and your own: settings that keep your sounds) and your presets; click the name for the list, ♡ marks a favourite. At the top of the list: **INIT** (an empty patch: no sounds, every setting at its default), **Reset settings** (defaults, the sounds stay) and **Save starting state…** (every setting and the number of slots, no audio; it appears under Starting states and applies to whatever sounds are loaded, keeping empty slots for the rest). |
-| Clear all samples (⋮ menu) | Removes every sound but keeps the A/B/C slots and every setting: drop new sounds into the empty cards and they play with the same layer controls, blend or mix and macros. |
+| Preset (top) | Click the name for the quick preset menu:<br>- Open Library…, Back to previous patch, INIT (an empty patch) and Reset settings (defaults, the sounds stay);<br>- **COLLECTIONS:** Starting States (the built-in Natural … Wide and your own, plus Save Starting State…), Favorites, Recently Used, All Presets;<br>- **CATEGORIES:** Arpeggios, Bass, Bells & Mallets, Keys, Leads, Pads, Percussion, Plucks, Strings, Synths, Textures, Voices, FX, Uncategorized (only the ones with presets);<br>- **PACKS:** each installed pack.<br>Each list is alphabetical with the loaded one ticked. It shows at most 20 rows, then **Browse all … in the Library** opens the Library on that collection. ‹ › step through the collection you chose from: Keys, Favorites, a pack, or all presets. They only walk the Starting States when you picked one from there. ♡ marks a favourite. A preset's category is the one you gave it when saving; otherwise a name such as "Keys – Felt Upright" lists it under Keys. Nothing is renamed or moved. |
+| Clear all sources (⋮ menu) | Removes every sound but keeps the A/B/C slots and every setting: drop new sounds into the empty cards and they play with the same layer controls, blend or mix and macros. |
 
 Click a macro's name for its popup: each one shows what it does (the reverb's tail, the
 filter's curve over your sound's spectrum, the movement over time, a cloud of possible
@@ -468,13 +474,27 @@ it back. Every edit is one undo step; the pattern is saved with the project and 
 
 - Projects remember everything: the sample(s), corrections, settings and the exact
   playback. They reopen identically and render bounces identically.
-- **☰ → Presets**: settings plus which sample(s) (`.osppreset`). Presets live in
-  `Documents/OSP/Presets` as ordinary files: make sub-folders there to organise them,
-  and they appear as sub-menus. **Previous / Next preset** step through them.
-- **☰ → Export instrument**: one `.ospinstrument` file with the recordings, their
-  analysis and the settings, saved in `Documents/OSP/Instruments` by default. Import it
-  on another computer and it sounds the same. **☰ → Instruments** lists that folder.
-- **☰ → Interface size**: 80–200 %.
+- **SAVE** (beside the preset name) and **⋮ → Save instrument**:
+  - they update the preset that is open, when it is one of yours (its Library tags, favourite
+    and collections stay);
+  - otherwise (a new patch, a starting state, or a factory or pack preset, which are read-only)
+    they ask for a name and save a new preset.
+- **⋮ → Save as…** always saves a new preset (`.osppreset`: settings plus which sample(s)).
+  Presets live in `Documents/OSP/Presets` as ordinary files. **Previous / Next preset** step
+  through the collection the loaded preset was chosen from (a category, Favorites, a pack, or
+  all presets); the preset name's menu and the Library show them all.
+- **⋮ → Open instrument…** opens a preset or a portable instrument.
+- **⋮ → Export portable instrument…** (CONTENT) writes one `.ospinstrument` file with the
+  recordings, their analysis and the settings. Open it on another computer and it sounds the
+  same.
+- **⋮ → Save as Starting State…** (CONTENT) opens the Library's Save sheet as a Starting
+  State: a name and a description, every setting, no audio.
+- **⋮ → Import pack… / Manage packs…** (CONTENT) open the Library's pack sheets.
+- **⋮ → Interface size**: 80–200 % (PREFERENCES), with **Library settings…** beside it.
+- **⋮ → Tutorials…, Reset Tutorials…, About ANDOR OSP** (SUPPORT).
+
+The main **⋮** menu only holds what concerns the whole instrument: INSTRUMENT, SOURCES,
+CONTENT, PREFERENCES and SUPPORT. Each source's own actions are on its card.
 
 Loading a preset, a starting state or an instrument file replaces the whole patch. If that was
 a mistake, the preset menu's first item, **Back to the patch before ...**, brings the previous
@@ -487,15 +507,15 @@ export asks you to confirm you may share it; that answer is remembered.
 
 ## The Library
 
-Every sound you load, every preset and template you save, in one window. Open it from the
-preset name's menu (**Open Library…**), from **⋮ → Library…**, or with **Cmd/Ctrl+L**. It
+Every sound you load, every preset and Starting State you save, in one window. Open it from the
+preset name's menu (**Open Library…**), from **⋮ → Open Library**, or with **Cmd/Ctrl+L**. It
 covers the instrument down to the keyboard; the keyboard stays below it. **×**, Escape or
 Cmd/Ctrl+L close it.
 
-- **Presets, Templates, Sounds** at the top. On the left: All, Factory, User, Packs,
+- **Presets, Starting States, Sounds** at the top. On the left: All, Factory, User, Packs,
   Favorites, Recent, Trash; your collections (**+** makes one); the categories or sound
   types, each with how many it holds. Type in the search field to narrow it.
-- **STARTING STATES** sit at the top of **Presets** and **Templates**: the built-in states
+- **STARTING STATES** sit at the top of **Presets** and **Starting States**: the built-in states
   (Natural, Alive, Floating, Broken, Frozen, Dream, Wide) as small tiles, the one in use
   marked. A click applies it: the settings change, your sounds stay. Below them, the list:
   **PRESETS** are complete instruments with their sounds; **TEMPLATES** are your own
@@ -513,7 +533,7 @@ Cmd/Ctrl+L close it.
   click on an empty source takes the selected sound. Double-click (or Return) loads the
   selected sound into the first empty source. ▶ plays the three wells together, dry. The
   keyboard and MIDI always play the instrument.
-- **Save…** (top right) saves the patch as a preset (with its sounds) or a template
+- **Save…** (top right) saves the patch as a preset (with its sounds) or a Starting State
   (settings only), with a category, tags and a description. Tick **Include audio as
   portable copy** to also write an `.ospinstrument` you can share. An existing name is
   never overwritten silently: the old one goes to the Library's trash.

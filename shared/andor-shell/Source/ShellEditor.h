@@ -278,6 +278,7 @@ private:
         ShellEditor& editor;
     };
 
+    osp::plugin::SharedMenuLook menuLook;   // (every menu in the look: see SharedMenuLook)
     osp::plugin::OspLookAndFeel lookAndFeel;
     ShellProcessor& shell;
     const bool modulationBound;

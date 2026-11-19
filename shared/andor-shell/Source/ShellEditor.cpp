@@ -1,5 +1,7 @@
 #include "ShellEditor.h"
 
+#include "MenuIcons.h"
+
 #include "Binding.h"
 #include "MacroPopups.h"
 
@@ -643,6 +645,16 @@ void ShellEditor::setSourceViewShown (bool shown)
             return;
         content.addChildComponent (*sourceView);
     }
+    if (shown && sourceView != nullptr)
+    {
+        // The source area's other view, in the cards' layer: the popovers and the modulation
+        // overlay (their halos) stay above it (ANDOR OSP's layering rule, shared).
+        juce::Component* lowest = &modOverlay;
+        for (auto* c : { static_cast<juce::Component*> (popup.get()), static_cast<juce::Component*> (&popupBackdrop) })
+            if (c != nullptr && c->getParentComponent() == &content && content.getIndexOfChildComponent (c) < content.getIndexOfChildComponent (lowest))
+                lowest = c;
+        sourceView->toBehind (lowest);
+    }
     sourceViewOpen = shown;
     sourceViewButton.setToggleState (shown, juce::dontSendNotification);
     sourceViewButton.repaint();
@@ -965,15 +977,18 @@ void ShellEditor::chooseFile (int layer)
 
 void ShellEditor::showLayerMenu (int layer, juce::Component& target)
 {
+    using osp::plugin::menuicons::Kind;
+    namespace menuicons = osp::plugin::menuicons;
+    const auto ellipsis = juce::String::fromUTF8 ("\xe2\x80\xa6");
     juce::PopupMenu menu;
     if (shell.hasHybridLayer() && layer == ShellProcessor::hybridLayer)
     {
         // The generator's recording: replaced (or relinked, when its file went missing) or removed.
         menu.addSectionHeader (shell.product().hybridSampleName);
-        menu.addItem (juce::String::fromUTF8 ("Replace or relink recording\xe2\x80\xa6"), [this] { chooseFile (ShellProcessor::hybridLayer); });
-        menu.addItem ("Remove recording", [this] { shell.removeLayer (ShellProcessor::hybridLayer); timerCallback(); });
+        menuicons::addItem (menu, Kind::replace, "Replace or relink recording" + ellipsis, true, [this] { chooseFile (ShellProcessor::hybridLayer); });
+        menuicons::addItem (menu, Kind::remove, "Remove recording", true, [this] { shell.removeLayer (ShellProcessor::hybridLayer); timerCallback(); }, true);
         if (const auto& action = shell.product().hybridAction; action.label.isNotEmpty() && action.run != nullptr)
-            menu.addItem (action.label + juce::String::fromUTF8 ("\xe2\x80\xa6"), [this] { shell.product().hybridAction.run (shell); });
+            menuicons::addItem (menu, Kind::blank, action.label + ellipsis, true, [this] { shell.product().hybridAction.run (shell); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target));
         return;
     }
@@ -981,14 +996,20 @@ void ShellEditor::showLayerMenu (int layer, juce::Component& target)
     {
         // The oscillators are the instrument: nothing to replace or remove.
         menu.addSectionHeader (shell.generatedSourceName());
-        menu.addItem ("Init", [this] { shell.initPatch(); timerCallback(); });
-        menu.addItem ("Reset settings", [this] { shell.resetSettings(); timerCallback(); });
+        menuicons::addItem (menu, Kind::init, "Init", true, [this] { shell.initPatch(); timerCallback(); });
+        menuicons::addItem (menu, Kind::reset, "Reset settings", true, [this] { shell.resetSettings(); timerCallback(); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target));
         return;
     }
-    menu.addSectionHeader ("Layer " + InstrumentHost::layerName (layer));
-    menu.addItem (juce::String::fromUTF8 ("Replace sound\xe2\x80\xa6"), [this, layer] { chooseFile (layer); });
-    menu.addItem ("Remove layer", [this, layer] { shell.removeLayer (layer); timerCallback(); });
+    // The layer's identity (as ANDOR OSP's source menus): its letter, its sound, its file.
+    const auto letter = InstrumentHost::layerName (layer);
+    const auto loaded = shell.currentInstrument (layer);
+    const auto file = loaded != nullptr ? juce::String::fromUTF8 (loaded->filename.c_str()) : juce::String();
+    menuicons::addSourceHeader (menu, "Layer " + letter, letter, osp::plugin::palette::layer (InstrumentHost::shownLayer (layer)),
+                                file.isNotEmpty() ? juce::File::createFileWithoutCheckingPath (file).getFileNameWithoutExtension() : "Layer " + letter,
+                                file.isNotEmpty() ? file : juce::String ("Empty"));
+    menuicons::addItem (menu, Kind::replace, "Replace sound" + ellipsis, true, [this, layer] { chooseFile (layer); });
+    menuicons::addItem (menu, Kind::remove, "Remove layer", true, [this, layer] { shell.removeLayer (layer); timerCallback(); }, true);
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target));
 }
 
@@ -997,31 +1018,36 @@ void ShellEditor::showLayerMenu (int layer, juce::Component& target)
 
 void ShellEditor::showMenu()
 {
+    // The actions with their icons (as ANDOR OSP's main menu); the engine line stays plain.
+    using osp::plugin::menuicons::Kind;
+    namespace menuicons = osp::plugin::menuicons;
+    const auto ellipsis = juce::String::fromUTF8 ("\xe2\x80\xa6");
     juce::PopupMenu menu;
     menu.addSectionHeader (shell.product().name);
     if (! shell.isGenerator())
     {
-        menu.addItem (juce::String::fromUTF8 ("Add sound\xe2\x80\xa6"), shell.slotCount() < InstrumentHost::numLayers, false, [this] { chooseFile (-1); });
+        menuicons::addItem (menu, Kind::add, "Add sound" + ellipsis, shell.slotCount() < InstrumentHost::numLayers, [this] { chooseFile (-1); });
         menu.addSeparator();
     }
     else if (shell.hasHybridLayer())
     {
-        menu.addItem (shell.product().hybridSampleName + juce::String::fromUTF8 (": load a recording\xe2\x80\xa6"), [this] { chooseFile (ShellProcessor::hybridLayer); });
+        menuicons::addItem (menu, Kind::open, shell.product().hybridSampleName + ": load a recording" + ellipsis, true, [this] { chooseFile (ShellProcessor::hybridLayer); });
         menu.addSeparator();
     }
-    menu.addItem (juce::String::fromUTF8 ("Open preset\xe2\x80\xa6"), [this] { choosePresetFile (false); });
-    menu.addItem (juce::String::fromUTF8 ("Save preset\xe2\x80\xa6"), [this] { choosePresetFile (true); });
-    menu.addItem ("Init", [this] { shell.initPatch(); timerCallback(); });
-    menu.addItem ("Reset settings", [this] { shell.resetSettings(); timerCallback(); });
+    menuicons::addItem (menu, Kind::open, "Open preset" + ellipsis, true, [this] { choosePresetFile (false); });
+    menuicons::addItem (menu, Kind::save, "Save preset" + ellipsis, true, [this] { choosePresetFile (true); });
+    menuicons::addItem (menu, Kind::init, "Init", true, [this] { shell.initPatch(); timerCallback(); });
+    menuicons::addItem (menu, Kind::reset, "Reset settings", true, [this] { shell.resetSettings(); timerCallback(); });
     menu.addSeparator();
     // (Showing and hiding the AUX strip is D's, beneath ARP: no menu item for it.)
-    menu.addItem ("Undo", shell.undoManager.canUndo(), false, [this] { shell.undoManager.undo(); });
-    menu.addItem ("Redo", shell.undoManager.canRedo(), false, [this] { shell.undoManager.redo(); });
+    menuicons::addItem (menu, Kind::undo, "Undo", shell.undoManager.canUndo(), [this] { shell.undoManager.undo(); });
+    menuicons::addItem (menu, Kind::redo, "Redo", shell.undoManager.canRedo(), [this] { shell.undoManager.redo(); });
     if (learn != nullptr)
         learn->addMenuItems (menu);   // Learn: Tutorials..., Reset Tutorials... (the product's opt-in)
+    menuicons::decorate (menu, { { "Learn", Kind::tutorials } });
     menu.addSeparator();
     const auto engine = shell.engineDescription();
-    menu.addItem (juce::String ("Engine: ") + engine.name + (engine.diagnostic ? " (diagnostic)" : ""), false, false, [] {});
+    menu.addItem (menuicons::item (Kind::info, juce::String ("Engine: ") + engine.name + (engine.diagnostic ? " (diagnostic)" : ""), [] {}, false));
     if (showMenuForTest != nullptr)
     {
         showMenuForTest (menu);
@@ -1426,6 +1452,10 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
         return;
     }
     if (c == nullptr || c == popup.get() || popup->isParentOf (c))
+        return;
+    // The overlay above everything took a press for one of the popover's own controls (its
+    // menu, its halo's range): the popover's, not an outside click (ANDOR OSP's fix, shared).
+    if ((c == &modOverlay || modOverlay.isParentOf (c)) && modOverlay.pressBelongsTo (*popup))
         return;
     if (c != this && ! isParentOf (c))
         return;   // a click in the popover's own menus
@@ -2201,7 +2231,7 @@ void ShellEditor::dimMacroArc (int macro, bool on)
 
 juce::Colour ShellEditor::userMacroColour (int macro) const
 {
-    return design::colour::macro (std::clamp (macro, 0, frame::macroCount - 1));
+    return design::colour::userMacro (std::clamp (macro, 0, frame::macroCount - 1));
 }
 
 void ShellEditor::setUpUserMacros()
@@ -2217,7 +2247,7 @@ void ShellEditor::setUpUserMacros()
         const int macro = static_cast<int> (i);
         frame::MacroSpec spec { um->parameterIds[i], um->name != nullptr ? um->name (shell, macro) : "MACRO " + juce::String (macro + 1),
                                 "User macro " + juce::String (macro + 1) + ": click for its assignments, double-click to rename" };
-        frame::setUpMacro (userRow[i], macro, spec, shell.parameters, content, true);
+        frame::setUpUserMacro (userRow[i], macro, spec, shell.parameters, content);
         userRow[i].slider.setTitle ("User Macro " + juce::String (macro + 1));
         userRow[i].label->onClick = [this, macro] {
             if (closedByLabelPress == 100 + macro)
@@ -2688,9 +2718,8 @@ void ShellEditor::startUserMacroRename (int macro)
     renameField->setFont (type::macroLabel (0.7f * static_cast<float> (label->getHeight())));
     renameField->setInputRestrictions (24);
     renameField->setText (um->name (shell, macro), false);
+    styleTextField (*renameField);
     renameField->setColour (juce::TextEditor::backgroundColourId, palette::ivory);
-    renameField->setColour (juce::TextEditor::textColourId, palette::text);
-    renameField->setColour (juce::TextEditor::outlineColourId, design::colour::hairline);
     renameField->setColour (juce::TextEditor::focusedOutlineColourId, userMacroColour (macro));
     content.addAndMakeVisible (*renameField);
     renameField->setBounds (label->getBounds().expanded (4, 2));
@@ -2739,6 +2768,8 @@ void ShellEditor::userMacroLabelMenu (int macro)
             }
         });
     });
+    namespace menuicons = osp::plugin::menuicons;
+    menuicons::decorate (menu, { { "Edit Assignments", menuicons::Kind::list }, { "Rename", menuicons::Kind::rename }, { "Clear Assignments", menuicons::Kind::remove } });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (userRow[static_cast<std::size_t> (macro)].label.get()));
 }
 

@@ -1,6 +1,7 @@
 """Packs the rendered ceramic pieces into the plugin's runtime resource.
 
     python3 pack.py            # Python 3 + numpy + Pillow (no Blender)
+    python3 pack.py --update   # only the pieces in raw/; every other piece kept from the pack
 
 Reads tools/blender-assets/output/ceramic/raw/ (render.py) and writes
 shared/andor-ui/Resources/skin/ceramic-skin.zip (stored, not deflated: PNG is compressed
@@ -101,12 +102,31 @@ def face_colour(rgba, margin_px):
     return "#" + "".join(f"{int(round(v * 255)):02x}" for v in c)
 
 
-def main():
+def main(update=False):
+    """update: re-render a few pieces (render.py --only) without the other raw renders on disk;
+    a piece with no raw render keeps its manifest entry and images from the existing pack,
+    byte for byte."""
     manifest = {"schemaVersion": SCHEMA, "name": "ceramic", "direction": P.DIRECTION, "pieces": []}
     files = {}
     missing = []
+    kept = {}
+    if update:
+        with zipfile.ZipFile(OUT) as z:
+            old = json.loads(z.read("manifest.json"))
+            for entry in old["pieces"]:
+                kept[entry["name"]] = (entry, {lv["file"]: z.read(lv["file"]) for lv in entry["levels"]})
+    replaced = []
     for p in P.pieces():
         name = p["name"]
+        rendered = all(os.path.exists(x) for x in ([os.path.join(RAW, f"{name}.{s}.png") for s in ("with", "without")]
+                                                    if p["kind"] == "pocket" else [os.path.join(RAW, name + ".png")]))
+        if update and not rendered and name in kept:
+            entry, images = kept[name]
+            manifest["pieces"].append(entry)
+            files.update(images)
+            continue
+        if update:
+            replaced.append(name)
         if p["kind"] == "pocket":
             paths = [os.path.join(RAW, f"{name}.{s}.png") for s in ("with", "without")]
             if not all(os.path.exists(x) for x in paths):
@@ -148,8 +168,10 @@ def main():
         for file, data in sorted(files.items()):
             z.writestr(file, data)
     total = sum(len(d) for d in files.values())
+    if update:
+        print("replaced: " + ", ".join(replaced))
     print(f"{len(manifest['pieces'])} pieces, {len(files)} images, {total / 1e6:.2f} MB -> {os.path.relpath(OUT, REPO)}")
 
 
 if __name__ == "__main__":
-    main()
+    main(update="--update" in sys.argv[1:])
