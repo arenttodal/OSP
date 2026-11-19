@@ -173,22 +173,41 @@ cams = {
     "macros": dict(yaw=-16, pitch=52, dist=0.30, lens=100, target=prod(420, 812 + KY, g["REF_PANEL_TOP"]), fstop=11),
     "display": dict(yaw=-14, pitch=46, dist=0.30, lens=100, target=prod(260, 330, g["REF_PANEL_TOP"]), fstop=11),
 }
-FACE_TARGET = prod(724, 500, g["REF_PANEL_TOP"])
+EW_M, EH_M = g["EW"], g["EH"]   # the master's editor capture (the face texture's own size)
+FACE_TARGET = prod(EW_M / 2, EH_M / 2, g["REF_PANEL_TOP"])
+ROT_RAD = math.radians(g["ROT"])   # the panel lies flat, turned by the shot's ROT about the vertical
+PANEL_UP = Vector((0, 1, 0))
+PANEL_UP.rotate(Euler((0, 0, ROT_RAD)))   # the editor's "up" on the panel, in world space
 if args.camera in ("ortho", "interface") and args.res == [960, 540]:
-    args.res = [960, 2 * round(960 * perf["editor"][1] / perf["editor"][0] / 2)]   # the editor's own aspect
+    args.res = [960, 2 * round(960 * EH_M / EW_M / 2)]   # the editor's own aspect
     scene.render.resolution_x, scene.render.resolution_y = args.res
+
+
+def look(cam_obj, target, up):
+    """Points the camera at target with the given world up (no roll from Blender's track axis)."""
+    from mathutils import Matrix
+    z = (cam_obj.location - Vector(target)).normalized()      # the camera looks along -Z
+    x = up.cross(z).normalized()
+    y = z.cross(x)
+    cam_obj.rotation_euler = Matrix((x, y, z)).transposed().to_euler()
+
+
 if args.camera == "ortho":
-    # E4: the frontal orthographic view; it registers with editor/NNNN.png (1448 px = the panel's width).
+    # E4: straight down onto the panel, rolled with it; 1448 editor px across the frame's width,
+    # so the frame registers with editor/NNNN.png.
     cam = g["camera"]("Perf ortho", yaw=0, pitch=0, dist=0.8, lens=85, target=FACE_TARGET)
+    cam.location = Vector(FACE_TARGET) + Vector((0, 0, 0.8))
+    cam.rotation_euler = (0.0, 0.0, ROT_RAD)
     cam.data.type = "ORTHO"
     cam.data.sensor_fit = "HORIZONTAL"
-    cam.data.ortho_scale = 1448 * PX
+    cam.data.ortho_scale = EW_M * PX
+    cam.data.dof.use_dof = False
 elif args.camera == "interface":
     # D08 Interface: a near-frontal perspective that glides into the frontal view and ends framed
-    # exactly as the orthographic camera (the panel's 1448 px across the frame's width), so the
-    # cut to the real editor capture matches its landmarks. A long lens keeps perspective low.
+    # exactly as the orthographic camera (the panel's width across the frame), so the cut to the
+    # real editor capture matches its landmarks. A long lens keeps perspective low.
     INTERFACE_LENS = 135.0
-    end_dist = INTERFACE_LENS / 36.0 * 1448 * PX
+    end_dist = INTERFACE_LENS / 36.0 * EW_M * PX
     cam = g["camera"]("Perf interface", yaw=-10, pitch=22, dist=end_dist * 1.12, lens=INTERFACE_LENS, target=FACE_TARGET, fit="HORIZONTAL")
     cam.data.dof.use_dof = False   # the whole face sharp, as the editor is
 
@@ -197,9 +216,12 @@ elif args.camera == "interface":
         t = t * t * (3.0 - 2.0 * t)
         yaw, pitch, dist = -10.0 * (1 - t), 22.0 * (1 - t), end_dist * (1.12 + (1.0 - 1.12) * t)
         d = Vector((0, -math.sin(math.radians(pitch)), math.cos(math.radians(pitch))))
-        d.rotate(Euler((0, 0, math.radians(yaw))))
+        d.rotate(Euler((0, 0, math.radians(yaw) + ROT_RAD)))   # yaw and tilt in the panel's own frame
         cam.location = Vector(FACE_TARGET) + d * dist
-        cam.rotation_euler = (Vector(FACE_TARGET) - cam.location).to_track_quat("-Z", "Y").to_euler()
+        if t >= 1.0:
+            cam.rotation_euler = (0.0, 0.0, ROT_RAD)   # exactly the ortho camera's orientation
+        else:
+            look(cam, FACE_TARGET, PANEL_UP)
 else:
     cam = g["camera"]("Perf " + args.camera, **cams[args.camera])
 scene.camera = cam

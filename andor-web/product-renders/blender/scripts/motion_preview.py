@@ -147,7 +147,15 @@ for cut in plan:
         src = [os.path.join(args.out, "frames", f"{cut['name']}_{i:04d}.png") for i in range(n)]
         seq = [src[0]] * h + src + [src[-1]] * h
         for k, f in enumerate(seq):
-            shutil.copyfile(f, os.path.join(sd, "master", f"{k + 1:04d}.png"))
+            # Hard links, not copies: a master is the rendered frames plus repeated rest frames, so
+            # copying would double the disk use of every 16-bit sequence (and filled the disk once).
+            dst = os.path.join(sd, "master", f"{k + 1:04d}.png")
+            if os.path.exists(dst):
+                os.remove(dst)
+            try:
+                os.link(f, dst)
+            except OSError:
+                shutil.copyfile(f, dst)
         shutil.copyfile(src[-1], os.path.join(sd, "poster.png"))
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(args.fps), "-i", os.path.join(sd, "master", "%04d.png"),
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", "-movflags", "+faststart", "-an",
