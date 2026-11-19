@@ -40,7 +40,7 @@
 **The wordmark** is placed from the closing frame, so it ends fully readable above the instrument. During the move it is:
 - discovered in the defocused wall: blurred, then sharpening as the camera withdraws;
 - faded in over 3–40 % of the move, so it is seen while the instrument still covers part of it;
-- uncovered as the instrument descends (in A and C the instrument covers the lower part of the letters until about 40 % of the move);
+- uncovered as the instrument descends. Measured from the matte: in A the instrument covers 35 % of the letters at the open and still covers part of them until 47 % of the move; in C, 20 % at the open, clear by 20 %; in A desktop, 56 % at the open, clear by 43 %.
 - printed on the wall: the ink darkens the wall's own light, so light gradients pass through the letters.
 
 Occlusion is measured on every frame and stored in `typography_meta.json`.
@@ -52,10 +52,12 @@ Occlusion is measured on every frame and stored in `typography_meta.json`.
 | Stage | IVORY GALLERY | DARK THEATRE (B1/B2 preserved) | IVORY GALLERY, low camera |
 | Lens | 65 mm, f/7.1 | 75 mm, f/8 | 50 mm, f/8 |
 | Opening | Across the timber cheek and the first card | A rim along the front edge, just above eye level | Almost at the instrument's level: a landscape of controls |
-| Closing width | about 77 % | about 72 % | about 85 % |
+| Closing width (measured from the matte) | 80 % | 75 % | 97 %: nearly edge to edge, see below |
 | Light | The key softbox orbits −14° → +4° as the instrument turns | Key, top line and fill rise from near-black | The key orbits +10° → −4° |
 
-**A desktop.** R01 A with a wider, right-weighted end frame: the instrument is at about 55 % width on the right. The headline "One sound. An entire instrument." (EB Garamond) arrives in the free left column after the wordmark. Its size is fitted from the matte, so it can never meet the instrument.
+**A desktop.** R01 A with a wider, right-weighted end frame: the instrument ends at 56 % width on the right (measured). The headline "One sound. An entire instrument." (EB Garamond) arrives in the free left column after the wordmark. Its size is fitted from the matte, so it can never meet the instrument. Measured: 240 px of free column at draft width, and the headline fits at its full size (3.4 % of the frame width), with at least 4 % of the frame width clear of the instrument.
+
+**C ends larger than the brief's 65–80 %.** C is the "larger architectural" alternative, and it closes at 97 % of the frame width, which leaves almost no side margin. If C is chosen, its end camera moves back about 20 % to land at roughly 80 %; that is a one-line spec change and a 45-minute draft re-render.
 
 ## R02 Silhouette (8 s)
 
