@@ -90,6 +90,7 @@ add_library(osp_dsp STATIC
     src/engine/EchoDelay.cpp
     src/engine/DriveProcessor.cpp
     src/engine/Arpeggiator.cpp
+    src/engine/ArpCustomPattern.cpp
     src/engine/Modulation.cpp
     src/engine/LayerEq.cpp
     src/engine/Dampen.cpp

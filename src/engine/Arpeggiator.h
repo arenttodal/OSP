@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/ArpCustomPattern.h"
 #include "engine/HostTiming.h"
 
 #include <array>
@@ -137,6 +138,10 @@ public:
         bool strumSync = false;        ///< SYNC: strumQuarters of the tempo; FREE: strumMs
         double strumMs = 20.0;         ///< 0 .. maxStrumMs
         double strumQuarters = 0.125;  ///< the SYNC spread as a note value, in quarters (1/32)
+
+        /** CUSTOM: play the lane's custom pattern (setCustomPattern) instead of `pattern`. On
+            without a valid pattern: `pattern` plays, as before. STRUM does not apply to it. */
+        bool custom = false;
     };
 
     struct Event
@@ -189,7 +194,17 @@ public:
     bool isSynced() const noexcept { return synced; }
     int heldCount() const noexcept { return held; }
     /** STRUM can change what plays: on, and the pattern makes chords. */
-    bool strumApplies() const noexcept { return settings.strum && settings.pattern == ArpPattern::chord; }
+    bool strumApplies() const noexcept { return settings.strum && settings.pattern == ArpPattern::chord && ! customActive(); }
+
+    /** The lane's custom pattern (copied: no allocation, real-time safe). It takes over at the
+        next step, keeping the phase (the step count); a note already sounding ends at its own
+        gate. An invalid pattern clears it. */
+    void setCustomPattern (const arp::CustomPattern& pattern) noexcept;
+    void clearCustomPattern() noexcept;
+    /** CUSTOM is on and a valid pattern is loaded: the custom pattern plays. */
+    bool customActive() const noexcept { return settings.custom && customLoaded; }
+    bool hasCustomPattern() const noexcept { return customLoaded; }
+    const arp::CustomPattern& customPattern() const noexcept { return customCurrent; }
     /** The last strummed chord's spread as played and as asked for, in samples (the panel shows
         when the step was too short for the setting). */
     std::int64_t lastStrumSpread() const noexcept { return strumSpreadPlayed; }
@@ -232,6 +247,21 @@ private:
     int pickRandom (std::int64_t step, int previousIndex, int length) const noexcept;
     /** RANDOM OTHER / RANDOM ONCE: the note at `position` of the cycle's shuffled order. */
     int pickShuffled (std::int64_t cycle, int position, int length) const noexcept;
+
+    // the custom pattern
+    struct CustomNote
+    {
+        Step step;
+        int offset = 0;       ///< ticks into the step (0 .. ticksPerStep - 1)
+        int duration = 0;     ///< the event's rhythmic duration, ticks
+        std::uint8_t source = 0;
+    };
+    /** The custom pattern's notes whose onsets fall in nominal step `step` (since the cycle
+        origin), in onset order. Events are at least minEventTicks long, so a step holds at most
+        ticksPerStep / minEventTicks of them. */
+    int customStepNotes (std::int64_t step, std::array<CustomNote, maxHeld>& out) const noexcept;
+    void fireCustomStep (std::int64_t time) noexcept;
+    void applyPendingCustom() noexcept;
 
     /** Where the pattern is: steps since the phrase (or the last octave change) began. */
     std::int64_t patternStep (std::int64_t step) const noexcept { return step - cycleOrigin; }
@@ -288,6 +318,11 @@ private:
     mutable bool sequenceDirty = true;
     mutable std::array<int, maxHeld> sortedIndex {};
     mutable int sortedCount = 0;
+
+    // the custom pattern (values, so copying the arpeggiator copies them)
+    arp::CustomPattern customCurrent {}, customNext {};
+    bool customLoaded = false, customPending = false, customNextValid = false;
+    mutable arp::CustomPool customPool {};
 
     // the clock
     std::int64_t blockStart = 0;   ///< absolute sample of the block's first sample
