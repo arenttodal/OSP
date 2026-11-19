@@ -71,7 +71,56 @@ Numbers match the contact sheet.
 
 The full rationale for each frame is in `art_direction_r2_frames.md`.
 
-CRITIQUE_PLACEHOLDER
+## The Monument typography
+
+There are two alternatives per frame. Occlusion is measured from the matte.
+
+| Frame | T1: readable wordmark | T2: monumental, cropped by the frame |
+|---|---|---|
+| A1 | the far edge cuts the letters' feet (35 %) | the instrument laid across a mark larger than the frame (50 %) |
+| A2 | the mark rises in the dark beyond the instrument's corner (16 %) | 82 %: abstract |
+| A3 | the far edge crosses the middle letters (31 %) | 66 %: abstract |
+
+**Recommendation: T1.**
+- A1 T1 is the strongest interaction. The wordmark stands behind the object rather than above it, and the object's edge does the occluding.
+- The T2 crops are striking as graphic texture. But they stop reading as ANDOR once more than about half the mark is covered. They are better kept for motion, where the mark can be uncovered.
+
+## Critical assessment
+
+### Strongest
+
+1. **08 · C2, a pool of light on the controls.** The most cinematic frame here, and the one most clearly "ANDOR":
+   - The light is the subject.
+   - The instrument is shown where it is played.
+   - The displays glow beyond the pool without leading it.
+
+   It needs no typography, and it animates naturally: the pool travels or grows. This is the best bridge from R02 A.
+2. **06 · B3, overhead, long light.** The most iconic still: a calm, graphic object in warm negative space, with one long shadow and clean displays. It would hold as a poster, a box or a homepage at any size. Its weakness is that it is static by nature: it is a photograph more than a shot.
+3. **02 · A2, plinth from above.** The best Monument without type. A single bright plane on a strong diagonal against the walnut, with mass and darkness on both sides. With T1, the wordmark sits naturally in the dark space.
+
+   **01 · A1** is the better typography frame. Of the three Monument endings for the Grand Reveal, A1 and A2 are the candidates.
+
+### Weakest
+
+- **04 · B1, ivory three-quarter.** The most conventional frame and the closest to a catalogue three-quarter. The key is still too broad, and the top surface reads evenly. If B is kept, it should be relit, not re-angled: a smaller, lower key and a stronger negative fill. B2 and B3 already carry the family.
+- **11 · D2, the macro row.** The long knob shadows are right. But the cyclorama behind blooms bright at top right, the foreground keys are too soft, and there is no single focal point. It needs a darker background and a clear hero knob. As it stands, it is a study, not a frame.
+- **03 · A3, corner monument.** Confident scale, but the instrument fills the frame and is lit too evenly, so it reads as an interface shot more than a sculpture. A narrower key, so the far end falls away, would rescue it.
+- **07 · C1** has the right mood but a very narrow focal plane: the mid surface goes soft. It works as the opening pose of the Silhouette shot, where the strip will travel. It is weaker as a still.
+
+### Across the set
+
+- **The ivory reads best when the light is small and low** (B3, C2, D1, D3) and worst when it is broad (B1, A3).
+- **Darkness works when it is shaped.** The dark frames read as dark, not underexposed, because each has one controlled source and black flags keeping the rest black.
+- **The flags work.** No studio reflection crosses a waveform in any frame.
+- **The approved materials and geometry are unchanged.** Every improvement here is camera and light.
+
+### Recommendation for the next animation gate
+
+1. **Grand Reveal: Monument.** Ends on A1 with T1 (or A2), opening in C1's darkness.
+2. **Silhouette.** Travels from C1 to C2.
+3. **Immersive Flyover.** Starts from D1's height and light.
+
+B3 is worth keeping as the campaign's key still, independent of motion.
 
 ## Decisions carried from the review
 

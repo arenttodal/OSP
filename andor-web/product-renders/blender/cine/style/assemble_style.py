@@ -89,7 +89,7 @@ for n, (fid, s) in enumerate(specs.items(), 1):
             comp.save(tp, quality=95)
             comp.save(tp[:-4] + ".png")
             rec["typography"][k] = dict(meta, file=os.path.relpath(tp, a.out), layout=L)
-            typo_items.append((f"{n:02d}{k[-1]}", f"{fid.replace('SF_', '')} {k} · occlusion {meta['occlusion']:.0%}", comp))
+            typo_items.append((f"{n:02d}", f"{fid.replace('SF_', '')} · {k} · occlusion {meta['occlusion']:.0%}", comp))
     index.append(rec)
     print("packaged", fid)
 sheet(items, os.path.join(a.out, f"andor-osp_style-frames-contact-sheet_numbered_draft_{V}.jpg"), 3,
