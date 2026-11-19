@@ -1,4 +1,6 @@
 #include "InstrumentHost.h"
+
+#include "io/ArpPatternJson.h"
 #include "ShapingPopups.h"
 #include "AndorParameters.h"
 #include "StrumPanel.h"
@@ -168,6 +170,72 @@ const juce::StringArray& InstrumentHost::strumDivisionNames()
         return n;
     }();
     return names;
+}
+
+void InstrumentHost::setCustomArpDocument (int card, const arppattern::Document* document)
+{
+    if (card < 0 || card > 2)
+        return;
+    auto& slot = customDocuments[static_cast<std::size_t> (card)];
+    if (document != nullptr && document->pattern.valid())
+    {
+        slot = *document;
+        const auto compiled = arppattern::compile (slot->pattern);
+        setCustomArpPattern (card, &compiled);
+    }
+    else
+    {
+        slot.reset();
+        setCustomArpPattern (card, nullptr);
+    }
+}
+
+const arppattern::Document* InstrumentHost::customArpDocument (int card) const
+{
+    if (card < 0 || card > 2)
+        return nullptr;
+    const auto& slot = customDocuments[static_cast<std::size_t> (card)];
+    return slot.has_value() ? &*slot : nullptr;
+}
+
+std::unique_ptr<juce::XmlElement> InstrumentHost::customPatternsToXml() const
+{
+    auto xml = std::make_unique<juce::XmlElement> ("CustomPatterns");
+    xml->setAttribute ("schema", 1);
+    for (int card = 0; card < 3; ++card)
+        if (const auto* d = customArpDocument (card))
+        {
+            auto* e = xml->createNewChildElement ("Card");
+            e->setAttribute ("index", card);
+            // (an attribute, not text: ANDOR OSP keeps its state as a ValueTree, which drops text)
+            e->setAttribute ("json", juce::String (arpPatternToString (*d)));
+        }
+    return xml->getNumChildElements() > 0 ? std::move (xml) : nullptr;
+}
+
+juce::StringArray InstrumentHost::customPatternsFromXml (const juce::XmlElement* element)
+{
+    juce::StringArray problems;
+    std::array<bool, 3> set {};
+    if (element != nullptr)
+        for (auto* e : element->getChildWithTagNameIterator ("Card"))
+        {
+            const int card = e->getIntAttribute ("index", -1);
+            if (card < 0 || card > 2)
+                continue;
+            std::string error;
+            if (const auto d = arpPatternFromString (e->getStringAttribute ("json").toStdString(), error))
+            {
+                setCustomArpDocument (card, &*d);
+                set[static_cast<std::size_t> (card)] = true;
+            }
+            else
+                problems.add ("Card " + layerName (card) + "'s custom pattern: " + juce::String (error));
+        }
+    for (int card = 0; card < 3; ++card)
+        if (! set[static_cast<std::size_t> (card)])
+            setCustomArpDocument (card, nullptr);
+    return problems;
 }
 
 void InstrumentHost::StrumReader::attach (juce::AudioProcessorValueTreeState& state, const juce::String& ns, int shown)

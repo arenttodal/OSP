@@ -225,6 +225,17 @@ TEST_CASE ("arp pattern model: compile and decompile round-trip; the file round-
     REQUIRE (read.has_value());
     CHECK (read->pattern == d.pattern);
 
+    // REST keeps the note's rank in memory, the file stores -1: the documents stay equal (a rest's
+    // rank means nothing), so a session saved and recalled is the same pattern.
+    auto rested = d;
+    REQUIRE (ap::edit::toRest (rested.pattern, 2));
+    REQUIRE (rested.pattern.events[2].rank == 2);
+    const auto restedAgain = arpPatternFromString (arpPatternToString (rested), error);
+    REQUIRE (restedAgain.has_value());
+    CHECK (restedAgain->pattern.events[2].rank == 0);
+    CHECK (*restedAgain == rested);
+    CHECK (restedAgain->pattern != d.pattern);
+
     auto json = arpPatternToJson (d);
     json.getDynamicObject()->setProperty ("schemaVersion", 2);
     CHECK_FALSE (arpPatternFromJson (json, error).has_value());   // a newer schema: refused

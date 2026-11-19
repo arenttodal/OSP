@@ -8,6 +8,7 @@
 #include "engine/InstrumentEngine.h"
 #include "engine/KeyDna.h"
 #include "engine/Modulation.h"
+#include "engine/PatternCapture.h"
 #include "engine/RhythmicShaper.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -608,6 +609,21 @@ public:
     virtual void setCustomArpPattern (int card, const arp::CustomPattern* pattern) { juce::ignoreUnused (card, pattern); }
     /** The pattern last set for the card (message thread; nullptr: none). */
     virtual const arp::CustomPattern* customArpPattern (int card) const { juce::ignoreUnused (card); return nullptr; }
+    /** Recording a Custom ARP pattern (null: the product cannot): the message thread starts, polls
+        and stops it; the processor feeds it the notes played before the arpeggiator. While it is
+        armed the arpeggiator steps aside (the keys sound as played, every lane), and takes over
+        again when the take stops or is cancelled. */
+    virtual PatternCapture* patternCapture() noexcept { return nullptr; }
+    /** The pattern document card 0 A .. 2 C plays (message thread): kept with the session and
+        presets (customPatternsToXml), compiled and handed to the audio thread (setCustomArpPattern).
+        nullptr clears it. The same in every product. */
+    void setCustomArpDocument (int card, const arppattern::Document* document);
+    const arppattern::Document* customArpDocument (int card) const;
+    /** The cards' documents in a session's state (<CustomPatterns>; null when no card has one). */
+    std::unique_ptr<juce::XmlElement> customPatternsToXml() const;
+    /** From a session's state: absent (an older session), every card has none. An unreadable
+        document is skipped (its card has none) and reported in the return value. */
+    juce::StringArray customPatternsFromXml (const juce::XmlElement* element);
 
     // -- Live capture (a product opts in: ANDOR OSP) -----------------------------------------
     /** What the CAPTURE page shows (message thread). */
@@ -760,6 +776,9 @@ protected:
     /** rackPresetMemory's (a host that saves it with the session reads and writes these). */
     mutable juce::CriticalSection rackMemoryLock;
     juce::StringPairArray rackMemory;
+
+private:
+    std::array<std::optional<arppattern::Document>, 3> customDocuments;   ///< message thread
 };
 
 } // namespace osp::plugin

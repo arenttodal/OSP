@@ -513,6 +513,12 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     timing.ppq = performance.ppq;
     timing.numerator = performance.numerator;
     timing.denominator = performance.denominator;
+    // Recording a Custom ARP pattern: the notes as played, before any arpeggiator.
+    if (capture->armed())
+        for (const auto metadata : midi)
+            if (const auto m = metadata.getMessage(); m.isNoteOnOrOff())
+                capture->push (metadata.samplePosition, m.getNoteNumber(), m.isNoteOn() ? m.getVelocity() : 0, timing.valid ? timing.bpm : 120.0);
+    capture->advance (buffer.getNumSamples());
     const auto& notes = cardArp ? runCardArpeggiators (midi, buffer.getNumSamples(), timing) : runArpeggiator (midi, buffer.getNumSamples(), timing);
     engine->setPlayedKeys (arpeggiator.isEnabled() || laneConfig != 0, midi);
     if (arpFollowerOn)
@@ -609,7 +615,8 @@ osp::Arpeggiator::Settings ShellProcessor::arpSettings() noexcept
     // ANDOR OSP's settings, moved by the ARP destinations (as its processor reads them).
     using namespace osp;
     Arpeggiator::Settings settings;
-    settings.enabled = arpEnabledParam->load() >= 0.5f && ! forceArpOff;
+    // (recording a Custom ARP pattern: the keys as played, the arpeggiator steps aside)
+    settings.enabled = arpEnabledParam->load() >= 0.5f && ! forceArpOff && ! capture->armed();
     settings.pattern = static_cast<ArpPattern> (std::clamp (juce::roundToInt (arpPatternParam->load()), 0, arp::patternCount - 1));
     settings.rate = static_cast<ArpRate> (std::clamp (juce::roundToInt (arpRateParam->load()), 0, arp::rateCount - 1));
     settings.gate = arpGateParam->load() / 100.0;
@@ -747,7 +754,7 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
     for (int c = 0; c < 3; ++c)
         if (cardOnParams[static_cast<std::size_t> (c)]->load() >= 0.5f)
             toggled = static_cast<std::uint8_t> (toggled | (1 << c));
-    const bool on = arpEnabledParam->load() >= 0.5f;
+    const bool on = arpEnabledParam->load() >= 0.5f && ! capture->armed();
     const bool link = cardLinkParam->load() >= 0.5f;
     const bool laned = on && toggled != 0 && ! (link && toggled == 7);
     const int config = laned ? (link ? 0x100 : 0x200) | toggled : 0;
@@ -1532,6 +1539,9 @@ std::unique_ptr<juce::XmlElement> ShellProcessor::stateXml() const
         if (auto tree = osp::plugin::keyDnaState::toTree (keyDna, drawn).createXml())
             xml->addChildElement (tree.release());
     }
+    // Custom ARP patterns: each card's whole document, embedded (absent: none).
+    if (auto patterns = customPatternsToXml())
+        xml->addChildElement (patterns.release());
     engine->saveState (*xml);   // (the engine's own: none unless it keeps some)
     auto* view = xml->createNewChildElement (viewType.toString());
     view->setAttribute ("arpOpen", arpOpen.load() ? 1 : 0);
@@ -1647,6 +1657,9 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
         const auto decoded = shaper != nullptr ? decodeShaperPattern (shaper->getStringAttribute ("value")) : std::nullopt;
         setLaneShaperPattern (1, decoded.value_or (osp::RhythmicShaper::patternSteps (osp::ShaperParams().pattern)), false);
     }
+    // Custom ARP patterns (absent: no card has one).
+    for (const auto& problem : customPatternsFromXml (xml.getChildByName ("CustomPatterns")))
+        DBG ("State: " << problem);
     if (auto* view = xml.getChildByName (viewType))
     {
         arpOpen = view->getIntAttribute ("arpOpen") != 0;

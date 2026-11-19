@@ -263,6 +263,20 @@ public:
     int litColumn() const noexcept { return shown.current; }
 
     static constexpr int visibleRows = 6;
+    /** Custom ARP patterns (docs/research/custom-arp): after the 18 styles, CUSTOM (the card's
+        own pattern), Create Pattern... and Custom Patterns... (the library). */
+    static constexpr int customRows = 3;
+    static constexpr int listRows = arp::patternCount + customRows;
+    /** A custom row (0 CUSTOM, 1 Create Pattern..., 2 Custom Patterns...), or empty while scrolled out. */
+    juce::Rectangle<float> customRowArea (int which) const;
+    /** The card whose custom pattern the rows show and set: linked, A; else the edited one. */
+    int customCard() const noexcept { return linked ? 0 : editCard; }
+    bool customChosen() const noexcept { return customOn; }
+    /** CUSTOM chosen for the card (its pattern plays); without a pattern, the editor opens. */
+    void chooseCustom();
+    /** The custom pattern editor for the card (`fresh`: an empty one, Create Pattern...). */
+    void openCustomEditor (bool fresh);
+    void mouseDoubleClick (const juce::MouseEvent&) override;
 
 private:
     void paintSteps (juce::Graphics&);
@@ -301,6 +315,11 @@ private:
     int fieldShown = -1;
     juce::Rectangle<float> title, collapse, numbers, steps, patternCaption, field, list, octaveCaption, octaveKeys;
     int firstRow = 0, hoverRow = -1;
+    bool customOn = false;          ///< the card's CUSTOM (arp.custom / arp.cardB|C.custom)
+    juce::String customName;        ///< its pattern's name ("" without one)
+    void setCustom (bool on);
+    void openLibraryMenu();
+    void paintCustomField (juce::Graphics&, juce::Rectangle<float> inner, float dim);
     float wheelPending = 0.0f;
     int hover = 0;   ///< 3 collapse, 10 + n octave key n
 };

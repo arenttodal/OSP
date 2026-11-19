@@ -62,7 +62,12 @@ struct Event
     bool rest = false;
     int duration = arp::ticksPerStep;   ///< ticks
     int velocity = 0;                   ///< 0: the held key's velocity
-    bool operator== (const Event&) const = default;
+    /** A rest's rank means nothing (it plays no note, and the file stores a rest as rank -1), so
+        two rests of the same length and velocity are the same event whatever rank they carry. */
+    bool operator== (const Event& o) const noexcept
+    {
+        return rest == o.rest && duration == o.duration && velocity == o.velocity && (rest || rank == o.rank);
+    }
 };
 
 struct Pattern
