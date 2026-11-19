@@ -78,3 +78,11 @@ new control.
 - Adaptive, plain contour-fit and fit-octave-cycles stay in the lab only.
 - CP2 implements the mapping as one replaceable function, so plain contour-fit can be restored in
   one line if listening prefers it.
+
+## Decision (19 November 2026)
+
+**Approved: the hybrid.** After listening to the comparison renders (contour-fit, hybrid,
+fit-octave-cycles over the OCTAVES progression), the user chose the hybrid as OCTAVES' behaviour
+for recorded patterns. In the product it is **CONTOUR** (the default), beside **DEGREES**
+(degree-cycle). Adaptive, plain contour-fit and fit-octave-cycles stay in the lab. CP2
+(integration) still needs its own go-ahead.
