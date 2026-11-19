@@ -1,0 +1,23 @@
+--- a/shared/andor-ui/Source/Design.cpp
++++ b/shared/andor-ui/Source/Design.cpp
+@@ -496,6 +496,10 @@
+ namespace osp::plugin::design::draw
+ {
+ 
++// ANDOR Virtual Studio capture hook (andor-web/virtual-studio/capture): the editor drawn without
++// knob caps, for the Blender panel texture (the physical knobs are separate objects there).
++bool captureWithoutCaps = false;
++
+ void knob (juce::Graphics& g, juce::Point<float> c, float r, float position, const KnobStyle& style)
+ {
+     using namespace colour;
+@@ -562,6 +566,9 @@
+         }
+     }
+ 
++    if (captureWithoutCaps)   // Virtual Studio capture: the track, arc and ticks only
++        return;
++
+     // A rendered cap: its own light, shadow and indicator, at the same radius.
+     if (style.sprite != nullptr && style.sprite->isValid() && ! style.graphite)
+     {

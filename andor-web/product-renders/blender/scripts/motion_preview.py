@@ -21,7 +21,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
 p = argparse.ArgumentParser()
-p.add_argument("--plan", required=True, choices=["D1", "D2", "D3", "G2"])
+p.add_argument("--plan", required=True, choices=["D1", "D2", "D3", "G2", "S6"])
 p.add_argument("--out", required=True)
 p.add_argument("--res", type=int, nargs=2, default=[640, 360])
 p.add_argument("--fps", type=int, default=12)
@@ -29,6 +29,12 @@ p.add_argument("--samples", type=int, default=16)
 p.add_argument("--cuts", default=None, help="comma-separated cut names to render (default: all)")
 p.add_argument("--handles", type=float, default=0.0, help="seconds of hold added before and after each cut (copies of its rest frames)")
 p.add_argument("--range", type=int, nargs=2, default=None, help="render only frames [a, b) of each cut (quality tests)")
+p.add_argument("--device", default="CPU", choices=["CPU", "CUDA", "OPTIX", "HIP", "METAL", "ONEAPI"],
+               help="Cycles device (GPU benchmarks: the machine's backend; falls back to CPU if none is found)")
+p.add_argument("--timings", default=None, help="write per-frame render times (seconds) and the device to this JSON")
+p.add_argument("--noise", type=float, default=0.05, help="adaptive-sampling threshold (drafts 0.05; finals much lower, see the Phase 6 flicker study)")
+p.add_argument("--border", type=float, nargs=4, default=None, help="render only this region (x0 y0 x1 y1, 0..1 from the bottom left, Blender's border): studies")
+p.add_argument("--cy", action="append", default=[], help="a Cycles setting for studies, e.g. --cy sample_clamp_indirect=10")
 p.add_argument("--width", type=int, default=None, help="G2: draft width; each cut keeps its own shot's aspect (or its res)")
 args = p.parse_args(argv)
 
@@ -56,6 +62,25 @@ G2_CUTS = [
     {"name": "D07_expression", "setup": "ANDOR_MATERIAL", "shot": "M06_R2_cine", "seconds": 5.0, "yaw": [-5.0, 3.0], "pitch": [0, 0], "dolly": [1.03, 1.0]},
 ]
 
+# Phase 6 cinematography studies (drafts): a stationary camera with a moving highlight, a focus pull,
+# and D06b refined (more focal coverage). Panel points are [u, v, z]: editor px and mm above the
+# panel top, as the shots' camera targets are written in campaign_setups.json.
+S6_CUTS = [
+    {"name": "S6_highlight", "setup": "ANDOR_MATERIAL", "shot": "M01_cine", "seconds": 5.0, "yaw": [0, 0], "pitch": [0, 0], "dolly": [1, 1],
+     "light_orbit": {"name": "Grazing key", "deg": [-14.0, 14.0]}},
+    {"name": "S6_focus_pull", "setup": "ANDOR_MATERIAL", "shot": "M02_cine", "seconds": 5.0, "yaw": [0, 0], "pitch": [0, 0], "dolly": [1, 1],
+     "focus_pull": {"from": [205, 520, 4.0], "to": [205, 330, 4.0], "hold": 0.2}},
+    {"name": "D06b_r2", "setup": "ANDOR_MATERIAL", "shot": "M02_cine", "seconds": 5.0, "yaw": [-5.0, 3.0], "pitch": [1.0, 0], "dolly": [1.03, 1.0],
+     "fstop": 8.0, "focus": [205, 470, 4.0]},
+    # D07 refinement: during the approved move the Edge strip's reflection returns over the top of
+    # the lit PITCH segment (pale salmon). r2a turns only that light a further 8 deg (constant); r2b
+    # also narrows the move. Geometry, shader and the rest of the rig are unchanged.
+    {"name": "D07_r2a", "setup": "ANDOR_MATERIAL", "shot": "M06_R2_cine", "seconds": 5.0, "yaw": [-5.0, 3.0], "pitch": [0, 0], "dolly": [1.03, 1.0],
+     "light_orbit": {"name": "Edge strip", "deg": [8.0, 8.0]}},
+    {"name": "D07_r2b", "setup": "ANDOR_MATERIAL", "shot": "M06_R2_cine", "seconds": 5.0, "yaw": [-3.0, 2.0], "pitch": [0, 0], "dolly": [1.03, 1.0],
+     "light_orbit": {"name": "Edge strip", "deg": [6.0, 6.0]}},
+]
+
 # A cut: setup, shot, seconds, and the camera move as start -> end deltas (eased).
 #   yaw (deg about the vertical through the focus point), pitch (deg), dolly (distance factor),
 #   fstop (None: the shot's own), res override (for vertical plans).
@@ -80,6 +105,7 @@ PLANS = {
          "yaw": [-7.0, 5.0], "pitch": [-2.0, 1.0], "dolly": [1.04, 1.0]},
     ],
     "G2": G2_CUTS,
+    "S6": S6_CUTS,
 }
 
 
@@ -92,6 +118,8 @@ def lerp(a, b, t):
 
 
 os.makedirs(os.path.join(args.out, "frames"), exist_ok=True)
+TIMES = []
+DEVICE_NAMES = []
 
 
 def complete_png(path):
@@ -115,10 +143,29 @@ for cut in plan:
         sw, sh = SETUPS[cut["setup"]]["shots"][cut["shot"]]["res"]
         res = [args.width, 2 * round(args.width * sh / sw / 2)]
     sys.argv = ["andor_scene.py", "--", "--setup", cut["setup"], "--shot", cut["shot"],
-                "--res", str(res[0]), str(res[1]), "--samples", str(args.samples), "--noise", "0.05"]
+                "--res", str(res[0]), str(res[1]), "--samples", str(args.samples), "--noise", str(args.noise)]
     g = runpy.run_path(os.path.join(HERE, "andor_scene.py"), run_name="__main__")
     bpy, Vector, Euler = g["bpy"], g["Vector"], g["Euler"]
     scene = bpy.context.scene
+    for kv in args.cy:   # study overrides (recorded in the manifest)
+        k, v = kv.split("=", 1)
+        setattr(scene.cycles, k, type(getattr(scene.cycles, k))(float(v) if "." in v else (v if not v.lstrip("-").isdigit() else int(v))))
+    if args.border:
+        scene.render.use_border = True
+        scene.render.use_crop_to_border = True
+        scene.render.border_min_x, scene.render.border_min_y, scene.render.border_max_x, scene.render.border_max_y = args.border
+    if args.device != "CPU":
+        prefs = bpy.context.preferences.addons["cycles"].preferences
+        prefs.compute_device_type = args.device
+        prefs.get_devices()
+        used = [d for d in prefs.devices if d.type == args.device]
+        for d in prefs.devices:
+            d.use = d.type == args.device
+        scene.cycles.device = "GPU" if used else "CPU"
+        DEVICE_NAMES = [d.name for d in used] or ["(no %s device found: CPU)" % args.device]
+    else:
+        import platform
+        DEVICE_NAMES = [platform.processor() or platform.machine()]
     scene.cycles.seed = 0                  # a fixed seed: the noise pattern does not crawl between frames
     scene.cycles.use_animated_seed = False
     scene.render.fps = args.fps
@@ -130,6 +177,17 @@ for cut in plan:
     dist0 = cam.data.dof.focus_distance if cam.data.dof.use_dof else 1.0
     target = cam.location + fwd * dist0
     rel0 = cam.location - target
+    def panel_point(uvz):   # editor px + mm above the panel top -> world (as the shots' targets)
+        u, v, z = uvz
+        v += g["KY"] if v > 600 else 0.0
+        return g["prod"](u, v, g["REF_PANEL_TOP"] + z * g["MM"])
+    if "fstop" in cut and cam.data.dof.use_dof:
+        cam.data.dof.aperture_fstop = cut["fstop"]
+    lo = cut.get("light_orbit")
+    if lo:
+        lamp = bpy.data.objects[lo["name"]]
+        bpy.context.view_layer.update()
+        lamp_m0 = lamp.matrix_world.copy()
     n = max(2, round(cut["seconds"] * args.fps))
     cdesc = {"name": cut["name"], "setup": cut["setup"], "shot": cut["shot"], "seconds": cut["seconds"], "frames": n, "res": res,
              "move": {k: cut[k] for k in ("yaw", "pitch", "dolly")}, "target_m": list(target)}
@@ -147,11 +205,27 @@ for cut in plan:
         cam.rotation_euler = (target - cam.location).to_track_quat("-Z", "Y").to_euler()
         if cam.data.dof.use_dof:
             cam.data.dof.focus_distance = (target - cam.location).length
+            if "focus" in cut:
+                cam.data.dof.focus_distance = (panel_point(cut["focus"]) - cam.location).length
+            fp = cut.get("focus_pull")
+            if fp:   # held at each end, eased between
+                h = fp.get("hold", 0.0)
+                u = min(1.0, max(0.0, (i / (n - 1) - h) / max(1e-6, 1.0 - 2 * h)))
+                pt = panel_point(fp["from"]).lerp(panel_point(fp["to"]), ease(u))
+                cam.data.dof.focus_distance = (pt - cam.location).length
+        if lo:   # the light swings about the vertical axis through the shot's focus point
+            from mathutils import Matrix
+            a = math.radians(lerp(lo["deg"][0], lo["deg"][1], t))
+            pivot = Matrix.Translation(target) @ Matrix.Rotation(a, 4, "Z") @ Matrix.Translation(-target)
+            lamp.matrix_world = pivot @ lamp_m0
         scene.render.filepath = os.path.join(args.out, "frames", f"{cut['name']}_{i:04d}.png")
         if not complete_png(scene.render.filepath):   # resumable
+            import time
+            t_start = time.time()
             bpy.ops.render.render(write_still=True)
+            TIMES.append({"cut": cut["name"], "frame": i, "seconds": round(time.time() - t_start, 2)})
     info["cuts"].append(cdesc)
-    if args.plan == "G2" and not args.range:
+    if args.plan in ("G2", "S6") and not args.range:
         # Per shot: handles (copies of the rest frames: the move starts and ends at rest), an
         # editing master (PNG sequence), a web draft MP4, the poster (its closing frame), a manifest.
         import shutil
@@ -174,7 +248,8 @@ for cut in plan:
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(args.fps), "-i", os.path.join(sd, "master", "%04d.png"),
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", "-movflags", "+faststart", "-an",
                         os.path.join(sd, f"{cut['name']}_draft.mp4")], check=False)
-        cdesc.update({"handles_frames": h, "total_frames": len(seq), "fps": args.fps, "samples": args.samples,
+        cdesc.update({k: cut[k] for k in ("fstop", "focus", "focus_pull", "light_orbit") if k in cut})
+        cdesc.update({"handles_frames": h, "total_frames": len(seq), "fps": args.fps, "samples": args.samples, "noise_threshold": args.noise, "cycles_overrides": args.cy,
                       "seed": 0, "music": None, "typography": None, "transitions": None,
                       "poster": "poster.png (= the last frame of the move)", "master": "master/%04d.png",
                       "web": f"{cut['name']}_draft.mp4", "status": "draft for review"})
@@ -182,6 +257,12 @@ for cut in plan:
     print("cut", cut["name"], n, "frames")
 
 json.dump(info, open(os.path.join(args.out, "plan.json"), "w"), indent=1)
+if args.timings:
+    import bpy as _bpy
+    json.dump({"blender": _bpy.app.version_string, "device": args.device, "devices": DEVICE_NAMES, "samples": args.samples,
+               "noise_threshold": args.noise, "res_width": args.width, "frames": TIMES,
+               "mean_seconds": round(sum(t["seconds"] for t in TIMES) / max(1, len(TIMES)), 2)},
+              open(args.timings, "w"), indent=1)
 # One MP4 for the plan (cuts in order, hard cuts), plus its opening and closing frames.
 frames_dir = os.path.join(args.out, "frames")
 lst = os.path.join(args.out, "frames.txt")
