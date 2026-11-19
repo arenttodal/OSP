@@ -95,6 +95,9 @@ namespace
             productInfo().addParameters (layout);
         // The MOD WHEEL's VIBRATO: after the product's own, so none of them moves.
         InstrumentHost::addVibratoParameters (layout);
+        // STRUM (after everything else, so nothing moves): the arpeggiator's (arp.strum.*), and
+        // B's and C's with the per-card arpeggiator. Off by default: every session as it was.
+        InstrumentHost::addStrumParameters (layout, productInfo().slug + ".", productInfo().strumParameterHint, productInfo().cardArpeggiator ? 3 : 1);
         return layout;
     }
 
@@ -157,6 +160,7 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
     arpVelocityParam = parameters.getRawParameterValue (osp::plugin::ids::arpVelocity);
     seedParam = parameters.getRawParameterValue (osp::plugin::ids::seed);
     cardArp = arpBound && productInfo().cardArpeggiator && parameters.getRawParameterValue (osp::plugin::ids::arpLink (productInfo().slug + ".")) != nullptr;
+    strumReaders[0].attach (parameters, productInfo().slug + ".", 0);   // the arpeggiator's STRUM (every product)
     if (cardArp)
     {
         lanes = std::make_unique<CardLanes>();
@@ -169,6 +173,8 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
             laneRateParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "rate"));
             laneOctavesParams[static_cast<std::size_t> (c - 1)] = parameters.getRawParameterValue (osp::plugin::ids::arpCardSetting (productInfo().slug + ".", c, "octaves"));
         }
+        for (int c = 1; c < 3; ++c)
+            strumReaders[static_cast<std::size_t> (c)].attach (parameters, productInfo().slug + ".", c);
         // The AUX follower (opt-in): its four parameters, every one the product's own.
         if (const auto& follower = productInfo().arpFollower)
         {
@@ -598,6 +604,7 @@ osp::Arpeggiator::Settings ShellProcessor::arpSettings() noexcept
     settings.swing = arpSwingParam->load() / 100.0;
     settings.velocityScale = arpVelocityParam->load() / 100.0;
     settings.rateStepped = arpStepped.load (std::memory_order_relaxed);
+    strumReaders[0].applyTo (settings);   // card A's (and every linked lane's) STRUM (absent: off)
     {
         // The ARP destinations, from the engine's last control period (ANDOR OSP's
         // applyArpModulation). Without a route every offset is 0: the settings as they are.
@@ -830,6 +837,7 @@ const juce::MidiBuffer& ShellProcessor::runCardArpeggiators (const juce::MidiBuf
             settings.rate = static_cast<ArpRate> (std::clamp (juce::roundToInt (laneRateParams[i]->load()), 0, arp::rateCount - 1));
             settings.octaves = std::clamp (juce::roundToInt (laneOctavesParams[i]->load()), arp::minOctaves, arp::maxOctaves);
             settings.octavesAtCycle = false;
+            strumReaders[i + 1].applyTo (settings);
         }
         auto& a = laneArp (lane);
         a.setSeed (lane == 0 ? seed : Prng::deriveSeed (seed, static_cast<std::uint64_t> (lane), 0x4c616e65));
@@ -962,6 +970,7 @@ osp::Arpeggiator::Settings ShellProcessor::followerSettings (int lane) const noe
         settings.rate = static_cast<ArpRate> (std::clamp (juce::roundToInt (laneRateParams[i]->load()), 0, arp::rateCount - 1));
         settings.octaves = std::clamp (juce::roundToInt (laneOctavesParams[i]->load()), arp::minOctaves, arp::maxOctaves);
         settings.octavesAtCycle = false;
+        strumReaders[i + 1].applyTo (settings);
     }
     return settings;
 }

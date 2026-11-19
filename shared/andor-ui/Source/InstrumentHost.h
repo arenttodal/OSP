@@ -576,6 +576,25 @@ public:
         card arpeggiated by default (the one arpeggiator, exactly as before); B's and C's own
         PATTERN / RATE / OCTAVES start as A's defaults. One definition for OSP and the shell. */
     static void addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns);
+    /** STRUM's parameters (ids::arpStrum) for the first `cards` cards (1: the one arpeggiator's,
+        arp.strum.*; 3: B's and C's too), appended with `hint` (ANDOR OSP 35; a shell product
+        after its own). Off by default, so every session from before plays as it did. One
+        definition for OSP and the shell. */
+    static void addStrumParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns, int hint, int cards = 3);
+    static const juce::StringArray& strumDirectionNames();
+    static const juce::StringArray& strumDivisionNames();
+    /** Reads one card's STRUM parameters on the audio thread (attach on the message thread). */
+    struct StrumReader
+    {
+        std::atomic<float>* on = nullptr;
+        std::atomic<float>* direction = nullptr;
+        std::atomic<float>* sync = nullptr;
+        std::atomic<float>* ms = nullptr;
+        std::atomic<float>* division = nullptr;
+        void attach (juce::AudioProcessorValueTreeState& state, const juce::String& ns, int shown);
+        /** Into the arpeggiator's settings (absent parameters: STRUM off). */
+        void applyTo (Arpeggiator::Settings& settings) const noexcept;
+    };
     /** The card (shown, 0 A .. 2 C) whose lane arpView() shows (the one the panel edits). */
     virtual void setArpViewCard (int shown) noexcept { juce::ignoreUnused (shown); }
 
@@ -650,6 +669,14 @@ public:
     virtual juce::String satelliteParameterId (int /*card*/) const { return {}; }
     /** SATELLITE's panel, showing card 0..2 (none by default: InstrumentHost.cpp). */
     virtual std::unique_ptr<MiniPanel> createSatellitePanel (int card);
+    /** STRUM's key on the ARP title row (beside SATELLITE): the product has STRUM's parameters
+        (InstrumentHost::addStrumParameters; ANDOR OSP and every shell product). Off: no key. */
+    virtual bool hasStrum() const { return false; }
+    /** STRUM's panel, showing card 0..2 (the shared StrumPanel on ids::arpStrum). */
+    virtual std::unique_ptr<MiniPanel> createStrumPanel (int card);
+    /** A key held now (the on-screen keyboard and incoming MIDI; message thread): STRUM's
+        picture draws the chord being played. */
+    virtual bool isKeyHeld (int /*note*/) const { return false; }
     /** Where the audio has card 0..2 now (SATELLITE's panel marker): -1 .. +1 across and ORBIT's
         rear 0 .. 1; false while the card does not move. */
     virtual bool satelliteView (int card, float& x, float& rear) const

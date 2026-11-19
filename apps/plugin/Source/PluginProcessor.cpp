@@ -162,6 +162,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     // USER MACROS (version hint 34; after VIBRATO): six assignable macros, userMacro.1 .. 6, as
     // ANDOR ANALOG's. At 0 with no assignment (every session from before) they do nothing.
     addUserMacroParameters (layout, 34, [] (int macro) { return userMacroId (macro); });
+    // STRUM (version hint 35; after USER MACROS): each card's own, off by default and in every
+    // session from before, so the arpeggiator plays exactly as it did.
+    addStrumParameters (layout, {}, 35);
     return layout;
 }
 
@@ -397,6 +400,8 @@ OspAudioProcessor::OspAudioProcessor()
     arpLinkParam = liveParameter (ids::arpLink ({}));
     for (int card = 0; card < 3; ++card)
         arpCardParams[static_cast<std::size_t> (card)] = liveParameter (ids::arpCard ({}, card));
+    for (int card = 0; card < 3; ++card)
+        strumReaders[static_cast<std::size_t> (card)].attach (parameters, {}, card);
     for (int card = 1; card < 3; ++card)
     {
         const auto i = static_cast<std::size_t> (card - 1);
@@ -1767,6 +1772,7 @@ const juce::MidiBuffer& OspAudioProcessor::runCardArpeggiators (const juce::Midi
             c.pattern[i] = juce::roundToInt (arpLanePatternParams[i]->load());
             c.rate[i] = juce::roundToInt (arpLaneRateParams[i]->load());
             c.octaves[i] = juce::roundToInt (arpLaneOctavesParams[i]->load());
+            strumReaders[i + 1].applyTo (c.strum[i]);
         }
     }
     const auto& out = lanes->process (*laneHost, midi, numSamples, timing, c);
@@ -1792,6 +1798,7 @@ Arpeggiator::Settings OspAudioProcessor::arpSettings() noexcept
     settings.octaves = std::clamp (juce::roundToInt (arpOctavesParam->load()), arp::minOctaves, arp::maxOctaves);
     settings.swing = arpSwingParam->load() / 100.0;
     settings.velocityScale = arpVelocityParam->load() / 100.0;
+    strumReaders[0].applyTo (settings);   // card A's (and every linked lane's) STRUM
     applyArpModulation (settings);
     return settings;
 }

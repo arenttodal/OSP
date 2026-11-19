@@ -185,6 +185,12 @@ const juce::MidiBuffer& CardArpLanes::process (Host& host, const juce::MidiBuffe
             settings.rate = static_cast<ArpRate> (std::clamp (controls.rate[i], 0, arp::rateCount - 1));
             settings.octaves = std::clamp (controls.octaves[i], arp::minOctaves, arp::maxOctaves);
             settings.octavesAtCycle = false;
+            const auto& own = controls.strum[i];
+            settings.strum = own.strum;
+            settings.strumDirection = own.strumDirection;
+            settings.strumSync = own.strumSync;
+            settings.strumMs = own.strumMs;
+            settings.strumQuarters = own.strumQuarters;
         }
         auto& a = laneArp (lane);
         a.setSeed (lane == 0 ? seed : Prng::deriveSeed (seed, static_cast<std::uint64_t> (lane), 0x4c616e65));

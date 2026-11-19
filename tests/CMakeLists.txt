@@ -41,6 +41,7 @@ add_executable(osp_tests
     unit/SatelliteTests.cpp
     unit/DriveProcessorTests.cpp
     unit/ArpeggiatorTests.cpp
+    unit/ArpStrumTests.cpp
     unit/ModulationTests.cpp
     unit/LayerEqTests.cpp
     unit/SynthesizeTests.cpp
@@ -77,6 +78,7 @@ add_executable(osp_tests
     integration/ReimaginedModesTests.cpp
     regression/GoldenTests.cpp
     regression/UnifiedBaselineTests.cpp
+    regression/ArpStyleBaselineTests.cpp
     investigation/StereoInvestigation.cpp
     investigation/Phase2Measurements.cpp
 )

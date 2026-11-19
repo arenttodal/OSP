@@ -8140,6 +8140,8 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "MixModulationTests.inc"
 #include "SynthesizeTests.inc"
 #include "CardArpTests.inc"
+#include "StrumPluginTests.inc"
+#include "StrumUiTests.inc"
 #include "CaptureTests.inc"
 #include "SpacePresetTests.inc"
 #include "RackControlsTests.inc"

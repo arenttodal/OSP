@@ -56,6 +56,9 @@ public:
         bool link = true;
         std::uint8_t cards = 7;        ///< the cards the arpeggio plays (bit 0 A .. bit 2 C)
         std::array<int, 2> pattern {}, rate {}, octaves { 1, 1 };   ///< B's and C's own (unlinked)
+        /** B's and C's own STRUM (unlinked; only its fields are read: strum, strumDirection,
+            strumSync, strumMs, strumQuarters). Linked, every lane strums as A. */
+        std::array<Arpeggiator::Settings, 2> strum {};
         std::uint64_t seed = 1;
     };
 

@@ -1,6 +1,7 @@
 #include "InstrumentHost.h"
 #include "ShapingPopups.h"
 #include "AndorParameters.h"
+#include "StrumPanel.h"
 #include "ShapingPopups.h"
 
 #include "engine/Dampen.h"
@@ -145,6 +146,48 @@ const juce::StringArray& InstrumentHost::arpRateNames()
         return n;
     }();
     return names;
+}
+
+const juce::StringArray& InstrumentHost::strumDirectionNames()
+{
+    static const juce::StringArray names = [] {
+        juce::StringArray n;
+        for (int i = 0; i < arp::strumDirectionCount; ++i)
+            n.add (arp::strumDirectionName (static_cast<StrumDirection> (i)));
+        return n;
+    }();
+    return names;
+}
+
+const juce::StringArray& InstrumentHost::strumDivisionNames()
+{
+    static const juce::StringArray names = [] {
+        juce::StringArray n;
+        for (int i = 0; i < arp::strumDivisionCount; ++i)
+            n.add (arp::strumDivisionName (i));
+        return n;
+    }();
+    return names;
+}
+
+void InstrumentHost::StrumReader::attach (juce::AudioProcessorValueTreeState& state, const juce::String& ns, int shown)
+{
+    on = state.getRawParameterValue (ids::arpStrum (ns, shown, "on"));
+    direction = state.getRawParameterValue (ids::arpStrum (ns, shown, "direction"));
+    sync = state.getRawParameterValue (ids::arpStrum (ns, shown, "sync"));
+    ms = state.getRawParameterValue (ids::arpStrum (ns, shown, "ms"));
+    division = state.getRawParameterValue (ids::arpStrum (ns, shown, "division"));
+}
+
+void InstrumentHost::StrumReader::applyTo (Arpeggiator::Settings& settings) const noexcept
+{
+    settings.strum = on != nullptr && on->load() >= 0.5f;
+    if (! settings.strum)
+        return;
+    settings.strumDirection = static_cast<StrumDirection> (direction != nullptr ? std::clamp (juce::roundToInt (direction->load()), 0, arp::strumDirectionCount - 1) : 0);
+    settings.strumSync = sync != nullptr && sync->load() >= 0.5f;
+    settings.strumMs = ms != nullptr ? static_cast<double> (ms->load()) : 20.0;
+    settings.strumQuarters = arp::strumDivisionQuarters (division != nullptr ? juce::roundToInt (division->load()) : arp::defaultStrumDivision);
 }
 
 InstrumentHost::ModCurves InstrumentHost::defaultModulationCurves()
@@ -719,6 +762,13 @@ std::optional<ShaperPattern> InstrumentHost::readShaperPatternFile (const juce::
 std::unique_ptr<MiniPanel> InstrumentHost::createSatellitePanel (int)
 {
     return nullptr;   // (none by default: a product that moves its cards supplies its panel)
+}
+
+std::unique_ptr<MiniPanel> InstrumentHost::createStrumPanel (int card)
+{
+    if (! hasStrum())
+        return nullptr;
+    return std::make_unique<StrumPanel> (*this, card, [this] (int note) { return isKeyHeld (note); });
 }
 
 juce::String InstrumentHost::destName (mod::Dest dest) const

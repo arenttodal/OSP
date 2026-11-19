@@ -1,5 +1,17 @@
 # Status
 
+> **18 Nov 2026, ARP STRUM (branch `claude/arp-strum`; `docs/research/arp-strum/`):** a CHORD
+> step's notes one after another, inside the one arpeggiator.
+> - **Engine:** a bounded pending note-on queue; UP / DOWN / RANDOM / ALTERNATE; FREE ms or
+>   SYNC note value; the total spread never reaches the next step; each gate runs from its own
+>   onset; nothing waits past a release, panic, restart or jump.
+> - **Parameters:** per card `arp.strum.*` / `arp.cardB|C.strum.*` (hint 35), the same in the
+>   shell.
+> - **Interface:** a STRUM key beside SATELLITE (light on / off / unavailable without CHORD)
+>   opening a shared panel.
+> - The 18-style golden is unchanged; zero spread is sample-identical.
+> - **NEXT:** review the audio examples; decide on FREE SPREAD as a modulation destination.
+
 > **18 Nov 2026, PEDAL LOOP × REIMAGINED (branch `claude/pedal-reimagined`;
 > `docs/research/pedal-reimagined/`):** PEDAL LOOP Forward and Ping-Pong now work in every
 > REIMAGINED mode at every amount, for One Shot with the layer's LOOP off.

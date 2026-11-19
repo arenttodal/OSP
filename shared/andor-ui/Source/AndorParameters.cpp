@@ -221,6 +221,26 @@ sub::SubSettings InstrumentHost::subSettingsFrom (const std::array<float, 10>& r
     return s;
 }
 
+void InstrumentHost::addStrumParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns, int hint, int cards)
+{
+    auto id = [hint] (const juce::String& s) { return juce::ParameterID { s, hint }; };
+    // FREE SPREAD: 0 .. 500 ms, the fine 1 .. 50 ms region over most of the travel.
+    juce::NormalisableRange<float> ms (0.0f, static_cast<float> (arp::maxStrumMs), 0.1f);
+    ms.setSkewForCentre (40.0f);
+    const auto msText = juce::AudioParameterFloatAttributes().withLabel ("ms").withStringFromValueFunction ([] (float v, int) {
+        return v < 10.0f ? juce::String (v, 1) + " ms" : juce::String (juce::roundToInt (v)) + " ms";
+    });
+    for (int c = 0; c < std::clamp (cards, 1, 3); ++c)
+    {
+        const auto name = c == 0 ? juce::String ("Arp Strum ") : "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)) + " Strum ";
+        layout.add (parameters::make<juce::AudioParameterBool> (id (ids::arpStrum (ns, c, "on")), name.trimEnd(), false));
+        layout.add (parameters::make<juce::AudioParameterChoice> (id (ids::arpStrum (ns, c, "direction")), name + "Direction", strumDirectionNames(), 0));
+        layout.add (parameters::make<juce::AudioParameterBool> (id (ids::arpStrum (ns, c, "sync")), name + "Sync", false));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id (ids::arpStrum (ns, c, "ms")), name + "Spread", ms, 20.0f, msText));
+        layout.add (parameters::make<juce::AudioParameterChoice> (id (ids::arpStrum (ns, c, "division")), name + "Sync Spread", strumDivisionNames(), arp::defaultStrumDivision));
+    }
+}
+
 void InstrumentHost::addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns)
 {
     auto id = [] (const juce::String& s) { return juce::ParameterID { s, 27 }; };
