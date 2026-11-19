@@ -28,7 +28,7 @@
 - `poster.png`;
 - `manifest.json`: setup, shot, camera move, frames, handles, fps, samples, seed, and `null` for music, typography and transitions.
 
-**Editing masters and web derivatives are kept apart.** The masters (PNG) go to the archive in the Package D zip. Only the MP4 drafts and posters sit next to the review sheets.
+**Editing masters and web derivatives are kept apart.** Only the MP4 drafts, posters and manifests go into the Package D zip, next to the review sheets. The 16-bit PNG masters of the drafts (about 6.5 GB) stay in the render workspace. They are not zipped: they would not fit on this machine's disk, and they can be rebuilt exactly from the committed scripts (fixed seed). The final masters come from final production.
 
 ## 2. The shots
 
