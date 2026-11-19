@@ -92,6 +92,20 @@ def lerp(a, b, t):
 
 
 os.makedirs(os.path.join(args.out, "frames"), exist_ok=True)
+
+
+def complete_png(path):
+    """A frame counts as rendered only if the PNG is whole (ends with its IEND chunk): a write
+    that failed (a full disk) leaves an empty or truncated file that must render again."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            if f.tell() < 64:
+                return False
+            f.seek(-12, 2)
+            return f.read()[4:8] == b"IEND"
+    except OSError:
+        return False
 plan = [c for c in PLANS[args.plan] if args.cuts is None or c["name"] in args.cuts.split(",")]
 info = {"plan": args.plan, "fps": args.fps, "res": args.res, "samples": args.samples, "cuts": []}
 SETUPS = json.load(open(os.path.join(HERE, "..", "config", "campaign_setups.json")))["setups"]
@@ -134,7 +148,7 @@ for cut in plan:
         if cam.data.dof.use_dof:
             cam.data.dof.focus_distance = (target - cam.location).length
         scene.render.filepath = os.path.join(args.out, "frames", f"{cut['name']}_{i:04d}.png")
-        if not os.path.exists(scene.render.filepath):   # resumable
+        if not complete_png(scene.render.filepath):   # resumable
             bpy.ops.render.render(write_still=True)
     info["cuts"].append(cdesc)
     if args.plan == "G2" and not args.range:
