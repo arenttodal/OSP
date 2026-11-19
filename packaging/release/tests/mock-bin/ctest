@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+case " $* " in *" -N "*) echo "  Test  #1: unit"; echo "  Test  #2: plugin" ;; *) [ "${MOCK_TESTS_FAIL:-0}" = 1 ] && exit 8; echo "100% tests passed" ;; esac

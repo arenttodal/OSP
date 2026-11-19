@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+case "$1" in
+  --check-signature) echo "Package \"$(basename "$2")\":"; echo "   Status: signed by a developer certificate issued by Apple for distribution"; echo "   Notarization: trusted by the Apple notary service"; echo "   Certificate Chain:"; echo "    1. Developer ID Installer: Mock Person (${MOCK_TEAM:-J2MAYE3B89})" ;;
+  --expand-full) mkdir -p "$3" && tar xf "$2" -C "$3" ;;
+esac

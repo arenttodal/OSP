@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+echo "Load command 9"; echo "      cmd LC_BUILD_VERSION"; echo "    minos 11.0"

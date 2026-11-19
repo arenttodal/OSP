@@ -53,3 +53,6 @@ __pycache__/
 
 # Factory packs: large, licensed audio; kept with the release, copied in before a build
 /packaging/factory-packs/*.osppack
+
+# Release outputs (packaging/release/andor-release.sh): installers are kept, never committed.
+/dist/

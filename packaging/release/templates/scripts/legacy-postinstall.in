@@ -1,0 +1,28 @@
+#!/bin/bash
+# "Move earlier test builds aside" (an installer option, unticked unless the person chooses it).
+# Earlier unsigned test builds of @PRODUCT_NAME@ were installed per user. Left there, a host can
+# find two copies and load the old one. Each copy found is MOVED, never deleted, as the logged-in
+# user, to ~/Library/Application Support/ANDOR/Previous Test Builds/<date>, where it can be put
+# back by hand. Only the exact paths below are looked at; nothing else is touched.
+set -u
+user="$(stat -f%Su /dev/console 2> /dev/null || true)"
+if [ -z "$user" ] || [ "$user" = "root" ] || [ "$user" = "loginwindow" ]; then
+    exit 0
+fi
+home="$(dscl . -read "/Users/$user" NFSHomeDirectory 2> /dev/null | awk '{ print $2 }')"
+[ -n "$home" ] && [ -d "$home" ] || exit 0
+stamp="$(date +%Y-%m-%d-%H%M%S)"
+dest="$home/Library/Application Support/ANDOR/Previous Test Builds/@PRODUCT_FILE_STEM@ $stamp"
+moved=0
+for rel in @LEGACY_PATHS@; do
+    src="$home/$rel"
+    # A real bundle only (no symlink is followed out of the home folder).
+    if [ -d "$src" ] && [ ! -L "$src" ]; then
+        /usr/bin/sudo -u "$user" /bin/mkdir -p "$dest/$(dirname "$rel")"
+        /usr/bin/sudo -u "$user" /bin/mv "$src" "$dest/$rel" && moved=$((moved + 1))
+    fi
+done
+if [ "$moved" -gt 0 ]; then
+    killall -9 AudioComponentRegistrar 2> /dev/null || true
+fi
+exit 0

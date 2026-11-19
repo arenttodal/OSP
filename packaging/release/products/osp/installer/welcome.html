@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+ body { font: 13px -apple-system, "Helvetica Neue", sans-serif; color: #1d1d1f; line-height: 1.45; }
+ h1 { font-size: 17px; font-weight: 600; margin: 0 0 6px; }
+ h2 { font-size: 13px; font-weight: 600; margin: 14px 0 4px; }
+ p, li { margin: 0 0 6px; }
+ code { font: 12px Menlo, monospace; }
+ .muted { color: #6e6e73; }
+ @media (prefers-color-scheme: dark) { body { color: #f5f5f7; } .muted { color: #a1a1a6; } }
+</style></head>
+<body>
+<h1>@PRODUCT_NAME@ @DISPLAY_VERSION@</h1>
+<p class="muted">@CHANNEL_LINE@ · Apple silicon and Intel · macOS @MIN_MACOS@ or later</p>
+<p>One tonal recording becomes an expressive instrument. This installer puts OSP where your
+music software looks for it:</p>
+<ul>
+ <li><b>Audio Unit</b> in <code>/Library/Audio/Plug-Ins/Components</code></li>
+ <li><b>VST3</b> in <code>/Library/Audio/Plug-Ins/VST3</code></li>
+ <li><b>Standalone app</b> in <code>/Applications</code></li>
+</ul>
+<p>Choose <b>Customize</b> on the Installation Type step to leave a format out.</p>
+<h2>Your music stays as it is</h2>
+<p>Your presets, samples, packs, custom patterns, preferences and DAW projects are not touched.
+Projects that use OSP open with this version.</p>
+<h2>Had an earlier OSP test build?</h2>
+<p>Earlier test builds were installed in your own <code>~/Library</code> and
+<code>~/Applications</code> folders. If you keep them, your DAW may find two OSPs and load
+the old one. In <b>Customize</b>, tick <b>Move earlier OSP test builds aside</b>: they are
+moved (not deleted) to <code>~/Library/Application Support/ANDOR/Previous Test Builds</code>,
+where you can put them back.</p>
+</body></html>

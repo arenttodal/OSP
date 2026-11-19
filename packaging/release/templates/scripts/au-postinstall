@@ -1,0 +1,5 @@
+#!/bin/bash
+# After the Audio Unit is installed: ask macOS to register it again, so hosts see the new
+# version without a restart. (Standard practice; nothing else is touched.)
+killall -9 AudioComponentRegistrar 2> /dev/null || true
+exit 0

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -e
+pkgs="" out="${@: -1}"
+while [ $# -gt 1 ]; do case "$1" in --package-path) pkgs="$2"; shift 2 ;; *) shift ;; esac; done
+tmp="$(mktemp -d)"; cp -a "$pkgs/." "$tmp/"; (cd "$tmp" && tar cf "$out" .); rm -rf "$tmp"

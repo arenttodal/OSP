@@ -1659,7 +1659,10 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
     }
     // Custom ARP patterns (absent: no card has one).
     for (const auto& problem : customPatternsFromXml (xml.getChildByName ("CustomPatterns")))
+    {
+        juce::ignoreUnused (problem);   // (DBG is empty in release builds)
         DBG ("State: " << problem);
+    }
     if (auto* view = xml.getChildByName (viewType))
     {
         arpOpen = view->getIntAttribute ("arpOpen") != 0;

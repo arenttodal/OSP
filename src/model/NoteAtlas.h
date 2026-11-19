@@ -200,6 +200,10 @@ struct Mapping
 {
     bool fill = true;
     double maxTransposeSemitones = 12.0;
+    /** FILL's reach for a phrase made into an instrument in NOTES (dropped, RECORDed or GRABbed):
+        two octaves, so a short phrase plays across the keyboard. Only a fresh analysis takes it;
+        a saved atlas keeps its own reach (written in every file), and so do built sets. */
+    static constexpr double phraseFillSemitones = 24.0;
     /** Fine tuning: play each note in tune (its cents corrected) or as recorded. */
     bool correctTuning = true;
     /** SPEED: how fast every note plays its recording, pitch kept (1 = as recorded; 0.5 =

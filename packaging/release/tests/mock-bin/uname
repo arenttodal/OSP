@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+case "$1" in -s) echo Darwin;; -m) echo arm64;; *) command -p uname "$@";; esac

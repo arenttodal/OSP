@@ -39,10 +39,10 @@ const char* toString (Detection d) noexcept
 std::string AnalysisSettings::digest() const
 {
     char buffer[256];
-    std::snprintf (buffer, sizeof (buffer), "%s|%.1f-%.1f|h%.4f|hp%.0f|s%.1f|f%.1f|n%.3f|b%.3f|p%.2f/%.3f|r%.1f/%.1f/%.1f/%.1f|a%.2f|t%d|d%s|m%.3f",
+    std::snprintf (buffer, sizeof (buffer), "%s|%.1f-%.1f|h%.4f|hp%.0f|s%.1f|f%.1f|n%.3f|b%.3f|p%.2f/%.3f|r%.1f/%.1f/%.1f/%.1f|a%.2f|t%d|d%s|m%.3f|q%.3f",
                    toString (backend), minHz, maxHz, hopSeconds, highPassHz, silenceDb, absoluteFloorDb, minNoteSeconds,
                    bridgeGapSeconds, pitchChangeSemitones, pitchHoldSeconds, rearticulationDb, attackRiseDb, unvoicedDipDb, softDipDb, a4Hz, autoTuning ? 1 : 0,
-                   toString (detection), minPieceSeconds);
+                   toString (detection), minPieceSeconds, fewerMinNoteSeconds);
     return buffer;
 }
 
@@ -1017,6 +1017,59 @@ std::unique_ptr<PitchTracker> makePitchTracker (PitchBackend backend)
     return std::make_unique<YinViterbiTracker>();
 }
 
+namespace
+{
+    /** DETECTION FEWER's minimum (owner's request, 19 Nov 2026): no note shorter than
+        `minSeconds`. A shorter piece joined to a neighbour (no gap) becomes part of it: the
+        neighbour nearer in pitch, else the longer one. The shortest piece goes first, so scraps
+        join before short notes do. Nothing is cut away. A shorter piece with a gap on both sides
+        is left as it is: analysePhrase switches its note off. */
+    void enforceMinimumLength (std::vector<Segment>& segs, const PitchContour& c, double minSeconds)
+    {
+        const auto minFrames = static_cast<std::size_t> (std::lround (minSeconds / c.hopSeconds));
+        if (minFrames == 0)
+            return;
+        const auto length = [&] (std::size_t i) { return segs[i].end - segs[i].begin; };
+        const auto gluedPrev = [&] (std::size_t i) { return i > 0 && segs[i - 1].end == segs[i].begin; };
+        const auto gluedNext = [&] (std::size_t i) { return i + 1 < segs.size() && segs[i + 1].begin == segs[i].end; };
+        for (;;)
+        {
+            auto pick = segs.size();
+            for (std::size_t i = 0; i < segs.size(); ++i)
+                if (length (i) < minFrames && (gluedPrev (i) || gluedNext (i)) && (pick == segs.size() || length (i) < length (pick)))
+                    pick = i;
+            if (pick == segs.size())
+                return;
+            const auto i = pick;
+            std::size_t into = gluedPrev (i) ? i - 1 : i + 1;
+            if (gluedPrev (i) && gluedNext (i))
+            {
+                const double centre = describePiece (c, segs[i]).centre;
+                const double dPrev = std::abs (centre - describePiece (c, segs[i - 1]).centre);
+                const double dNext = std::abs (centre - describePiece (c, segs[i + 1]).centre);
+                if (std::abs (dPrev - dNext) > 0.5)
+                    into = dPrev < dNext ? i - 1 : i + 1;
+                else
+                    into = length (i - 1) >= length (i + 1) ? i - 1 : i + 1;
+            }
+            auto& target = segs[into];
+            if (into > i)
+            {
+                target.begin = segs[i].begin;
+                target.legatoIn = segs[i].legatoIn;
+                target.pitchCut = segs[i].pitchCut;
+            }
+            else
+            {
+                target.end = segs[i].end;
+                target.legatoOut = segs[i].legatoOut;
+            }
+            target.possibleRepeats.insert (target.possibleRepeats.end(), segs[i].possibleRepeats.begin(), segs[i].possibleRepeats.end());
+            segs.erase (segs.begin() + static_cast<std::ptrdiff_t> (i));
+        }
+    }
+}
+
 std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, const AnalysisSettings& settings)
 {
     const auto s = settings.effective();
@@ -1199,6 +1252,8 @@ std::vector<Segment> segment (const PitchContour& c, const Preprocessed& pre, co
     }
 
     consolidate (kept, c, s);
+    if (s.detection == Detection::fewer && s.fewerMinNoteSeconds > 0.0)
+        enforceMinimumLength (kept, c, s.fewerMinNoteSeconds);
     for (std::size_t i = 0; i < kept.size(); ++i)
     {
         kept[i].legatoIn = i > 0 && kept[i - 1].end == kept[i].begin;
@@ -1748,6 +1803,29 @@ AnalysisResult analysePhrase (const AudioData& audio, const atlas::SourceAsset& 
             segments = std::move (joined);
             describeAll();
             repairHarmonicNotes (a.notes, pre, s);
+        }
+    }
+
+    // FEWER: a note still shorter than its minimum had nothing to join (a gap on both sides). It
+    // stays in the atlas, switched off, for the musician to switch on.
+    if (s.detection == Detection::fewer && s.fewerMinNoteSeconds > 0.0)
+    {
+        int switchedOff = 0;
+        for (std::size_t i = 0; i < a.notes.size() && i < segments.size(); ++i)
+        {
+            const double seconds = static_cast<double> (segments[i].end - segments[i].begin) * result.contour.hopSeconds;
+            if (a.notes[i].included && seconds + 1.0e-9 < s.fewerMinNoteSeconds)
+            {
+                a.notes[i].included = false;
+                ++switchedOff;
+            }
+        }
+        if (switchedOff > 0)
+        {
+            char text[160];
+            std::snprintf (text, sizeof (text), "%d note(s) shorter than %.2f s with nothing to join were switched off (FEWER; kept in the atlas)",
+                           switchedOff, s.fewerMinNoteSeconds);
+            result.warnings.push_back (text);
         }
     }
 

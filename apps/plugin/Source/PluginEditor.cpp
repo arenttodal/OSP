@@ -1548,7 +1548,12 @@ void OspAudioProcessorEditor::openInstrumentFile()
 void OspAudioProcessorEditor::showAbout()
 {
     juce::String text;
-    text << "Version " << JucePlugin_VersionString << "\n"
+   #ifndef OSP_RELEASE_DISPLAY_VERSION
+    #define OSP_RELEASE_DISPLAY_VERSION JucePlugin_VersionString
+    #define OSP_RELEASE_BUILD_NUMBER "0"
+    #define OSP_RELEASE_GIT_SHA "unknown"
+   #endif
+    text << "Version " << OSP_RELEASE_DISPLAY_VERSION << " (build " << OSP_RELEASE_BUILD_NUMBER << ", " << OSP_RELEASE_GIT_SHA << ")\n"
          << "Built " << __DATE__ << "\n\n"
          << "One tonal recording, an expressive instrument.";
     juce::AlertWindow::showAsync (juce::MessageBoxOptions()

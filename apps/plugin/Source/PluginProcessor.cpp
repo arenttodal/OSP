@@ -3799,7 +3799,10 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         stateTree.removeChild (patternTree, nullptr);
         const auto patternXml = patternTree.isValid() ? patternTree.createXml() : nullptr;
         for (const auto& problem : customPatternsFromXml (patternXml.get()))
-            DBG ("State: " << problem);   // (that card has none; the rest of the state loads)
+        {
+            juce::ignoreUnused (problem);   // (DBG is empty in release builds)
+            DBG ("State: " << problem);     // (that card has none; the rest of the state loads)
+        }
     }
     const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
     // LOOP's fallback for short notes: the session's, per layer. Saved before it existed: off

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Stand-in: configure writes a cache; build makes the three bundles as JSON-plist directories.
+set -e
+if [ "$1" = "--build" ]; then
+  b="$2/apps/plugin/OSP_Plugin_artefacts/Release"
+  for spec in "AU/OSP.component" "VST3/OSP.vst3" "Standalone/OSP.app"; do
+    d="$b/$spec"; mkdir -p "$d/Contents/MacOS" "$d/Contents/Resources"; echo bin > "$d/Contents/MacOS/OSP"
+    python3 - "$d/Contents/Info.plist" "$spec" <<'PY'
+import json, sys
+p = {"CFBundleIdentifier": "com.osp.instrument", "CFBundleExecutable": "OSP",
+     "CFBundleShortVersionString": "0.9.0", "CFBundleVersion": "0.9.0.1"}
+if sys.argv[2].startswith("AU/"):
+    p["AudioComponents"] = [{"type": "aumu", "subtype": "Osp1", "manufacturer": "Ospx"}]
+if sys.argv[2].startswith("Standalone/"):
+    p["NSMicrophoneUsageDescription"] = "mic"
+json.dump(p, open(sys.argv[1], "w"))
+PY
+  done
+  [ -n "${MOCK_EXTRA_FILE:-}" ] && touch "$b/Standalone/OSP.app/Contents/Resources/$MOCK_EXTRA_FILE"
+  exit 0
+fi
+build=""; prev=""
+for a in "$@"; do [ "$prev" = "-B" ] && build="$a"; prev="$a"; done
+mkdir -p "$build"
+printf 'OSP_FACTORY_AUTHORING:BOOL=%s\nCMAKE_BUILD_TYPE:STRING=Release\n' "${MOCK_AUTHORING:-OFF}" > "$build/CMakeCache.txt"

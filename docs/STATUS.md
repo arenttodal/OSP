@@ -1,5 +1,50 @@
 # Status
 
+> **19 Nov 2026, macOS release infrastructure and ANDOR OSP 0.9.0-beta.1 (branch
+> `claude/macos-release`, from `claude/custom-arp`; `docs/release/`, `packaging/release/`):**
+> - **One release command:** `packaging/release/andor-release.sh --product osp`. It runs
+>   preflight, a fresh universal Release build (OSP_FACTORY_AUTHORING OFF) and the full ctest,
+>   then signs inside-out (hardened runtime, secure timestamps, the app's audio-input
+>   entitlement only). It builds a PKG with selectable AU / VST3 / app choices and an optional,
+>   unticked move of earlier per-user test builds (moved, never deleted). It notarizes
+>   (Accepted with no issues, or it stops), staples and verifies (codesign, pkgutil, spctl,
+>   stapler), checks the payload, and writes a SHA-256, a release manifest
+>   (`andor.release-manifest` 1), release notes and a verification report. `--install-test`
+>   also installs and runs auval, pluginval and a launch. Every mandatory step fails closed.
+> - **Version:** one source, `packaging/release/products/osp/version.env`: 0.9.0-beta.1,
+>   build 1, CFBundleVersion 0.9.0.1, channel beta. CMake reads it; the About panel shows
+>   version, build and commit. The identity is unchanged: `com.osp.instrument`, AU
+>   `aumu Osp1 Ospx`, parameter IDs and state.
+> - **Reusable:** product-specific values live in `products/<product>/`; ANALOG and Modular add
+>   their own.
+> - **GitHub Actions:** `release-macos.yml`, run by hand. It is guarded by two environments
+>   with the owner as required reviewer, signs from a temporary keychain and notarizes with an
+>   App Store Connect API key. It only ever creates a draft pre-release. `ci.yml` stays
+>   unsigned, and now also runs the release scripts' tests (25 checks, stand-in Apple tools).
+> - **Tested here (Linux):** the release flow and each fail-closed gate with stand-in tools.
+>   **Not run yet:** any real signing, notarization or installation. That runs on the owner's
+>   Mac (`docs/release/RELEASE_RUNBOOK.md`).
+> - **NOTES FILL (owner's request):** a phrase made into NOTES (dropped, RECORDed, GRABbed)
+>   starts with FILL at ±24 st (`atlas::Mapping::phraseFillSemitones`), set in
+>   `loadAnalysedRecording`. Saved atlases keep their reach, as do multi-sample sets, the
+>   research renders and the goldens (the struct default stays 12). Checked in the plugin's
+>   phrase test (`[phase4]`).
+> - **DETECTION FEWER minimum (owner's request):** with FEWER no note is shorter than 0.4 s
+>   (`AnalysisSettings::fewerMinNoteSeconds`). Before, FEWER only made the splitting rules
+>   stricter, so a phrase of clearly separated notes looked the same at all three settings.
+>   - A shorter piece joined to a neighbour becomes part of it (the nearer in pitch, else the
+>     longer).
+>   - A lone short note stays in the atlas, switched off.
+>
+>   NORMAL and MORE are unchanged; the settings digest gains the minimum.
+>   `[phrase][fewer]` covers it on contours and on synthesized audio.
+> - **NEXT:**
+>   - the owner runs the release on the Mac, then the manual checklist
+>     (`docs/release/BETA_TESTING.md`);
+>   - the GitHub secrets (`docs/release/OWNER_SETUP_MACOS.md`);
+>   - factory packs (none pinned yet);
+>   - the ceramic cache fix (resize speed and memory), still unmerged.
+
 > **19 Nov 2026, Custom ARP CP3 + CP4 (branch `claude/custom-arp`; `docs/research/custom-arp/04-cp3-cp4.md`):**
 > make, edit and keep custom patterns, in ANDOR OSP and every ANDOR shell product (ANALOG).
 > - **Make:** RECORD from the keys or the host. The capture is taken before the arpeggiator,

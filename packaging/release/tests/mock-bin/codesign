@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Stand-in for codesign: a "signature" is a file recording identity, entitlements and a hash.
+set -e
+target="${@: -1}"
+sig="$target/Contents/_CodeSignature/mock.json"
+case " $* " in
+  *" --verify "*) [ -f "$sig" ] || { echo "$target: code object is not signed at all" >&2; exit 1; }; echo "$target: valid on disk"; echo "$target: satisfies its Designated Requirement"; exit 0 ;;
+  *" --entitlements - "*) [ -f "$sig" ] && python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["entitlements"])' "$sig"; exit 0 ;;
+  *" -dv "*)
+     [ -f "$sig" ] || { echo "$target: code object is not signed at all" >&2; exit 1; }
+     id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["CFBundleIdentifier"])' "$target/Contents/Info.plist")"
+     hash="$(find "$target" -type f ! -path '*/_CodeSignature/*' -exec shasum {} + | sort -k2 | sed "s#$target##" | shasum | cut -c1-40)"
+     { echo "Executable=$target/Contents/MacOS/x"; echo "Identifier=$id"; echo "CodeDirectory v=20500 size=1 flags=0x10000(runtime) hashes=1+7 location=embedded";
+       echo "CDHash=$hash"; echo "Authority=Developer ID Application: Mock Person (${MOCK_TEAM:-J2MAYE3B89})"; echo "Authority=Developer ID Certification Authority";
+       echo "Timestamp=Nov 19, 2026 at 12:00:00"; echo "TeamIdentifier=${MOCK_TEAM:-J2MAYE3B89}"; } >&2
+     exit 0 ;;
+esac
+ent=""; prev=""
+for a in "$@"; do [ "$prev" = "--entitlements" ] && ent="$(cat "$a")"; prev="$a"; done
+[ "${MOCK_FAIL_SIGN:-0}" = 1 ] && { echo "mock: signing failed" >&2; exit 1; }
+mkdir -p "$(dirname "$sig")" 2>/dev/null || true
+[ -d "$target/Contents" ] && python3 -c 'import json,sys; json.dump({"entitlements": sys.argv[2]}, open(sys.argv[1],"w"))' "$sig" "$ent"
+echo "$target: signed"

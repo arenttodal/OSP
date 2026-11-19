@@ -1,0 +1,163 @@
+name: Release (macOS, signed and notarized)
+
+# A signed, notarized ANDOR installer, built only when asked (Actions › this workflow › Run).
+# Ordinary development builds stay in ci.yml, unsigned and without any secret.
+#
+# It runs the same command as a release on the owner's Mac: packaging/release/andor-release.sh.
+# Secrets (docs/release/OWNER_SETUP_MACOS.md, "GitHub Actions"):
+#   MACOS_DEVELOPER_ID_APPLICATION_P12   base64 of the Developer ID Application .p12
+#   MACOS_DEVELOPER_ID_INSTALLER_P12     base64 of the Developer ID Installer .p12
+#   MACOS_CERTIFICATES_P12_PASSWORD      the password both .p12 files were exported with
+#   NOTARY_API_KEY_P8                    base64 of the App Store Connect API key (.p8)
+#   NOTARY_API_KEY_ID                    its Key ID
+#   NOTARY_API_ISSUER_ID                 its Issuer ID
+# They live in the "release-signing" environment, whose required reviewer (the owner)
+# approves each run before any secret reaches the runner. Publishing needs a second approval
+# ("release-publish") and only ever creates a DRAFT pre-release: nothing is public, and no
+# tag is pushed, until the owner publishes the draft on GitHub.
+
+on:
+  workflow_dispatch:
+    inputs:
+      product:
+        description: "Product (packaging/release/products/<product>)"
+        type: choice
+        options: [osp]
+        default: osp
+      macos_runner:
+        description: "macOS runner (the build is universal on either; Intel when Apple-silicon runners are short)"
+        type: choice
+        options: [macos-15, macos-15-intel]
+        default: macos-15
+      draft_release:
+        description: "Afterwards, create a DRAFT GitHub pre-release with the installer (second approval)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.product }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ${{ inputs.macos_runner }}
+    environment: release-signing
+    timeout-minutes: 300
+    outputs:
+      folder: ${{ steps.release.outputs.folder }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: The signing secrets are configured
+        env:
+          APP_P12: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12 }}
+          INSTALLER_P12: ${{ secrets.MACOS_DEVELOPER_ID_INSTALLER_P12 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATES_P12_PASSWORD }}
+          KEY_P8: ${{ secrets.NOTARY_API_KEY_P8 }}
+          KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
+        run: |
+          missing=""
+          for name in APP_P12 INSTALLER_P12 P12_PASSWORD KEY_P8 KEY_ID ISSUER_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing release secrets:$missing (docs/release/OWNER_SETUP_MACOS.md)"
+            exit 1
+          fi
+
+      - name: Tools
+        run: brew install ninja
+
+      - name: Factory packs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash packaging/factory-packs/fetch.sh
+
+      - name: Temporary keychain with the certificates and notary credentials
+        env:
+          APP_P12: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12 }}
+          INSTALLER_P12: ${{ secrets.MACOS_DEVELOPER_ID_INSTALLER_P12 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATES_P12_PASSWORD }}
+          KEY_P8: ${{ secrets.NOTARY_API_KEY_P8 }}
+          KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/andor-release.keychain-db"
+          keychain_password="$(uuidgen)"
+          echo "::add-mask::$keychain_password"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          umask 077
+          printf '%s' "$APP_P12" | base64 --decode > "$RUNNER_TEMP/app.p12"
+          printf '%s' "$INSTALLER_P12" | base64 --decode > "$RUNNER_TEMP/installer.p12"
+          security import "$RUNNER_TEMP/app.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security import "$RUNNER_TEMP/installer.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/productbuild -T /usr/bin/productsign
+          rm -f "$RUNNER_TEMP/app.p12" "$RUNNER_TEMP/installer.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          printf '%s' "$KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          xcrun notarytool store-credentials ANDOR-notary --key "$RUNNER_TEMP/notary.p8" \
+            --key-id "$KEY_ID" --issuer "$ISSUER_ID" --keychain "$keychain" > /dev/null
+          rm -f "$RUNNER_TEMP/notary.p8"
+          echo "ANDOR_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      - name: Build, test, sign, package, notarize, staple, verify
+        id: release
+        run: |
+          packaging/release/andor-release.sh --product "${{ inputs.product }}" --keychain "$ANDOR_KEYCHAIN"
+          folder="$(ls -d dist/release/*/* | head -1)"
+          echo "folder=$folder" >> "$GITHUB_OUTPUT"
+          cat "$folder/VERIFICATION_REPORT.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the release (installer, checksum, manifest, notes, report, logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ inputs.product }}
+          path: |
+            dist/release/
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Remove the temporary keychain
+        if: always()
+        run: |
+          if [ -n "${ANDOR_KEYCHAIN:-}" ]; then security delete-keychain "$ANDOR_KEYCHAIN" || true; fi
+
+  draft-release:
+    # A second, separate approval (environment "release-publish"); creates a DRAFT
+    # pre-release only. The owner reviews and publishes it by hand on GitHub.
+    if: inputs.draft_release
+    needs: release
+    runs-on: ubuntu-latest
+    environment: release-publish
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ inputs.product }}
+          path: dist/release/
+      - name: Draft pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          folder="${{ needs.release.outputs.folder }}"
+          manifest="$folder/release-manifest.json"
+          version="$(jq -r .version.semver "$manifest")"
+          commit="$(jq -r .source.commit "$manifest")"
+          product="$(jq -r .product.id "$manifest")"
+          [ "$(jq -r .releaseReady "$manifest")" = true ] || { echo "::error::the release is not release-ready"; exit 1; }
+          gh release create "$product-v$version" --repo "$GITHUB_REPOSITORY" --draft --prerelease \
+            --target "$commit" --title "$(jq -r .product.name "$manifest") $version" \
+            --notes-file "$folder/RELEASE_NOTES.md" \
+            "$folder"/*.pkg "$folder"/*.sha256 "$manifest" "$folder/VERIFICATION_REPORT.md"

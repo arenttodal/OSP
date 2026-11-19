@@ -42,6 +42,11 @@ TEST_CASE ("plugin: a recorded phrase is analysed onto a layer, each note on its
     REQUIRE (instrument != nullptr);
     REQUIRE (instrument->atlas != nullptr);
     REQUIRE (instrument->set != nullptr);
+    // A phrase made into NOTES starts with FILL on, reaching two octaves (a saved atlas keeps
+    // its own reach: [phase5]).
+    CHECK (instrument->atlas->mapping.fill);
+    CHECK (instrument->atlas->mapping.maxTransposeSemitones == Approx (atlas::Mapping::phraseFillSemitones));
+    CHECK (atlas::Mapping::phraseFillSemitones == 24.0);
     const auto status = p.atlasStatus();
     REQUIRE (status != nullptr);
     CHECK (status->analysed);

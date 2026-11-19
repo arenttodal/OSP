@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+# Stand-in for /usr/libexec/PlistBuddy over JSON "plists" (Print / Set), for the release tests.
+import json, sys
+args = sys.argv[1:]
+path = args[-1]
+cmds = [args[i + 1] for i in range(len(args) - 1) if args[i] == "-c"]
+data = json.load(open(path))
+def walk(d, keys):
+    for k in keys:
+        d = d[int(k)] if isinstance(d, list) else d[k]
+    return d
+for c in cmds:
+    verb, rest = c.split(" ", 1)
+    if verb == "Print":
+        keys = [k for k in rest.lstrip(":").split(":") if k]
+        try:
+            v = walk(data, keys)
+        except (KeyError, IndexError, ValueError):
+            print(f'Print: Entry, "{rest}", Does Not Exist', file=sys.stderr); sys.exit(1)
+        print(json.dumps(v) if isinstance(v, (dict, list)) else v)
+    elif verb == "Set":
+        target, value = rest.split(" ", 1)
+        keys = [k for k in target.lstrip(":").split(":") if k]
+        parent = walk(data, keys[:-1])
+        last = keys[-1]
+        val = {"true": True, "false": False}.get(value, value)
+        if isinstance(parent, list): parent[int(last)] = val
+        else: parent[last] = val
+        json.dump(data, open(path, "w"))

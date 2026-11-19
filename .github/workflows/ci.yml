@@ -39,6 +39,12 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ninja
 
+      - name: Release scripts (stand-in Apple tools, macOS's own bash 3.2)
+        # packaging/release: the whole release flow and each fail-closed gate, without signing
+        # anything (docs/release/RELEASE_RUNBOOK.md). Seconds; no secrets.
+        if: runner.os == 'macOS'
+        run: RELEASE_BASH=/bin/bash bash packaging/release/tests/run-mock-release.sh
+
       - name: Fetch factory packs
         # The Core pack (and any other factory pack) listed in packaging/factory-packs/packs.lock,
         # from this repository's GitHub Releases, verified by SHA-256; the build bundles them.

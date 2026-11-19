@@ -16,6 +16,9 @@ juce_add_plugin(OSP_Plugin
     BUNDLE_ID "com.osp.instrument"
     PLUGIN_MANUFACTURER_CODE Ospx
     PLUGIN_CODE Osp1
+    # VERSION is the project's (packaging/release/products/osp/version.env); CFBundleVersion
+    # adds the build number, which only grows, so every build is newer to macOS.
+    BUILD_VERSION "${PROJECT_VERSION}.${OSP_RELEASE_BUILD}"
     FORMATS ${OSP_PLUGIN_FORMATS}
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
@@ -69,6 +72,13 @@ target_compile_definitions(OSP_Plugin PUBLIC
 # an authoring build. Customer builds publish ordinary packs only (docs/sound-design.md).
 option(OSP_FACTORY_AUTHORING "Build OSP with official factory-content publishing" OFF)
 target_compile_definitions(OSP_Plugin PRIVATE OSP_FACTORY_AUTHORING=$<BOOL:${OSP_FACTORY_AUTHORING}>)
+# What the About panel shows: the release's own name for this build (0.9.0-beta.1, build 1, the
+# commit), from the same version.env as everything else.
+target_compile_definitions(OSP_Plugin PRIVATE
+    OSP_RELEASE_DISPLAY_VERSION="${OSP_RELEASE_DISPLAY_VERSION}"
+    OSP_RELEASE_BUILD_NUMBER="${OSP_RELEASE_BUILD}"
+    OSP_RELEASE_CHANNEL="${OSP_RELEASE_CHANNEL}"
+    OSP_RELEASE_GIT_SHA="${OSP_GIT_SHA}")
 
 # The built-in starting states: whole .ospstate files ("NN Name.ospstate": order and name),
 # made in OSP itself (Save Starting State) and copied here. See docs/sound-design.md.

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Stand-in: a component package is a directory holding Payload/ and scripts.
+set -e
+root="" out="${@: -1}" analyze=0 scripts=""
+while [ $# -gt 1 ]; do case "$1" in --analyze) analyze=1; shift ;; --root) root="$2"; shift 2 ;; --scripts) scripts="$2"; shift 2 ;; --nopayload) shift ;; *) shift ;; esac; done
+if [ "$analyze" = 1 ]; then
+  python3 -c 'import json,os,sys; r=sys.argv[1]; json.dump([{"RootRelativeBundlePath": d, "BundleIsRelocatable": True} for d in os.listdir(r)], open(sys.argv[2],"w"))' "$root" "$out"; exit 0
+fi
+mkdir -p "$out/Payload"; [ -n "$root" ] && cp -a "$root/." "$out/Payload/"; [ -n "$scripts" ] && cp -a "$scripts" "$out/Scripts"; true

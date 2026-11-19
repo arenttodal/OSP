@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+case "$1" in -productName) echo macOS;; -productVersion) echo 15.5;; esac

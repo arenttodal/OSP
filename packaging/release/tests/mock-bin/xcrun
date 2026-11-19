@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+case "$1" in
+  --find) echo "/usr/bin/$2"; exit 0 ;;
+  --sdk) echo "15.5"; exit 0 ;;
+  notarytool)
+    shift; case "$1" in
+      history) exit 0 ;;
+      submit) echo "{\"id\": \"mock-0001\", \"status\": \"${MOCK_NOTARY_STATUS:-Accepted}\", \"message\": \"Processing complete\"}" ;;
+      log) out="${@: -1}"; if [ -n "${MOCK_NOTARY_ISSUE:-}" ]; then echo "{\"status\":\"x\",\"issues\":[{\"severity\":\"warning\",\"path\":\"a\",\"message\":\"$MOCK_NOTARY_ISSUE\"}]}" > "$out"; else echo '{"status":"Accepted","issues":null}' > "$out"; fi ;;
+    esac ;;
+  stapler) echo "The staple and validate action worked!" ;;
+esac

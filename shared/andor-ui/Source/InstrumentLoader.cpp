@@ -813,6 +813,9 @@ LoadResult loadAnalysedRecording (const AnalyseRequest& request, SampleStore& st
             if (! cache.store (*analysed, request.settings, error))
                 result.warnings.push_back (error);
         }
+        // A phrase made into an instrument here starts with FILL's phrase reach (two octaves).
+        // This also covers a cached analysis, whose file may hold an older default.
+        analysed->mapping.maxTransposeSemitones = atlas::Mapping::phraseFillSemitones;
         describeAtlas (*status, *analysed);
         status->warnings = analysisWarnings;
         result.warnings.insert (result.warnings.end(), analysisWarnings.begin(), analysisWarnings.end());

@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+echo "Xcode 16.4"; echo "Build version 16F6"

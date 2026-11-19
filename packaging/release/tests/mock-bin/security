@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+echo '  1) AAAA "Developer ID Application: Mock Person (J2MAYE3B89)"'
+[ "${MOCK_TWO_IDENTITIES:-0}" = 1 ] && echo '  3) CCCC "Developer ID Application: Mock Person Old (J2MAYE3B89)"'
+echo '  2) BBBB "Developer ID Installer: Mock Person (J2MAYE3B89)"'
+echo '     2 valid identities found'

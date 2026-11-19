@@ -77,6 +77,12 @@ struct AnalysisSettings
         (a fragment of the same note, a slide, an octave slip, a weak scrap), becomes part of that
         neighbour. Short notes with their own pitch (fast runs, grace notes) are kept. */
     double minPieceSeconds = 0.25;
+    /** DETECTION FEWER's minimum: no note shorter than this (0: none). A shorter piece joined to a
+        neighbour becomes part of it, the neighbour nearer in pitch, else the longer one; its audio
+        is never cut away. A shorter piece with a gap on both sides has nothing to join: it stays
+        in the atlas, switched off (`included` false), for the musician to switch on. NORMAL and
+        MORE keep every short note with a steady pitch of its own. */
+    double fewerMinNoteSeconds = 0.4;
     double maxAnalysisSeconds = 180.0;  ///< longer recordings: the first part is analysed (warning)
     double a4Hz = 440.0;
     bool autoTuning = false;            ///< estimate the recording's global offset before rounding

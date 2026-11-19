@@ -9,6 +9,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 
 using namespace osp;
@@ -423,4 +424,119 @@ TEST_CASE ("Phrase analysis: DETECTION and MIN NOTE are settings like any other"
     const std::vector<Piece> rebowed { { 0.2, 0, 0, silent, false }, { 0.5, 60, 60 }, { 0.05, 60, 60, -19.0f }, { 0.5, 60, 60 }, { 0.2, 0, 0, silent, false } };
     CHECK (segmentsOf (rebowed).size() == 1);
     CHECK (segmentsOf (rebowed, more).size() == 2);
+}
+
+TEST_CASE ("Phrase analysis: FEWER makes every note at least 0.4 s; nothing is cut away", "[phrase][unit][fewer]")
+{
+    phrase::AnalysisSettings normal, fewer;
+    fewer.detection = phrase::Detection::fewer;
+    CHECK (fewer.fewerMinNoteSeconds == Approx (0.4));
+    auto other = fewer;
+    other.fewerMinNoteSeconds = 0.3;
+    CHECK (other.digest() != fewer.digest());   // cached analyses never mix the two
+
+    const auto frames = [] (double seconds) { return static_cast<std::size_t> (std::lround (seconds / 0.005)); };
+
+    SECTION ("a short note joined to its neighbours becomes part of the nearer one in pitch")
+    {
+        // 72 (0.5 s), 73 (0.15 s, a note of its own), 79 (0.5 s), joined without gaps.
+        const std::vector<Piece> run { { 0.2, 0, 0, silent, false }, { 0.5, 72, 72 }, { 0.15, 73, 73 }, { 0.5, 79, 79 }, { 0.2, 0, 0, silent, false } };
+        const auto kept = segmentsOf (run, normal);
+        REQUIRE (kept.size() == 3);   // NORMAL keeps a short note with a steady pitch of its own
+        const auto joined = segmentsOf (run, fewer);
+        REQUIRE (joined.size() == 2);
+        CHECK (joined[0].begin == kept[0].begin);   // the audio is all still there...
+        CHECK (joined[1].end == kept[2].end);
+        CHECK (joined[0].end == kept[1].end);        // ...the short note joined 72, the nearer
+        for (const auto& seg : joined)
+            CHECK (seg.end - seg.begin >= frames (0.4));
+    }
+    SECTION ("equally far in pitch: the longer neighbour takes it")
+    {
+        const std::vector<Piece> run { { 0.2, 0, 0, silent, false }, { 0.45, 70, 70 }, { 0.15, 72, 72 }, { 0.9, 74, 74 }, { 0.2, 0, 0, silent, false } };
+        const auto joined = segmentsOf (run, fewer);
+        REQUIRE (joined.size() == 2);
+        // (boundaries sit within a few frames of the pieces' edges)
+        CHECK (joined[0].end <= frames (0.2 + 0.45) + 5);                       // 70 stayed as it was
+        CHECK (joined[1].end - joined[1].begin >= frames (0.15 + 0.9) - 5);     // 74 took the short note
+    }
+    SECTION ("a run of short notes becomes notes of at least 0.4 s")
+    {
+        std::vector<Piece> run { { 0.2, 0, 0, silent, false } };
+        for (int k = 0; k < 8; ++k)
+            run.push_back ({ 0.12, 60.0 + 2 * k, 60.0 + 2 * k });
+        run.push_back ({ 0.2, 0, 0, silent, false });
+        const auto joined = segmentsOf (run, fewer);
+        REQUIRE_FALSE (joined.empty());
+        for (const auto& seg : joined)
+            CHECK (seg.end - seg.begin >= frames (0.4));
+        CHECK (joined.front().begin == frames (0.2));
+        CHECK (joined.back().end == frames (0.2 + 8 * 0.12));
+    }
+    SECTION ("a short note between silences has nothing to join: it stays a piece of its own")
+    {
+        const std::vector<Piece> lone { { 0.2, 0, 0, silent, false }, { 0.6, 72, 72 }, { 0.3, 0, 0, silent, false },
+                                        { 0.2, 76, 76 }, { 0.3, 0, 0, silent, false }, { 0.6, 79, 79 }, { 0.2, 0, 0, silent, false } };
+        CHECK (segmentsOf (lone, fewer).size() == 3);
+    }
+}
+
+namespace
+{
+    /** Sine notes (MIDI, seconds; MIDI 0 = silence) at 48 kHz, with 10 ms fades. */
+    AudioData sineNotes (const std::vector<std::pair<double, double>>& notes)
+    {
+        AudioData a;
+        a.sampleRate = 48000.0;
+        a.channels.resize (1);
+        auto& out = a.channels[0];
+        double phase = 0.0;
+        for (const auto& [midi, seconds] : notes)
+        {
+            const auto n = static_cast<int> (std::lround (seconds * a.sampleRate));
+            const int fade = static_cast<int> (0.01 * a.sampleRate);
+            for (int i = 0; i < n; ++i)
+            {
+                float v = 0.0f;
+                if (midi > 0.0)
+                {
+                    phase += 2.0 * 3.14159265358979323846 * midiToHz (midi) / a.sampleRate;
+                    const double env = std::min ({ 1.0, i / static_cast<double> (fade), (n - i) / static_cast<double> (fade) });
+                    v = static_cast<float> (0.3 * env * std::sin (phase));
+                }
+                out.push_back (v);
+            }
+        }
+        return a;
+    }
+}
+
+TEST_CASE ("Phrase analysis: FEWER switches a lone short note off, kept in the atlas", "[phrase][unit][fewer]")
+{
+    // A 0.25 s note alone between silences, two long notes around it.
+    const auto audio = sineNotes ({ { 0, 0.2 }, { 69, 0.8 }, { 0, 0.4 }, { 72, 0.25 }, { 0, 0.4 }, { 76, 0.8 }, { 0, 0.2 } });
+    phrase::AnalysisSettings normal, fewer;
+    fewer.detection = phrase::Detection::fewer;
+    const auto isShort = [&] (const atlas::NoteEvent& n) { return n.rootMidi == 72; };
+
+    const auto heard = phrase::analysePhrase (audio, fixtureSource(), normal);
+    REQUIRE (heard.ok);
+    REQUIRE (heard.atlas.notes.size() == 3);
+    for (const auto& n : heard.atlas.notes)
+        CHECK (n.included);   // NORMAL plays it
+
+    const auto fewerResult = phrase::analysePhrase (audio, fixtureSource(), fewer);
+    REQUIRE (fewerResult.ok);
+    REQUIRE (fewerResult.atlas.notes.size() == 3);   // still in the atlas...
+    int off = 0;
+    for (const auto& n : fewerResult.atlas.notes)
+    {
+        CHECK (n.included == ! isShort (n));         // ...switched off, the long notes on
+        off += n.included ? 0 : 1;
+    }
+    CHECK (off == 1);
+    bool warned = false;
+    for (const auto& w : fewerResult.warnings)
+        warned = warned || w.find ("switched off (FEWER") != std::string::npos;
+    CHECK (warned);
 }

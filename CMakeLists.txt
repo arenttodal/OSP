@@ -1,7 +1,30 @@
 cmake_minimum_required(VERSION 3.25)
 
+# The product's version: packaging/release/products/osp/version.env is the one source (the
+# release scripts read the same file). OSP_RELEASE_* reach the plugin (About, CFBundleVersion).
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/release/products/osp/version.env" OSP_VERSION_LINES REGEX "^PRODUCT_[A-Z_]+=")
+foreach(line IN LISTS OSP_VERSION_LINES)
+    string(REGEX REPLACE "^PRODUCT_([A-Z_]+)=(.*)$" "\\1;\\2" pair "${line}")
+    list(GET pair 0 key)
+    list(LENGTH pair n)
+    if(n GREATER 1)
+        list(GET pair 1 value)
+    else()
+        set(value "")
+    endif()
+    set(OSP_RELEASE_${key} "${value}")
+endforeach()
+if(NOT OSP_RELEASE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$" OR NOT OSP_RELEASE_BUILD MATCHES "^[0-9]+$")
+    message(FATAL_ERROR "packaging/release/products/osp/version.env: PRODUCT_VERSION must be MAJOR.MINOR.PATCH and PRODUCT_BUILD a whole number")
+endif()
+if(OSP_RELEASE_PRERELEASE)
+    set(OSP_RELEASE_DISPLAY_VERSION "${OSP_RELEASE_VERSION}-${OSP_RELEASE_PRERELEASE}")
+else()
+    set(OSP_RELEASE_DISPLAY_VERSION "${OSP_RELEASE_VERSION}")
+endif()
+
 project(OSP
-    VERSION 0.1.0
+    VERSION ${OSP_RELEASE_VERSION}
     DESCRIPTION "One-Sample Performance instrument - research harness and engine"
     LANGUAGES C CXX)
 
@@ -20,8 +43,18 @@ if(MSVC)
 endif()
 
 if(APPLE)
-    # Universal binaries can be enabled later with -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64".
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
+    # Universal binaries: -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" (CI and the release script).
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "${OSP_RELEASE_MIN_MACOS}" CACHE STRING "Minimum macOS version")
+endif()
+
+# The commit a build comes from (the About panel and the release manifest). The release script
+# passes it; otherwise it is read here, "unknown" outside a git checkout.
+if(NOT OSP_GIT_SHA)
+    execute_process(COMMAND git rev-parse --short=12 HEAD WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                    OUTPUT_VARIABLE OSP_GIT_SHA OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(NOT OSP_GIT_SHA)
+        set(OSP_GIT_SHA "unknown")
+    endif()
 endif()
 
 option(OSP_BUILD_TESTS "Build unit/integration/regression tests" ON)
