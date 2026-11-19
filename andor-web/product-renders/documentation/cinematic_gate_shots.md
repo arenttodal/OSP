@@ -37,10 +37,10 @@ Generated from `blender/cine/shots/*.json` by `gate_report.py`.
 |---|---|
 | Setup | ANDOR_GALLERY (base light rig of shot A2); 16:9, 24 fps, 11 s + 1 s handles |
 | Lens | 65 (constant) mm, f/7.1 |
-| Camera position | 0 s: [-0.3, -0.42, 0.05] (bezier [0.45, 0, 0.25, 1]) → 10 s: [0.05, -1.1, 0.45] |
-| Camera target | 0 s: [-0.04, 0, 0.015] (bezier [0.45, 0, 0.25, 1]) → 10 s: [-0.09, 0.05, 0.095] |
+| Camera position | 0 s: [-0.3, -0.42, 0.05] (bezier [0.45, 0, 0.25, 1]) → 10 s: [0.08, -1.32, 0.53] |
+| Camera target | 0 s: [-0.04, 0, 0.015] (bezier [0.45, 0, 0.25, 1]) → 10 s: [-0.16, 0.05, 0.1] |
 | Focus point | 0 s: [-0.08, -0.04, 0.015] (bezier [0.45, 0, 0.25, 1]) → 10 s: [0, 0, 0.03] |
-| Visible width (at target) | open 0.27 m → close 0.67 m (instrument: 0.40 m) |
+| Visible width (at target) | open 0.27 m → close 0.81 m (instrument: 0.40 m) |
 | Product tilt | 0 s: 0 (bezier [0.45, 0, 0.25, 1]) → 10.4 s: 18 ° |
 | Product translate | 0 s: [0, 0, 0.035] (bezier [0.45, 0, 0.25, 1]) → 10.4 s: [0, 0, 0.052] |
 | Light: Key softbox | orbit 0 s: -14 (bezier [0.33, 0, 0.25, 1]) → 11 s: 4 |

@@ -57,6 +57,7 @@ ap.add_argument("--still", type=float, default=None, help="render one frame at t
 ap.add_argument("--still-width", type=int, default=1920)
 ap.add_argument("--still-samples", type=int, default=128)
 ap.add_argument("--still-noise", type=float, default=0.01)
+ap.add_argument("--depth", default="auto", choices=["auto", "8", "16"], help="PNG bit depth; auto: 8 for draft sizes (< 1920 px), else 16")
 args = ap.parse_args(argv)
 spec = json.load(open(args.spec))
 
@@ -78,6 +79,7 @@ from mathutils import Matrix, Quaternion  # noqa: E402
 scene = bpy.context.scene
 scene.render.fps, scene.render.fps_base = FPS, 1.0
 scene.cycles.seed, scene.cycles.use_animated_seed = 0, False
+scene.render.image_settings.color_depth = args.depth if args.depth != "auto" else ("8" if res[0] < 1920 else "16")
 ROT = math.radians(g["ROT"])
 Q_ROT = Quaternion((0, 0, 1), ROT)
 

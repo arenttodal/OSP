@@ -22,7 +22,7 @@ import argparse
 import json
 import os
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FONT_MARK = os.path.join(HERE, "fonts", "InterTight-760.ttf")
@@ -31,7 +31,7 @@ FONT_LINE = os.path.join(HERE, "fonts", "EBGaramond-Regular.ttf")
 HEADLINE = ["One sound.", "An entire instrument."]
 # Ink: a printed, matte presence on the wall, never a glow.
 LOOKS = {
-    "ivory": {"mark": (60, 54, 48), "mark_alpha": 0.86, "line": (44, 40, 36)},
+    "ivory": {"mark": (60, 54, 48), "mark_alpha": 0.80, "multiply": 0.30, "line": (44, 40, 36)},
     "dark": {"mark": (176, 166, 152), "mark_alpha": 0.62, "line": (206, 198, 186)},
 }
 
@@ -45,6 +45,8 @@ ap.add_argument("--frames", type=int, nargs=2)
 ap.add_argument("--width-frac", type=float, default=0.78, help="wordmark width as a fraction of the frame")
 ap.add_argument("--gap-frac", type=float, default=0.025, help="closing gap between baseline and instrument")
 ap.add_argument("--scale-from", type=float, default=1.06)
+ap.add_argument("--reveal", type=float, nargs=2, default=[0.15, 0.62], help="the wordmark fades in over this part of the move")
+ap.add_argument("--blur-from", type=float, default=0.022, help="opening defocus of the wall, as a fraction of the frame width")
 a = ap.parse_args()
 
 names = sorted(f for f in os.listdir(a.beauty) if f.endswith(".png") and os.path.exists(os.path.join(a.matte, f)))
@@ -90,21 +92,36 @@ ImageDraw.Draw(layer).text((mark_x - bb[0], mark_y - bb[1]), "ANDOR", font=font,
 centre = (mark_x + mark_w_real / 2, mark_y + cap_h / 2)
 
 line_layer = None
+headline_fit = None
 if a.layout == "desktop":
     # Headline in the quiet space below the wordmark, left column; it never meets the instrument.
+    # Its size is fitted to the free space left of the instrument at the close (from the matte),
+    # with a margin, so the line can never meet the product.
+    y0 = round(H * 0.60)
     ls = round(W * 0.034)
+    rows = close_alpha.crop((0, y0, W, min(H, y0 + round(ls * 2.6)))).point(lambda v: 255 if v > 24 else 0)
+    bbx = rows.getbbox()
+    inst_left = bbx[0] if bbx else W
+    avail = inst_left - x_mark0 - round(W * 0.04)
     lf = ImageFont.truetype(FONT_LINE, ls)
+    widest = max(lf.getbbox(t)[2] - lf.getbbox(t)[0] for t in HEADLINE)
+    if widest > avail:
+        ls = max(8, int(ls * avail / widest))
+        lf = ImageFont.truetype(FONT_LINE, ls)
     line_layer = Image.new("L", (W, H), 0)
     d = ImageDraw.Draw(line_layer)
-    y = round(H * 0.60)
+    y = y0
     for t in HEADLINE:
         d.text((x_mark0, y), t, font=lf, fill=255)
         y += round(ls * 1.18)
+    headline_fit = {"size_px": ls, "free_width_px": avail, "instrument_left_px": inst_left,
+                    "fits_at_full_size": ls >= round(W * 0.034)}
 
 meta = {"layout": a.layout, "look": a.look, "frame": [W, H], "wordmark": {"font": "Inter Tight 760", "size_px": size,
         "box_px": [mark_x, mark_y, mark_x + mark_w_real, mark_y + cap_h], "baseline_px": baseline,
-        "closing_top_of_instrument_px": top_inst, "scale_from": a.scale_from},
-        "headline": HEADLINE if line_layer else None, "frames": [names[0], names[-1]], "occlusion": []}
+        "closing_top_of_instrument_px": top_inst, "scale_from": a.scale_from,
+        "reveal": a.reveal, "blur_from": a.blur_from},
+        "headline": HEADLINE if line_layer else None, "headline_fit": headline_fit, "frames": [names[0], names[-1]], "occlusion": []}
 
 if a.look == "auto":
     # Dark ink on a light wall, light ink on a dark one: the wall's mean luminance under the mark.
@@ -121,11 +138,29 @@ for i, n in enumerate(names):
     # scale the wall layer about the wordmark centre (an affine on the type only)
     lay = layer.transform((W, H), Image.AFFINE, (1 / s, 0, centre[0] - centre[0] / s, 0, 1 / s, centre[1] - centre[1] / s),
                           resample=Image.BICUBIC)
+    # The wall is out of focus while the camera is close and sharpens as it withdraws; the type
+    # sits in that focus, and fades in over the reveal so it is discovered, not announced.
+    r = a.blur_from * W * (1 - u) ** 2
+    if r > 0.3:
+        lay = lay.filter(ImageFilter.GaussianBlur(r))
+    r0, r1 = a.reveal
+    v = min(1.0, max(0.0, (u - r0) / max(1e-6, r1 - r0)))
+    k = L["mark_alpha"] * v * v * (3 - 2 * v)
     beauty = Image.open(os.path.join(a.beauty, n)).convert("RGB")
     alpha = Image.open(os.path.join(a.matte, n)).getchannel("A")
-    behind = Image.composite(mark_rgb, beauty, lay.point(lambda v: int(v * L["mark_alpha"])))
+    if "multiply" in L:
+        # printed on the lit wall: the ink darkens the wall's own light, so the wall's gradients
+        # and the light's movement pass through the letters
+        ink = Image.eval(lay, lambda q: int(255 - q * k * (1 - L["multiply"])))
+        behind = ImageChops.multiply(beauty, Image.merge("RGB", (ink, ink, ink)))
+    else:
+        behind = Image.composite(mark_rgb, beauty, lay.point(lambda q: int(q * k)))
     if line_layer is not None:
-        behind = Image.composite(line_rgb, behind, line_layer)
+        # the headline arrives after the wordmark, as the move settles
+        hv = min(1.0, max(0.0, (u - 0.55) / 0.35))
+        hk = hv * hv * (3 - 2 * hv)
+        if hk > 0:
+            behind = Image.composite(line_rgb, behind, line_layer.point(lambda q: int(q * hk)))
     Image.composite(beauty, behind, alpha).save(os.path.join(a.out, n))
     # occlusion: the fraction of the wordmark's ink the instrument covers
     ink = sum(lay.histogram()[128:])

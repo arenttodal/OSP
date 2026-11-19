@@ -38,8 +38,8 @@ shots.append({
 shots.append(dict(shots[-1], id="R01_A_desktop", variant="A: desktop website composition (headline space left)",
                   narrative="R01 A, ending with the instrument right of centre and quiet space on the left for the "
                             "headline (One sound. An entire instrument.) beside the wordmark.",
-                  camera=dict(shots[-1]["camera"], position=[[0.0, [-0.30, -0.42, 0.05], SLOW_SETTLE], [10.0, [0.05, -1.10, 0.45]]],
-                              target=[[0.0, [-0.04, 0.0, 0.015], SLOW_SETTLE], [10.0, [-0.09, 0.05, 0.095]]])))
+                  camera=dict(shots[-1]["camera"], position=[[0.0, [-0.30, -0.42, 0.05], SLOW_SETTLE], [10.0, [0.08, -1.32, 0.53]]],
+                              target=[[0.0, [-0.04, 0.0, 0.015], SLOW_SETTLE], [10.0, [-0.16, 0.05, 0.10]]])))
 shots.append({
     "id": "R01_B", "family": "R01 Grand Reveal", "variant": "B: dark theatre, sculptural",
     "narrative": "Near darkness. A rim of light traces the instrument's front edge from just below its eye line. "
