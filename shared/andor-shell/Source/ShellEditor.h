@@ -125,6 +125,11 @@ public:
         return ! shell.trimsOnlyWithThreeCards() || shell.slotCount() >= 3 ? osp::plugin::EngineCard::footTrim : 0.0f;
     }
     float shownTrim = -1.0f;   ///< the trim the window was last shaped for
+    /** A caller that lays the instrument out and then shapes the window itself (a rack, the
+        arpeggiator's editor or the AUX strip shown): the layout must not shape it too, or a host
+        that first answers with the old size hears the same request twice and takes it as asked
+        again. */
+    bool shapingWindow = false;
     /** How far everything under the cards moves up: the cards' trim, less the AUX strip's room
         while it is shown (negative: down). */
     float sourceTrim() const noexcept { return cardTrim() - auxShift(); }
