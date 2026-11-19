@@ -1,0 +1,66 @@
+{
+ "id": "R03_C",
+ "family": "R03 Above the Sound",
+ "variant": "C: crane forward over the keys",
+ "narrative": "From a low front view across the keys, the camera cranes up and forward over the macro row until it looks down onto the three engines; the point of interest moves from the keys to the displays as the instrument's whole surface opens beneath us.",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 9.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 11.0,
+  "position": [
+   [
+    0.0,
+    [
+     0.02,
+     -0.98,
+     0.2
+    ],
+    [
+     0.45,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    9.0,
+    [
+     0.03,
+     -0.52,
+     0.88
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     0.0,
+     -0.06,
+     0.0
+    ],
+    [
+     0.45,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    9.0,
+    [
+     0.0,
+     0.06,
+     0.0
+    ]
+   ]
+  ]
+ }
+}

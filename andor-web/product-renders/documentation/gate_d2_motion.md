@@ -1,5 +1,10 @@
 # Gate D2 · Motion library drafts D01–D08 and the performance-driven PoC (Phase 5)
 
+> **Archived (Cinematic Direction 2.0).**
+> - These drafts, and the G2 / S6 plans in `scripts/motion_preview.py`, are archived as the record of Gate D2.
+> - Final rendering of these variants, including the D02 one-second final test, is paused until the new direction has been evaluated.
+> - The new library is R01–R08, under `blender/cine/`. See `cinematic_direction_2.md`.
+
 **Basis:** the approved C3 master. Geometry, materials, light and compositions are unchanged.
 
 **What moves:**

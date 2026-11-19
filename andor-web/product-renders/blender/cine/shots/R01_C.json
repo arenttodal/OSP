@@ -1,0 +1,137 @@
+{
+ "id": "R01_C",
+ "family": "R01 Grand Reveal",
+ "variant": "C: architectural scale",
+ "narrative": "A low camera, almost at the instrument's level, close enough that the control surface is a landscape. The camera withdraws along the floor and only gently rises, so the instrument stays monumental - large in frame, seen slightly from below - while it tilts toward us and the wordmark towers behind it.",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 11.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 50,
+  "fstop": 8.0,
+  "position": [
+   [
+    0.0,
+    [
+     0.08,
+     -0.4,
+     0.022
+    ],
+    [
+     0.45,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    10.0,
+    [
+     0.0,
+     -0.7,
+     0.075
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     0.02,
+     0.0,
+     0.02
+    ],
+    [
+     0.45,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    10.0,
+    [
+     0.0,
+     0.02,
+     0.07
+    ]
+   ]
+  ]
+ },
+ "product": {
+  "pivot": [
+   0,
+   0,
+   0
+  ],
+  "tilt": [
+   [
+    0.0,
+    0.0,
+    [
+     0.45,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    10.4,
+    20.0
+   ]
+  ],
+  "translate": [
+   [
+    0.0,
+    [
+     0,
+     0,
+     0.035
+    ],
+    [
+     0.45,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    10.4,
+    [
+     0,
+     0,
+     0.05
+    ]
+   ]
+  ]
+ },
+ "lights": {
+  "Key softbox": {
+   "orbit": [
+    [
+     0.0,
+     10.0,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     11.0,
+     -4.0
+    ]
+   ]
+  }
+ },
+ "typography": {
+  "wordmark": "ANDOR",
+  "behind_product": true
+ }
+}

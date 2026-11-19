@@ -1,0 +1,251 @@
+{
+ "id": "R02_B",
+ "family": "R02 Silhouette",
+ "variant": "B: ivory, the light rises",
+ "narrative": "Dusk in the gallery. A single low raking light skims the floor and draws the instrument's silhouette and timber edge; as it swings round, the room's soft architectural light rises behind it, and ceramic, grain and controls resolve in warm daylight. An almost imperceptible push forward.",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 8.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 70,
+  "fstop": 8.0,
+  "position": [
+   [
+    0.0,
+    [
+     -0.46,
+     -0.86,
+     0.21
+    ],
+    "linear"
+   ],
+   [
+    8.0,
+    [
+     -0.445,
+     -0.835,
+     0.205
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     0.0,
+     0.01,
+     0.01
+    ]
+   ]
+  ]
+ },
+ "lights": {
+  "Key softbox": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     0.8,
+     0.0,
+     [
+      0.55,
+      0.0,
+      0.2,
+      1.0
+     ]
+    ],
+    [
+     7.0,
+     1.0
+    ]
+   ]
+  },
+  "Edge strip": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     0.8,
+     0.0,
+     [
+      0.55,
+      0.0,
+      0.2,
+      1.0
+     ]
+    ],
+    [
+     7.0,
+     1.0
+    ]
+   ]
+  },
+  "Overhead": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     1.5,
+     0.0,
+     [
+      0.55,
+      0.0,
+      0.2,
+      1.0
+     ]
+    ],
+    [
+     7.0,
+     0.55
+    ]
+   ]
+  },
+  "Fill": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     0.8,
+     0.0,
+     [
+      0.55,
+      0.0,
+      0.2,
+      1.0
+     ]
+    ],
+    [
+     7.0,
+     1.0
+    ]
+   ]
+  },
+  "Front kicker": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     0.8,
+     0.0,
+     [
+      0.55,
+      0.0,
+      0.2,
+      1.0
+     ]
+    ],
+    [
+     7.0,
+     1.0
+    ]
+   ]
+  },
+  "Low rake": {
+   "energy": [
+    [
+     0.0,
+     0.7,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     8.0,
+     1.0
+    ]
+   ],
+   "orbit": [
+    [
+     0.0,
+     -25.0,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     8.0,
+     0.0
+    ]
+   ]
+  }
+ },
+ "exposure": [
+  [
+   0.0,
+   -1.0,
+   [
+    0.55,
+    0.0,
+    0.2,
+    1.0
+   ]
+  ],
+  [
+   7.0,
+   -0.25
+  ]
+ ],
+ "world": [
+  [
+   0.0,
+   0.05,
+   [
+    0.55,
+    0.0,
+    0.2,
+    1.0
+   ]
+  ],
+  [
+   7.0,
+   1.0
+  ]
+ ],
+ "emission": [
+  [
+   0.0,
+   0.0,
+   "hold"
+  ],
+  [
+   2.0,
+   0.0,
+   [
+    0.33,
+    0.0,
+    0.25,
+    1.0
+   ]
+  ],
+  [
+   7.5,
+   0.8
+  ]
+ ]
+}

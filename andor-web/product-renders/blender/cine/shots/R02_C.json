@@ -1,0 +1,325 @@
+{
+ "id": "R02_C",
+ "family": "R02 Silhouette",
+ "variant": "C: highlight scan over the control surface",
+ "narrative": "A dim, close three-quarter view of the control surface. A broad soft reflection - a card out of frame - glides across it, and each knob, key and display bezel flares into form as the highlight crosses it, leaving the surface revealed in its wake. Locked camera.",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 8.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 9.0,
+  "position": [
+   [
+    0.0,
+    [
+     -0.42,
+     -0.8,
+     0.55
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     0.0,
+     0.03,
+     0.0
+    ]
+   ]
+  ]
+ },
+ "lights": {
+  "Key softbox": {
+   "energy": [
+    [
+     0.0,
+     0.03,
+     "hold"
+    ],
+    [
+     5.5,
+     0.03,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     8.0,
+     0.7
+    ]
+   ]
+  },
+  "Edge strip": {
+   "energy": [
+    [
+     0.0,
+     0.03,
+     "hold"
+    ],
+    [
+     5.5,
+     0.03,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     8.0,
+     0.7
+    ]
+   ]
+  },
+  "Overhead": {
+   "energy": [
+    [
+     0.0,
+     0.03,
+     "hold"
+    ],
+    [
+     5.5,
+     0.03,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     8.0,
+     0.7
+    ]
+   ]
+  },
+  "Fill": {
+   "energy": [
+    [
+     0.0,
+     0.03,
+     "hold"
+    ],
+    [
+     5.5,
+     0.03,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     8.0,
+     0.7
+    ]
+   ]
+  },
+  "Front kicker": {
+   "energy": [
+    [
+     0.0,
+     0.03,
+     "hold"
+    ],
+    [
+     5.5,
+     0.03,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     8.0,
+     0.7
+    ]
+   ]
+  },
+  "Low rake": {
+   "energy": [
+    [
+     0.0,
+     0.03,
+     "hold"
+    ],
+    [
+     5.5,
+     0.03,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     8.0,
+     0.7
+    ]
+   ]
+  }
+ },
+ "exposure": [
+  [
+   0.0,
+   -0.5,
+   "hold"
+  ],
+  [
+   5.5,
+   -0.5,
+   [
+    0.33,
+    0.0,
+    0.25,
+    1.0
+   ]
+  ],
+  [
+   8.0,
+   0.0
+  ]
+ ],
+ "world": [
+  [
+   0.0,
+   0.05,
+   "hold"
+  ],
+  [
+   5.5,
+   0.1,
+   [
+    0.33,
+    0.0,
+    0.25,
+    1.0
+   ]
+  ],
+  [
+   8.0,
+   0.8
+  ]
+ ],
+ "emission": [
+  [
+   0.0,
+   0.15,
+   "hold"
+  ],
+  [
+   5.0,
+   0.15,
+   [
+    0.33,
+    0.0,
+    0.25,
+    1.0
+   ]
+  ],
+  [
+   8.0,
+   0.8
+  ]
+ ],
+ "cards": [
+  {
+   "name": "Scan card",
+   "size": [
+    0.14,
+    0.9
+   ],
+   "color": [
+    1.0,
+    0.98,
+    0.95
+   ],
+   "position": [
+    [
+     0.0,
+     [
+      -0.75,
+      0.55,
+      0.45
+     ],
+     [
+      0.45,
+      0.0,
+      0.55,
+      1.0
+     ]
+    ],
+    [
+     7.0,
+     [
+      0.75,
+      0.55,
+      0.45
+     ]
+    ]
+   ],
+   "target": [
+    [
+     0.0,
+     [
+      -0.1,
+      0.0,
+      0.0
+     ],
+     [
+      0.45,
+      0.0,
+      0.55,
+      1.0
+     ]
+    ],
+    [
+     7.0,
+     [
+      0.1,
+      0.0,
+      0.0
+     ]
+    ]
+   ],
+   "strength": [
+    [
+     0.0,
+     0.0,
+     "smooth"
+    ],
+    [
+     0.6,
+     30.0,
+     "linear"
+    ],
+    [
+     6.8,
+     30.0,
+     "smooth"
+    ],
+    [
+     8.0,
+     12.0
+    ]
+   ],
+   "diffuse": false
+  }
+ ]
+}

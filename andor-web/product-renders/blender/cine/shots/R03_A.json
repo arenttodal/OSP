@@ -1,0 +1,81 @@
+{
+ "id": "R03_A",
+ "family": "R03 Above the Sound",
+ "variant": "A: diagonal flyover, rising",
+ "narrative": "We drift diagonally above the three sound engines, from the near-left corner toward the far right, rising slowly. The three cards, their displays and source controls pass beneath in layered parallax, with a corner of the macro row anchoring the foreground: three voices, one instrument.",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 9.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 11.0,
+  "position": [
+   [
+    0.0,
+    [
+     -0.55,
+     -0.77,
+     0.6
+    ],
+    [
+     0.33,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    9.0,
+    [
+     0.34,
+     -0.7,
+     0.88
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     -0.06,
+     0.04,
+     0.0
+    ],
+    [
+     0.33,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    9.0,
+    [
+     0.03,
+     0.055,
+     0.0
+    ]
+   ]
+  ]
+ },
+ "lights": {
+  "Key softbox": {
+   "orbit": [
+    [
+     0.0,
+     -6.0,
+     "linear"
+    ],
+    [
+     9.0,
+     6.0
+    ]
+   ]
+  }
+ }
+}

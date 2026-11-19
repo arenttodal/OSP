@@ -1,0 +1,173 @@
+{
+ "id": "R01_B",
+ "family": "R01 Grand Reveal",
+ "variant": "B: dark theatre, sculptural",
+ "narrative": "Near darkness. A rim of light traces the instrument's front edge from just below its eye line. As the camera draws back and slightly up, the instrument rises a few centimetres and tilts toward us; the rim widens into a sculpted silhouette and the control surface catches the top light. It settles floating in the dark, the wordmark emerging behind it.",
+ "setup": "ANDOR_FLOATING",
+ "base_shot": "B1_R4",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 11.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 75,
+  "fstop": 8.0,
+  "position": [
+   [
+    0.0,
+    [
+     0.3,
+     -0.4,
+     0.012
+    ],
+    [
+     0.45,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    10.0,
+    [
+     0.036,
+     -1.2,
+     0.28
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     0.07,
+     0.0,
+     0.004
+    ],
+    [
+     0.45,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    10.0,
+    [
+     -0.004,
+     0.03,
+     0.075
+    ]
+   ]
+  ]
+ },
+ "product": {
+  "pivot": [
+   0,
+   0,
+   0
+  ],
+  "tilt": [
+   [
+    0.0,
+    0.0,
+    [
+     0.45,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    10.4,
+    22.0
+   ]
+  ],
+  "translate": [
+   [
+    0.0,
+    [
+     0,
+     0,
+     -0.02
+    ],
+    [
+     0.45,
+     0.0,
+     0.25,
+     1.0
+    ]
+   ],
+   [
+    10.4,
+    [
+     0,
+     0,
+     0.03
+    ]
+   ]
+  ]
+ },
+ "lights": {
+  "Key softbox": {
+   "energy": [
+    [
+     0.0,
+     0.15,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     8.0,
+     1.0
+    ]
+   ]
+  },
+  "Top line": {
+   "energy": [
+    [
+     0.0,
+     0.3,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     7.0,
+     1.0
+    ]
+   ]
+  },
+  "Fill": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     [
+      0.33,
+      0.0,
+      0.25,
+      1.0
+     ]
+    ],
+    [
+     9.0,
+     1.0
+    ]
+   ]
+  }
+ },
+ "typography": {
+  "wordmark": "ANDOR",
+  "behind_product": true
+ }
+}

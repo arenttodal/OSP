@@ -1,0 +1,112 @@
+diff --git a/shared/andor-ui/Source/ArpSection.cpp b/shared/andor-ui/Source/ArpSection.cpp
+index 62f5499..285cc21 100644
+--- a/shared/andor-ui/Source/ArpSection.cpp
++++ b/shared/andor-ui/Source/ArpSection.cpp
+@@ -146,6 +146,19 @@ int ArpControl::hoverAt (juce::Point<float> at) const
+ void ArpControl::paintLight (juce::Graphics& g, juce::Point<float> c, bool on, bool hovered, const char* onPiece, const char* offPiece)
+ {
+     using namespace design;
++    if (! isEnabled() && (on || hovered))   // (the inner call is unlit and unhovered: no recursion)
++    {
++        // LOCAL K2 disabled pilot: no illumination and no hover. The lens is drawn unlit; a set
++        // (latent on) light keeps a small ink centre, so disabled-on and disabled-off differ
++        // without any glow. The component's alpha lowers this ink with the rest of the key.
++        paintLight (g, c, false, false, onPiece, offPiece);
++        if (on)
++        {
++            g.setColour (colour::text.withAlpha (0.85f));
++            g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (c));
++        }
++        return;
++    }
+     if (auto* pieces = skin::active())
+     {
+         if (on)
+diff --git a/shared/andor-ui/Source/KeyboardUtilityActions.cpp b/shared/andor-ui/Source/KeyboardUtilityActions.cpp
+index 8866956..6697c80 100644
+--- a/shared/andor-ui/Source/KeyboardUtilityActions.cpp
++++ b/shared/andor-ui/Source/KeyboardUtilityActions.cpp
+@@ -24,8 +24,13 @@ public:
+ 
+     skin::KeyState keyState() const
+     {
++        if (! isEnabled())   // LOCAL K2 disabled pilot: the key at rest (no hover, press or active light)
++            return skin::KeyState::normal;
++        if (skin::pilotForcedKeyState >= 0)   // LOCAL pilot capture only
++            return static_cast<skin::KeyState> (skin::pilotForcedKeyState);
+         return active || isDown() ? skin::KeyState::pressed : isOver() ? skin::KeyState::hover : skin::KeyState::normal;
+     }
++    void enablementChanged() override { repaintFace(); }
+ 
+     void buttonStateChanged() override { repaintFace(); }
+     void focusGained (FocusChangeType) override { repaintFace(); }
+@@ -42,14 +47,18 @@ public:
+     {
+         using namespace design;
+         const auto r = getLocalBounds().toFloat();
+-        const auto c = r.getCentre().translated (0.0f, down || active ? 0.5f : 0.0f);
+-        const auto ink = colour::text.withAlpha (highlighted || active ? 0.95f : 0.8f);
++        const bool enabled = isEnabled();   // LOCAL K2 disabled pilot: lower ink contrast, no illumination
++        if (! enabled)
++            highlighted = down = false;
++        const bool lit = active && enabled;
++        const auto c = r.getCentre().translated (0.0f, down || lit ? 0.5f : 0.0f);
++        const auto ink = enabled ? colour::text.withAlpha (highlighted || lit ? 0.95f : 0.8f) : colour::text.withAlpha (0.8f * skin::disabledInkAlpha);
+         switch (action)
+         {
+             case Action::aux:
+             {
+                 // A "D" of the AUX badge's family, in AUX's restrained purple (never a power key).
+-                g.setColour (active ? accent.darker (0.25f) : accent.withAlpha (highlighted ? 1.0f : 0.85f));
++                g.setColour (! enabled ? colour::text.withAlpha (0.8f * skin::disabledInkAlpha) : lit ? accent.darker (0.25f) : accent.withAlpha (highlighted ? 1.0f : 0.85f));
+                 g.setFont (fonts::make (17.0f, fonts::Weight::medium, 0.0f));
+                 g.drawText ("D", juce::Rectangle<float> (16.0f, 18.0f).withCentre (c.translated (0.0f, 0.5f)), juce::Justification::centred, false);
+                 break;
+diff --git a/shared/andor-ui/Source/CeramicSkin.cpp b/shared/andor-ui/Source/CeramicSkin.cpp
+index 73a9830..533e3fa 100644
+--- a/shared/andor-ui/Source/CeramicSkin.cpp
++++ b/shared/andor-ui/Source/CeramicSkin.cpp
+@@ -508,13 +778,27 @@ float keyRadius (KeyRole role) noexcept
+     return 7.0f;
+ }
+ 
++int pilotForcedKeyState = -1;
++float disabledInkAlpha = 0.45f;   // LOCAL K2 disabled pilot   // LOCAL K2 pilot capture only (not committed): -1 none, else a KeyState for every key
++
+ void drawKeys (juce::Graphics& g, juce::Component& surface)
+ {
+     if (active() == nullptr)
+         return;
+     for (auto* child : surface.getChildren())
+         if (const auto* face = dynamic_cast<const KeyFace*> (child); face != nullptr && child->isVisible() && face->keyOnSurface())
+-            key (g, face->keyArea (child->getBounds().toFloat()), keyRadius (face->keyRole()), face->keyRole(), face->keyState());
++        {
++            // LOCAL K2 disabled pilot: a disabled key keeps its body (same size and construction) at
++            // rest, with no hover, press or active light, and its own ink (icon, label, lamp) at
++            // reduced contrast. The ink is the key component's own drawing: its alpha dims only that.
++            const bool enabled = child->isEnabled();
++            const float inkAlpha = enabled ? 1.0f : disabledInkAlpha;
++            if (std::abs (child->getAlpha() - inkAlpha) > 0.001f)
++                child->setAlpha (inkAlpha);
++            const auto state = ! enabled ? KeyState::normal
++                             : pilotForcedKeyState >= 0 ? static_cast<KeyState> (pilotForcedKeyState) : face->keyState();
++            key (g, face->keyArea (child->getBounds().toFloat()), keyRadius (face->keyRole()), face->keyRole(), state);
++        }
+ }
+ 
+ bool drawnBySurface() noexcept { return active() != nullptr; }
+diff --git a/shared/andor-ui/Source/CeramicSkin.h b/shared/andor-ui/Source/CeramicSkin.h
+index c8a3cf9..956043c 100644
+--- a/shared/andor-ui/Source/CeramicSkin.h
++++ b/shared/andor-ui/Source/CeramicSkin.h
+@@ -213,6 +264,10 @@ public:
+ 
+ /** The A1 key of every visible child of `surface` that is a KeyFace, at its bounds. */
+ void drawKeys (juce::Graphics&, juce::Component& surface);
++/** LOCAL pilot hooks (not committed): a forced key state for review captures (-1: off) and the
++    disabled keys' ink alpha (K2 disabled study). */
++extern int pilotForcedKeyState;
++extern float disabledInkAlpha;
+ /** True while the ceramic look draws keys and raised faces on the surface below them. */
+ bool drawnBySurface() noexcept;
+ 

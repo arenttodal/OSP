@@ -1,0 +1,334 @@
+"""ANDOR cinematography rig (Cinematic Direction 2.0): directed shots from JSON shot specs.
+
+  <bpy python> cine/cine_rig.py -- --spec cine/shots/R01_A.json --out <dir>
+      [--width 768] [--samples 6] [--noise 0.05] [--pass beauty|matte|clean]
+      [--frames A B] [--still SECONDS --still-width 1920 --still-samples 128]
+
+The approved master (geometry, materials, environment, lights) is built by scripts/andor_scene.py
+from the spec's `setup` and `base_shot`; this rig then replaces the generic orbit with directed,
+independently animated channels:
+
+  camera.position / camera.target   product-frame metres (x along the keys, y toward the back,
+                                     z up; origin at the product's centre at rest). The camera
+                                     looks at its target with world-up (no accidental roll);
+                                     an explicit `roll` channel exists for intent only.
+  camera.lens / camera.fstop / camera.focus   focal length (mm), aperture, focus point (product
+                                     frame) - independent of the target.
+  product.tilt / product.turn        degrees about the product's own x (back edge up: toward the
+                                     viewer) and z axes, about `product.pivot`; product.translate
+                                     (product frame, metres). The whole instrument moves as one
+                                     body; floor shadows and reflections are rendered every frame.
+  lights.<name>.energy               a multiplier of the setup's energy; .orbit (deg about the
+                                     vertical through the product centre); .translate (metres).
+  cards[]                            reflection cards: emissive planes seen only in reflections.
+  exposure                           an offset (stops) on the setup's exposure.
+  world / emission                   multipliers of the world light and of the instrument's
+                                     self-lit surfaces (displays, LEDs).
+
+Every channel is a list of keys [t_seconds, value, easing-to-next] (value: number or [x, y, z]).
+Easing: linear, smooth, in_out (cubic), out (cubic), settle (quintic out), in (cubic), hold, or
+a CSS-style cubic bezier [x1, y1, x2, y2]. Keys are evaluated per frame here (not Blender
+f-curves), so each shot has its own velocity curves and handles hold the end poses.
+
+Passes (same animation, deterministic): beauty (the master), matte (product alpha: environment
+held out, film transparent) and clean (the environment without the product: shadow ratio).
+"""
+import argparse
+import json
+import math
+import os
+import runpy
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SCRIPTS = os.path.join(HERE, "..", "scripts")
+argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
+ap = argparse.ArgumentParser()
+ap.add_argument("--spec", required=True)
+ap.add_argument("--out", required=True)
+ap.add_argument("--width", type=int, default=768)
+ap.add_argument("--samples", type=int, default=6)
+ap.add_argument("--noise", type=float, default=0.05)
+ap.add_argument("--pass", dest="pass_", default="beauty", choices=["beauty", "matte", "clean"])
+ap.add_argument("--frames", type=int, nargs=2, default=None)
+ap.add_argument("--keyframes", action="store_true", help="render the opening, 1/4, 1/2, 3/4 and closing frames of the move")
+ap.add_argument("--still", type=float, default=None, help="render one frame at this time (seconds into the move)")
+ap.add_argument("--still-width", type=int, default=1920)
+ap.add_argument("--still-samples", type=int, default=128)
+ap.add_argument("--still-noise", type=float, default=0.01)
+args = ap.parse_args(argv)
+spec = json.load(open(args.spec))
+
+FPS = spec.get("fps", 24)
+DUR = float(spec["seconds"])
+HANDLE = float(spec.get("handles", 1.0))
+N = int(round((DUR + 2 * HANDLE) * FPS))
+aspect = spec["aspect"]   # [w, h]
+width = args.still_width if args.still is not None else args.width
+res = [width, 2 * round(width * aspect[1] / aspect[0] / 2)]
+samples = args.still_samples if args.still is not None else (4 if args.pass_ == "matte" else args.samples)
+noise = args.still_noise if args.still is not None else args.noise
+
+sys.argv = ["andor_scene.py", "--", "--setup", spec["setup"], "--shot", spec["base_shot"], "--res", str(res[0]), str(res[1]),
+            "--samples", str(samples), "--noise", str(noise)]
+g = runpy.run_path(os.path.join(SCRIPTS, "andor_scene.py"), run_name="__main__")
+bpy, Vector, Euler = g["bpy"], g["Vector"], g["Euler"]
+from mathutils import Matrix, Quaternion  # noqa: E402
+scene = bpy.context.scene
+scene.render.fps, scene.render.fps_base = FPS, 1.0
+scene.cycles.seed, scene.cycles.use_animated_seed = 0, False
+ROT = math.radians(g["ROT"])
+Q_ROT = Quaternion((0, 0, 1), ROT)
+
+# ---- easing and keys -------------------------------------------------------------------------
+def bezier(x1, y1, x2, y2):
+    def f(u):
+        lo, hi = 0.0, 1.0   # solve x(s) = u by bisection, return y(s)
+        for _ in range(40):
+            s = 0.5 * (lo + hi)
+            x = 3 * (1 - s) ** 2 * s * x1 + 3 * (1 - s) * s * s * x2 + s ** 3
+            lo, hi = (s, hi) if x < u else (lo, s)
+        s = 0.5 * (lo + hi)
+        return 3 * (1 - s) ** 2 * s * y1 + 3 * (1 - s) * s * s * y2 + s ** 3
+    return f
+
+
+EASE = {"linear": lambda u: u, "smooth": lambda u: u * u * (3 - 2 * u), "in": lambda u: u ** 3,
+        "out": lambda u: 1 - (1 - u) ** 3, "in_out": lambda u: 4 * u ** 3 if u < 0.5 else 1 - (-2 * u + 2) ** 3 / 2,
+        "settle": lambda u: 1 - (1 - u) ** 5, "hold": lambda u: 0.0}
+
+
+def ev(keys, t, default=None):
+    if keys is None:
+        return default
+    if not isinstance(keys, list) or not keys or not isinstance(keys[0], list):
+        return keys   # a constant
+    if t <= keys[0][0]:
+        return keys[0][1]
+    for k0, k1 in zip(keys, keys[1:]):
+        if k0[0] <= t <= k1[0]:
+            e = k0[2] if len(k0) > 2 else "smooth"
+            fn = bezier(*e) if isinstance(e, list) else EASE[e]
+            u = fn((t - k0[0]) / max(1e-9, k1[0] - k0[0]))
+            a, b = k0[1], k1[1]
+            return [x + (y - x) * u for x, y in zip(a, b)] if isinstance(a, list) else a + (b - a) * u
+    return keys[-1][1]
+
+
+# ---- the product frame --------------------------------------------------------------------------
+root = bpy.data.objects["OSP"]
+bpy.context.view_layer.update()
+mins, maxs = [1e9] * 3, [-1e9] * 3
+def _under_root(o):
+    while o.parent is not None:
+        if o.parent == root:
+            return True
+        o = o.parent
+    return False
+
+
+# Only the instrument (descendants of the OSP root): the backdrop parents its own planks.
+product_objs = [o for o in bpy.data.objects if o.type == "MESH" and _under_root(o)]
+for o in product_objs:
+    for c in o.bound_box:
+        w = o.matrix_world @ Vector(c)
+        for i in range(3):
+            mins[i], maxs[i] = min(mins[i], w[i]), max(maxs[i], w[i])
+CENTER = Vector([(a + b) / 2 for a, b in zip(mins, maxs)])
+
+
+def P(v):
+    """product-frame point (metres, from the centre at rest) -> world."""
+    return CENTER + Q_ROT @ Vector(v)
+
+
+pc = spec.get("product", {})
+pivot_local = Vector(pc.get("pivot", [0, 0, 0]))
+pivot = bpy.data.objects.new("Cine product pivot", None)
+scene.collection.objects.link(pivot)
+pivot.location = P(pivot_local)
+bpy.context.view_layer.update()
+root.parent = pivot
+root.matrix_parent_inverse = pivot.matrix_world.inverted()
+pivot.rotation_mode = "QUATERNION"
+
+# ---- lights, cards, camera ------------------------------------------------------------------------
+lights = {}
+for name, lc in spec.get("lights", {}).items():
+    o = bpy.data.objects.get(name)
+    if o is None:
+        print("no light", name)
+        continue
+    lights[name] = (o, lc, o.matrix_world.copy(), o.data.energy)
+cards = []
+for cd in spec.get("cards", []):
+    me = bpy.data.meshes.new(cd["name"])
+    w, h = cd["size"]
+    me.from_pydata([(-w / 2, -h / 2, 0), (w / 2, -h / 2, 0), (w / 2, h / 2, 0), (-w / 2, h / 2, 0)], [], [(0, 1, 2, 3)])
+    o = bpy.data.objects.new(cd["name"], me)
+    scene.collection.objects.link(o)
+    mat = bpy.data.materials.new(cd["name"])
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    em, out = nt.nodes.new("ShaderNodeEmission"), nt.nodes.new("ShaderNodeOutputMaterial")
+    em.inputs["Color"].default_value = (*cd.get("color", [1, 1, 1]), 1)
+    nt.links.new(em.outputs[0], out.inputs[0])
+    me.materials.append(mat)
+    o.visible_camera = False
+    o.visible_diffuse = cd.get("diffuse", False)
+    o.visible_shadow = False
+    cards.append((o, cd, em))
+cam_data = bpy.data.cameras.new("Cine camera")
+cam = bpy.data.objects.new("Cine camera", cam_data)
+scene.collection.objects.link(cam)
+cam_data.sensor_fit, cam_data.sensor_width = "HORIZONTAL", 36.0
+cam_data.clip_start = 0.005
+cs = spec["camera"]
+if cs.get("fstop"):
+    cam_data.dof.use_dof = True
+    cam_data.dof.aperture_blades = 9
+scene.camera = cam
+base_exposure = scene.view_settings.exposure
+world_bg = scene.world.node_tree.nodes["Background"].inputs["Strength"] if scene.world else None
+world_base = world_bg.default_value if world_bg else 0.0
+# The instrument's self-lit surfaces (displays, LEDs): one multiplier, so a shot emerging from
+# darkness is not led by glowing screens.
+emitters, _seen = [], set()
+for o in product_objs:
+    for slot in o.material_slots:
+        m = slot.material
+        if m is None or not m.use_nodes or m.name in _seen:
+            continue
+        _seen.add(m.name)
+        for n in m.node_tree.nodes:
+            sock = n.inputs.get("Emission Strength") if n.type == "BSDF_PRINCIPLED" else (n.inputs.get("Strength") if n.type == "EMISSION" else None)
+            if sock is None:
+                continue
+            if sock.is_linked:   # displays: strength = mask x constant (a Math multiply)
+                src = sock.links[0].from_node
+                if src.type == "MATH" and src.operation == "MULTIPLY" and not src.inputs[1].is_linked:
+                    sock = src.inputs[1]
+                else:
+                    continue
+            if sock.default_value > 0:
+                emitters.append((sock, sock.default_value))
+print("cine: emitters", len(emitters), "world", world_base)
+
+
+def look(o, target, roll_deg=0.0):
+    z = (o.location - target).normalized()
+    up = Vector((0, 0, 1))
+    if abs(z.dot(up)) > 0.999:
+        up = Q_ROT @ Vector((0, 1, 0))
+    x = up.cross(z).normalized()
+    y = z.cross(x)
+    m = Matrix((x, y, z)).transposed()
+    if roll_deg:
+        m = m @ Matrix.Rotation(math.radians(roll_deg), 3, "Z")
+    o.rotation_euler = m.to_euler()
+
+
+# ---- passes -----------------------------------------------------------------------------------------
+env_objs = [o for o in bpy.data.objects if o.type == "MESH" and o not in product_objs and o not in [c[0] for c in cards]]
+if args.pass_ == "matte":
+    scene.render.film_transparent = True
+    scene.cycles.use_denoising = False
+    for o in env_objs:
+        o.is_holdout = True
+    scene.render.image_settings.color_mode = "RGBA"
+elif args.pass_ == "clean":
+    for o in product_objs:
+        o.hide_render = True
+
+
+def apply(t):
+    """Sets every animated channel for time t (seconds into the move; handles hold the ends)."""
+    tt = min(DUR, max(0.0, t))
+    tilt = math.radians(ev(pc.get("tilt"), tt, 0.0))
+    turn = math.radians(ev(pc.get("turn"), tt, 0.0))
+    q_local = Quaternion((0, 0, 1), turn) @ Quaternion((1, 0, 0), tilt)
+    pivot.rotation_quaternion = Q_ROT @ q_local @ Q_ROT.inverted()
+    pivot.location = P(pivot_local + Vector(ev(pc.get("translate"), tt, [0, 0, 0])))
+    for name, (o, lc, m0, e0) in lights.items():
+        o.data.energy = e0 * ev(lc.get("energy"), tt, 1.0)
+        a = math.radians(ev(lc.get("orbit"), tt, 0.0))
+        tr = Q_ROT @ Vector(ev(lc.get("translate"), tt, [0, 0, 0]))
+        o.matrix_world = Matrix.Translation(tr) @ Matrix.Translation(CENTER) @ Matrix.Rotation(a, 4, "Z") @ Matrix.Translation(-CENTER) @ m0
+    for o, cd, em in cards:
+        o.location = P(ev(cd["position"], tt))
+        look(o, P(ev(cd["target"], tt)))
+        em.inputs["Strength"].default_value = ev(cd.get("strength"), tt, 1.0)
+    cam_data.lens = ev(cs["lens"], tt)
+    cam.location = P(ev(cs["position"], tt))
+    target = P(ev(cs["target"], tt))
+    look(cam, target, ev(cs.get("roll"), tt, 0.0))
+    if cam_data.dof.use_dof:
+        cam_data.dof.aperture_fstop = ev(cs["fstop"], tt)
+        cam_data.dof.focus_distance = (P(ev(cs.get("focus", cs["target"]), tt)) - cam.location).length
+    shift = ev(cs.get("shift"), tt, [0.0, 0.0])
+    cam_data.shift_x, cam_data.shift_y = shift
+    scene.view_settings.exposure = base_exposure + ev(spec.get("exposure"), tt, 0.0)
+    if world_bg is not None:
+        world_bg.default_value = world_base * ev(spec.get("world"), tt, 1.0)
+    em_k = ev(spec.get("emission"), tt, 1.0)
+    for sock, v0 in emitters:
+        sock.default_value = v0 * em_k
+    return {"t": round(t, 4), "lens": round(cam_data.lens, 2), "cam": [round(x, 4) for x in cam.location],
+            "target": [round(x, 4) for x in target], "tilt_deg": round(math.degrees(tilt), 2)}
+
+
+def complete_png(path):
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            if f.tell() < 64:
+                return False
+            f.seek(-12, 2)
+            return f.read()[4:8] == b"IEND"
+    except OSError:
+        return False
+
+
+os.makedirs(args.out, exist_ok=True)
+log = []
+if args.keyframes:
+    kdir = os.path.join(args.out, "keyframes_" + args.pass_)
+    os.makedirs(kdir, exist_ok=True)
+    for lab, u in (("0_open", 0.0), ("1_quarter", 0.25), ("2_mid", 0.5), ("3_three_quarter", 0.75), ("4_close", 1.0)):
+        rec = apply(u * DUR)
+        rec["label"] = lab
+        path = os.path.join(kdir, f"{spec['id']}_{lab}.png")
+        if not complete_png(path):
+            scene.render.filepath = path
+            t0 = time.time()
+            bpy.ops.render.render(write_still=True)
+            rec["render_s"] = round(time.time() - t0, 1)
+        log.append(rec)
+elif args.still is not None:
+    log.append(apply(args.still))
+    path = os.path.join(args.out, f"{spec['id']}_still_t{args.still:.2f}.png")
+    scene.render.filepath = path
+    t0 = time.time()
+    bpy.ops.render.render(write_still=True)
+    log[-1]["render_s"] = round(time.time() - t0, 1)
+else:
+    fdir = os.path.join(args.out, args.pass_)
+    os.makedirs(fdir, exist_ok=True)
+    f0, f1 = args.frames if args.frames else (1, N)
+    for f in range(f0, f1 + 1):
+        t = (f - 1) / FPS - HANDLE
+        rec = apply(t)
+        path = os.path.join(fdir, f"{f:04d}.png")
+        if not complete_png(path):
+            scene.frame_set(f)
+            scene.render.filepath = path
+            t0 = time.time()
+            bpy.ops.render.render(write_still=True)
+            rec["render_s"] = round(time.time() - t0, 1)
+        log.append(rec)
+json.dump({"spec": spec, "pass": args.pass_, "res": res, "samples": samples, "noise": noise, "fps": FPS,
+           "frames_total": N, "handles_s": HANDLE, "blender": bpy.app.version_string, "frames": log},
+          open(os.path.join(args.out, f"{spec['id']}_{'keyframes' if args.keyframes else (args.pass_ if args.still is None else 'still')}_meta.json"), "w"), indent=1)
+print("done", spec["id"], args.pass_ if args.still is None else "still")
