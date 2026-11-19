@@ -37,7 +37,12 @@ EMPHASIS = {"modifier": 1.0, "mode": 0.8, "eq": 0.8, "layerState": 0.6, "advance
 KEY_STATES = ("normal", "hover", "pressed", "active")
 
 MACROS = {"life": 62, "drive": 208, "character": 354, "motion": 500, "echo": 646, "space": 792}   # slider x (y 752, 132 px)
-MACRO_COLOURS = {"life": "#be7552", "drive": "#b5843a", "character": "#7b8d69", "motion": "#73899c", "echo": "#5c9490", "space": "#96839d"}
+# The harmonised CORE palette (design::colour::macro; approved 18 Nov 2026).
+MACRO_COLOURS = {"life": "#879674", "drive": "#bb784e", "character": "#518b88", "motion": "#b09a61", "echo": "#94776b", "space": "#758899"}
+# The USER macros' frozen palette (design::colour::userMacro), in macro order (LIFE, DRIVE,
+# FILTER, MOVEMENT, SPACE, ECHO places): the CORE colours they had before the harmonised palette.
+USER_MACRO_COLOURS = ["#be7552", "#b5843a", "#7b8d69", "#73899c", "#96839d", "#5c9490"]
+USER_MACRO_PLACES = ["life", "drive", "character", "motion", "space", "echo"]
 BADGES = {"A": "#c4561f", "B": "#4d6176", "C": "#64806b"}
 
 
@@ -103,6 +108,13 @@ def pieces():
             out.append(dict(name=f"led-{name}-{'lit' if lit else 'unlit'}", kind="lens", centre=(x + 66, 883), diameter=9, height=0.75,
                             rect=(x + 66 - 4.5, 883 - 4.5, 9, 9), insets=[4.5] * 4,
                             colour=MACRO_COLOURS[name], lit=lit, base="panel", margin=6, scale=4, samples=SAMPLES_SMALL))
+    # The USER bank's lenses: the same lens at the same place, in the USER palette.
+    for n, (place, colour) in enumerate(zip(USER_MACRO_PLACES, USER_MACRO_COLOURS), start=1):
+        x = MACROS[place]
+        for lit in (False, True):
+            out.append(dict(name=f"led-user-{n}-{'lit' if lit else 'unlit'}", kind="lens", centre=(x + 66, 883), diameter=9, height=0.75,
+                            rect=(x + 66 - 4.5, 883 - 4.5, 9, 9), insets=[4.5] * 4,
+                            colour=colour, lit=lit, base="panel", margin=6, scale=4, samples=SAMPLES_SMALL))
     for lit in (False, True):
         out.append(dict(name=f"led-arp-{'on' if lit else 'off'}", kind="lens", centre=(1325, 931), diameter=11, height=0.7,
                         rect=(1325 - 5.5, 931 - 5.5, 11, 11), insets=[5.5] * 4,

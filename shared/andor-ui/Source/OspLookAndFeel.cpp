@@ -1,6 +1,7 @@
 #include "OspLookAndFeel.h"
 
 #include "Design.h"
+#include "MenuIcons.h"
 
 #include "BinaryData.h"
 
@@ -63,11 +64,11 @@ OspLookAndFeel::OspLookAndFeel()
     setColour (juce::ComboBox::textColourId, text);
     setColour (juce::ComboBox::arrowColourId, textDim);
     setColour (juce::ComboBox::outlineColourId, border);
-    setColour (juce::PopupMenu::backgroundColourId, housingLight);
-    setColour (juce::PopupMenu::textColourId, text);
-    setColour (juce::PopupMenu::headerTextColourId, textDim);
-    setColour (juce::PopupMenu::highlightedBackgroundColourId, recessed);
-    setColour (juce::PopupMenu::highlightedTextColourId, text);
+    setColour (juce::PopupMenu::backgroundColourId, popupSurface());
+    setColour (juce::PopupMenu::textColourId, juce::Colour (0xff2f2c28));
+    setColour (juce::PopupMenu::headerTextColourId, juce::Colour (0xff8a847a));
+    setColour (juce::PopupMenu::highlightedBackgroundColourId, popupHighlight());
+    setColour (juce::PopupMenu::highlightedTextColourId, juce::Colour (0xff2f2c28));
     setColour (juce::Slider::textBoxTextColourId, text);
     setColour (juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
     setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
@@ -379,16 +380,321 @@ void OspLookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& lab
     label.setFont (getComboBoxFont (box));
 }
 
+namespace
+{
+    bool translucentMenusForced = false;
+
+    /** The card's ink colours: graphite text, a softer graphite for labels and shortcuts. */
+    const juce::Colour menuInk { 0xff2f2c28 };
+    const juce::Colour menuInkSoft { 0xff8a847a };
+    const juce::Colour menuRule { 0xffe6ddcf };
+    const juce::Colour menuRim { 0x24504434 };
+
+    int shadowMarginFor (const juce::PopupMenu::Options& options)
+    {
+        // A menu inside a component is always drawn over it (translucent); a desktop window
+        // only where the platform composites windows.
+        return options.getParentComponent() != nullptr || OspLookAndFeel::translucentMenus() ? OspLookAndFeel::popupShadowMargin : 0;
+    }
+
+    /** The card: where there is a margin, rounded, on a soft contact and ambient shadow; else
+        square, filling the window, with a hairline. */
+    void drawMenuCard (juce::Graphics& g, int width, int height, int margin)
+    {
+        const auto bounds = juce::Rectangle<int> (width, height).toFloat();
+        if (margin <= 0)
+        {
+            g.fillAll (OspLookAndFeel::popupSurface());
+            g.setColour (menuRim);
+            g.drawRect (bounds, 1.0f);
+            return;
+        }
+        const auto card = bounds.reduced (static_cast<float> (margin));
+        juce::Path shape;
+        shape.addRoundedRectangle (card, OspLookAndFeel::popupRadius);
+        juce::DropShadow (juce::Colours::black.withAlpha (0.10f), 6, { 0, 3 }).drawForPath (g, shape);   // ambient
+        juce::DropShadow (juce::Colours::black.withAlpha (0.15f), 3, { 0, 1 }).drawForPath (g, shape);   // contact
+        g.setColour (OspLookAndFeel::popupSurface());
+        g.fillPath (shape);
+        g.setColour (menuRim);
+        g.strokePath (shape, juce::PathStrokeType (1.0f));
+    }
+}
+
+bool OspLookAndFeel::translucentMenus() noexcept
+{
+    return translucentMenusForced || juce::Desktop::canUseSemiTransparentWindows();
+}
+
+void OspLookAndFeel::setTranslucentMenusForTests (bool forced) noexcept
+{
+    translucentMenusForced = forced;
+}
+
+int OspLookAndFeel::popupSideInset (const juce::Component& item) noexcept
+{
+    for (auto* c = item.getParentComponent(); c != nullptr; c = c->getParentComponent())
+        if (c->getName() == "menu")   // (JUCE's menu window)
+            return c->getParentComponent() != nullptr || translucentMenus() ? popupShadowMargin : 0;
+    return 0;
+}
+
 void OspLookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int width, int height)
 {
-    g.fillAll (palette::raised);
-    g.setColour (palette::hairline);
-    g.drawRect (0, 0, width, height, 1);
+    drawMenuCard (g, width, height, translucentMenus() ? popupShadowMargin : 0);
+}
+
+void OspLookAndFeel::drawPopupMenuBackgroundWithOptions (juce::Graphics& g, int width, int height, const juce::PopupMenu::Options& options)
+{
+    drawMenuCard (g, width, height, shadowMarginFor (options));
+}
+
+int OspLookAndFeel::getPopupMenuBorderSize()
+{
+    return popupPadding + (translucentMenus() ? popupShadowMargin : 0);
+}
+
+int OspLookAndFeel::getPopupMenuBorderSizeWithOptions (const juce::PopupMenu::Options& options)
+{
+    // JUCE places a submenu's window at its row's right edge: with the padding equal to the
+    // margin, the two cards meet edge to edge and the submenu's first row lines up with its row.
+    return popupPadding + shadowMarginFor (options);
+}
+
+void OspLookAndFeel::preparePopupMenuWindow (juce::Component& window)
+{
+    const bool translucent = window.getParentComponent() != nullptr || translucentMenus();
+    // JUCE makes a menu window opaque when its background colour is; the card's corners and
+    // shadow need a translucent one (this re-creates the window where it is on the desktop).
+    if (translucent)
+        window.setOpaque (false);
+    if (! translucent)
+        return;
+    // A submenu: JUCE opens its window at its parent window's edge, so the two cards would sit
+    // two shadow margins apart. Moved to meet it, overlapping it a little (its own shadow falls
+    // on the parent): as one surface opening out of another.
+    constexpr int overlap = 3;
+    const auto bounds = window.getBounds();
+    auto consider = [&] (juce::Component* other) {
+        if (other == nullptr || other == &window || other->getName() != "menu" || ! other->isVisible())
+            return false;
+        // (Within a few pixels: a scaled menu's edges are rounded in its own units.)
+        const auto o = other->getBounds();
+        constexpr int slack = 3;
+        if (std::abs (o.getRight() - bounds.getX()) <= slack)
+            window.setTopLeftPosition (o.getRight() - 2 * popupShadowMargin - overlap, bounds.getY());
+        else if (std::abs (o.getX() - bounds.getRight()) <= slack)
+            window.setTopLeftPosition (o.getX() - bounds.getWidth() + 2 * popupShadowMargin + overlap, bounds.getY());
+        else
+            return false;
+        return true;
+    };
+    bool others = false;
+    auto visit = [&] (juce::Component* c) {
+        others = others || (c != nullptr && c != &window && c->getName() == "menu" && c->isVisible());
+        return consider (c);
+    };
+    if (auto* parent = window.getParentComponent())
+    {
+        for (auto* child : parent->getChildren())
+            if (visit (child))
+                return;
+    }
+    else
+    {
+        auto& desktop = juce::Desktop::getInstance();
+        for (int i = desktop.getNumComponents(); --i >= 0;)
+            if (visit (desktop.getComponent (i)))
+                return;
+    }
+    // A menu of its own (no other open): JUCE puts its window's corner at its anchor's (under
+    // it, its left edge); the card sits a shadow margin inside. Moved so the card's left edge is
+    // the anchor's and its top 3 px under it.
+    if (! others)
+        window.setTopLeftPosition (bounds.getX() - popupShadowMargin, bounds.getY() - (popupShadowMargin - 3));
+}
+
+int OspLookAndFeel::getMenuWindowFlags()
+{
+    // The card draws its own shadow; the system's would square it off.
+    return translucentMenus() ? 0 : juce::ComponentPeer::windowHasDropShadow;
 }
 
 juce::Font OspLookAndFeel::getPopupMenuFont()
 {
     return fonts::make (13.5f, fonts::Weight::regular);
+}
+
+void OspLookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth, int& idealHeight)
+{
+    if (isSeparator)
+    {
+        idealWidth = 50;
+        idealHeight = popupSeparatorHeight;
+        return;
+    }
+    idealHeight = standardMenuItemHeight > 0 ? std::max (standardMenuItemHeight, popupRowHeight) : popupRowHeight;
+    // Text after the icon column (the wider gutter: an icon menu's labels must fit too), and room
+    // after it for a chevron, a tick or a shortcut.
+    idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (getPopupMenuFont(), text)) + popupIconGutter + 34;
+}
+
+void OspLookAndFeel::getIdealPopupMenuSectionHeaderSizeWithOptions (const juce::String& text, int, int& idealWidth, int& idealHeight, const juce::PopupMenu::Options&)
+{
+    idealHeight = popupHeaderHeight;
+    idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (fonts::make (10.5f, fonts::Weight::semibold, 0.12f), text.toUpperCase())) + 2 * 14 + 8;
+}
+
+void OspLookAndFeel::drawPopupMenuSectionHeader (juce::Graphics& g, const juce::Rectangle<int>& area, const juce::String& sectionName)
+{
+    // A quiet label in small capitals near the bottom of its row, over its group (the groups'
+    // rules are the menus' own separators: a header cannot know whether it is first).
+    g.setColour (menuInkSoft);
+    g.setFont (fonts::make (10.5f, fonts::Weight::semibold, 0.12f));
+    g.drawFittedText (sectionName.toUpperCase(), area.withTrimmedLeft (14).withTrimmedRight (12).withTrimmedTop (area.getHeight() / 3),
+                      juce::Justification::centredLeft, 1, 0.9f);
+}
+
+void OspLookAndFeel::drawPopupMenuItemWithOptions (juce::Graphics& g, const juce::Rectangle<int>& area, bool isHighlighted, const juce::PopupMenu::Item& item,
+                                                   const juce::PopupMenu::Options& options)
+{
+    const auto colour = item.colour != juce::Colour() ? &item.colour : nullptr;
+    const bool hasSubMenu = item.subMenu != nullptr && (item.itemID == 0 || item.subMenu->getNumItems() > 0);
+    drawPopupMenuItem (g, area.reduced (shadowMarginFor (options), 0), item.isSeparator, item.isEnabled, isHighlighted, item.isTicked, hasSubMenu, item.text,
+                       item.shortcutKeyDescription, item.image.get(), colour);
+}
+
+void OspLookAndFeel::drawPopupMenuSectionHeaderWithOptions (juce::Graphics& g, const juce::Rectangle<int>& area, const juce::String& sectionName,
+                                                            const juce::PopupMenu::Options& options)
+{
+    drawPopupMenuSectionHeader (g, area.reduced (shadowMarginFor (options), 0), sectionName);
+}
+
+void OspLookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<int>& area, bool isSeparator, bool isActive, bool isHighlighted, bool isTicked,
+                                        bool hasSubMenu, const juce::String& text, const juce::String& shortcutKeyText, const juce::Drawable* icon,
+                                        const juce::Colour* textColour)
+{
+    if (isSeparator)
+    {
+        g.setColour (menuRule);
+        g.fillRect (juce::Rectangle<int> (area.getX() + 12, area.getCentreY(), area.getWidth() - 24, 1));
+        return;
+    }
+    if (isHighlighted && isActive)
+    {
+        g.setColour (popupHighlight());
+        g.fillRoundedRectangle (area.toFloat().reduced (4.0f, 1.0f), 5.0f);
+    }
+    const auto ink = (textColour != nullptr ? *textColour : menuInk).withMultipliedAlpha (isActive ? 1.0f : 0.38f);
+    auto drawTick = [&] (juce::Point<float> c) {
+        juce::Path tick;
+        tick.startNewSubPath (c.x - 4.0f, c.y);
+        tick.lineTo (c.x - 1.0f, c.y + 3.0f);
+        tick.lineTo (c.x + 4.5f, c.y - 3.5f);
+        g.setColour (ink);
+        g.strokePath (tick, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    };
+    const auto rowY = static_cast<float> (area.getY()), rowH = static_cast<float> (area.getHeight());
+    auto textArea = area.withTrimmedRight (12);
+    if (icon != nullptr)
+    {
+        // An icon menu: the icon in its own column, the label after it, a tick at the right.
+        const auto box = juce::Rectangle<float> (static_cast<float> (area.getX()) + 10.0f, rowY, 15.0f, rowH).withSizeKeepingCentre (15.0f, 15.0f);
+        if (auto* glyph = dynamic_cast<const menuicons::Glyph*> (icon))
+            menuicons::draw (g, glyph->glyphKind(), box, ink.withMultipliedAlpha (textColour != nullptr ? 1.0f : 0.86f));
+        else
+            icon->drawWithin (g, box, juce::RectanglePlacement::centred, isActive ? 1.0f : 0.4f);
+        textArea.removeFromLeft (popupIconGutter);
+        if (isTicked)
+        {
+            drawTick ({ static_cast<float> (textArea.getRight()) - 6.0f, rowY + rowH * 0.5f });
+            textArea.removeFromRight (18);
+        }
+    }
+    else
+    {
+        if (isTicked)
+            drawTick ({ static_cast<float> (area.getX()) + 13.0f, rowY + rowH * 0.5f });
+        textArea.removeFromLeft (popupGutter);
+    }
+    if (hasSubMenu)
+    {
+        const auto chevronBox = textArea.removeFromRight (10).toFloat().withSizeKeepingCentre (6.0f, 9.0f);
+        juce::Path chevron;
+        chevron.startNewSubPath (chevronBox.getX() + 1.0f, chevronBox.getY());
+        chevron.lineTo (chevronBox.getRight() - 1.0f, chevronBox.getCentreY());
+        chevron.lineTo (chevronBox.getX() + 1.0f, chevronBox.getBottom());
+        g.setColour (ink.withMultipliedAlpha (0.6f));
+        g.strokePath (chevron, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        textArea.removeFromRight (6);
+    }
+    if (shortcutKeyText.isNotEmpty())
+    {
+        g.setColour (menuInkSoft.withMultipliedAlpha (isActive ? 1.0f : 0.6f));
+        g.setFont (fonts::make (11.5f, fonts::Weight::regular, 0.02f));
+        g.drawText (shortcutKeyText, textArea, juce::Justification::centredRight, false);
+        textArea.removeFromRight (juce::roundToInt (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), shortcutKeyText)) + 12);
+    }
+    g.setColour (ink);
+    g.setFont (getPopupMenuFont());
+    g.drawFittedText (text, textArea, juce::Justification::centredLeft, 1, 0.9f);
+}
+
+SharedMenuLook::Holder::Holder()
+{
+    juce::LookAndFeel::setDefaultLookAndFeel (&look);
+}
+
+SharedMenuLook::Holder::~Holder()
+{
+    // Nothing may still draw with the look when it goes: open menus close, the default returns.
+    juce::PopupMenu::dismissAllActiveMenus();
+    juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+}
+
+void drawDropdownField (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text, bool hot, bool focused, bool enabled)
+{
+    // As the racks' MODE field (ValueSelector, RackStyle::mode): drop, rim, light face.
+    const float radius = 5.0f;
+    g.setColour (juce::Colour (0x65c5bcae));
+    g.fillRoundedRectangle (r.translated (0.0f, 1.0f), radius);
+    g.setColour (juce::Colour (hot && enabled ? 0xffc8bfb2 : 0xffd3cbbf));
+    g.fillRoundedRectangle (r, radius);
+    g.setColour (juce::Colour (hot && enabled ? 0xfffaf7f1 : 0xfff6f2eb));
+    g.fillRoundedRectangle (r.reduced (1.0f), radius - 1.0f);
+    const auto ink = juce::Colour (0xff66615e).withMultipliedAlpha (enabled ? 1.0f : 0.45f);
+    auto area = r.reduced (10.0f, 0.0f);
+    const auto chevronBox = area.removeFromRight (10.0f).withSizeKeepingCentre (8.0f, 8.0f);
+    juce::Path chevron;
+    chevron.startNewSubPath (chevronBox.getX(), chevronBox.getY() + 2.5f);
+    chevron.lineTo (chevronBox.getCentreX(), chevronBox.getBottom() - 1.5f);
+    chevron.lineTo (chevronBox.getRight(), chevronBox.getY() + 2.5f);
+    g.setColour (ink.withMultipliedAlpha (0.8f));
+    g.strokePath (chevron, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (ink);
+    g.setFont (fonts::make (11.0f, fonts::Weight::regular, 0.04f));
+    g.drawText (text.toUpperCase(), area.withTrimmedRight (4.0f), juce::Justification::centred, true);
+    if (focused)
+    {
+        g.setColour (juce::Colour (0xff90adbf));
+        g.drawRoundedRectangle (r.expanded (2.0f), radius + 2.0f, 2.0f);
+    }
+}
+
+void styleTextField (juce::TextEditor& field, TextSurface surface)
+{
+    // The foreground always follows the field's own surface (never forced dark everywhere).
+    const bool dark = surface == TextSurface::dark;
+    const auto ground = dark ? juce::Colour (0xff1c2122) : palette::raised;
+    const auto ink = dark ? palette::valueBubbleText : palette::text;
+    field.setColour (juce::TextEditor::backgroundColourId, ground);
+    field.setColour (juce::TextEditor::textColourId, ink);
+    field.setColour (juce::TextEditor::highlightColourId, palette::sage.withAlpha (dark ? 0.55f : 0.45f));
+    field.setColour (juce::TextEditor::highlightedTextColourId, ink);
+    field.setColour (juce::TextEditor::outlineColourId, dark ? palette::displayLine : palette::hairline);
+    field.setColour (juce::TextEditor::focusedOutlineColourId, palette::accent);
+    field.setColour (juce::CaretComponent::caretColourId, ink);
+    field.applyColourToAllText (ink, true);
 }
 
 } // namespace osp::plugin

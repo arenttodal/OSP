@@ -68,7 +68,7 @@ The export draws through `Component::createComponentSnapshot`, the plugin's own 
 | wellA / wellB / wellRim / wellGrid | #1f2324 / #1c2325 / #111415 / #2e3434 | Waveform and envelope displays |
 | text / textSecondary / textMicro | #23211e / #5d5850 / #8a847b | Typography |
 | accent (Top / Bottom / Soft) | #e8692a (#f36a2c / #d3461a / #f2c8b0) | Active states, underline, value fills |
-| macro colours | LIFE #be7552, DRIVE #b5843a, CHARACTER #7b8d69, MOVEMENT #73899c, ECHO #5c9490, SPACE #96839d | Halos, LEDs, popovers |
+| macro colours | LIFE #be7552, DRIVE #b5843a, CHARACTER #7b8d69, MOVEMENT #73899c, ECHO #5c9490, SPACE #96839d (since 18 Nov 2026 the harmonised palette: docs/research/menu-content/palette) | Halos, LEDs, popovers |
 | layer identities | A orange, B blue-grey, C sage (badge, LED, arc, thumb, wave) | Cards |
 | knob cap (vector knobs) | #f8f3ea → #d9d0c2, rim #b9ad9b, pointer #141210 | Layer and mini knobs |
 

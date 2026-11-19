@@ -122,6 +122,10 @@ namespace frame
         juce::Slider slider { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
         std::unique_ptr<MacroLabel> label;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+        /** A USER macro (setUpUserMacro): its arc, accent and light take the USER palette
+            (colour::userMacro) and its own rendered lens, so a CORE palette change leaves the
+            USER bank as it is. */
+        bool user = false;
     };
     static constexpr int macroCount = 6;
     using MacroRow = std::array<MacroKnob, macroCount>;
@@ -137,6 +141,8 @@ namespace frame
         the value bubble, a modulation drop target) and adds it to `content`. */
     void setUpMacro (MacroKnob& knob, int index, const MacroSpec& spec, juce::AudioProcessorValueTreeState& state, juce::Component& content,
                      bool opensPopup = true);
+    /** setUpMacro for the USER bank's knob at that place: the same knob in the USER palette. */
+    void setUpUserMacro (MacroKnob& knob, int index, const MacroSpec& spec, juce::AudioProcessorValueTreeState& state, juce::Component& content);
 
     /** The keyboard's range (A0..C8), naming (MIDI 60 = C4) and colours. */
     void setUpKeyboard (OspKeyboard& keyboard);

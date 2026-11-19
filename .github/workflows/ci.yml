@@ -30,6 +30,15 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ninja
 
+      - name: Fetch factory packs
+        # The Core pack (and any other factory pack) listed in packaging/factory-packs/packs.lock,
+        # from this repository's GitHub Releases, verified by SHA-256; the build bundles them.
+        # No entries: nothing is fetched and the build is as before.
+        if: matrix.plugin == 'ON'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash packaging/factory-packs/fetch.sh
+
       - name: Configure
         # macOS builds universal binaries (Apple Silicon + Intel) so the test build runs on any Mac.
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOSP_BUILD_PLUGIN=${{ matrix.plugin }} ${{ runner.os == 'macOS' && '"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"' || '' }}

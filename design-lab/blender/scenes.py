@@ -414,7 +414,7 @@ class Builder:
         """Lens LEDs under the macros (the macro's colour; lit while it is modulated) and the
         ARP light."""
         y, d = self.geo["macroLedY"], self.geo["macroLedDiameter"]
-        colours = {"life": "#be7552", "drive": "#b5843a", "character": "#7b8d69", "motion": "#73899c", "echo": "#5c9490", "space": "#96839d"}
+        colours = {"life": "#879674", "drive": "#bb784e", "character": "#518b88", "motion": "#b09a61", "echo": "#94776b", "space": "#758899"}
         z0 = deck.top - (panel["depth"] if panel["kind"] == "graphiteInset" else 0.0)
         for pid, r, _ in self.g["macros"]:
             lit = pid in self.geo["litMacros"]

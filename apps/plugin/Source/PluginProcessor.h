@@ -71,6 +71,22 @@ public:
     int getNumPrograms() override;
     int getCurrentProgram() override { return currentProgram; }
     void setCurrentProgram (int index) override;
+    /** The quick preset menu groups presets (collections, categories, packs); see presetList. */
+    bool groupsPresets() const override { return groupPresets; }
+    /** False: the quick menu's one flat list, as before (comparisons). */
+    void setGroupsPresets (bool group) noexcept { groupPresets = group; }
+    /** The collection the arrows walk ("all", "states", "favourites", "recent", "category:<name>",
+        "pack:<id>"): set when a preset is chosen from one (the quick menu, the Library). */
+    void setBrowseContext (const juce::String& context);
+    juce::String browseContext() const;
+    /** The entries of a collection, in the order the arrows walk them. */
+    std::vector<PresetEntry> presetsIn (const juce::String& context) const;
+    /** Re-reads the Library's preset metadata now (the quick menu reads a copy, refreshed when it
+        is older than a second). */
+    void refreshPresetIndex() const;
+    /** Whether a new instance opens on the first built-in state (true; the headless tests turn
+        it off so their processors start from the parameters' defaults). */
+    static void setNewInstancesOpenOnFirstState (bool shouldOpen) noexcept;
     const juce::String getProgramName (int index) override;
     void changeProgramName (int, const juce::String&) override {}
 
@@ -142,6 +158,10 @@ public:
     static juce::Array<juce::File> findFiles (const juce::File& folder, const juce::String& extension);
     /** The preset last loaded or saved (empty if none): the browser marks and steps from it. */
     juce::File currentPresetFile() const { return lastPresetFile; }
+    /** SAVE may update the open preset in place: a user preset file this computer can write,
+        not a starting state, never a factory or pack preset (those are read-only: SAVE makes a
+        copy through Save As). */
+    bool canSaveInPlace() const;
     /** Loads the previous (-1) or next (+1) preset under `root` (default: the preset
         folder; a preset opened from elsewhere steps through its own folder), wrapping around. */
     bool stepPreset (int delta, const juce::File& root = presetFolder());
@@ -479,7 +499,11 @@ public:
     void resetSettings() override;
     /** A user starting state: every setting and the slot count, no audio. Opening one applies
         the settings to the sounds already loaded (and keeps empty slots for the rest). */
-    bool saveStartingState (const juce::File& file);
+    /** A Starting State: every setting (macros, effects and routing, modulation, performance,
+        the slots), never the sounds or anything tied to them (their trees: analysis, roots,
+        maps, edits). The description travels in the file. Saving one leaves the instrument
+        as it is: its name, its preset and what SAVE updates. */
+    bool saveStartingState (const juce::File& file, const juce::String& description = {});
     bool loadStartingState (const juce::File& file);
     static juce::File startingStateFolder();
     static constexpr const char* startingStateExtension = ".ospstate";
@@ -982,6 +1006,21 @@ private:
     double pitchBendSemitones = 0.0;
     bool hostWasPlaying = false;     // audio thread: transport start resets performance memory
     int currentProgram = 0;
+    /** The Library's presets and Starting States with their metadata (message thread). */
+    struct PresetMeta
+    {
+        juce::String name, category, packId, packName;
+        juce::File file;
+        bool favourite = false, state = false;
+        std::int64_t lastUsed = 0;
+    };
+    mutable std::vector<PresetMeta> presetIndexCache;
+    mutable std::set<juce::String> presetIndexTrashed;   ///< files the Library has in its trash
+    mutable juce::uint32 presetIndexTime = 0;
+    mutable bool presetIndexRead = false;
+    juce::String browsing;                      ///< the arrows' collection (empty: from what is loaded)
+    bool groupPresets = true;
+    std::vector<juce::String> browsingOrder;    ///< "recent" keeps the order it was chosen in
     juce::File lastPresetFile;
     juce::File lastStartingStateFile;
     juce::String presetNameOverride;   ///< INIT, Reset or a user starting state while it is the last one opened

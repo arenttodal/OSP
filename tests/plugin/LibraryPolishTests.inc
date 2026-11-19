@@ -413,3 +413,167 @@ TEST_CASE ("library polish: screenshots - Presets with STARTING STATES, Template
     juce::FileOutputStream stream (file);
     juce::PNGImageFormat().writeImageToStream (image, stream);
 }
+
+namespace
+{
+    /** Pixels of `field` (rendered as it is on screen) clearly darker than its background: its
+        text, as a reader sees it. */
+    int darkTextPixels (juce::TextEditor& field)
+    {
+        const auto image = field.createComponentSnapshot (field.getLocalBounds(), true, 2.0f);
+        int dark = 0;
+        for (int y = 0; y < image.getHeight(); ++y)
+            for (int x = 0; x < image.getWidth(); ++x)
+                if (image.getPixelAt (x, y).getPerceivedBrightness() < 0.45f)
+                    ++dark;
+        return dark;
+    }
+
+    juce::TextEditor* firstField (juce::Component& c)
+    {
+        for (auto* child : c.getChildren())
+        {
+            if (auto* t = dynamic_cast<juce::TextEditor*> (child))
+                return t;
+            if (auto* t = firstField (*child))
+                return t;
+        }
+        return nullptr;
+    }
+} // namespace
+
+TEST_CASE ("text fields: the Rename sheet's name is dark on the light field, selected too; every Library and macro text field reads", "[plugin][library][library-polish][contrast]")
+{
+    LibraryRig rig;
+    rig.panel->prompt ("Rename", "Natural Warmth", [] (const juce::String&) {});
+    auto* sheet = rig.panel->sheet();
+    REQUIRE (sheet != nullptr);
+    auto* field = firstField (*sheet);
+    REQUIRE (field != nullptr);
+    CHECK (field->getText() == "Natural Warmth");
+    CHECK (darkTextPixels (*field) > 150);   // (the name, dark on the light field - was white on white)
+    // Selected: dark text on muted sage, still read.
+    field->selectAll();
+    CHECK (darkTextPixels (*field) > 150);
+    CHECK (field->findColour (juce::TextEditor::highlightColourId).getPerceivedBrightness() > 0.45f);   // (a light selection under dark text)
+    // Typing more: the new characters are dark too.
+    field->moveCaretToEnd();
+    field->insertTextAtCaret (" II");
+    CHECK (darkTextPixels (*field) > 170);
+    if (const char* dir = std::getenv ("OSP_LIBRARY_SHOTS"))
+    {
+        field->setHighlightedRegion ({ 0, 7 });   // (part selected: the sage selection, graphite text)
+        const auto image = rig.editor->createComponentSnapshot (rig.editor->getLocalArea (sheet, sheet->getLocalBounds()), true, 2.0f);
+        const auto file = juce::File (juce::String::fromUTF8 (dir)).getChildFile ("08-rename-sheet.png");
+        file.deleteFile();
+        juce::FileOutputStream stream (file);
+        juce::PNGImageFormat().writeImageToStream (image, stream);
+    }
+    rig.panel->closeSheet();
+    // The search field and the Save sheet's fields.
+    rig.panel->setSearchText ("Choir");
+    if (auto* search = firstField (*rig.panel))
+        CHECK (darkTextPixels (*search) > 60);
+    rig.panel->openSaveSheet();
+    REQUIRE (rig.panel->sheet() != nullptr);
+    auto* name = firstField (*rig.panel->sheet());
+    REQUIRE (name != nullptr);
+    name->setText ("Warm Hymn");
+    CHECK (darkTextPixels (*name) > 100);
+    rig.panel->closeSheet();
+    // A USER macro renamed in place.
+    rig.ui->closeLibrary();
+    rig.ui->userMacros().showBank (1);
+    rig.ui->userMacros().startRename (0);
+    auto* rename = rig.ui->userMacros().renameEditor();
+    REQUIRE (rename != nullptr);
+    rename->selectAll();
+    CHECK (darkTextPixels (*rename) > 60);
+    rig.ui->userMacros().showBank (0);
+}
+
+TEST_CASE ("text fields: the shared styling follows the field's surface - graphite on light, warm light on graphite - in every state", "[plugin][contrast]")
+{
+    using osp::plugin::TextSurface;
+    auto pixels = [] (juce::TextEditor& f, bool wantDark) {
+        const auto image = f.createComponentSnapshot (f.getLocalBounds(), true, 2.0f);
+        int n = 0;
+        for (int y = 0; y < image.getHeight(); ++y)
+            for (int x = 0; x < image.getWidth(); ++x)
+            {
+                const float b = image.getPixelAt (x, y).getPerceivedBrightness();
+                n += wantDark ? (b < 0.45f ? 1 : 0) : (b > 0.75f ? 1 : 0);
+            }
+        return n;
+    };
+    osp::plugin::OspLookAndFeel look;
+    for (const auto surface : { TextSurface::light, TextSurface::dark })
+    {
+        const bool light = surface == TextSurface::light;
+        INFO ((light ? "light" : "dark"));
+        juce::Component parent;
+        parent.setLookAndFeel (&look);
+        parent.setSize (300, 40);
+        juce::TextEditor field;
+        field.setText ("Pre-filled name", false);   // (before it has a parent: the case that was white)
+        parent.addAndMakeVisible (field);
+        field.setBounds (0, 0, 300, 40);
+        osp::plugin::styleTextField (field, surface);
+        const int filled = pixels (field, light);
+        CHECK (filled > 150);                         // pre-filled
+        field.selectAll();
+        CHECK (pixels (field, light) > 150);          // selected
+        field.moveCaretToEnd();
+        field.insertTextAtCaret (" typed");
+        CHECK (pixels (field, light) > filled);       // typed
+        field.clear();
+        field.setTextToShowWhenEmpty ("Placeholder", juce::Colour (0xff8c867c));
+        CHECK (pixels (field, light) < filled / 3);   // (empty: only the quiet placeholder)
+        field.setEnabled (false);
+        field.setText ("Disabled", false);
+        CHECK (pixels (field, light) > 40);           // disabled still reads
+        parent.setLookAndFeel (nullptr);
+    }
+}
+
+TEST_CASE ("overlays: the Library opens fully above the Mixer / FX Routing view and stays above it through the timer; closing it returns to the view", "[plugin][routing][library]")
+{
+    LibraryRig rig;
+    auto& ui = *rig.ui;
+    rig.editor->setVisible (true);   // (hit testing walks visible components only)
+    ui.closeLibrary();
+    ui.setSourceViewShown (true);
+    auto* routing = ui.sourceViewComponent();
+    REQUIRE (routing != nullptr);
+    ui.openLibrary();
+    auto* library = ui.libraryWindow();
+    REQUIRE (library != nullptr);
+    for (int tick = 0; tick < 10; ++tick)
+        ui.refreshNow();
+    auto layer = [] (juce::Component& c) { return c.getParentComponent()->getIndexOfChildComponent (&c); };
+    CHECK (layer (*library) > layer (*routing));
+    CHECK (routing->isVisible());
+    // The Library takes the presses over the view (its controls, never the covered mixer).
+    const auto centre = rig.editor->getLocalArea (library, library->getLocalBounds()).getCentre();
+    auto* hit = rig.editor->getComponentAt (centre);
+    INFO ("hit: " << (hit != nullptr ? typeid (*hit).name() : "null") << " title " << (hit != nullptr ? hit->getTitle() : juce::String()) << " parent " << (hit != nullptr && hit->getParentComponent() != nullptr ? typeid (*hit->getParentComponent()).name() : ""));
+    CHECK ((hit == library || library->isParentOf (hit)));
+    // Its tabs, a search, a sheet, then closed: the view is still open, as it was.
+    library->setView (osp::plugin::LibraryPanel::View::presets);
+    REQUIRE (library->settle());
+    library->openSaveSheet();
+    CHECK (library->sheet() != nullptr);
+    library->closeSheet();
+    ui.closeLibrary();
+    CHECK (ui.sourceViewShown());
+    CHECK (routing->isVisible());
+    // The view opened while the Library is open: it goes under the Library.
+    ui.setSourceViewShown (false);
+    ui.openLibrary();
+    ui.setSourceViewShown (true);
+    for (int tick = 0; tick < 5; ++tick)
+        ui.refreshNow();
+    REQUIRE (ui.libraryWindow() != nullptr);
+    CHECK (layer (*ui.libraryWindow()) > layer (*routing));
+    ui.closeLibrary();
+}

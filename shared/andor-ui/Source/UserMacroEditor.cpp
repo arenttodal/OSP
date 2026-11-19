@@ -408,7 +408,7 @@ namespace usermacros
 UserMacroPanel::UserMacroPanel (InstrumentHost& h, int m, const juce::String& selectTarget)
     : MiniPanel (h.userMacroAssignments() != nullptr ? h.userMacroAssignments()->displayName (m) : UserMacroState::defaultName (m), "MACRO " + juce::String (m + 1)), host (h), macroIndex (m)
 {
-    const auto colour = design::colour::macro (macroIndex);
+    const auto colour = design::colour::userMacro (macroIndex);
     for (auto* s : { &low, &high })
     {
         s->setSliderStyle (juce::Slider::LinearHorizontal);
@@ -660,7 +660,7 @@ void UserMacroPanel::layoutContent (juce::Rectangle<int> area)
 void UserMacroPanel::paint (juce::Graphics& g)
 {
     MiniPanel::paint (g);
-    const auto colour = design::colour::macro (macroIndex);
+    const auto colour = design::colour::userMacro (macroIndex);
     g.setFont (type::popupLabel (11.0f));
     if (rowCount() == 0)
     {

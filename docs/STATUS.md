@@ -20,6 +20,77 @@
 > - **NEXT:** listening on the real recordings (the lab takes them); the user's review of the
 >   development build (PL-R5).
 
+> **18 Nov 2026, shared menu visual refinement (branch `claude/menu-visual`, on
+> `claude/osp-menu-content`; `docs/research/menu-visual/`):**
+> - **Every menu takes the ANDOR look.** Until now, no menu set a look of its own, so in a DAW
+>   and in the standalone they were desktop windows in JUCE's default dark look.
+>   `SharedMenuLook` now makes one shared OspLookAndFeel the default look while an editor is
+>   open. It applies to OSP and the shell products alike.
+> - **Ceramic card:**
+>   - `#F7F0E6`, 8 px corners, a soft two-layer shadow in a translucent window (opaque square
+>     fallback where windows cannot be translucent);
+>   - 28 px rows, quiet small-capital section labels;
+>   - sage `#DDE3D4` rounded hover;
+>   - each card sits on its anchor, and submenus overlap their parent by 3 px.
+> - **Icons:** monochrome icons for actions, with warm rust for destructive ones.
+> - **Identity headers** (chip, name, file) on OSP's source menus and the shell's layer menus.
+> - **Preset dropdown:** "Previous patch"; category prefixes are dropped inside their flyouts
+>   (display only).
+> - **Library, USER macro, FX routing and mod menus:** icons for their actions.
+> - **Screenshots:** before and after for menus 1–8.
+> - **Tests:** the shared look's lifetime; the card's geometry against its anchor and a real
+>   hover-opened submenu at 100 / 150 / 200 %.
+
+> **18 Nov 2026, menu architecture, content authoring, preset navigation (branch
+> `claude/osp-menu-content`; `docs/research/menu-content/`, `docs/research/preset-navigation/`):**
+> - **Main menu:** INSTRUMENT / CONTENT / PREFERENCES / SUPPORT, with no layer items. Each
+>   source A/B/C has its own menu.
+> - **SAVE:** updates a writable user preset in place; otherwise it is Save As. Factory presets
+>   are read-only.
+> - **Save as Starting State…:** one dialog with a name and a description. The state holds no
+>   audio and the instrument is left unchanged.
+> - **Packs:**
+>   - dependencies, rights and content validation on export;
+>   - user installs are never factory;
+>   - drafts in the pack builder;
+>   - factory publishing only in `OSP_FACTORY_AUTHORING` builds.
+> - **Quick preset menu:**
+>   - grouped as COLLECTIONS, CATEGORIES (14, the empty ones hidden) and PACKS;
+>   - one column, at most 20 rows per flyout, then Browse all in the Library;
+>   - the arrows walk the collection a preset was chosen from;
+>   - categories are derived (`src/library/PresetCategory.h`), so nothing is rewritten;
+>   - tested at 50 / 500 / 5,000 presets.
+> - **CORE macro palette: harmonised** (approved).
+>   - LIFE sage, DRIVE copper, FILTER teal, MOVEMENT brass, SPACE slate, ECHO clay.
+>   - The beads were re-rendered in Blender (`bpy` 4.2) and swapped in with
+>     `pack.py --update`.
+>   - The USER bank keeps its frozen palette and lenses; the pedals keep V5.
+> - **NEXT:** SUPPORT's user guide link needs a URL.
+
+> **17 Nov 2026, final interface polish (branch `claude/osp-final-polish`):**
+> - **Popovers stay open** through right-click, Assign to Macro, halo range drags,
+>   invert/reset, Escape and menu cancel, and knob turns.
+>   - Cause: presses on the shared modulation overlay looked like outside clicks.
+>   - Fix: `ModulationOverlay::pressBelongsTo`.
+>   - Docs: `docs/research/popover-macro-interaction.md`.
+> - **Popovers and halos sit above the Mixer / FX Routing view.**
+>   - Cause: the view's per-tick `toFront`.
+>   - Fix: it is placed once, at the cards' layer.
+> - **Text fields read on every surface:** `styleTextField` (light / dark), with every field
+>   audited (`docs/research/text-inputs-and-layers.md`). The Library opens above the Mixer.
+> - **Signal chain pedal light:** follows the effect's real ON (a click, automation, undo,
+>   presets). Bypassed, only the display dims (`docs/research/pedal-led/`).
+> - **INFO: See tutorials.** Preset card heart and actions aligned. A compact **ROOT NOTE**
+>   selector (any MIDI root). **TYPE** in ANDOR's dropdown look (`docs/research/final-polish/`).
+> - **Built-in starting states are whole states:**
+>   - embedded `.ospstate` files (`apps/plugin/Resources/StartingStates`);
+>   - a new instance opens on the first, applied in full;
+>   - CI fetches the Core factory pack listed in `packaging/factory-packs/packs.lock`;
+>   - how to design them: `docs/sound-design.md`.
+> - **NEXT:**
+>   - replace the seven baked states with designed ones;
+>   - publish the Core pack and add its line to `packs.lock`.
+
 > **17 Nov 2026, Library & Preset Browser polish (branch `claude/osp-library-polish`;
 > `docs/research/library-polish/`, before/after shots):**
 > - **Space:** plays, pauses (keeping the position) and resumes the selected sound.

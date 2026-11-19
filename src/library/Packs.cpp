@@ -335,11 +335,27 @@ PackResult inspectPack (const Catalog& catalog, const std::filesystem::path& fil
     return result;
 }
 
-PackResult installPack (Catalog& catalog, const std::filesystem::path& file, const PackPlaces& places)
+PackResult installPack (Catalog& catalog, const std::filesystem::path& file, const PackPlaces& places, PackSource source)
 {
     auto result = inspectPack (catalog, file, places);
     if (! result.ok)
         return result;
+    if (source == PackSource::user)
+    {
+        std::error_code exists;
+        if (std::filesystem::exists (places.factoryDir / result.manifest.id, exists))
+        {
+            result.ok = false;
+            result.error = "its id (" + result.manifest.id + ") is OSP's own factory content; a pack from a file cannot replace it";
+            return result;
+        }
+        if (result.manifest.factory)
+        {
+            // (only OSP's own bundle installs factory content)
+            result.manifest.factory = false;
+            result.notes.push_back ("marked as factory content: installed as an ordinary pack");
+        }
+    }
     result.ok = false;
     result.sounds = result.presets = result.templates = 0;   // counted again as they are installed
     const auto& m = result.manifest;
@@ -568,7 +584,7 @@ std::vector<PackResult> installFactoryPacks (Catalog& catalog, const std::filesy
         // Only factory packs, only when new or newer; a broken one is reported, never fatal.
         if (look.ok && (! look.manifest.factory || look.alreadyInstalled))
             continue;
-        results.push_back (look.ok ? installPack (catalog, file, places) : look);
+        results.push_back (look.ok ? installPack (catalog, file, places, PackSource::bundle) : look);
     }
     return results;
 }
@@ -696,6 +712,17 @@ PackResult exportPack (Catalog& catalog, const std::filesystem::path& storeDir, 
         {
             result.error = a->name + "'s file cannot be read (" + file.filename().string() + ")";
             return result;
+        }
+        {
+            // Only content that will load: a well-formed state with its version; a file marked as a
+            // Starting State never travels as a preset.
+            const auto xml = juce::XmlDocument::parse (juce::File (juce::String::fromUTF8 (file.string().c_str())));
+            const bool state = a->type == AssetType::templateState;
+            if (xml == nullptr || ! xml->hasAttribute ("stateVersion") || (! state && xml->getIntAttribute ("startingState") == 1))
+            {
+                result.error = a->name + " is not a valid " + (state ? "Starting State" : "preset") + " (" + file.filename().string() + ")";
+                return result;
+            }
         }
         PackItem item;
         item.kind = a->type == AssetType::templateState ? PackItem::Kind::templateState : PackItem::Kind::preset;

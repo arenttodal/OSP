@@ -492,6 +492,17 @@ public:
     /** The macro whose range is the ring of this control now (-1: none). */
     int primaryMacro (const juce::String& parameterId) const;
     bool isEditingMacro() const noexcept { return macroEditMacro >= 0; }
+    /** The control the overlay's latest press acted on (a right-click's menu, a halo's range or
+        depth), or nullptr: the overlay is one shared layer above the whole window, so a press it
+        takes physically belongs to it but logically to that control - and to the popover the
+        control sits in. An editor's outside-click watcher asks this before closing a popover. */
+    juce::Component* pressedControl() const noexcept { return lastPressed.getComponent(); }
+    /** Whether the latest press the overlay took belongs to a control inside `owner`. */
+    bool pressBelongsTo (const juce::Component& owner) const noexcept
+    {
+        const auto* c = pressedControl();
+        return c != nullptr && (c == &owner || owner.isParentOf (c));
+    }
     juce::StringArray macroReadout (const juce::String& parameterId) const;
     bool keyPressed (const juce::KeyPress&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
@@ -531,6 +542,7 @@ private:
         ModulationOverlay& owner;
     };
     ControlClicks controlClicks { *this };
+    juce::Component::SafePointer<juce::Component> lastPressed;   ///< pressedControl()
     juce::Component::SafePointer<juce::Component> listenedRoot;
     void showMenu (juce::PopupMenu& menu);
     /** ARP RATE's knob position (0..1) for its step sped up by `octaves` (its own order). */
