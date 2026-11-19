@@ -99,6 +99,9 @@ bool MosaicEngine::start (const ReimaginedNote& n, const ReimaginedControl& c) n
     noiseLevel.fill (0.0f);
     emphasisPhase = 2.0 * std::numbers::pi * rng.nextDouble();
     seconds = 0.0;
+    sourceRate = n.source->sampleRate();
+    requestedPedal = n.granular ? PedalLoopMode::normal : n.pedalLoop;
+    fold.configure (n.loop ? PedalLoopMode::normal : requestedPedal, n.pedalTurnFrames, n.pedalTurnCorrelation);
     position = naturalFrame (0.0);
     mix = 0.0f;
     done = false;
@@ -114,6 +117,14 @@ void MosaicEngine::control (const ReimaginedControl& c) noexcept
     const auto& p = c.settings->mosaic;
     const double dt = 32.0 / rate;
     seconds += dt;
+    // PEDAL LOOP: the evolution's time, folded into the loop while the pedal holds the note.
+    double evolution = seconds;
+    if (fold.configuredLoop() != PedalLoopMode::normal)
+    {
+        const double frames = static_cast<double> (note.source->numFrames());
+        seconds += fold.follow (note.model->original.continuation.pedal, seconds * sourceRate, sourceRate, frames - 4.0) / sourceRate;
+        evolution = fold.engaged() ? fold.position (seconds * sourceRate) / sourceRate : seconds;
+    }
     const auto& frames = mosaic->frames;
     const int last = static_cast<int> (frames.size()) - 1;
 
@@ -129,7 +140,7 @@ void MosaicEngine::control (const ReimaginedControl& c) noexcept
     // reaching the attack); not held, it ends on the attack.
     const bool holds = mosaic->sustains && note.loop;
     const double travel = std::clamp (p.motion, 0.0, 1.0) * (0.4 + 0.6 * ramp (amount, 0.55, 0.85));
-    const double natural = naturalFrame (seconds);
+    const double natural = naturalFrame (evolution);
     double target = natural;
     const bool inBody = note.reverse ? holds && natural <= mosaic->bodyFrame : natural >= mosaic->bodyFrame;
     if (inBody)
@@ -161,10 +172,10 @@ void MosaicEngine::control (const ReimaginedControl& c) noexcept
     double levelGain = 1.0, tail = 1.0;
     if (! holds)
     {
-        const double over = seconds - frames.back().seconds;
+        const double over = evolution - frames.back().seconds;
         tail = over > 0.0 ? std::max (0.0, 1.0 - over / 0.3) : 1.0;
         levelGain = std::min (4.0, tail * levelAt (natural) / std::max (1.0e-6, levelAt (position)));
-        done = over > 0.3;
+        done = over > 0.3 && ! fold.holding();   // (never while a pedal loop holds the note)
     }
 
     const bool textured = p.model == MosaicModel::textured;

@@ -2,6 +2,7 @@
 // and the Library backup (export, restore). The work runs on the Library's background thread;
 // every step that changes something asks first.
 
+#include "OspLookAndFeel.h"
 #include "LibraryCapture.h"
 #include "LibraryPlaces.h"
 #include "library/Archive.h"
@@ -243,8 +244,21 @@ void LibraryPanel::exportCollectionAsPack (const std::string& collectionId, cons
     exportCollection (collectionId, std::move (fields), out);
 }
 
+namespace
+{
+   #ifndef OSP_FACTORY_AUTHORING
+    #define OSP_FACTORY_AUTHORING 0
+   #endif
+    std::atomic<bool> factoryAuthoringEnabled { OSP_FACTORY_AUTHORING != 0 };
+}
+
+bool LibraryPanel::factoryAuthoring() noexcept { return factoryAuthoringEnabled.load(); }
+void LibraryPanel::setFactoryAuthoring (bool enabled) noexcept { factoryAuthoringEnabled.store (enabled); }
+
 void LibraryPanel::exportCollection (const std::string& collectionId, library::PackExport fields, const juce::File& out)
 {
+    if (! factoryAuthoring())
+        fields.factory = false;   // (a customer build publishes ordinary packs only)
     juce::Component::SafePointer<LibraryPanel> safe (this);
     setStatus (juce::String::fromUTF8 ("Making the pack\xe2\x80\xa6"));
     processor.libraryService().requestBackground<library::PackResult> (
@@ -319,7 +333,9 @@ public:
         const auto last = remembered.getProperty ("version", {}).toString();
         id.setText (get ("id", "com.yourname." + juce::String (packIdFor (collectionName)).fromFirstOccurrenceOf ("user.", false, false).upToLastOccurrenceOf (".", false, false)), false);
         name.setText (get ("name", collectionName), false);
-        version.setText (last.isEmpty() ? juce::String ("1.0.0") : nextVersion (last), false);
+        // A draft keeps its version; after a publish the next one is suggested (never the same file).
+        const bool draft = static_cast<bool> (remembered.getProperty ("draft", false));
+        version.setText (last.isEmpty() ? juce::String ("1.0.0") : (draft ? last : nextVersion (last)), false);
         creator.setText (get ("creator", {}), false);
         licence.setText (get ("license", {}), false);
         description.setText (get ("description", {}), false);
@@ -340,9 +356,15 @@ public:
         factory.setButtonText ("Factory pack: built into OSP's installer, installed at startup (the core sounds only)");
         cancel.onClick = [this] { panel.closeSheet(); };
         publish.onClick = [this] { commit(); };
+        saveDraft.setTitle ("Save the pack's details as a draft");
+        saveDraft.onClick = [this] { keepDraft(); };
         publish.setTitle ("Publish the pack");
-        for (auto* c : std::initializer_list<juce::Component*> { &id, &name, &version, &creator, &licence, &description, &factory, &cancel, &publish })
+        for (auto* c : std::initializer_list<juce::Component*> { &id, &name, &version, &creator, &licence, &description, &cancel, &saveDraft, &publish })
             addAndMakeVisible (c);
+        addChildComponent (factory);
+        factory.setVisible (factoryAuthoring());   // (authoring builds only: §9.7)
+        for (auto* field : { &id, &name, &version, &creator, &licence, &description })
+            styleTextField (*field);
     }
     void paintContent (juce::Graphics& g) override
     {
@@ -379,6 +401,8 @@ public:
         auto buttons = r.removeFromBottom (40);
         publish.setBounds (buttons.removeFromRight (170));
         buttons.removeFromRight (8);
+        saveDraft.setBounds (buttons.removeFromRight (130));
+        buttons.removeFromRight (8);
         cancel.setBounds (buttons.removeFromRight (110));
     }
     void visibilityChanged() override
@@ -387,7 +411,37 @@ public:
             id.grabKeyboardFocus();
     }
 
+public:
+    /** Save Draft: the pack's details kept with its collection (its content), nothing exported;
+        the sheet reopens on them, its version unchanged, across sessions. */
+    void keepDraft()
+    {
+        const auto file = publishingFile (collectionId);
+        file.getParentDirectory().createDirectory();
+        file.replaceWithText (juce::JSON::toString (memo (true)));
+        panel.setStatus ("Draft saved: " + name.getText().trim() + " " + version.getText().trim() + ". Add content to its collection, then Publish.");
+        panel.closeSheet();
+    }
+    juce::TextEditor& field (const juce::String& which)
+    {
+        return which == "id" ? id : which == "name" ? name : which == "version" ? version : which == "creator" ? creator : which == "licence" ? licence : description;
+    }
+
 private:
+    juce::var memo (bool draft) const
+    {
+        auto* m = new juce::DynamicObject();
+        m->setProperty ("id", id.getText().trim().toLowerCase());
+        m->setProperty ("name", name.getText().trim());
+        m->setProperty ("version", version.getText().trim());
+        m->setProperty ("creator", creator.getText().trim());
+        m->setProperty ("license", licence.getText().trim());
+        m->setProperty ("description", description.getText().trim());
+        m->setProperty ("factory", factoryAuthoring() && factory.getToggleState());
+        m->setProperty ("draft", draft);
+        return juce::var (m);
+    }
+
     void commit()
     {
         library::PackExport fields;
@@ -397,7 +451,7 @@ private:
         fields.creator = creator.getText().trim().toStdString();
         fields.license = licence.getText().trim().toStdString();
         fields.description = description.getText().trim().toStdString();
-        fields.factory = factory.getToggleState();
+        fields.factory = factoryAuthoring() && factory.getToggleState();
         if (! library::validPackId (fields.id) || fields.name.empty() || ! library::validVersion (fields.version))
         {
             problem = "Needs an id (a-z, 0-9, '.', '_', '-'), a name and a version such as 1.0.0.";
@@ -413,6 +467,7 @@ private:
         remembered->setProperty ("license", juce::String (fields.license));
         remembered->setProperty ("description", juce::String (fields.description));
         remembered->setProperty ("factory", fields.factory);
+        remembered->setProperty ("draft", false);   // (published: the next opening suggests the next version)
         const juce::var memo (remembered);
         const auto fileName = juce::File::createLegalFileName (juce::String (fields.name) + " " + juce::String (fields.version)) + ".osppack";
         juce::Component::SafePointer<LibraryPanel> safe (&panel);
@@ -434,13 +489,48 @@ private:
     std::string collectionId;
     juce::TextEditor id, name, version, creator, licence, description;
     juce::ToggleButton factory;
-    juce::TextButton cancel { "Cancel" }, publish { juce::String::fromUTF8 ("Publish\xe2\x80\xa6") };
+    juce::TextButton cancel { "Cancel" }, saveDraft { "Save Draft" }, publish { juce::String::fromUTF8 ("Publish\xe2\x80\xa6") };
     juce::String problem;
 };
 
 void LibraryPanel::openPublishSheet (const std::string& collectionId, const juce::String& name)
 {
     showSheet (std::make_unique<PublishSheet> (*this, collectionId, name), "publish");
+}
+
+void LibraryPanel::createPackDraft()
+{
+    // A pack draft is a collection (its content: sounds, presets, Starting States added with the
+    // rows' Add to collection) with the pack's details kept beside it (Save Draft).
+    juce::Component::SafePointer<LibraryPanel> safe (this);
+    processor.libraryService().request<std::pair<std::string, juce::String>> (
+        [] (library::Catalog& c) -> std::pair<std::string, juce::String> {
+            for (int n = 1; n < 1000; ++n)
+            {
+                const auto name = n == 1 ? juce::String ("New pack") : "New pack " + juce::String (n);
+                bool taken = false;
+                for (const auto& col : c.collections())
+                    taken = taken || juce::String (col.name) == name;
+                if (taken)
+                    continue;
+                if (const auto id = c.createCollection (name.toStdString()))
+                    return { *id, name };
+            }
+            return {};
+        },
+        [safe] (std::pair<std::string, juce::String> made) {
+            if (safe == nullptr)
+                return;
+            if (made.first.empty())
+            {
+                safe->setStatus ("Could not start a pack draft.");
+                return;
+            }
+            safe->scopeKey = "collection:" + juce::String (made.first);
+            safe->refresh();
+            safe->openPublishSheet (made.first, made.second);
+            safe->setStatus ("Pack draft " + made.second + ": add sounds, presets and Starting States to it (right-click a row), then Publish.");
+        });
 }
 
 //==============================================================================

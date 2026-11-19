@@ -11,6 +11,7 @@ set(ANDOR_UI_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/InstrumentHost.cpp
     ${ANDOR_UI_DIR}/Source/AndorParameters.cpp
+    ${ANDOR_UI_DIR}/Source/MenuIcons.cpp
     ${ANDOR_UI_DIR}/Source/OspLookAndFeel.cpp
     ${ANDOR_UI_DIR}/Source/Design.cpp
     ${ANDOR_UI_DIR}/Source/SpriteKnobRenderer.cpp
@@ -35,6 +36,7 @@ set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/FxPresets.cpp
     ${ANDOR_UI_DIR}/Source/EqSpectrum.cpp
     ${ANDOR_UI_DIR}/Source/SatellitePanel.cpp
+    ${ANDOR_UI_DIR}/Source/StrumPanel.cpp
     ${ANDOR_UI_DIR}/Source/AndorSubPanel.cpp
     ${ANDOR_UI_DIR}/Source/UserMacroAssignments.cpp
     ${ANDOR_UI_DIR}/Source/UserMacroEditor.cpp

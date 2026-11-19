@@ -1,12 +1,16 @@
 #include "LibraryPanel.h"
 
+#include "MenuIcons.h"
+
 #include "Design.h"
 #include "LibraryCapture.h"
 #include "OspLookAndFeel.h"
+#include "RootNoteSelector.h"
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
 #include "library/Classifier.h"
 #include "library/FolderScan.h"
+#include "library/PresetCategory.h"
 #include "library/SoundImport.h"
 
 namespace osp::plugin
@@ -28,7 +32,13 @@ namespace
     constexpr int detailHeight = 128;
 
     const juce::StringArray soundTypes { "Bass", "Keys", "Pluck", "Pad", "Percussion", "Vocal", "Texture", "Other" };
-    const juce::StringArray presetCategories { "Keys", "Pads", "Basses", "Plucks", "Rhythmic", "Textures", "Evolving", "FX", "Experimental" };
+    /** The preset categories: the quick menu's (library::presetCategories), one list. */
+    const juce::StringArray presetCategories = [] {
+        juce::StringArray list;
+        for (const auto c : library::presetCategories)
+            list.add (juce::String (std::string (c)));
+        return list;
+    }();
     const juce::StringArray templateCategories { "Evolving", "Rhythmic", "Granular", "Keys", "Basses", "Textured", "FX" };
 
     juce::String originName (Origin o)
@@ -774,7 +784,7 @@ public:
         if (has)
         {
             const auto& r = panel.row (i);
-            load.setButtonText (r.trashed ? "Restore" : (panel.view == View::templates ? "Load Template" : "Load"));
+            load.setButtonText (r.trashed ? "Restore" : (panel.view == View::templates ? "Load State" : "Load"));
         }
         repaint();
     }
@@ -786,7 +796,7 @@ public:
         {
             g.setColour (colour::textMicro);
             g.setFont (type::micro (15.0f));
-            g.drawText (panel.rows.empty() ? juce::String() : "Select a " + juce::String (panel.view == View::templates ? "template" : "preset") + " to see it here.",
+            g.drawText (panel.rows.empty() ? juce::String() : "Select a " + juce::String (panel.view == View::templates ? "starting state" : "preset") + " to see it here.",
                         getLocalBounds(), juce::Justification::centred);
             return;
         }
@@ -795,10 +805,11 @@ public:
         drawLibraryArtwork (g, art, r.id, 8.0f);
         const float x = art.getRight() + 18.0f;
         const float w = static_cast<float> (load.getX()) - x - 20.0f;
+        const auto lay = layout();
         g.setColour (colour::text);
         g.setFont (type::preset (0.9f));
-        g.drawText (r.name, juce::Rectangle<float> (x, 16.0f, w - 40.0f, 26.0f), juce::Justification::centredLeft, true);
-        heart = juce::Rectangle<float> (x + w - 22.0f, 20.0f, 18.0f, 16.0f);
+        g.drawText (r.name, lay.name, juce::Justification::centredLeft, true);
+        heart = lay.heart;
         if (! r.isBuiltIn())
             drawHeart (g, heart, r.favourite);
         juce::StringArray meta;
@@ -827,10 +838,36 @@ public:
             drawStars (g, stars, r.rating);
         }
     }
+    /** Where the name and its heart go (paint, clicks and tests): the heart 10 px after the
+        name, on its centre line; a long name truncates before the heart, never under it. */
+    LibraryPanel::DetailLayout layout() const
+    {
+        LibraryPanel::DetailLayout out;
+        out.load = load.getBounds();
+        out.more = more.getBounds();
+        const int i = panel.selectedRow();
+        if (i < 0)
+            return out;
+        const auto& r = panel.row (i);
+        const auto art = juce::Rectangle<float> (16.0f, 16.0f, static_cast<float> (getHeight()) - 32.0f, static_cast<float> (getHeight()) - 32.0f);
+        out.artwork = art;
+        const float x = art.getRight() + 18.0f;
+        const float w = static_cast<float> (load.getX()) - x - 20.0f;
+        const auto nameLine = juce::Rectangle<float> (x, 16.0f, w, 26.0f);
+        const float heartW = 18.0f, heartH = 16.0f, heartGap = 10.0f;
+        const float nameRoom = r.isBuiltIn() ? w : juce::jmax (0.0f, w - heartGap - heartW);
+        out.nameWidth = std::ceil (juce::GlyphArrangement::getStringWidth (type::preset (0.9f), r.name));
+        out.name = nameLine.withWidth (nameRoom);
+        // (optically centred: the heart's mass sits above its box's middle, so the box drops 1 px)
+        out.heart = juce::Rectangle<float> (x + juce::jmin (nameRoom, out.nameWidth) + heartGap, nameLine.getCentreY() - heartH * 0.5f + 1.0f, heartW, heartH);
+        out.truncated = out.nameWidth > nameRoom;
+        return out;
+    }
     void resized() override
     {
+        // Load and the menu: one centre line, the card's own vertical centre, the same height.
         auto r = getLocalBounds().reduced (16);
-        more.setBounds (r.removeFromRight (40).withSizeKeepingCentre (40, 36));
+        more.setBounds (r.removeFromRight (40).withSizeKeepingCentre (40, 38));
         r.removeFromRight (8);
         load.setBounds (r.removeFromRight (150).withSizeKeepingCentre (150, 38));
     }
@@ -856,6 +893,13 @@ private:
     juce::TextButton more { juce::String::fromUTF8 ("\xe2\x8b\xaf") };
     juce::Rectangle<float> heart, stars;
 };
+
+LibraryPanel::DetailLayout LibraryPanel::detailLayout() const
+{
+    return detailStrip != nullptr ? detailStrip->layout() : DetailLayout {};
+}
+
+juce::Component* LibraryPanel::detailCard() const noexcept { return detailStrip.get(); }
 
 //==============================================================================
 // The sound inspector (mockup panel 5): waveform and preview, Type, collections, tags, notes,
@@ -917,7 +961,7 @@ public:
         g.setColour (colour::hairline);
         g.fillRect (0, foot + 9, getWidth(), 1);
         g.setColour (colour::textMicro);
-        g.drawText (panel.view == View::templates ? "TEMPLATES" : "PRESETS", 2, foot + 14, 300, footHeight - 14, juce::Justification::centredLeft);
+        g.drawText (panel.view == View::templates ? "YOUR STARTING STATES" : "PRESETS", 2, foot + 14, 300, footHeight - 14, juce::Justification::centredLeft);
     }
 
 private:
@@ -1008,16 +1052,12 @@ public:
                 if (typeBox.getText() != r->category)
                     panel.edit ([id = r->id, t = typeBox.getText().toStdString()] (library::Catalog& c) { return c.setCategory (id, t); });
         };
-        rootBox.setTitle ("Root note");
-        rootBox.addItem ("Detected", 1);
-        for (int n = 24; n <= 96; ++n)
-            rootBox.addItem (noteName (n), n + 100);
-        rootBox.onChange = [this] {
+        // ROOT NOTE: Detected, a pitch class and an octave (any MIDI root); the same catalog edit.
+        rootBox.onChange = [this] (std::optional<int> chosen) {
             const auto* r = current();
             if (r == nullptr)
                 return;
-            const int id = rootBox.getSelectedId();
-            const std::optional<double> root = id > 100 ? std::optional<double> (id - 100) : std::nullopt;
+            const std::optional<double> root = chosen ? std::optional<double> (*chosen) : std::nullopt;
             if (root == r->rootMidi)
                 return;
             panel.edit ([aid = r->id, root] (library::Catalog& c) { return c.setRootMidi (aid, root); }, "Root note set");
@@ -1050,6 +1090,8 @@ public:
         notes.setReturnKeyStartsNewLine (false);
         notes.setTextToShowWhenEmpty ("Notes", colour::textMicro);
         notes.setTitle ("Notes");
+        styleTextField (tagInput);
+        styleTextField (notes);
         notes.onFocusLost = [this] { commitNotes(); };
         notes.onReturnKey = [this] { commitNotes(); };
         // (no LOAD TO keys: a sound goes to a source by dragging it onto A, B or C; Return and a
@@ -1058,6 +1100,10 @@ public:
     /** The play key shows what a press does: play, or pause while playing. */
     void updateTransport()
     {
+        // (the analysis's root arrives once the preview is prepared)
+        if (const auto* r = current(); r != nullptr && ! r->rootMidi && ! rootBox.root())
+            if (const auto d = detectedRoot (*r); d != rootBox.detected())
+                rootBox.setRoot (std::nullopt, d);
         const auto* r = current();
         const bool playing = r != nullptr && panel.processor.audition().browserTransport() == Audition::Transport::playing
                           && panel.processor.audition().browserKey() == panel.previewKey (*r);
@@ -1071,13 +1117,15 @@ public:
     void update()
     {
         const auto* r = current();
+        if (r == nullptr)
+            rootBox.showPicker (false);
         for (auto* c : std::initializer_list<juce::Component*> { &play, &typeBox, &rootBox, &tagInput, &notes, &addCollection, &tags, &collections })
             c->setVisible (r != nullptr && ! r->trashed);
         updateTransport();
         if (r != nullptr)
         {
             typeBox.setText (r->category, juce::dontSendNotification);
-            rootBox.setSelectedId (r->rootMidi ? juce::roundToInt (*r->rootMidi) + 100 : 1, juce::dontSendNotification);
+            rootBox.setRoot (r->rootMidi ? std::optional<int> (juce::roundToInt (*r->rootMidi)) : std::nullopt, detectedRoot (*r));
             if (! notes.hasKeyboardFocus (true))
                 notes.setText (r->notes, false);
             tags.setChips (r->tags);
@@ -1233,6 +1281,21 @@ private:
         const int i = panel.selectedRow();
         return i >= 0 ? &panel.row (i) : nullptr;
     }
+    /** The analysis's own root for the selected sound, once its preview is prepared (a root the
+        user gave replaces it in the prepared sound, so only an unset one is the analysis's). */
+    std::optional<int> detectedRoot (const LibraryRow& r) const
+    {
+        const auto& slot = panel.processor.audition().slot (library::PreviewEngine::browserSlot);
+        if (r.rootMidi || slot.assetId != r.id || slot.sound == nullptr || ! slot.sound->rootKnown)
+            return std::nullopt;
+        return juce::roundToInt (slot.sound->rootMidi);
+    }
+
+public:
+    RootNoteSelector& rootSelector() noexcept { return rootBox; }
+    juce::ComboBox& typeSelector() noexcept { return typeBox; }
+
+private:
     void commitNotes()
     {
         if (const auto* r = current(); r != nullptr && notes.getText() != r->notes)
@@ -1275,7 +1338,8 @@ private:
 
     LibraryPanel& panel;
     juce::TextButton play { juce::String::fromUTF8 ("\xe2\x96\xb6") };
-    juce::ComboBox typeBox, rootBox;
+    AndorDropdown typeBox;
+    RootNoteSelector rootBox;
     juce::TextEditor tagInput, notes;
     juce::TextButton addCollection { "+" };
     ChipRow tags, collections;
@@ -1283,6 +1347,9 @@ private:
     juce::Rectangle<float> heart;
     int propertiesTop = 0;
 };
+
+RootNoteSelector* LibraryPanel::rootNoteSelector() const noexcept { return inspector != nullptr ? &inspector->rootSelector() : nullptr; }
+juce::ComboBox* LibraryPanel::typeDropdown() const noexcept { return inspector != nullptr ? &inspector->typeSelector() : nullptr; }
 
 //==============================================================================
 // SOURCES A B C (was the audition tray, mockup panel 4): a sound dragged onto A, B or C loads
@@ -1492,6 +1559,7 @@ namespace
             : Sheet (p, t, { 460, 170 }), done (std::move (d))
         {
             field.setText (initial, false);
+            styleTextField (field);   // (its text was inserted before it joined the editor's colours)
             field.setTitle (t);
             field.onReturnKey = [this] { ok.triggerClick(); };
             field.onEscapeKey = [this] { panel.closeSheet(); };
@@ -1582,7 +1650,7 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
 {
     setTitle ("ANDOR/OSP Library");
     setWantsKeyboardFocus (true);
-    const char* names[] { "Presets", "Templates", "Sounds" };
+    const char* names[] { "Presets", "Starting States", "Sounds" };
     for (std::size_t i = 0; i < tabs.size(); ++i)
     {
         tabs[i].setButtonText (names[i]);
@@ -1610,15 +1678,7 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
         menu.addItem (juce::String::fromUTF8 ("Scan folder\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openScanSheet(); });
         menu.addItem (juce::String::fromUTF8 ("Inbox folders\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openSettingsSheet(); });
         menu.addSeparator();
-        menu.addItem (juce::String::fromUTF8 ("Install pack\xe2\x80\xa6"), [safe] {
-            if (safe == nullptr)
-                return;
-            safe->chooser = std::make_unique<juce::FileChooser> ("Install a pack", juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile ("Downloads"), "*.osppack");
-            safe->chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
-                if (safe != nullptr && fc.getResult().existsAsFile())
-                    safe->installPack (fc.getResult());
-            });
-        });
+        menu.addItem (juce::String::fromUTF8 ("Install pack\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->chooseAndInstallPack(); });
         menu.addItem (juce::String::fromUTF8 ("Packs\xe2\x80\xa6"), [safe] { if (safe != nullptr) safe->openPacksSheet(); });
         menu.addSeparator();
         menu.addItem (juce::String::fromUTF8 ("Back up the Library\xe2\x80\xa6"), [safe] {
@@ -1666,6 +1726,7 @@ LibraryPanel::LibraryPanel (OspAudioProcessor& p) : processor (p)
     addChildComponent (backButton);
     search.setTextToShowWhenEmpty (juce::String::fromUTF8 ("Search\xe2\x80\xa6"), colour::textMicro);
     search.setTitle ("Search the Library");
+    styleTextField (search);
     search.setFont (type::micro (16.0f));
     search.setJustification (juce::Justification::centredLeft);
     search.setIndents (12, 0);
@@ -1867,6 +1928,11 @@ void LibraryPanel::query()
         q.trashedOnly = true, builtIns = false;
     else if (key.startsWith ("collection:"))
         q.collection = key.fromFirstOccurrenceOf ("collection:", false, false).toStdString(), builtIns = false;
+    // Presets: a category is the listed one (library::canonicalCategory: the stored value, an
+    // older alias or the name's prefix), the same as the quick menu's; filtered as rows are read.
+    std::string listedCategory;
+    if (key.startsWith ("category:") && view == View::presets)
+        listedCategory = key.fromFirstOccurrenceOf ("category:", false, false).toStdString(), builtIns = false, q.limit = 20000;
     else if (key.startsWith ("category:"))
         q.category = key.fromFirstOccurrenceOf ("category:", false, false).toStdString(), builtIns = false;
     if (view == View::sounds)
@@ -1899,7 +1965,7 @@ void LibraryPanel::query()
     };
     juce::Component::SafePointer<LibraryPanel> safe (this);
     processor.libraryService().request<Answer> (
-        [q, factoryNames, type, fixedCategories, currentView, candidates, key, lengthChoice, sortChoice] (library::Catalog& c) {
+        [q, factoryNames, type, fixedCategories, currentView, candidates, key, lengthChoice, sortChoice, listedCategory] (library::Catalog& c) {
             Answer a;
             if (candidates)
             {
@@ -1991,6 +2057,8 @@ void LibraryPanel::query()
                 }
             for (const auto& asset : candidates ? std::vector<library::Asset> {} : c.search (q))
             {
+                if (! listedCategory.empty() && library::canonicalCategory (asset.category, asset.name) != listedCategory)
+                    continue;
                 LibraryRow r;
                 r.id = asset.id;
                 r.type = asset.type;
@@ -2034,7 +2102,7 @@ void LibraryPanel::query()
             const bool sounds = currentView == View::sounds;
             a.side.push_back ({ "header:library", sounds ? "Library" : "Collections", -1 });
             const int builtInCount = currentView == View::templates ? factoryNames.size() : 0;
-            a.side.push_back ({ "all", sounds ? "All Sounds" : (currentView == View::templates ? "All Templates" : "All Presets"),
+            a.side.push_back ({ "all", sounds ? "All Sounds" : (currentView == View::templates ? "All Starting States" : "All Presets"),
                                 count ([] (library::SearchQuery&) {}) + builtInCount });
             if (! sounds)
                 a.side.push_back ({ "factory", "Factory", count ([] (library::SearchQuery& s) { s.origin = Origin::factory; }) + builtInCount });
@@ -2060,12 +2128,26 @@ void LibraryPanel::query()
             a.side.push_back ({ "header:categories", sounds ? "Types" : "Categories", -1 });
             auto categories = fixedCategories;
             std::map<juce::String, int> counts;
-            for (const auto& [name, n] : c.categoryCounts (type))
+            if (currentView == View::presets)
             {
-                counts[juce::String (name).toLowerCase()] = n;
-                if (! categories.contains (juce::String (name), true))
-                    categories.add (juce::String (name));
+                // The listed categories (the quick menu's), counted as listed (the quick menu hides
+                // empty ones; the Library lists them all, as it always has).
+                library::SearchQuery every;
+                every.type = type;
+                every.limit = 20000;
+                for (const auto& asset : c.search (every))
+                    ++counts[juce::String (std::string (library::canonicalCategory (asset.category, asset.name))).toLowerCase()];
+                categories.clear();
+                for (const auto name : library::presetCategories)
+                    categories.add (juce::String (std::string (name)));
             }
+            else
+                for (const auto& [name, n] : c.categoryCounts (type))
+                {
+                    counts[juce::String (name).toLowerCase()] = n;
+                    if (! categories.contains (juce::String (name), true))
+                        categories.add (juce::String (name));
+                }
             for (const auto& name : categories)
                 a.side.push_back ({ "category:" + name, name, counts[name.toLowerCase()] });
             return a;
@@ -2322,6 +2404,8 @@ void LibraryPanel::loadRow (const LibraryRow& r)
     }
     else
         ok = r.type == AssetType::templateState ? processor.loadStartingState (r.file) : processor.loadPreset (r.file);
+        if (ok)
+            processor.setBrowseContext (browseContextFor (r));
     if (! ok)
     {
         setStatus (r.name + " could not be opened (the file may be damaged or from a newer version).");
@@ -2332,6 +2416,22 @@ void LibraryPanel::loadRow (const LibraryRow& r)
     setStatus ("Loaded " + r.name, true);
     if (onPatchChanged != nullptr)
         onPatchChanged();
+}
+
+juce::String LibraryPanel::browseContextFor (const LibraryRow& r) const
+{
+    // The preset arrows walk what the Library was showing (the same collections as the quick menu).
+    if (r.type == AssetType::templateState)
+        return "states";
+    if (scopeKey == "favourites" || scopeKey == "recent")
+        return scopeKey;
+    if (scopeKey.startsWith ("category:"))
+        return scopeKey;
+    if (scopeKey == "packs" || scopeKey == "factory")
+        return "origin:pack";
+    if (scopeKey == "user")
+        return "origin:user";
+    return "all";
 }
 
 void LibraryPanel::renameRow (const LibraryRow& r)
@@ -2387,6 +2487,22 @@ void LibraryPanel::restoreRow (const LibraryRow& r)
     refresh();
 }
 
+namespace
+{
+    /** The row menu's actions with their icons (shared menu look, docs/research/menu-visual). */
+    void decorateRowMenu (juce::PopupMenu& menu)
+    {
+        using osp::plugin::menuicons::Kind;
+        osp::plugin::menuicons::decorate (menu, { { "Play / Pause", Kind::play }, { "Preview", Kind::play }, { "Load into*", Kind::importIn },
+                                                  { "Load starting state", Kind::startingState }, { "Load", Kind::importIn }, { "Trim / Slice", Kind::trim },
+                                                  { "Duplicate", Kind::saveAs }, { "Export*", Kind::exportOut }, { "Rename", Kind::rename },
+                                                  { "Describe", Kind::rename }, { "Move to Trash", Kind::remove }, { "Restore", Kind::previous },
+                                                  { "Show in Finder", Kind::reveal }, { "Add to favourites", Kind::favourite },
+                                                  { "Remove from favourites", Kind::favourite }, { "Replace with the selected sound", Kind::replace },
+                                                  { "Import*", Kind::importIn } });
+    }
+}
+
 void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
 {
     if (index < 0 || index >= rowCount())
@@ -2423,13 +2539,13 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
             menu.addItem (r.rejected ? "Bring back" : "Set aside (nothing is deleted)", [safe, aside = ! r.rejected] { if (safe != nullptr) safe->setSelectedAside (aside); });
         }
         menu.addItem ("Show in Finder", [file = juce::File (r.path)] { file.revealToUser(); });
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
+        decorateRowMenu (menu), menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
         return;
     }
     if (r.trashed)
     {
         menu.addItem ("Restore", [safe, r] { if (safe != nullptr) safe->restoreRow (r); });
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
+        decorateRowMenu (menu), menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
         return;
     }
     if (r.type == AssetType::sound)
@@ -2444,10 +2560,10 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
     }
     else
     {
-        menu.addItem (r.type == AssetType::templateState ? "Load template" : "Load", [safe, r] { if (safe != nullptr) safe->loadRow (r); });
+        menu.addItem (r.type == AssetType::templateState ? "Load starting state" : "Load", [safe, r] { if (safe != nullptr) safe->loadRow (r); });
         if (r.isBuiltIn())
         {
-            menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
+            decorateRowMenu (menu), menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
             return;
         }
         menu.addItem ("Duplicate", [safe, r] {
@@ -2519,7 +2635,7 @@ void LibraryPanel::showRowMenu (int index, juce::Point<int> where)
     menu.addItem (juce::String::fromUTF8 ("Rename\xe2\x80\xa6"), [safe, r] { if (safe != nullptr) safe->renameRow (r); });
     menu.addSeparator();
     menu.addItem ("Move to Trash", [safe, r] { if (safe != nullptr) safe->trashRow (r); });
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
+    decorateRowMenu (menu), menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea ({ where.x, where.y, 1, 1 }));
 }
 
 std::string LibraryPanel::previewKey (const LibraryRow& r)
@@ -2632,7 +2748,7 @@ namespace
             name.setText (proc.presetDisplayName() == "INIT" ? juce::String() : proc.presetDisplayName(), false);
             name.setTextToShowWhenEmpty ("My Evolving Texture", colour::textMicro);
             preset.setButtonText ("Preset (with sounds): the complete instrument with its current sounds");
-            templateType.setButtonText ("Template (no sounds): settings only, audio files will not be included");
+            templateType.setButtonText ("Starting State (no audio): every setting, macros, effects and modulation; no recordings");
             preset.setRadioGroupId (77);
             templateType.setRadioGroupId (77);
             (asTemplate ? templateType : preset).setToggleState (true, juce::dontSendNotification);
@@ -2645,10 +2761,17 @@ namespace
             portable.setButtonText ("Include audio as portable copy (recommended for sharing): an .ospinstrument beside it");
             for (auto* c : std::initializer_list<juce::Component*> { &name, &preset, &templateType, &category, &tags, &notes, &portable, &cancel, &save })
                 addAndMakeVisible (c);
+            for (auto* field : { &name, &tags, &notes })
+                styleTextField (*field);
             name.onReturnKey = [this] { save.triggerClick(); };
             cancel.onClick = [this] { panel.closeSheet(); };
             save.onClick = [this] { commit(); };
             updateType();
+            // A modified preset keeps its category by default.
+            if (! asTemplate)
+                for (const auto& e : proc.presetList())
+                    if (e.file != juce::File() && e.file == proc.currentPresetFile() && e.category.isNotEmpty() && e.category != "Uncategorized")
+                        category.setText (e.category, juce::dontSendNotification);
         }
         void updateType()
         {
@@ -2710,7 +2833,7 @@ namespace
                 if (safe == nullptr)
                     return;
                 file.getParentDirectory().createDirectory();
-                const bool ok = isTemplate ? proc.saveStartingState (file) : proc.savePreset (file);
+                const bool ok = isTemplate ? proc.saveStartingState (file, text) : proc.savePreset (file);
                 if (! ok)
                 {
                     safe->setStatus ("Could not save " + file.getFileName() + ".");
@@ -3140,7 +3263,22 @@ namespace
 
 void LibraryPanel::openSaveSheet()
 {
-    showSheet (std::make_unique<SaveSheet> (*this, processor, view == View::templates), "save");
+    openSaveSheet (view == View::templates);
+}
+
+void LibraryPanel::openSaveSheet (bool startingState)
+{
+    showSheet (std::make_unique<SaveSheet> (*this, processor, startingState), "save");
+}
+
+void LibraryPanel::chooseAndInstallPack()
+{
+    juce::Component::SafePointer<LibraryPanel> safe (this);
+    chooser = std::make_unique<juce::FileChooser> ("Install a pack", juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile ("Downloads"), "*.osppack");
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+        if (safe != nullptr && fc.getResult().existsAsFile())
+            safe->installPack (fc.getResult());
+    });
 }
 
 void LibraryPanel::openSettingsSheet()

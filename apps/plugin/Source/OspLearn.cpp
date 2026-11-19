@@ -124,7 +124,7 @@ namespace
         r.id = "osp.layers";
         r.holds = Condition::state ("osp.layers.two");
         r.title = "A second recording is needed";
-        r.body = juce::String::fromUTF8 ("Open the \xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2 menu and choose Add layer\xe2\x80\xa6, or drag a second file beside the card: ADD LAYER appears while you drag.");
+        r.body = juce::String::fromUTF8 ("Open the \xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2 menu and choose Add source\xe2\x80\xa6, or drag a second file beside the card: ADD LAYER appears while you drag.");
         r.targetId = "osp.header.menu";
         return r;
     }
@@ -711,9 +711,9 @@ static Catalog ospCatalog()
         save.unavailableBody = preset.unavailableBody;
         l.steps.push_back (save);
         l.steps.push_back (step ("export", "osp.header.menu", "Take it elsewhere",
-                                 juce::String::fromUTF8 ("To move a sound to another computer, choose Export instrument\xe2\x80\xa6 in the \xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2 menu. It writes one .ospinstrument file holding the settings and copies of the recordings.")));
+                                 juce::String::fromUTF8 ("To move a sound to another computer, choose Export portable instrument\xe2\x80\xa6 in the \xe2\x80\xa2\xe2\x80\xa2\xe2\x80\xa2 menu (CONTENT). It writes one .ospinstrument file holding the settings and copies of the recordings.")));
         l.steps.push_back (step ("open", "osp.header.menu", "Open it again",
-                                 juce::String::fromUTF8 ("Open instrument file\xe2\x80\xa6 in the same menu brings an exported instrument back, recordings included. The sound you had before can be restored from the preset name's menu.")));
+                                 juce::String::fromUTF8 ("Open instrument\xe2\x80\xa6 in the same menu brings an exported instrument back, recordings included. The sound you had before can be restored from the preset name's menu.")));
         l.completionText = "Presets keep your settings and point to recordings on this computer. Exported instruments carry the recordings with them.";
         setUp (l, { soundReady() }, "Saving needs a sound to save: use your current one, or the bowed example.");
         c.lessons.push_back (l);
@@ -730,7 +730,7 @@ static Catalog ospCatalog()
     help ("osp.source.level", "LEVEL", "How loud this layer is, from silence to +6 dB.", "osp.quickstart");
     help ("osp.source.reimagined", "REIMAGINED", "How far this layer's REIMAGINED mode transforms the recording. At 0 % the layer plays without it. Click the name to choose the mode.",
           "osp.reimagined");
-    help ("osp.source.mode", "Playback mode", "One Shot plays the recording from START; Granular builds the note from overlapping grains. The menu also holds PEDAL LOOP for One Shot.",
+    help ("osp.source.mode", "Playback mode", "One Shot plays the recording from START; Granular builds the note from overlapping grains. The menu also holds PEDAL LOOP for One Shot: the sustain pedal holds the note in a Forward or Ping-Pong loop, in every REIMAGINED mode.",
           "osp.playback");
     help ("osp.granular.position", "POS", "Where in the recording the grains are taken (START is added).", "osp.playback");
     help ("osp.granular.size", "SIZE", "How long each grain lasts, 20 to 400 ms.", "osp.playback");
@@ -761,7 +761,7 @@ static Catalog ospCatalog()
     help ("osp.mod.halo", "Modulation ring", "The coloured ring shows how far a source moves this control. Drag it to change the depth; right-click for more.", "osp.modulation");
     help ("osp.header.preset", "Presets and Library", "The preset's name: arrows step through presets; the name opens the Library, starting states and the sound before the last load.",
           "osp.presets");
-    help ("osp.header.menu", "Menu", "Add layers, presets and instruments (Export instrument carries the recordings), undo, interface size and the tutorials.");
+    help ("osp.header.menu", "Menu", "The instrument (new, save, open, the Library, undo), its sources (add, record, clear), content (starting states, portable instruments, packs), preferences and support (tutorials). Each source's own actions are on its card's menu.");
     help ("osp.samples", "Samples", "How each file of a multi-sample sound is used: its role, its root note and its velocity layer. A change is yours and is kept.", "osp.multisample");
     help ("osp.advanced", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
     help ("keyboard.settings", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");

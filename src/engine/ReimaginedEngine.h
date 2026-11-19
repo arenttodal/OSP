@@ -1,6 +1,7 @@
 #pragma once
 
 #include "audio/pitch/SincInterpolator.h"
+#include "engine/PedalLoopMode.h"
 #include "engine/ReimaginedModes.h"
 #include "model/InstrumentModel.h"
 
@@ -37,6 +38,12 @@ struct ReimaginedNote
     double velocity = 0.8;       ///< 0..1, after the DYNAMICS curve
     int note = 60;
     std::uint64_t seed = 1;      ///< the note's own seed (LIFE: a take repeats exactly)
+    /** PEDAL LOOP the note asks for (docs/research/pedal-reimagined): Normal unless it can loop
+        (One Shot, forward, the recording's pedal regions valid, the layer's LOOP not already
+        holding a Forward loop). The regions: model->original.continuation.pedal. */
+    PedalLoopMode pedalLoop = PedalLoopMode::normal;
+    double pedalTurnFrames = 0.0;      ///< Ping-Pong's turn crossfade (source frames)
+    float pedalTurnCorrelation = 0.0f;
 };
 
 /** Live inputs, once per control period (32 samples). */
@@ -87,8 +94,18 @@ public:
     virtual double grainPositionOffset() const noexcept { return 0.0; }
     /** Where it reads the recording now (source frames), for the display; < 0: nowhere. */
     virtual double sourcePosition() const noexcept { return -1.0; }
-    /** The note has nothing left to play (the voice ends it). */
+    /** The note has nothing left to play (the voice ends it). Never while a pedal loop holds it. */
     virtual bool finished() const noexcept { return false; }
+
+    /** PEDAL LOOP (docs/research/pedal-reimagined): what this note plays when the sustain pedal
+        is down: the note's request, or Normal where the engine cannot loop it. */
+    virtual PedalLoopMode pedalLoopMode() const noexcept { return PedalLoopMode::normal; }
+    /** The sustain pedal for this note (it may arrive right after start(); the latest wins).
+        Down: the engine's reading loops the recording's pedal region; up: ordinary playback
+        resumes where the loop is (the transformation never restarts). */
+    virtual void pedal (bool) noexcept {}
+    virtual bool pedalArmed() const noexcept { return false; }
+    virtual bool pedalLooping() const noexcept { return false; }
 };
 
 namespace reimagined

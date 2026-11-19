@@ -48,11 +48,18 @@ TEST_CASE ("user macros: six appended parameters at 0; nothing assigned is bit-e
 {
     OspAudioProcessor p;
     const auto& all = p.getParameters();
-    REQUIRE (all.size() >= 6);
+    // Six consecutive parameters, appended after every earlier one (later versions, such as
+    // STRUM, append after them; the whole tail's order is pinned in UnifiedPhase2Tests).
+    int first = -1;
+    for (int i = 0; i < all.size() && first < 0; ++i)
+        if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (all[i]); ranged != nullptr && ranged->getParameterID() == "userMacro.1")
+            first = i;
+    REQUIRE (first >= 0);
+    REQUIRE (first + 6 <= all.size());
     for (int m = 0; m < 6; ++m)
     {
-        // The last six, in order, 0..100 %, default 0.
-        auto* param = dynamic_cast<juce::AudioParameterFloat*> (all[all.size() - 6 + m]);
+        // In order, 0..100 %, default 0.
+        auto* param = dynamic_cast<juce::AudioParameterFloat*> (all[first + m]);
         REQUIRE (param != nullptr);
         CHECK (param->paramID == "userMacro." + juce::String (m + 1));
         CHECK (param->getName (40) == "User Macro " + juce::String (m + 1));

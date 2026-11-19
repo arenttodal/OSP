@@ -532,6 +532,37 @@ ArpInlinePanel::ArpInlinePanel (InstrumentHost& p)
         satellite->editedCard = [this] { return linked ? 0 : editCard; };
         addAndMakeVisible (*satellite);
     }
+    if (p.hasStrum())
+    {
+        // STRUM (docs/research/arp-strum): beside SATELLITE, the same key. Its light switches
+        // the card being edited (linked: A, which every lane follows); it plays only with CHORD.
+        auto& host = p;
+        auto parameterOf = [&host] (const juce::String& id) { return host.apvts().getParameter (id); };
+        SatelliteKey::Behaviour b;
+        b.name = "STRUM";
+        b.tooltip = "STRUM: a chord's notes one after another (the light switches it, the name opens it)";
+        b.unavailableTooltip = "STRUM is on, but plays only with the CHORD pattern";
+        b.isOn = [this, parameterOf] {
+            auto* on = parameterOf (ids::arpStrum (ospProcessor.cardArpNamespace(), strumCard(), "on"));
+            return on != nullptr && on->getValue() >= 0.5f;
+        };
+        b.isAvailable = [this, parameterOf] {
+            auto* pattern = parameterOf (ids::arpCardSetting (ospProcessor.cardArpNamespace(), strumCard(), "pattern"));
+            return pattern != nullptr && juce::roundToInt (pattern->convertFrom0to1 (pattern->getValue())) == static_cast<int> (ArpPattern::chord);
+        };
+        b.toggle = [this, parameterOf] {
+            if (auto* on = parameterOf (ids::arpStrum (ospProcessor.cardArpNamespace(), strumCard(), "on")))
+            {
+                ospProcessor.undo().beginNewTransaction ("Strum");
+                on->beginChangeGesture();
+                on->setValueNotifyingHost (on->getValue() >= 0.5f ? 0.0f : 1.0f);
+                on->endChangeGesture();
+            }
+        };
+        b.createPanel = [this] { return ospProcessor.createStrumPanel (strumCard()); };
+        strum = std::make_unique<SatelliteKey> (p, std::move (b));
+        addAndMakeVisible (*strum);
+    }
 }
 
 void ArpInlinePanel::showEditedCard()
@@ -625,6 +656,8 @@ void ArpInlinePanel::refresh()
 {
     if (satellite != nullptr)
         satellite->refresh();
+    if (strum != nullptr)
+        strum->refresh();
     const auto now = ospProcessor.arpView();
     if (now.active != shown.active || now.current != shown.current || now.low != shown.low || now.high != shown.high)
     {
@@ -669,6 +702,13 @@ void ArpInlinePanel::resized()
             editTabs[static_cast<std::size_t> (c)] = { 460.0f + 28.0f * static_cast<float> (c), y - 0.5f * h, 28.0f, h };
         if (satellite != nullptr)
             satellite->setBounds (juce::Rectangle<float> (566.0f, y - 0.5f * h, static_cast<float> (satellite->preferredWidth()), h).getSmallestIntegerContainer());
+    }
+    if (strum != nullptr)
+    {
+        // A stable place right of SATELLITE's (SATELLITE's own place without per-card lanes).
+        const float y = 27.0f, h = 22.0f;
+        const float x = satellite != nullptr ? strumKeyArea().getX() + 4.0f : 566.0f;
+        strum->setBounds (juce::Rectangle<float> (x, y - 0.5f * h, static_cast<float> (strum->preferredWidth()), h).getSmallestIntegerContainer());
     }
     revealSelected();
 }
@@ -1176,8 +1216,27 @@ SatelliteKey::SatelliteKey (InstrumentHost& h) : host (h)
     shownOn = anyOn();
 }
 
+SatelliteKey::SatelliteKey (InstrumentHost& h, Behaviour b) : host (h), behaviour (std::move (b))
+{
+    setTitle (name().toLowerCase().replaceSection (0, 1, name().substring (0, 1)));
+    setDescription ("The light switches it, the name opens its panel");
+    setTooltip (behaviour.tooltip);
+    setWantsKeyboardFocus (true);
+    setMouseClickGrabsKeyboardFocus (false);
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    shownOn = anyOn();
+    shownAvailable = isAvailable();
+}
+
+bool SatelliteKey::isAvailable() const
+{
+    return behaviour.isAvailable == nullptr || behaviour.isAvailable();
+}
+
 bool SatelliteKey::anyOn() const
 {
+    if (behaviour.isOn != nullptr)
+        return behaviour.isOn();
     for (int card = 0; card < 3; ++card)
         if (auto* p = host.apvts().getParameter (host.satelliteParameterId (card)); p != nullptr && p->getValue() >= 0.5f)
             return true;
@@ -1192,6 +1251,12 @@ bool SatelliteKey::isOpen() const
 
 void SatelliteKey::toggle()
 {
+    if (behaviour.toggle != nullptr)
+    {
+        behaviour.toggle();
+        refresh();
+        return;
+    }
     // One undo step: every card's light that changes.
     int mask = 0;
     for (int card = 0; card < 3; ++card)
@@ -1228,18 +1293,21 @@ void SatelliteKey::openPanel()
         refresh();
         return;
     }
-    if (auto panel = host.createSatellitePanel (juce::jlimit (0, 2, editedCard != nullptr ? editedCard() : 0)))
+    if (auto panel = behaviour.createPanel != nullptr ? behaviour.createPanel() : host.createSatellitePanel (juce::jlimit (0, 2, editedCard != nullptr ? editedCard() : 0)))
         owner->openAnchoredPopover (std::move (panel), *this);
     refresh();
 }
 
 void SatelliteKey::refresh()
 {
-    const bool on = anyOn(), open = isOpen();
-    if (on != shownOn || open != shownOpen)
+    const bool on = anyOn(), open = isOpen(), available = isAvailable();
+    if (on != shownOn || open != shownOpen || available != shownAvailable)
     {
         shownOn = on;
         shownOpen = open;
+        shownAvailable = available;
+        if (behaviour.unavailableTooltip.isNotEmpty())
+            setTooltip (on && ! available ? behaviour.unavailableTooltip : behaviour.tooltip);
         repaint();
     }
 }
@@ -1284,7 +1352,16 @@ void SatelliteKey::paint (juce::Graphics& g)
     const bool overLight = hover && lightArea().contains (mouse);
     // The light: a small lens, lit (the accent, a soft glow) or dark (a hairline ring).
     const auto light = juce::Rectangle<float> (8.0f, 8.0f).withCentre ({ lightCentreX, r.getCentreY() });
-    if (shownOn)
+    if (shownOn && ! shownAvailable)
+    {
+        // On, but it cannot act on what plays (STRUM without chords): the accent only as a
+        // ring around a dark lens, never lit.
+        g.setColour (colour::text.withAlpha (0.08f));
+        g.fillEllipse (light);
+        g.setColour (colour::accent.withAlpha (overLight ? 0.75f : 0.55f));
+        g.drawEllipse (light.reduced (0.5f), 1.2f);
+    }
+    else if (shownOn)
     {
         g.setColour (colour::accent.withAlpha (0.22f));
         g.fillEllipse (light.expanded (3.0f));

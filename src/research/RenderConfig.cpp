@@ -511,6 +511,25 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
         arpSettings.swing = std::clamp (json::getDouble (a, "swing", arpSettings.swing), 0.0, arp::maxSwing);
         config.arp.bpm = std::clamp (json::getDouble (a, "bpm", config.arp.bpm), 20.0, 400.0);
         config.arp.transport = json::getBool (a, "transport", config.arp.transport);
+        // STRUM (CHORD only): "strum": { "direction": "up", "ms": 30 } or { "sync": "1/32" }.
+        if (json::has (a, "strum"))
+        {
+            const auto& st = a["strum"];
+            arpSettings.strum = json::getBool (st, "enabled", true);
+            const auto direction = juce::String (json::getString (st, "direction", "up")).toUpperCase();
+            for (int i = 0; i < arp::strumDirectionCount; ++i)
+                if (direction == arp::strumDirectionName (static_cast<StrumDirection> (i)))
+                    arpSettings.strumDirection = static_cast<StrumDirection> (i);
+            arpSettings.strumMs = std::clamp (json::getDouble (st, "ms", arpSettings.strumMs), 0.0, arp::maxStrumMs);
+            if (json::has (st, "sync"))
+            {
+                arpSettings.strumSync = true;
+                const auto division = juce::String (json::getString (st, "sync", "1/32")).toUpperCase();
+                for (int i = 0; i < arp::strumDivisionCount; ++i)
+                    if (division == juce::String (arp::strumDivisionName (i)).toUpperCase())
+                        arpSettings.strumQuarters = arp::strumDivisionQuarters (i);
+            }
+        }
     }
 
     return config;

@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "OspStartingStates.h"
 #include "TutorialSounds.h"
 #include "engine/fx/Effects.h"
 #include "FxIdentity.h"
@@ -17,6 +18,7 @@
 #include "io/ContentHash.h"
 #include "io/NoteAtlasJson.h"
 #include "library/Inbox.h"
+#include "library/PresetCategory.h"
 #include "library/Classifier.h"
 #include "analysis/phrase/PhraseEdits.h"
 
@@ -65,6 +67,55 @@ namespace
         { "Dream", 40, 45, 60, 45, 60, 65, 300, 4000 },
         { "Wide", 40, 60, 90, 40, 55, 30, 10, 1200 },
     };
+
+    /** A built-in starting state as it ships: a whole .ospstate embedded from
+        apps/plugin/Resources/StartingStates ("NN Name.ospstate": its place and its name). */
+    struct BuiltInState
+    {
+        juce::String name;
+        std::shared_ptr<const juce::XmlElement> xml;
+    };
+
+    /** The embedded states in file order; an unreadable one is skipped (and reported). Empty: the
+        legacy table above stands in (names, and its few settings). Message thread. */
+    const std::vector<BuiltInState>& builtInStates()
+    {
+        static const std::vector<BuiltInState> states = [] {
+            std::vector<std::pair<juce::String, int>> files;
+            for (int i = 0; i < OspStartingStatesData::namedResourceListSize; ++i)
+                files.push_back ({ juce::String::fromUTF8 (OspStartingStatesData::originalFilenames[i]), i });
+            std::sort (files.begin(), files.end(), [] (const auto& a, const auto& b) { return a.first.compareNatural (b.first) < 0; });
+            std::vector<BuiltInState> out;
+            for (const auto& [file, index] : files)
+            {
+                int size = 0;
+                const char* data = OspStartingStatesData::getNamedResource (OspStartingStatesData::namedResourceList[index], size);
+                auto xml = data != nullptr ? juce::XmlDocument::parse (juce::String::fromUTF8 (data, size)) : nullptr;
+                if (xml == nullptr || ! xml->hasTagName ("OSP"))
+                {
+                    DBG ("OSP: the built-in starting state " << file << " could not be read; skipped");
+                    continue;
+                }
+                // "01 Natural.ospstate" -> "Natural" (the number orders them only).
+                auto name = file.upToLastOccurrenceOf (".", false, false).trim();
+                if (name.initialSectionContainingOnly ("0123456789").isNotEmpty())
+                    name = name.fromFirstOccurrenceOf (" ", false, false).trim();
+                out.push_back ({ name.isNotEmpty() ? name : file, std::shared_ptr<const juce::XmlElement> (std::move (xml)) });
+            }
+            return out;
+        }();
+        return states;
+    }
+
+    int builtInCount() { return builtInStates().empty() ? static_cast<int> (std::size (startingStates)) : static_cast<int> (builtInStates().size()); }
+
+    juce::String builtInName (int index)
+    {
+        index = std::clamp (index, 0, builtInCount() - 1);
+        return builtInStates().empty() ? juce::String (startingStates[index].name) : builtInStates()[static_cast<std::size_t> (index)].name;
+    }
+
+    std::atomic<bool> newInstancesOpenOnFirstState { true };
 }
 
 /** The shared per-card lanes' view of this processor (osp::plugin::CardArpLanes::Host). */
@@ -111,6 +162,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     // USER MACROS (version hint 34; after VIBRATO): six assignable macros, userMacro.1 .. 6, as
     // ANDOR ANALOG's. At 0 with no assignment (every session from before) they do nothing.
     addUserMacroParameters (layout, 34, [] (int macro) { return userMacroId (macro); });
+    // STRUM (version hint 35; after USER MACROS): each card's own, off by default and in every
+    // session from before, so the arpeggiator plays exactly as it did.
+    addStrumParameters (layout, {}, 35);
     return layout;
 }
 
@@ -346,6 +400,8 @@ OspAudioProcessor::OspAudioProcessor()
     arpLinkParam = liveParameter (ids::arpLink ({}));
     for (int card = 0; card < 3; ++card)
         arpCardParams[static_cast<std::size_t> (card)] = liveParameter (ids::arpCard ({}, card));
+    for (int card = 0; card < 3; ++card)
+        strumReaders[static_cast<std::size_t> (card)].attach (parameters, {}, card);
     for (int card = 1; card < 3; ++card)
     {
         const auto i = static_cast<std::size_t> (card - 1);
@@ -418,6 +474,18 @@ OspAudioProcessor::OspAudioProcessor()
     engine.prepare (48000.0, 512, engineSettings);
 
     startTimerHz (20);
+    // A new instance opens on the first built-in state, all of it: the header names it and the
+    // controls hold it. (A session or preset the host restores next replaces it as ever.)
+    if (newInstancesOpenOnFirstState.load())
+    {
+        setCurrentProgram (0);
+        undoManager.clearUndoHistory();
+    }
+}
+
+void OspAudioProcessor::setNewInstancesOpenOnFirstState (bool shouldOpen) noexcept
+{
+    newInstancesOpenOnFirstState.store (shouldOpen);
 }
 
 OspAudioProcessor::~OspAudioProcessor()
@@ -1704,6 +1772,7 @@ const juce::MidiBuffer& OspAudioProcessor::runCardArpeggiators (const juce::Midi
             c.pattern[i] = juce::roundToInt (arpLanePatternParams[i]->load());
             c.rate[i] = juce::roundToInt (arpLaneRateParams[i]->load());
             c.octaves[i] = juce::roundToInt (arpLaneOctavesParams[i]->load());
+            strumReaders[i + 1].applyTo (c.strum[i]);
         }
     }
     const auto& out = lanes->process (*laneHost, midi, numSamples, timing, c);
@@ -1729,6 +1798,7 @@ Arpeggiator::Settings OspAudioProcessor::arpSettings() noexcept
     settings.octaves = std::clamp (juce::roundToInt (arpOctavesParam->load()), arp::minOctaves, arp::maxOctaves);
     settings.swing = arpSwingParam->load() / 100.0;
     settings.velocityScale = arpVelocityParam->load() / 100.0;
+    strumReaders[0].applyTo (settings);   // card A's (and every linked lane's) STRUM
     applyArpModulation (settings);
     return settings;
 }
@@ -2866,16 +2936,179 @@ void OspAudioProcessor::parameterGestureChanged (int parameterIndex, bool gestur
 //==============================================================================
 // Header preset navigation
 
+void OspAudioProcessor::refreshPresetIndex() const
+{
+    std::vector<PresetMeta> rows;
+    std::set<juce::String> trashed;
+    const bool read = libraryHub->runAndWait ([&rows, &trashed] (library::Catalog& c) {
+        {
+            library::SearchQuery bin;
+            bin.trashedOnly = true;
+            bin.limit = 20000;
+            for (const auto& a : c.search (bin))
+                if (a.type != library::AssetType::sound)
+                    if (const auto info = c.preset (a.id))
+                        trashed.insert (juce::File (juce::String::fromUTF8 (info->file.c_str())).getFullPathName());
+        }
+        std::map<std::string, std::string> packNames;
+        for (const auto& pack : c.packs())
+            packNames[pack.id] = pack.name;
+        for (const auto type : { library::AssetType::preset, library::AssetType::templateState })
+            for (int offset = 0;; offset += 1000)
+            {
+                library::SearchQuery q;
+                q.type = type;
+                q.limit = 1000;
+                q.offset = offset;
+                const auto found = c.search (q);
+                for (const auto& a : found)
+                    if (const auto info = c.preset (a.id))
+                    {
+                        PresetMeta m;
+                        m.name = juce::String::fromUTF8 (a.name.c_str());
+                        m.file = juce::File (juce::String::fromUTF8 (info->file.c_str()));
+                        m.state = a.type == library::AssetType::templateState;
+                        m.category = juce::String::fromUTF8 (std::string (library::canonicalCategory (a.category, a.name)).c_str());
+                        m.packId = juce::String::fromUTF8 (a.packId.c_str());
+                        if (const auto name = packNames.find (a.packId); name != packNames.end())
+                            m.packName = juce::String::fromUTF8 (name->second.c_str());
+                        m.favourite = a.favourite;
+                        m.lastUsed = c.lastUsed (a.id);
+                        rows.push_back (std::move (m));
+                    }
+                if (static_cast<int> (found.size()) < q.limit)
+                    break;
+            }
+    }, 3000);
+    if (read)
+    {
+        presetIndexCache = std::move (rows);
+        presetIndexTrashed = std::move (trashed);
+        presetIndexRead = true;
+    }
+    presetIndexTime = juce::Time::getMillisecondCounter();
+}
+
 std::vector<OspAudioProcessor::PresetEntry> OspAudioProcessor::presetList() const
 {
+    // The built-in states, then the Starting States and presets the Library knows (the user's,
+    // factory and pack content, with their category, pack, favourite and history), and any file
+    // in the user's folders it has not indexed yet. The user's preset files keep their order.
+    if (! presetIndexRead || juce::Time::getMillisecondCounter() - presetIndexTime > 1000)
+        refreshPresetIndex();
     std::vector<PresetEntry> list;
-    for (int i = 0; i < static_cast<int> (std::size (startingStates)); ++i)
-        list.push_back ({ startingStates[i].name, i, {}, true });
-    for (const auto& file : findFiles (startingStateFolder(), startingStateExtension))
-        list.push_back ({ file.getFileNameWithoutExtension(), -1, file, true });
-    for (const auto& file : findFiles (presetFolder(), presetExtension))
-        list.push_back ({ file.getFileNameWithoutExtension(), -1, file, false });
+    for (int i = 0; i < builtInCount(); ++i)
+        list.push_back ({ builtInName (i), i, {}, true });
+    std::map<juce::String, const PresetMeta*> known;
+    for (const auto& m : presetIndexCache)
+        known[m.file.getFullPathName()] = &m;
+    auto entryFor = [] (const PresetMeta& m) {
+        PresetEntry e { m.name, -1, m.file, m.state };
+        e.category = m.category;
+        e.packId = m.packId;
+        e.packName = m.packName;
+        e.favourite = m.favourite;
+        e.lastUsed = m.lastUsed;
+        return e;
+    };
+    for (const bool states : { true, false })
+    {
+        std::set<juce::String> listed;
+        for (const auto& file : findFiles (states ? startingStateFolder() : presetFolder(), states ? startingStateExtension : presetExtension))
+        {
+            listed.insert (file.getFullPathName());
+            if (presetIndexTrashed.count (file.getFullPathName()) > 0)
+                continue;   // (in the Library's trash: not offered)
+            if (const auto m = known.find (file.getFullPathName()); m != known.end())
+                list.push_back (entryFor (*m->second));
+            else
+            {
+                PresetEntry e { file.getFileNameWithoutExtension(), -1, file, states };
+                e.category = juce::String::fromUTF8 (std::string (library::canonicalCategory ({}, file.getFileNameWithoutExtension().toStdString())).c_str());
+                list.push_back (e);
+            }
+        }
+        for (const auto& m : presetIndexCache)
+            if (m.state == states && ! listed.count (m.file.getFullPathName()) && m.file.existsAsFile())
+                list.push_back (entryFor (m));
+    }
     return list;
+}
+
+namespace
+{
+    juce::String entryKey (const InstrumentHost::PresetEntry& e) { return e.program >= 0 ? "program:" + juce::String (e.program) : e.file.getFullPathName(); }
+}
+
+std::vector<OspAudioProcessor::PresetEntry> OspAudioProcessor::presetsIn (const juce::String& context) const
+{
+    const auto all = presetList();
+    std::vector<PresetEntry> out;
+    for (const auto& e : all)
+    {
+        bool in = false;
+        if (context == "states")
+            in = e.startingState;
+        else if (e.startingState)
+            in = false;   // (Starting States only when they are the collection)
+        else if (context.isEmpty() || context == "all")
+            in = true;
+        else if (context == "favourites")
+            in = e.favourite;
+        else if (context == "recent")
+            in = e.lastUsed > 0;
+        else if (context.startsWith ("category:"))
+            in = e.category == context.fromFirstOccurrenceOf ("category:", false, false);
+        else if (context.startsWith ("pack:"))
+            in = e.packId == context.fromFirstOccurrenceOf ("pack:", false, false);
+        else if (context == "origin:pack")
+            in = e.packId.isNotEmpty();
+        else if (context == "origin:user")
+            in = e.packId.isEmpty();
+        if (in)
+        {
+            out.push_back (e);
+            out.back().context = context.isEmpty() ? juce::String ("all") : context;
+        }
+    }
+    if (context == "states")
+        return out;   // (built-ins first, then the user's, as listed)
+    if (context == "recent")
+    {
+        // Most recent first, in the order the collection had when it was chosen (loading one
+        // changes its history: the walk would otherwise jump).
+        std::stable_sort (out.begin(), out.end(), [] (const PresetEntry& a, const PresetEntry& b) { return a.lastUsed > b.lastUsed; });
+        if (! browsingOrder.empty())
+        {
+            std::map<juce::String, std::size_t> rank;
+            for (std::size_t i = 0; i < browsingOrder.size(); ++i)
+                rank[browsingOrder[i]] = i;
+            std::stable_sort (out.begin(), out.end(), [&rank] (const PresetEntry& a, const PresetEntry& b) {
+                const auto ra = rank.find (entryKey (a)), rb = rank.find (entryKey (b));
+                return (ra != rank.end() ? ra->second : rank.size()) < (rb != rank.end() ? rb->second : rank.size());
+            });
+        }
+        return out;
+    }
+    std::stable_sort (out.begin(), out.end(), [] (const PresetEntry& a, const PresetEntry& b) { return a.name.compareNatural (b.name) < 0; });
+    return out;
+}
+
+void OspAudioProcessor::setBrowseContext (const juce::String& context)
+{
+    browsing = context;
+    browsingOrder.clear();
+    if (context == "recent")
+        for (const auto& e : presetsIn (context))
+            browsingOrder.push_back (entryKey (e));
+}
+
+juce::String OspAudioProcessor::browseContext() const
+{
+    if (browsing.isNotEmpty())
+        return browsing;
+    // Nothing chosen from a collection (a new instance, a session): what is loaded decides.
+    return presetIsProgram || lastStartingStateFile != juce::File() ? juce::String ("states") : juce::String ("all");
 }
 
 juce::String OspAudioProcessor::presetDisplayName() const
@@ -2884,11 +3117,13 @@ juce::String OspAudioProcessor::presetDisplayName() const
         return lastPresetFile.getFileNameWithoutExtension();
     if (! presetIsProgram && presetNameOverride.isNotEmpty())
         return presetNameOverride;
-    return startingStates[std::clamp (currentProgram, 0, static_cast<int> (std::size (startingStates)) - 1)].name;
+    return builtInName (currentProgram);
 }
 
 void OspAudioProcessor::openPresetEntry (const PresetEntry& entry)
 {
+    if (entry.context.isNotEmpty() && entry.context != browsing)
+        setBrowseContext (entry.context);   // (a new collection replaces the arrows' context)
     if (entry.program >= 0)
     {
         rememberPreviousState ("Before " + entry.name);
@@ -2903,18 +3138,27 @@ void OspAudioProcessor::openPresetEntry (const PresetEntry& entry)
 
 void OspAudioProcessor::stepPresetList (int delta)
 {
-    const auto list = presetList();
+    // The arrows walk the collection the loaded preset was chosen from (recomputed each step:
+    // a deleted or renamed item simply drops out).
+    const auto context = browseContext();
+    const auto list = presetsIn (context);
     if (list.empty())
         return;
     int current = -1;
     for (int i = 0; i < static_cast<int> (list.size()); ++i)
-        if ((presetIsProgram && list[static_cast<std::size_t> (i)].program == currentProgram)
-            || (! presetIsProgram && list[static_cast<std::size_t> (i)].file != juce::File()
-                && (list[static_cast<std::size_t> (i)].file == lastPresetFile || list[static_cast<std::size_t> (i)].file == lastStartingStateFile)))
+    {
+        const auto& e = list[static_cast<std::size_t> (i)];
+        if ((presetIsProgram && e.program == currentProgram && presetNameOverride.isEmpty())
+            || (! presetIsProgram && e.file != juce::File() && (e.file == lastPresetFile || e.file == lastStartingStateFile)))
             current = i;
+    }
     const int count = static_cast<int> (list.size());
-    const int next = current < 0 ? 0 : ((current + delta) % count + count) % count;
-    openPresetEntry (list[static_cast<std::size_t> (next)]);
+    const int next = current < 0 ? (delta > 0 ? 0 : count - 1) : ((current + delta) % count + count) % count;
+    const auto keep = browsing;
+    auto entry = list[static_cast<std::size_t> (next)];
+    entry.context.clear();   // (the same collection: its order is kept)
+    openPresetEntry (entry);
+    browsing = keep.isNotEmpty() ? keep : context;
 }
 
 namespace
@@ -3892,18 +4136,30 @@ void OspAudioProcessor::recallInstrument (const juce::ValueTree& tree, int layer
 
 int OspAudioProcessor::getNumPrograms()
 {
-    return static_cast<int> (std::size (startingStates));
+    return builtInCount();
 }
 
 const juce::String OspAudioProcessor::getProgramName (int index)
 {
-    return index >= 0 && index < getNumPrograms() ? juce::String (startingStates[index].name) : juce::String();
+    return index >= 0 && index < getNumPrograms() ? builtInName (index) : juce::String();
 }
 
 void OspAudioProcessor::setCurrentProgram (int index)
 {
     if (index < 0 || index >= getNumPrograms())
         return;
+    if (! builtInStates().empty())
+    {
+        // The whole state, as a starting state from the Library applies it: every setting, the
+        // modulation, FX route, macros and slots; the sounds already loaded stay.
+        applyStateXml (*builtInStates()[static_cast<std::size_t> (index)].xml, true);
+        currentProgram = index;
+        presetIsProgram = true;
+        presetNameOverride.clear();
+        lastPresetFile = juce::File();
+        lastStartingStateFile = juce::File();
+        return;
+    }
     currentProgram = index;
     presetIsProgram = true;
     presetNameOverride.clear();
@@ -4039,7 +4295,19 @@ void OspAudioProcessor::initPatch()
     presetNameOverride = "INIT";
 }
 
-bool OspAudioProcessor::saveStartingState (const juce::File& file)
+bool OspAudioProcessor::canSaveInPlace() const
+{
+    const auto file = lastPresetFile;
+    if (presetIsProgram || file == juce::File() || ! file.existsAsFile() || file.getFileExtension() != presetExtension || ! file.hasWriteAccess())
+        return false;
+    const auto places = packPlaces();
+    for (const auto& dir : { places.packsDir, places.factoryDir })
+        if (file.isAChildOf (juce::File (juce::String::fromUTF8 (dir.string().c_str()))))
+            return false;
+    return true;
+}
+
+bool OspAudioProcessor::saveStartingState (const juce::File& file, const juce::String& description)
 {
     auto xml = createStateXml();
     if (xml == nullptr)
@@ -4052,14 +4320,13 @@ bool OspAudioProcessor::saveStartingState (const juce::File& file)
         xml->removeAttribute (property);
     xml->setAttribute ("keptSlots", slotCount());
     xml->setAttribute ("startingState", 1);
+    if (description.isNotEmpty())
+        xml->setAttribute ("description", description);
     file.getParentDirectory().createDirectory();
     if (! xml->writeTo (file))
         return false;
     libraryHub->presetSaved (file, library::AssetType::templateState, {}, slotCount(), stateVersion);
-    presetNameOverride = file.getFileNameWithoutExtension();
-    presetIsProgram = false;
-    lastPresetFile = juce::File();
-    lastStartingStateFile = file;
+    // (the instrument is unchanged: its header name, its preset file and SAVE's target stay)
     return true;
 }
 

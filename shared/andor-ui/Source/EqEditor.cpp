@@ -239,8 +239,10 @@ void EqValueField::beginTyping()
     editor = std::make_unique<juce::TextEditor>();
     editor->setJustification (juce::Justification::centred);
     editor->setFont (type::popupValue (12.5f));
-    editor->setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff1c2122));
+    styleTextField (*editor, TextSurface::dark);   // (its selection was graphite text on the dark field)
     editor->setColour (juce::TextEditor::textColourId, juce::Colour (0xffeee8dd));
+    editor->setColour (juce::TextEditor::highlightedTextColourId, juce::Colour (0xffeee8dd));
+    editor->setColour (juce::CaretComponent::caretColourId, juce::Colour (0xffeee8dd));
     editor->setColour (juce::TextEditor::outlineColourId, accent);
     editor->setColour (juce::TextEditor::focusedOutlineColourId, accent);
     editor->setText (parameter != nullptr ? parameter->getCurrentValueAsText() : juce::String(), false);

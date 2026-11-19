@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "description": "A harp sweep: UP over two octaves, 260 ms, one chord a second. Render with --fixture chords; compare with strum-off-reference (and baseline A/B with the same arp block).",
+  "arp": {
+    "enabled": true,
+    "transport": true,
+    "pattern": "chord",
+    "rate": "1/4",
+    "gate": 1.3,
+    "octaves": 2,
+    "bpm": 60,
+    "strum": {
+      "direction": "up",
+      "ms": 260
+    }
+  }
+}

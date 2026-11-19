@@ -25,6 +25,7 @@
 #include "research/RenderMetrics.h"
 #include "research/PedalLoopLab.h"
 #include "research/ArpPatternLab.h"
+#include "research/PedalReimaginedLab.h"
 #include "research/RenderSession.h"
 #include "research/SourceAnalysis.h"
 #include "research/TestSignalSet.h"
@@ -141,6 +142,8 @@ BENCHMARK
   --benchmark [--engine A|C] [--voices 24] [--seconds 20] [--sample-rate 48000] [--block-size 128] [--output-json <f>] [--no-retrigger] [--transpose <semitones>]
   --pedal-loop-lab <dir> [--recordings <a.wav,b.wav>] [--no-audio] [--bench yes]
         Pedal Loop 1.0: renders and measures the matrix (stand-ins, then the recordings) into <dir>.
+  --pedal-reimagined-lab <dir> [--recordings <a.wav,b.wav>] [--no-audio] [--bench yes] [--only-recordings yes]
+        PEDAL LOOP x REIMAGINED: A/B/C/D per REIMAGINED mode, Forward and Ping-Pong, into <dir>.
 
 CUSTOM ARP PATTERNS (CP1; docs/research/custom-arp)
   --arp-lab <dir> [--no-audio]
@@ -1596,6 +1599,40 @@ int commandPedalLoopLab (const Args& args)
     return result.allFinite ? exitOk : exitProcessing;
 }
 
+int commandPedalReimaginedLab (const Args& args)
+{
+    // PEDAL LOOP x REIMAGINED (docs/research/pedal-reimagined): stand-ins and/or recordings.
+    const fs::path out = args.get ("--pedal-reimagined-lab");
+    std::vector<research::PedalLabSource> sources;
+    if (! args.has ("--only-recordings"))
+        sources = research::pedalLabStandIns (48000.0);
+    std::stringstream list (args.get ("--recordings"));
+    std::string file;
+    while (std::getline (list, file, ','))
+    {
+        if (file.empty())
+            continue;
+        auto loaded = io::loadAudioFile (file);
+        if (! loaded.ok)
+            return fail (exitInput, loaded.error);
+        sources.push_back ({ fs::path (file).stem().string(), std::move (loaded.audio), false });
+    }
+    if (sources.empty())
+        return fail (exitUsage, "no sources");
+    fs::create_directories (out);
+    if (args.has ("--bench"))
+    {
+        const auto table = research::runPedalReimaginedBenchmark (sources.front(), 3);
+        std::ofstream (out / "pedal-reimagined-benchmark.md") << table;
+        std::cout << table;
+        return exitOk;
+    }
+    const auto result = research::runPedalReimaginedLab (sources, out, ! args.has ("--no-audio"));
+    std::ofstream (out / "pedal-reimagined-lab.md") << result.markdown;
+    std::cout << result.markdown << "\n" << result.renders << " renders, " << (result.allFinite ? "all finite" : "NOT ALL FINITE") << "\n";
+    return result.allFinite ? exitOk : exitProcessing;
+}
+
 int commandBenchmark (const Args& args)
 {
     BenchmarkOptions options;
@@ -1677,6 +1714,8 @@ int main (int argc, char** argv)
             return commandPedalLoopLab (args);
         if (args.has ("--arp-lab"))
             return commandArpLab (args);
+        if (args.has ("--pedal-reimagined-lab"))
+            return commandPedalReimaginedLab (args);
         if (args.has ("--unified"))
             return commandUnified (args);
         if (args.has ("--atlas"))

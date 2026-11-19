@@ -1,4 +1,6 @@
 #include "ModulationPanel.h"
+
+#include "MenuIcons.h"
 #include "Binding.h"
 
 #include "ArpSection.h"
@@ -1514,6 +1516,7 @@ juce::PopupMenu ModulationPanel::sourceMenu (int source)
             menu.addItem ("Apply to AMP", true, p.velocityAppliesToAmp(), [&p] { p.setVelocityAppliesToAmp (! p.velocityAppliesToAmp()); });
         menu.addSeparator();
         menu.addItem ("Routes...", [safe, source] { if (safe != nullptr && safe->onShowRoutes != nullptr) safe->onShowRoutes (source); });
+        menuicons::decorate (menu, { { "Edit curve", menuicons::Kind::settings }, { "Reset curve", menuicons::Kind::reset }, { "Routes", menuicons::Kind::list } });
         return menu;
     }
     if (source < 2)
@@ -3344,6 +3347,7 @@ void ModulationOverlay::mouseDown (const juce::MouseEvent& e)
     // when it claimed this press (a host's right-click reaches the overlay itself, so an
     // unmodulated knob must find its menu here, not only through rightClickedControl).
     const int index = targetAt (e.position, e.mods.isAltDown(), e.mods.isPopupMenu());
+    lastPressed = index >= 0 ? targets[static_cast<std::size_t> (index)].slider.getComponent() : nullptr;
     if (index < 0)
         return;
     const auto& t = targets[static_cast<std::size_t> (index)];

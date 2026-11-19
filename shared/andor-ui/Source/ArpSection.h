@@ -122,12 +122,25 @@ private:
 class SatelliteKey final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
+    /** Another key of this design on the title row (STRUM): its name, whether it is on, whether
+        it can act now (on but unavailable: its light suppressed, not lit), what its light does
+        and the panel its name opens. Empty: SATELLITE's own behaviour, exactly as before. */
+    struct Behaviour
+    {
+        juce::String name, tooltip, unavailableTooltip;
+        std::function<bool()> isOn, isAvailable;
+        std::function<void()> toggle;
+        std::function<std::unique_ptr<MiniPanel>()> createPanel;
+    };
     explicit SatelliteKey (InstrumentHost& host);
+    SatelliteKey (InstrumentHost& host, Behaviour behaviour);
 
     /** The card the panel opens on (the one being edited). */
     std::function<int()> editedCard;
     bool anyOn() const;
     bool isOpen() const;
+    /** It can act on what plays now (STRUM: the pattern makes chords); SATELLITE always can. */
+    bool isAvailable() const;
     /** The light's part (local): a click there switches, anywhere else opens. */
     juce::Rectangle<int> lightArea() const { return getLocalBounds().withWidth (lightPartWidth); }
     /** Its width: the light, the name and the chevron at even spacing (the name's own width). */
@@ -150,10 +163,11 @@ private:
     // chevron's half width, the right margin. Light to name and name to chevron: one rhythm.
     static constexpr float lightCentreX = 9.0f, nameX = 21.0f, chevronGap = 9.0f, chevronHalf = 4.0f, rightMargin = 7.0f;
     static constexpr int lightPartWidth = 17;   ///< (to midway between the light and the name)
-    juce::String name() const { return "SATELLITE"; }
+    juce::String name() const { return behaviour.name.isNotEmpty() ? behaviour.name : juce::String ("SATELLITE"); }
     InstrumentHost& host;
+    Behaviour behaviour;
     int remembered = 0;   ///< the cards switched off by the light (bit per card)
-    bool shownOn = false, shownOpen = false;
+    bool shownOn = false, shownOpen = false, shownAvailable = true;
 };
 
 class ArpInlinePanel final : public juce::Component, public skin::SurfaceFace
@@ -226,6 +240,12 @@ public:
     static juce::Rectangle<float> satelliteKeyArea() noexcept { return { 562.0f, 12.0f, 126.0f, 30.0f }; }
     /** SATELLITE's key (a product's opt-in), or null. */
     SatelliteKey* satelliteKey() noexcept { return satellite.get(); }
+    /** STRUM's key, right of SATELLITE's place (InstrumentHost::hasStrum), in panel coordinates:
+        the visual regression's mask between a product with STRUM and its reference. */
+    static juce::Rectangle<float> strumKeyArea() noexcept { return { 692.0f, 12.0f, 100.0f, 30.0f }; }
+    SatelliteKey* strumKey() noexcept { return strum.get(); }
+    /** The card STRUM's light and panel act on: linked, A (every lane strums as A); else the edited one. */
+    int strumCard() const noexcept { return linked ? 0 : editCard; }
 
     /** Places of the parts (tests, snapshots). */
     juce::Rectangle<float> displayArea() const { return steps; }
@@ -274,6 +294,7 @@ private:
     std::array<std::unique_ptr<MiniKnob>, 2> laneRate;
     std::array<juce::Rectangle<float>, 3> cardChips {}, editTabs {};
     std::unique_ptr<SatelliteKey> satellite;
+    std::unique_ptr<SatelliteKey> strum;
     juce::Rectangle<float> playsCaption, linkChip, editCaption;
     Arpeggiator::Display preview;   ///< the pattern on a C major chord, while nothing is held
     Arpeggiator::Display fieldSteps; ///< the picture: the style on C E G B, one octave

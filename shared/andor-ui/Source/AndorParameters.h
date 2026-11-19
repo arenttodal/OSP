@@ -132,6 +132,10 @@ namespace osp::plugin::ids
     inline juce::String arpLink (const juce::String& ns) { return ns + "arp.link"; }
     inline juce::String arpCard (const juce::String& ns, int shown) { return ns + "arp.card" + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + juce::jlimit (0, 2, shown))); }
     inline juce::String arpCardSetting (const juce::String& ns, int shown, const juce::String& name) { return shown <= 0 ? "arp." + name : arpCard (ns, shown) + "." + name; }
+    /** STRUM, per card (version hint 35 in ANDOR OSP): arp.strum.on / .direction / .sync / .ms /
+        .division for card A, arp.cardB.strum.* and arp.cardC.strum.* (in the product's
+        namespace) for B and C. Off by default and in every session from before. */
+    inline juce::String arpStrum (const juce::String& ns, int shown, const juce::String& field) { return arpCardSetting (ns, shown, "strum." + field); }
     // A/B layers (stable: never rename). Per layer: layerA.sourceMode, layerA.granular.position, ...
     inline const juce::String blend = "ab.blend";
     // Adaptive 1-3 layers (version hint 7): the three-layer mix position and the envelope's D and S.

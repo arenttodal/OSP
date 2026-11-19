@@ -1,4 +1,6 @@
 #include "FxRouting.h"
+
+#include "MenuIcons.h"
 #include "FxIdentity.h"
 #include "FxPresets.h"
 #include "FxParameters.h"
@@ -336,6 +338,7 @@ public:
     {
         search.setTextToShowWhenEmpty ("Search effects", weak);
         search.setFont (font (11.0f));
+        styleTextField (search);
         search.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xfffbf8f2));
         search.setColour (juce::TextEditor::outlineColourId, edge);
         search.setColour (juce::TextEditor::focusedOutlineColourId, sage);
@@ -675,9 +678,12 @@ bool FxRoutingView::toggleBypass (InstanceId id)
         const auto param = fxParamId (host, id, "on");
         if (auto* p = host.apvts().getParameter (param))
         {
+            // Its own undo step (the parameter tree records it when it next syncs).
+            host.undo().beginNewTransaction (juce::String (p->getValue() >= 0.5f ? "Bypass " : "Enable ") + fx::typeName (id.type));
             p->beginChangeGesture();
             p->setValueNotifyingHost (p->getValue() >= 0.5f ? 0.0f : 1.0f);
             p->endChangeGesture();
+            refreshBypass();   // (the light at once, from the parameter itself)
             repaint();
             return true;
         }
@@ -744,6 +750,8 @@ juce::PopupMenu FxRoutingView::settingsMenu()
             return;
         auto* w = new juce::AlertWindow ("Save FX chain", "A name for this chain:", juce::MessageBoxIconType::NoIcon);
         w->addTextEditor ("name", "My chain");
+        if (auto* field = w->getTextEditor ("name"))
+            styleTextField (*field);
         w->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
         w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
         w->enterModalState (true, juce::ModalCallbackFunction::create ([safe, w] (int result) {
@@ -760,6 +768,8 @@ juce::PopupMenu FxRoutingView::settingsMenu()
         folder.createDirectory();
         folder.revealToUser();
     });
+    menuicons::decorate (m, { { "Restore original", menuicons::Kind::reset }, { "Save FX chain", menuicons::Kind::save },
+                              { "Load FX chain", menuicons::Kind::open }, { "Show chains folder", menuicons::Kind::reveal } });
     return m;
 }
 
@@ -954,6 +964,11 @@ juce::String FxRoutingView::signature() const
 
 void FxRoutingView::timerCallback()
 {
+    syncNow();
+}
+
+void FxRoutingView::syncNow()
+{
     // (The window's scale changes the board's tile size: a pure re-projection.)
     if (std::abs (juce::Component::getApproximateScaleFactorForComponent (this) - layoutScale) > 0.01f)
     {
@@ -967,6 +982,40 @@ void FxRoutingView::timerCallback()
         placeQuick();   // (follows its tile; closes when the effect is removed)
         repaint();
     }
+    // An effect switched on or off elsewhere (its rack, a macro's lamp, automation, undo, a
+    // preset): its light follows - the tiles once kept the state they were laid out with.
+    if (refreshBypass())
+        repaint();
+}
+
+bool FxRoutingView::liveBypassed (fx::InstanceId id) const
+{
+    if (fx::isLegacy (id.type))
+    {
+        auto g = route();
+        fx::ChainPath path;
+        int at = 0;
+        if (! fx::locate (g, id, path, at))
+            return false;
+        return (*fx::chainAt (g, path))[static_cast<std::size_t> (at)].bypassed;
+    }
+    const auto param = fxParamId (host, id, "on");
+    return host.apvts().getParameter (param) != nullptr && host.parameterValue (param) < 0.5f;
+}
+
+bool FxRoutingView::refreshBypass()
+{
+    bool changed = false;
+    for (auto& t : placed)
+        if (const bool now = liveBypassed (t.id); now != t.bypassed)
+        {
+            t.bypassed = now;
+            changed = true;
+            for (auto& k : tileKnobs)
+                if (k->owner == t.id)
+                    k->setAlpha (now ? 0.8f : 1.0f);
+        }
+    return changed;
 }
 
 //==============================================================================
@@ -1218,12 +1267,7 @@ bool FxRoutingView::layoutAttempt (const fx::Graph& g, float scale, const std::v
         t.id = id;
         t.bounds = bounds;
         t.light = juce::Rectangle<int> (24, 24).withCentre ({ bounds.getRight() - 14, bounds.getY() + 14 });
-        t.bypassed = fx::isLegacy (id.type) ? bypassedLegacy : ! fx::isOn (fx::Settings {}, id);
-        if (! fx::isLegacy (id.type))
-        {
-            const auto param = fxParamId (host, id, "on");
-            t.bypassed = host.apvts().getParameter (param) != nullptr && host.parameterValue (param) < 0.5f;
-        }
+        t.bypassed = fx::isLegacy (id.type) ? bypassedLegacy : liveBypassed (id);
         t.stacked = stacked;
         placed.push_back (t);
     };
@@ -1370,7 +1414,7 @@ void FxRoutingView::placeTileKnobs()
             k->label = c.label;
             const float cx = geo.textX - 6.0f * b + cw * (static_cast<float> (i) + 0.5f);
             k->setBounds (juce::Rectangle<int> (side, side).withCentre ({ juce::roundToInt (cx), juce::roundToInt (r.getY() + 55.0f * b) }));
-            k->setAlpha (t.bypassed ? 0.55f : 1.0f);
+            k->setAlpha (t.bypassed ? 0.8f : 1.0f);   // (still legible: the light says it is off)
             next.push_back (std::move (k));
         }
     }
@@ -1669,15 +1713,10 @@ void FxRoutingView::paintTile (juce::Graphics& g, const Tile& t, bool ghost) con
             const auto strip = i < 0 ? geo.pattern.withWidth (solid) : juce::Rectangle<float> (geo.pattern.getX() + solid + stepW * static_cast<float> (i), r.getY(), stepW, r.getHeight());
             juce::Graphics::ScopedSaveState s (g);
             g.reduceClipRegion (strip.getSmallestIntegerContainer());
-            g.beginTransparencyLayer (i < 0 ? 1.0f : 1.0f - (static_cast<float> (i) + 0.5f) / 6.0f);
+            // Bypassed: the motif (the pedal's own display) at about 40 %; the LED says it first.
+            g.beginTransparencyLayer ((i < 0 ? 1.0f : 1.0f - (static_cast<float> (i) + 0.5f) / 6.0f) * (t.bypassed ? 0.4f : 1.0f));
             paintFxMotif (g, id.motif, geo.pattern.withTrimmedTop (3.0f * b).withTrimmedBottom (3.0f * b).withWidth (geo.pattern.getWidth() + 10.0f * b), id, MotifScale::mini);
             g.endTransparencyLayer();
-        }
-        if (t.bypassed)
-        {
-            // Bypassed: the face greyed under a cream veil, still in its place.
-            g.setColour (juce::Colour (0xfff2ece3).withAlpha (0.42f));
-            g.fillRect (r);
         }
     }
     g.setColour (juce::Colours::white.withAlpha (0.16f));

@@ -148,6 +148,9 @@ struct ProductInfo
         own PATTERN / RATE / OCTAVES while unlinked; the ARP panel shows them. Off: one
         arpeggiator for the instrument, as in ANDOR OSP. */
     bool cardArpeggiator = false;
+    /** STRUM's parameters' version hint (appended after the product's own and VIBRATO): a
+        product whose own hints reach 35 sets a higher one. */
+    int strumParameterHint = 35;
     /** C RHYTHM as a modulation source (ANDOR ANALOG's RHYTHMIC MORPH): the routes' source list
         and the panel offer it after ANDOR OSP's twelve. */
     bool rhythmSource = false;

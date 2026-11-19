@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "description": "A rolled piano chord: UP, 70 ms, slow chords at 70 BPM. Render with --fixture chords; compare with strum-off-reference (and baseline A/B with the same arp block).",
+  "arp": {
+    "enabled": true,
+    "transport": true,
+    "pattern": "chord",
+    "rate": "1/4",
+    "gate": 1.1,
+    "octaves": 1,
+    "bpm": 70,
+    "strum": {
+      "direction": "up",
+      "ms": 70
+    }
+  }
+}

@@ -189,10 +189,17 @@ public:
     /** The keyboard's action keys (SETTINGS, INFO). */
     KeyboardUtilityActions& keyboardActions() noexcept { return utilityKeys; }
     /** Tests: the main menu (showMenu) is handed here instead of being shown. */
-    std::function<void (juce::PopupMenu&)> showMenuForTest;
+    std::function<void (juce::PopupMenu&)> showMenuForTest;   ///< the main menu and the source menus, instead of showing them
+    /** The header's main menu (global actions only) and a source card's menu, as they open. */
+    juce::PopupMenu mainMenu();
+    juce::PopupMenu sourceMenu (int layer);
+    /** The width the look gives a menu (its widest row): the main menu opens right-aligned to its key. */
+    int popupMenuWidth (const juce::PopupMenu& menu);
     void openMainMenu() { showMenu(); }
     HeaderMix& headerMixControl() noexcept { return headerMix; }
     EngineCard& engineCard (int layer) noexcept { return *cards[static_cast<std::size_t> (juce::jlimit (0, 2, layer))]; }
+    /** The header's preset bar (tests, snapshots). */
+    PresetBar& presetBarComponent() noexcept { return presetBar; }
     /** A source (0..3 a tab, 4 the mod wheel) dragged to / released at a point (instrument
         coordinates): what the tabs' and the wheel's drag does (tests drive it directly). Returns the route's slot on release, or -1. */
     void dragModulation (int source, juce::Point<float> where);
@@ -232,7 +239,9 @@ private:
     void updateFocus();
     void showMenu();
     void showLayerMenu (int layer, juce::Component& target);
-    void addLayerSection (juce::PopupMenu& menu, int layer, bool header);
+    void saveInstrument();
+    void openInstrumentFile();
+    void showAbout();
     void chooseFile (int layer, bool addAsNewLayer);
     void choosePresetFile (bool save, bool instrument);
     void saveStartingState();
@@ -256,6 +265,7 @@ private:
         OspAudioProcessorEditor& editor;
     };
 
+    SharedMenuLook menuLook;   // (every menu in the look: see SharedMenuLook)
     OspLookAndFeel lookAndFeel;
     OspAudioProcessor& ospProcessor;
 

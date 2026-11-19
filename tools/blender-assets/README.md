@@ -142,6 +142,7 @@ production pieces and the approved lab renders come from one source.
 cd tools/blender-assets/skin
 python render.py                       # every piece (about 25 min on 4 cores); --only 'key-*' --force
 python3 pack.py                        # -> shared/andor-ui/Resources/skin/ceramic-skin.zip
+python3 pack.py --update               # only the pieces in raw/ (e.g. after render.py --only 'led-*'); the rest kept from the pack
 ```
 
 - `pieces.py` lists the pieces: what, where in the design canvas, the margin for the shadow

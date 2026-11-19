@@ -71,6 +71,9 @@ struct Materials
     /** The six macros' identities (colour::macro), when a product sets its own (alpha 0: ANDOR
         OSP's mineral palette). LIFE, DRIVE, CHARACTER, MOVEMENT, SPACE, ECHO. */
     std::array<juce::Colour, 6> macros {};
+    /** The six USER macros' colours (colour::userMacro), when a product sets its own (alpha 0:
+        its CORE colours if it set those, else ANDOR OSP's frozen USER palette). */
+    std::array<juce::Colour, 6> userMacros {};
 
     /** ANDOR OSP's own. */
     static Materials osp()
@@ -157,22 +160,39 @@ namespace colour
     const juce::Colour arp { 0xffc98f3e };
     const juce::Colour arpOnDark { 0xffe9b45f };
 
-    /** The six macros' identities, one natural mineral palette at about the same lightness
-        (CIE L* 56-58): LIFE rust, DRIVE ochre (the place and colour DYNAMICS had before it
-        moved into Advanced), CHARACTER moss, MOVEMENT mineral blue, SPACE muted mauve, ECHO
-        verdigris (the patina of an old tape machine's copper). They mark only the macro's
-        thin value arc, its small light, and the accents of its popover; panels, text and
-        values stay neutral. */
+    /** The six macros' identities: the harmonised CORE palette (approved 18 Nov 2026,
+        docs/research/menu-content/palette), six muted earthy hues at about the same lightness.
+        LIFE dried sage, DRIVE burnished copper, FILTER aged teal, MOVEMENT antique brass, SPACE
+        slate blue, ECHO warm clay. FILTER and MOVEMENT were two near-equal greys (moss and
+        mineral blue) before. They mark only the macro's thin value arc, its small light, and
+        the accents of its popover; panels, text and values stay neutral. The effect pedals
+        keep their own V5 enamels (FxIdentity), and the USER macros their frozen palette
+        (userMacro). The beads are rendered sprites of the same colours
+        (tools/blender-assets/skin/pieces.py MACRO_COLOURS). */
     enum class Macro { life, drive, character, movement, space, echo };
     inline juce::Colour macro (Macro m)
     {
         if (const auto own = detail::materials.macros[static_cast<std::size_t> (m)]; own.getAlpha() != 0)
             return own;   // (the product's own: ANDOR ANALOG's spore SPACE)
-        static const std::array<juce::Colour, 6> colours { juce::Colour (0xffbe7552), juce::Colour (0xffb5843a), juce::Colour (0xff7b8d69),
-                                                           juce::Colour (0xff73899c), juce::Colour (0xff96839d), juce::Colour (0xff5c9490) };
+        static const std::array<juce::Colour, 6> colours { juce::Colour (0xff879674), juce::Colour (0xffbb784e), juce::Colour (0xff518b88),
+                                                           juce::Colour (0xffb09a61), juce::Colour (0xff758899), juce::Colour (0xff94776b) };
         return colours[static_cast<std::size_t> (m)];
     }
     inline juce::Colour macro (int index) { return macro (static_cast<Macro> (juce::jlimit (0, 5, index))); }
+    /** The USER macros' own palette (lens, halo, label accent, panel), in USER macro order.
+        Frozen: the colours they had when they shared CORE's, so a CORE palette change never
+        recolours them. */
+    inline juce::Colour userMacro (int index)
+    {
+        const auto i = static_cast<std::size_t> (juce::jlimit (0, 5, index));
+        if (const auto own = detail::materials.userMacros[i]; own.getAlpha() != 0)
+            return own;
+        if (const auto core = detail::materials.macros[i]; core.getAlpha() != 0)
+            return core;   // (a product with its own CORE colours: its USER colours as before)
+        static const std::array<juce::Colour, 6> colours { juce::Colour (0xffbe7552), juce::Colour (0xffb5843a), juce::Colour (0xff7b8d69),
+                                                           juce::Colour (0xff73899c), juce::Colour (0xff96839d), juce::Colour (0xff5c9490) };
+        return colours[i];
+    }
     /** The same identity lifted for lines on the graphite displays (equal weight on dark). */
     inline juce::Colour macroOnDark (Macro m) { return macro (m).withMultipliedBrightness (1.32f).withMultipliedSaturation (1.08f); }
 

@@ -40,6 +40,14 @@ public:
     void render (const float* dryL, const float* dryR, float* outL, float* outR, int n) noexcept override;
     double sourcePosition() const noexcept override { return note.granular || done ? -1.0 : heads[0].pos; }
     double grainPositionOffset() const noexcept override { return grainOffset; }
+    PedalLoopMode pedalLoopMode() const noexcept override { return pedalMode; }
+    void pedal (bool down) noexcept override
+    {
+        pedalWanted = down && pedalMode != PedalLoopMode::normal;
+        pedalTried = false;
+    }
+    bool pedalArmed() const noexcept override { return pedalHeld; }
+    bool pedalLooping() const noexcept override { return pedalHeld && pedalLooped; }
     bool finished() const noexcept override { return done; }
 
 private:
@@ -57,6 +65,9 @@ private:
     void requestTurn (double legScale) noexcept;
     void reverseNow (bool atExtremum) noexcept;
     void planLeg() noexcept;
+    /** PEDAL LOOP: applies the latest pedal (arming takes the region, letting go restores the
+        note's own). */
+    void followPedal() noexcept;
 
     ReimaginedNote note;
     double rate = 48000.0;
@@ -85,6 +96,17 @@ private:
     double highBound() const noexcept { return sustains ? regionEnd : soundEnd; }
     ToyboxPlay play = ToyboxPlay::forward;
     double motion = 0.0, step = 1.0, factor = 1.0;
+
+    /** PEDAL LOOP (docs/research/pedal-reimagined): while the pedal holds the note, the walk's
+        region is the recording's pedal region: FORWARD loops it with the memory's own turns,
+        Ping-Pong turns at both ends (at waveform extrema, TOYBOX's own U-turn), TURN and
+        CHAOS walk inside it. Letting go restores the note's region; the walk goes on. */
+    PedalLoopMode pedalMode = PedalLoopMode::normal;
+    bool pedalWanted = false, pedalHeld = false, pedalTried = false, pedalLooped = false;
+    double savedStart = 0.0, savedEnd = 0.0, savedNoteDir = 1.0;
+    bool savedSustains = false;
+    float pedalGain = 1.0f, pedalGainTarget = 1.0f, pedalGainStep = 0.0f;
+    double pedalLeave = 0.0;   ///< where the loop begins (the region's end, approached)
 
     // Granular notes: a head (seconds around POS) the grains follow - the memory looping a
     // leg (FORWARD), turning at its ends (TURN) or jumping within it (CHAOS).
