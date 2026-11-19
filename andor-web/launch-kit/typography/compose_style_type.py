@@ -49,6 +49,8 @@ def compose(beauty, matte, L):
     mark = wordmark(L["cap_height"] * H, L.get("text", "ANDOR"))
     layer = Image.new("L", (W, H), 0)
     layer.paste(mark, (round(L["x"] * W), round(L["y"] * H)))
+    # occlusion is measured on the letter shapes, not on the faded ink, so it stays meaningful while a pass fades in
+    shape = layer.point(lambda v: 255 if v > 127 else 0)
     if L.get("blur", 0) > 0:
         layer = layer.filter(ImageFilter.GaussianBlur(L["blur"] * s))
     a = L.get("alpha", 1.0)
@@ -70,9 +72,8 @@ def compose(beauty, matte, L):
     if L.get("behind", True) and matte is not None:
         alpha = matte.getchannel("A")
         out = Image.composite(beauty, marked, alpha)
-        hard = layer.point(lambda v: 255 if v > 96 else 0)
-        cover = ImageChops.multiply(hard, alpha.point(lambda v: 255 if v > 127 else 0))
-        occl = sum(cover.histogram()[128:]) / max(1, sum(hard.histogram()[128:]))
+        cover = ImageChops.multiply(shape, alpha.point(lambda v: 255 if v > 127 else 0))
+        occl = sum(cover.histogram()[128:]) / max(1, sum(shape.histogram()[128:]))
     else:
         out, occl = marked, 0.0
     bbox = [round(L["x"] * W), round(L["y"] * H), round(L["x"] * W) + mark.width, round(L["y"] * H) + mark.height]

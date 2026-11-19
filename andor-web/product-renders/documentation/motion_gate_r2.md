@@ -65,7 +65,32 @@ The clean master carries no type. Three separate wordmark passes are composited 
 How the passes move:
 - Each fades in and sharpens over 4.5–10.5 s.
 - The instrument's coordinated turn and the camera's travel uncover it.
-- The measured occlusion at each keyframe is in `motion_index.json`.
+- The measured occlusion at each keyframe is in the package's `gate_index.json`.
+
+**Measured occlusion: the share of the letters the instrument covers, from its rendered matte.**
+
+| Pass | Opening | Quarter | Mid (6 s) | Three-quarter (9 s) | Closing |
+|---|---|---|---|---|---|
+| T1 | 100 % | 100 % | 97 % | 18 % | 16 % |
+| T2 | 95 % | 96 % | 86 % | 47 % | 42 % |
+| T3 | 86 % | 88 % | 65 % | 13 % | 11 % |
+
+- **The uncovering is real.** The camera's travel and the instrument's turn uncover the mark between about 6 and 9 s, while the pass fades in over 4.5–10.5 s.
+- **It settles early.** Most of the uncovering is done by 9 s, so the three-quarter and closing frames look nearly alike. If the reveal should still be travelling in the last 3 s, the next draft moves the curve's centre later.
+
+**The metric was corrected in this gate.** It used to threshold the faded ink, so a pass reads 0 % while it fades in. It now measures the letter shapes themselves.
+- The stills' occlusion values in `style_index.json` were re-measured the same way. For example, SF_A2 T2 is 42 % covered.
+- No published figure quoted the old values.
+
+### Review notes on the drafts
+
+- **R02_POOL.** The transformation builds steadily:
+  - The strip crosses the controls in the first quarter.
+  - The pool is still partial at mid.
+  - The displays stay dark until the three-quarter frame.
+  - The closing pool reads fully lit across the macro row. If the centre is still too bright, the next step is a further −0.3 EV on the Pool light only.
+- **R03_ENG.** The track passes A, B and C in order, with the direction of view constant. At f/8 the near source knobs are soft, which carries the depth of D3. The engines' displays stay sharp.
+- **R04_WIN.** It is deliberately almost still. The change is in the shadow edge and the sheen, so judge it as a moving clip, not from the keyframe sheet.
 
 ### Performance preparation
 
