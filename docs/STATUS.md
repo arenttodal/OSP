@@ -23,7 +23,11 @@
 > - **NEXT:**
 >   - pattern packs (library patterns shipped on their own; pack presets already carry theirs);
 >   - drawing and editing per-event velocity (CP6);
->   - host tests in real DAWs and listening with real takes.
+>   - host tests in real DAWs and listening with real takes;
+>   - running the shell `[arp-custom]` test in ANDOR ANALOG. ANALOG's own
+>     `AnalogProductTests.cpp` must first follow the Shared FX move (it still names
+>     `andor::analog::FxRoutingView`, `fxRackShown` and `fxpresets`), and its OSP pin must follow
+>     this branch. Every shared source and the shell test already compile for ANALOG here.
 
 > **19 Nov 2026, Custom ARP CP2 (branch `claude/custom-arp`; `docs/research/custom-arp/03-cp2.md`):**
 > recorded patterns play inside the one arpeggiator, in ANDOR OSP and the ANDOR shell (ANALOG).
