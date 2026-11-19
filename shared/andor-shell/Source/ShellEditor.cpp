@@ -676,7 +676,8 @@ void ShellEditor::layoutSources()
             card->setFootTrimmed (trim > 0.0f);
         shownCount = -1;
         layoutInstrument();
-        frame::applyWindowShape (*this, instrumentHeight(), true);
+        if (! shapingWindow)   // (else the caller shapes it, once)
+            frame::applyWindowShape (*this, instrumentHeight(), true);
         content.repaint();
         return;
     }
@@ -1513,7 +1514,10 @@ void ShellEditor::applyAuxStrip()
     auxShownApplied = want;
     if (! want && rack.isShown (rack::Kind::aux))
         setRackExpanded (rack::Kind::aux, false);   // (its rack goes with it)
-    layoutInstrument();
+    {
+        const juce::ScopedValueSetter<bool> once (shapingWindow, true);
+        layoutInstrument();
+    }
     frame::applyWindowShape (*this, instrumentHeight(), true);
     placeKeyDna();
     content.repaint();
@@ -1529,7 +1533,10 @@ void ShellEditor::setArpExpanded (bool open)
     arpPanel.setVisible (open);
     if (open)
         arpPanel.refresh();
-    layoutInstrument();
+    {
+        const juce::ScopedValueSetter<bool> once (shapingWindow, true);
+        layoutInstrument();
+    }
     frame::applyWindowShape (*this, instrumentHeight(), true);
     placeKeyDna();
     content.repaint();
@@ -1629,7 +1636,10 @@ void ShellEditor::rackChanged()
         if (rackOfMacro[i].has_value())
             macros[i].label->setRackOpen (rack.isShown (*rackOfMacro[i]));
     rack.settle();
-    layoutInstrument();
+    {
+        const juce::ScopedValueSetter<bool> once (shapingWindow, true);
+        layoutInstrument();
+    }
     frame::applyWindowShape (*this, instrumentHeight(), true);
     placeKeyDna();
     content.repaint();
