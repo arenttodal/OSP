@@ -1,26 +1,21 @@
 # Status
 
-> **20 Nov 2026, Custom Patterns open when clicked (shared: ANDOR OSP and every shell product;
-> branch `claude/analog-parity-r1-custom-arp`, then `claude/analog-parity-r1`):**
-> - **Symptom (owner's report, ANDOR OSP):** a click on the ARP list's "Custom Patterns ›" row
->   showed nothing.
-> - **Cause:** the row opened the browser inside the press. JUCE then gives the same press to the
->   editor's outside-click watcher (OSP's editor and the shell's alike). The press was on the
->   list, and the browser's anchor is an invisible child of it that takes no clicks, so the
->   watcher did not count it as the anchor and closed the browser at once. The R2 tests opened
->   the browser by calling `openCustomBrowser()`, so they never went through a click.
-> - **Fix (`ArpInlinePanel::mouseDown`):** the row opens the browser just after the press (as the
->   browser already opens the editor). The hosts' popover rules are unchanged; the pencil and
->   Edit were not affected (their anchor is the panel itself).
-> - **Tests, by click:** OSP's `custom pattern r2: clicks...` (PopoverRig: the real window
->   where there is one, else JUCE's routing step by step) and ANDOR ANALOG's parity test, on
->   cards A, B and C: the row opens the browser and it stays open; + New Pattern, a factory
->   pattern, Edit and the pencil each do what they say. Both fail without the fix.
+> **20 Nov 2026, Custom Patterns open when clicked, on the ANALOG parity line (branches
+> `claude/analog-parity-r1-custom-arp` and `claude/analog-parity-r1`):**
+> - **The owner's report** (OSP's first test build: "nothing happens when I click custom
+>   patterns") was fixed on the beta line as 9ff21209; that commit is cherry-picked here, so the
+>   shared `ArpInlinePanel::mouseDown` is OSP's own: the row opens the browser after the press
+>   (the editor's outside-click watcher, told of a press after the pressed component, closed a
+>   browser opened inside it, as the press was on the list rather than the browser's anchor).
+> - **The same fix had been made here independently first (7aa93c49)** and is kept as a test:
+>   `custom pattern r2: clicks...` clicks through PopoverRig (the real window where there is one,
+>   else JUCE's routing step by step) on cards A, B and C: the row opens the browser and it stays
+>   open; + New Pattern, a factory pattern, Edit and the pencil work. It fails without the fix.
+>   ANDOR ANALOG has the same test (`CustomArpParityTests`), real window under Xvfb.
 > - OSP's own real-window tests still fail under this container's Xvfb (`BadAtom`, already noted
->   for `[menu-visual]`); the routed path runs there and on macOS CI. ANALOG's shell tests run
->   the real window.
-> - **NEXT:** the same fix on OSP's beta line (`claude/macos-release`), which has R2 and this bug;
->   not changed here (a protected release branch).
+>   for `[menu-visual]`); their routed path runs here and on macOS CI.
+> - Not taken from the beta: the DAMPEN Starting States commit (3c260390, ANDOR OSP's own
+>   presets), as with its release work, MIDI Learn and the POS-line fix.
 >
 > **20 Nov 2026, R2 on the ANDOR ANALOG parity line (branch `claude/analog-parity-r1-custom-arp`):**
 > R2 (6ef33767) cherry-picked alone (8d3b3729); the beta's release work, MIDI Learn and the POS
