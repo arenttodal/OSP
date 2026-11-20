@@ -260,6 +260,44 @@ TEST_CASE ("custom pattern r2: the row opens the browser; Edit and + New Pattern
     w.ui->closePopup();
 }
 
+TEST_CASE ("custom pattern r2: a real click on the Custom Patterns row opens the browser and it stays open (the outside-click watcher included)", "[plugin][arp-custom][arp-custom-r2]")
+{
+    // Reported on the first test build: the row opened the browser in its own press, then the
+    // editor's outside-click watcher (JUCE tells it after the pressed component) saw a press on
+    // the ARP panel - not the browser's anchor, the style list - and closed it at once.
+    using namespace customr2;
+    OspAudioProcessor p;
+    Window w (p);
+    auto& arp = w.arp();
+    const auto doc = documentOf ("row", "Row Pattern", 4);
+    p.setCustomArpDocument (0, &doc);
+    arp.chooseCustom();
+    arp.refresh();   // (the row is scrolled into view, lit)
+    const auto row = arp.customRowArea (0);
+    REQUIRE_FALSE (row.isEmpty());
+    auto press = [&arp] (juce::Point<float> at) {
+        const auto now = juce::Time::getCurrentTime();
+        return juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), at, {}, juce::MouseInputSource::defaultPressure, 0.0f, 0.0f, 0.0f, 0.0f,
+                                 &arp, &arp, now, at, now, 1, false);
+    };
+    arp.mouseDown (press (row.getCentre()));
+    w.ui->mouseDownAnywhere (&arp);   // what the global listener does with the same press, after the panel
+    if (! pumpMessages())
+        return;
+    REQUIRE (w.browser() != nullptr);
+    CHECK (w.browser()->find (Browser::Kind::current, "Row Pattern") >= 0);
+    // A later press elsewhere in the window still closes it.
+    w.ui->mouseDownAnywhere (&w.ui->arpControl());
+    CHECK (w.ui->openPopupPanel() == nullptr);
+    // The pencil, clicked for real: the editor opens and stays open.
+    arp.mouseDown (press (arp.pencilArea().getCentre()));
+    w.ui->mouseDownAnywhere (&arp);
+    pumpMessages();
+    REQUIRE (w.editor() != nullptr);
+    CHECK (w.editor()->document().id == "row");
+    w.ui->closePopup();
+}
+
 TEST_CASE ("custom pattern r2: linked and unlinked cards: the row, the name and the browser follow the card being edited", "[plugin][arp-custom][arp-custom-r2]")
 {
     using namespace customr2;

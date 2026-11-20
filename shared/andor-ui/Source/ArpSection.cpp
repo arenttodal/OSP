@@ -1294,7 +1294,15 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
     }
     if (const int row = rowAt (e.position); row >= arp::patternCount)
     {
-        openCustomBrowser();   // (choosing there turns CUSTOM on; opening alone changes nothing)
+        // Opened after this press has been handled everywhere: the editor's outside-click
+        // watcher hears the press after this component and would close a panel opened now (it
+        // is anchored to the list, not to this panel). Choosing there turns CUSTOM on; opening
+        // alone changes nothing.
+        juce::Component::SafePointer<ArpInlinePanel> safe (this);
+        juce::MessageManager::callAsync ([safe] {
+            if (safe != nullptr)
+                safe->openCustomBrowser();
+        });
         return;
     }
     if (const int row = rowAt (e.position); row >= 0)

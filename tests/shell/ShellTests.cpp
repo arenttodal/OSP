@@ -28,6 +28,13 @@
 #include <filesystem>
 
 using Catch::Approx;
+#if ! (JUCE_MAC || JUCE_IOS || JUCE_ANDROID)
+namespace juce::detail
+{
+bool dispatchNextMessageOnSystemQueue (bool returnIfNoPendingMessages);   // (juce_events: Linux / Windows)
+}
+#endif
+
 using andor::shell::ShellEditor;
 using andor::shell::ShellProcessor;
 
@@ -1367,9 +1374,33 @@ TEST_CASE ("shell: the custom pattern browser and editor (R2) work through the s
     REQUIRE (ui != nullptr);
     auto& arp = ui->arpInlinePanel();
     CHECK (osp::plugin::ArpInlinePanel::listRows == osp::arp::patternCount + 1);
-    arp.openCustomBrowser();
+    // A real click on the row (the shell's outside-click watcher hears it after the panel).
+    osp::arppattern::Document rowDoc;
+    rowDoc.id = "row";
+    rowDoc.name = "Row";
+    rowDoc.pattern.events = { { 0, false, 960, 0 }, { 1, false, 960, 0 } };
+    rowDoc.pattern.maxRank = 1;
+    p.setCustomArpDocument (0, &rowDoc);
+    arp.chooseCustom();
+    arp.refresh();
+    const auto row = arp.customRowArea (0);
+    REQUIRE_FALSE (row.isEmpty());
+    {
+        const auto now = juce::Time::getCurrentTime();
+        arp.mouseDown (juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), row.getCentre(), {}, juce::MouseInputSource::defaultPressure,
+                                         0.0f, 0.0f, 0.0f, 0.0f, &arp, &arp, now, row.getCentre(), now, 1, false));
+        ui->pressAnywhere (&arp);
+    }
+   #if JUCE_MAC || JUCE_IOS || JUCE_ANDROID
+    return;   // (the message loop cannot be pumped from a test here)
+   #else
+    for (int i = 0; i < 200 && juce::detail::dispatchNextMessageOnSystemQueue (true); ++i)
+    {
+    }
+   #endif
     auto* browser = dynamic_cast<osp::plugin::CustomPatternBrowser*> (ui->openPopupPanel());
     REQUIRE (browser != nullptr);
+    p.setCustomArpDocument (0, nullptr);
     CHECK (browser->find (osp::plugin::CustomPatternBrowser::Kind::newPattern) >= 0);
     ui->requestClosePopup();
     CHECK (ui->openPopupPanel() == nullptr);
