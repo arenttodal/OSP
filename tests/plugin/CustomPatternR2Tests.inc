@@ -267,6 +267,8 @@ TEST_CASE ("custom pattern r2: clicks: the row opens the browser and it stays op
     // watcher, seeing a press on the list rather than the browser's anchor, closed it at once: a
     // click on the row showed nothing (the tests above open it by calling, so they missed it).
     using namespace customr2;
+    if (! pumpMessages())
+        return;   // (a platform where the test cannot run the message loop: the browser opens a message later)
     Library library;
     PopoverRig rig;
     rig.p.setParameterValue ("arp.enabled", 1.0f);
