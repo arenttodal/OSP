@@ -22,11 +22,13 @@ The scene is built from scripts and textures, with no `.blend` file and no add-o
 
 ## Run (from the bundle's root)
 
+The R4 benchmark is R04 Window Light, rendered by the shot rig on the frozen interface: two frames at 1920 px for the parity check, and six frames at the final 3840 px for timing (three of them consecutive, for flicker).
+
 ```bash
-blender -b --python product-renders/blender/scripts/motion_preview.py -- \
-  --plan G2 --cuts D02_orbit_9x16 --width 1080 --fps 24 --samples 96 --noise 0.01 \
-  --range 60 66 --device OPTIX --timings bench_OPTIX.json --out out_OPTIX
+./run_benchmark.sh OPTIX /path/to/blender
 ```
+
+On a GPU, the rig denoises on the GPU and renders without tiles. Results and the cost estimate from the first run (Runpod RTX 4090, 20 Nov) are in `documentation/gpu_benchmark_r04.md`. `pod_runner.py` is the small HTTP runner used to drive a rented pod from a machine that only has HTTPS.
 
 **`--device`:**
 - **CUDA or OPTIX:** NVIDIA;

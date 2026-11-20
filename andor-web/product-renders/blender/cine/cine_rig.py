@@ -112,6 +112,11 @@ if args.device != "CPU":
         d.use = d.type == args.device
     scene.cycles.device = "GPU" if used else "CPU"
     DEVICE_NAMES = [d.name for d in used] or ["(no %s device found: rendered on CPU)" % args.device]
+    if used:
+        # On a GPU the denoiser runs there too, on the whole frame at once (no tiles, so no full-buffer
+        # round trip to disk): the R04 benchmark spent ~43 of 54 s per 4K frame denoising on the pod's CPU.
+        scene.cycles.denoising_use_gpu = True
+        scene.cycles.use_auto_tile = False
 else:
     import platform
     DEVICE_NAMES = [platform.processor() or platform.machine()]
@@ -500,7 +505,7 @@ else:
             bpy.ops.render.render(write_still=True)
             rec["render_s"] = round(time.time() - t0, 1)
         log.append(rec)
-json.dump({"interface_textures": os.path.basename(os.path.normpath(g["TEX"])), "device": args.device, "devices": DEVICE_NAMES, "interface_frozen": FROZEN_OK, "interface_commit": FROZEN_NOTE if FROZEN_OK else None, "spec": spec, "pass": args.pass_, "res": res, "samples": samples, "noise": noise, "fps": FPS,
+json.dump({"interface_textures": os.path.basename(os.path.normpath(g["TEX"])), "device": args.device, "devices": DEVICE_NAMES, "denoise_gpu": bool(getattr(scene.cycles, "denoising_use_gpu", False)) and scene.cycles.device == "GPU", "interface_frozen": FROZEN_OK, "interface_commit": FROZEN_NOTE if FROZEN_OK else None, "spec": spec, "pass": args.pass_, "res": res, "samples": samples, "noise": noise, "fps": FPS,
            "frames_total": N, "handles_s": HANDLE, "blender": bpy.app.version_string, "frames": log},
           open(os.path.join(args.out, f"{spec['id']}_{'keyframes' if args.keyframes else (args.pass_ if args.still is None else 'still')}_meta.json"), "w"), indent=1)
 print("done", spec["id"], args.pass_ if args.still is None else "still")

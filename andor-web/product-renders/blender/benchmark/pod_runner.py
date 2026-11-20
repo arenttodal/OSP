@@ -54,7 +54,7 @@ def setup():
 
 def run():
     try:
-        state["phase"] = "running"
+        state.update(phase="running", error=None)
         d = os.path.join(W, "bundle")
         shutil.rmtree(d, ignore_errors=True)
         zipfile.ZipFile(os.path.join(W, "bundle.zip")).extractall(d)
@@ -74,7 +74,7 @@ def run():
 
 
 def maybe_run():
-    if state["blender_ready"] and state["bundle"] and state["phase"] in ("setup", "ready"):
+    if state["blender_ready"] and state["bundle"] and state["phase"] in ("setup", "ready", "done", "error"):
         threading.Thread(target=run, daemon=True).start()
     elif state["blender_ready"] and state["phase"] == "setup":
         state["phase"] = "ready"

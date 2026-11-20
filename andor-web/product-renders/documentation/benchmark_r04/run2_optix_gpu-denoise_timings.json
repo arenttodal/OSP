@@ -1,0 +1,98 @@
+[
+ {
+  "pass": "parity",
+  "res": [
+   1920,
+   1080
+  ],
+  "frame": 217,
+  "s": 4.3,
+  "devices": [
+   "NVIDIA GeForce RTX 4090"
+  ]
+ },
+ {
+  "pass": "parity",
+  "res": [
+   1920,
+   1080
+  ],
+  "frame": 25,
+  "s": 6.5,
+  "devices": [
+   "NVIDIA GeForce RTX 4090"
+  ]
+ },
+ {
+  "pass": "timing",
+  "res": [
+   3840,
+   2160
+  ],
+  "frame": 121,
+  "s": 11.9,
+  "devices": [
+   "NVIDIA GeForce RTX 4090"
+  ]
+ },
+ {
+  "pass": "timing",
+  "res": [
+   3840,
+   2160
+  ],
+  "frame": 217,
+  "s": 12.0,
+  "devices": [
+   "NVIDIA GeForce RTX 4090"
+  ]
+ },
+ {
+  "pass": "timing",
+  "res": [
+   3840,
+   2160
+  ],
+  "frame": 218,
+  "s": 12.1,
+  "devices": [
+   "NVIDIA GeForce RTX 4090"
+  ]
+ },
+ {
+  "pass": "timing",
+  "res": [
+   3840,
+   2160
+  ],
+  "frame": 219,
+  "s": 11.9,
+  "devices": [
+   "NVIDIA GeForce RTX 4090"
+  ]
+ },
+ {
+  "pass": "timing",
+  "res": [
+   3840,
+   2160
+  ],
+  "frame": 25,
+  "s": 11.9,
+  "devices": [
+   "NVIDIA GeForce RTX 4090"
+  ]
+ },
+ {
+  "pass": "timing",
+  "res": [
+   3840,
+   2160
+  ],
+  "frame": 313,
+  "s": 12.0,
+  "devices": [
+   "NVIDIA GeForce RTX 4090"
+  ]
+ }
+]
