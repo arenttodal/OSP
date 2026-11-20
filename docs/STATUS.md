@@ -1286,7 +1286,9 @@ lives in `arenttodal/andor-arp`.
   (`cmake -S arp-core`: STRUM tests, the 18-style golden, codec, fixtures, an include check).
 - **Results:** ctest green (unit, integration, regression, performance-smoke, bootstrap, and the
   three arp-core tests); the 18-style golden unchanged; no golden updated. ANDOR ANALOG
-  (`analog_dsp_tests` and the arp-core tests) built and passed against this branch.
+  (`analog_dsp_tests` and the arp-core tests) built and passed against this branch. macOS CI
+  (run 497, macos-15, plugin ON): build, the full ctest (plugin and state tests included), AU
+  validation (ANDOR OSP and the example product) — all passed.
 
 ## IN PROGRESS
 
@@ -1299,8 +1301,7 @@ lives in `arenttodal/andor-arp`.
 - **ANDOR ARP (spinoff).** The shared core is extracted here; the product (three-lane coordinator,
   Max for Live external, Master/Receiver link) is in `arenttodal/andor-arp`, pinned to this
   branch. Not yet run: the ANDOR shell's `[shell][arp-custom]` test in ANDOR ANALOG (blocked by
-  ANALOG's own test drift, see the CP3/CP4 notes), the plugin build's state tests on this branch
-  (they use the unchanged JUCE text path). Merging this branch into the release line is the
+  ANALOG's own test drift, see the CP3/CP4 notes). Merging this branch into the release line is the
   owner's decision.
 
 - **AUX strip (shell, opt-in; ANDOR ANALOG's D / AUX, analog `docs/aux/AUX_REPORT.md`).**
