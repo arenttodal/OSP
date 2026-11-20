@@ -228,6 +228,7 @@ ShellProcessor::ShellProcessor (std::unique_ptr<Engine> productEngine)
             if (auto* parameter = parameters.getParameter (id))
                 parameter->addListener (ampEnvelopeTouch.get());
     }
+    midiLearnMap = std::make_unique<osp::plugin::MidiLearn> (*this, parameters);
     startTimerHz (20);
 }
 
@@ -364,6 +365,9 @@ void ShellProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             performance.pitchWheel = static_cast<float> (m.getPitchWheelValue() - 8192) / 8192.0f;
         else if (m.isControllerOfType (1))
             performance.modWheel = static_cast<float> (m.getControllerValue()) / 127.0f;
+        // MIDI LEARN: a learned controller turns its control (applied on the message thread).
+        if (m.isController() && midiLearnMap != nullptr)
+            midiLearnMap->handleController (m.getControllerNumber(), m.getControllerValue());
         // CC 1-4's Learn: the next controller that moves is taken for the slot.
         if (m.isController() && m.getControllerNumber() < 120)
             if (const int learn = ccLearn.exchange (-1, std::memory_order_acq_rel); learn >= 0 && learn < osp::mod::ccSlots)
@@ -1693,13 +1697,23 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
 void ShellProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     if (auto xml = stateXml())
+    {
+        // MIDI LEARN belongs to the session (the DAW project), never to presets: added here only.
+        if (auto learned = midiLearnMap->toXml())
+            xml->addChildElement (learned.release());
         copyXmlToBinary (*xml, destData);
+    }
 }
 
 void ShellProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
+    {
+        midiLearnMap->fromXml (xml->getChildByName ("MidiLearn"));   // (none in an older session)
+        if (auto* learned = xml->getChildByName ("MidiLearn"))
+            xml->removeChildElement (learned, true);
         applyStateXml (*xml);
+    }
 }
 
 //==============================================================================

@@ -28,6 +28,7 @@ namespace osp::plugin
 {
 
 class MiniPanel;   // (ShapingPopups.h: a product's small panels, SATELLITE's)
+class MidiLearn;   // (MidiLearn.h: an external controller turning one control)
 
 /**
     What the shared ANDOR interface (shared/andor-ui) needs from the instrument it shows: the
@@ -545,6 +546,9 @@ public:
     virtual int modControllerNumber (int slot) const noexcept = 0;
     virtual void setModControllerNumber (int slot, int controller) noexcept = 0;
     virtual void learnModController (int slot) noexcept = 0;
+    /** MIDI LEARN: an external controller turning one control (MidiLearn.h); nullptr where a
+        host has none. */
+    virtual MidiLearn* midiLearn() noexcept { return nullptr; }
     virtual int learningModController() const noexcept = 0;
     virtual bool velocityAppliesToAmp() const noexcept = 0;
     virtual void setVelocityAppliesToAmp (bool on) noexcept = 0;

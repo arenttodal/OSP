@@ -1318,3 +1318,36 @@ TEST_CASE ("shell: custom ARP patterns are saved with the state and presets; a s
     CHECK (r.customArpDocument (2) == nullptr);
     CHECK (r.customArpPattern (2) == nullptr);
 }
+
+TEST_CASE ("shell: MIDI LEARN turns a control, is saved with the session and never with presets", "[shell][midi-learn]")
+{
+    juce::MemoryBlock session;
+    TempDir tmp;
+    const auto preset = tmp.dir.getChildFile ("sound");
+    {
+        ShellProcessor p;
+        p.prepareToPlay (48000.0, 256);
+        auto* learn = p.midiLearn();
+        REQUIRE (learn != nullptr);
+        learn->learn ("life");
+        juce::AudioBuffer<float> buffer (2, 256);
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::controllerEvent (1, 21, 127), 0);
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        learn->applyPending();
+        CHECK (learn->controllerFor ("life") == 21);
+        CHECK (p.apvts().getParameter ("life")->getValue() == Approx (1.0f).margin (0.002));
+        p.getStateInformation (session);
+        REQUIRE (p.savePreset (preset));
+    }
+    const auto saved = preset.withFileExtension (andor::shell::productInfo().presetExtension);
+    const auto xml = juce::XmlDocument::parse (saved);
+    REQUIRE (xml != nullptr);
+    CHECK (xml->getChildByName ("MidiLearn") == nullptr);
+    ShellProcessor q;
+    q.setStateInformation (session.getData(), static_cast<int> (session.getSize()));
+    CHECK (q.midiLearn()->controllerFor ("life") == 21);
+    REQUIRE (q.loadPreset (saved));
+    CHECK (q.midiLearn()->controllerFor ("life") == 21);   // a preset keeps the controller setup
+}

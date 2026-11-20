@@ -2,6 +2,7 @@
 
 #include "AndorParameters.h"
 #include "InstrumentHost.h"
+#include "MidiLearn.h"
 #include "InstrumentLoader.h"
 #include "ShellProduct.h"
 
@@ -135,6 +136,7 @@ public:
     void setModControllerNumber (int slot, int controller) noexcept override;
     void learnModController (int slot) noexcept override { ccLearn.store (slot, std::memory_order_release); }
     int learningModController() const noexcept override { return ccLearn.load (std::memory_order_acquire); }
+    osp::plugin::MidiLearn* midiLearn() noexcept override { return midiLearnMap.get(); }
     bool velocityAppliesToAmp() const noexcept override { return velToAmp.load(); }
     void setVelocityAppliesToAmp (bool on) noexcept override { velToAmp = on; }
     bool arpRateIsStepped() const noexcept override { return arpStepped.load(); }
@@ -457,6 +459,8 @@ private:
     void publishCurve (int index) noexcept;
     std::array<std::atomic<int>, osp::mod::ccSlots> ccNumbers {};
     std::atomic<int> ccLearn { -1 };
+    // MIDI LEARN (MidiLearn.h): made once the parameters exist; saved with the session only.
+    std::unique_ptr<osp::plugin::MidiLearn> midiLearnMap;
     std::atomic<bool> velToAmp { true }, arpStepped { false };
 
     // Modulation, when the engine binds the routes (mod.*): the settings gathered from the

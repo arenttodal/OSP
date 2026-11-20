@@ -4,6 +4,7 @@
 #include "InstrumentLoader.h"
 #include "InstrumentHost.h"
 #include "LiveParameters.h"
+#include "MidiLearn.h"
 #include "UserMacroAssignments.h"
 #include "LibraryService.h"
 #include "LoadedInstrument.h"
@@ -233,6 +234,7 @@ public:
     void setModControllerNumber (int slot, int controller) noexcept override;
     void learnModController (int slot) noexcept override { modCcLearn.store (slot >= 0 && slot < mod::ccSlots ? slot : -1, std::memory_order_release); }
     int learningModController() const noexcept override { return modCcLearn.load (std::memory_order_acquire); }
+    MidiLearn* midiLearn() noexcept override { return midiLearnMap.get(); }
 
     /** What the arpeggiator's 16-step display shows (lock-free snapshot, any thread). */
     ArpView arpView() const noexcept override;
@@ -1007,6 +1009,8 @@ private:
     void applyArpModulation (Arpeggiator::Settings& settings) noexcept;
     int shownDynamicsCurve = 1;   ///< DYNAMICS' curve as last followed (message thread): moving it sets the VEL curve
     std::atomic<int> modCcLearn { -1 };
+    // MIDI LEARN (MidiLearn.h): made once the parameters exist; saved with the session only.
+    std::unique_ptr<MidiLearn> midiLearnMap;
     std::atomic<float> screenPitch { 0.0f }, screenMod { 0.0f };
     float lastScreenPitch = 0.0f, lastScreenMod = 0.0f;
     bool presetIsProgram = true;   ///< the header shows the starting state until a preset file is opened

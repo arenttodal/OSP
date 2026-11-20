@@ -34,6 +34,10 @@ The first signed and notarized beta of ANDOR OSP, for invited testers (November 
 - NOTES DETECTION **FEWER** now makes every note at least 0.4 s long: a shorter note joined to
   its neighbour becomes part of it (nothing is cut away), and a short note with silence on both
   sides stays in the map, switched off, for you to switch on. NORMAL and MORE are unchanged.
+- **MIDI Learn:** right-click a control, choose **Learn MIDI CC**, move a knob or fader on your
+  controller: it now turns that control (the knob moves, and your DAW can record it). Forget it
+  from the same menu. Your controller setup is saved with the project and stays when you change
+  presets.
 - The Library and preset browser, seven built-in Starting States, ANDOR Learn lessons and
   tutorials.
 

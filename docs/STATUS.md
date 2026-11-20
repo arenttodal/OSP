@@ -38,6 +38,16 @@
 >
 >   NORMAL and MORE are unchanged; the settings digest gains the minimum.
 >   `[phrase][fewer]` covers it on contours and on synthesized audio.
+> - **MIDI LEARN (owner's request, ANDOR OSP and the shell):** right-click a control, **Learn
+>   MIDI CC**, move a controller. That controller now turns the parameter itself, through the
+>   host, in a change gesture (`shared/andor-ui/Source/MidiLearn`).
+>   - The audio thread only posts the value; a 60 Hz message timer applies it (no lock, no
+>     allocation; tested).
+>   - Mappings are saved with the session only: presets never carry them, and loading a preset
+>     keeps them.
+>   - A learned controller takes over the built-in CC 20-27 macro shortcut.
+>
+>   Tests: `[midi-learn]` (plugin, 3 cases) and the shell test.
 > - **NEXT:**
 >   - the owner runs the release on the Mac, then the manual checklist
 >     (`docs/release/BETA_TESTING.md`);

@@ -476,6 +476,7 @@ OspAudioProcessor::OspAudioProcessor()
     engineSettings.outputGainDb = -9.0;
     engine.prepare (48000.0, 512, engineSettings);
 
+    midiLearnMap = std::make_unique<MidiLearn> (*this, parameters);
     startTimerHz (20);
     // A new instance opens on the first built-in state, all of it: the header names it and the
     // controls hold it. (A session or preset the host restores next replaces it as ever.)
@@ -1553,6 +1554,10 @@ void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
     const bool memberChannel = engine.isMpe() && channel >= 2;
     // The CC 1-4 sources: the slots following this controller (Learn takes it first), and
     // PRESSURE (channel pressure; MPE members keep their own expression).
+    // MIDI LEARN: a learned controller turns its control (applied on the message thread); its
+    // number's built-in macro shortcut (CC 20-27) then stays out of the way.
+    const bool learnedController = m.isController() && midiLearnMap != nullptr
+                                   && midiLearnMap->handleController (m.getControllerNumber(), m.getControllerValue());
     if (m.isController() && m.getControllerNumber() < 120)
     {
         const int cc = m.getControllerNumber();
@@ -1586,7 +1591,7 @@ void OspAudioProcessor::handleMidi (const juce::MidiMessage& m) noexcept
         engine.setModWheel (modWheel);   // the MOD WHEEL modulation source
         wheelShown.store (modWheel, std::memory_order_relaxed);
     }
-    else if (m.isController() && m.getControllerNumber() >= 20 && m.getControllerNumber() <= 27)
+    else if (m.isController() && m.getControllerNumber() >= 20 && m.getControllerNumber() <= 27 && ! learnedController)
         ccMacro[static_cast<std::size_t> (m.getControllerNumber() - 20)] = static_cast<float> (m.getControllerValue()) / 127.0f;   // 27: DRIVE
     else if (m.isPitchWheel() && memberChannel)
         engine.setChannelPitchBend (channel, (m.getPitchWheelValue() - 8192) / 8192.0 * 48.0); // MPE default: +/- 48 st
@@ -3605,7 +3610,12 @@ namespace
 void OspAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     if (const auto xml = createStateXml())
+    {
+        // MIDI LEARN belongs to the session (the DAW project), never to presets: added here only.
+        if (auto learned = midiLearnMap->toXml())
+            xml->addChildElement (learned.release());
         copyXmlToBinary (*xml, destData);
+    }
 }
 
 std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
@@ -3754,6 +3764,11 @@ void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
     const auto xml = getXmlFromBinary (data, sizeInBytes);
     if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
         return;
+    // MIDI LEARN: the session's own mappings (none in an older session); kept out of the
+    // parameter state, so presets never carry them.
+    midiLearnMap->fromXml (xml->getChildByName ("MidiLearn"));
+    if (auto* learned = xml->getChildByName ("MidiLearn"))
+        xml->removeChildElement (learned, true);
     applyStateXml (*xml);
 }
 

@@ -1,6 +1,7 @@
 #include "ModulationPanel.h"
 
 #include "MenuIcons.h"
+#include "MidiLearn.h"
 #include "Binding.h"
 
 #include "ArpSection.h"
@@ -2675,6 +2676,25 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
         menu.addSectionHeader ("RATE MODULATION");
         menu.addItem ("Smooth", true, ! p.arpRateIsStepped(), [&p] { p.setArpRateStepped (false); });
         menu.addItem ("Stepped (musical ratios)", true, p.arpRateIsStepped(), [&p] { p.setArpRateStepped (true); });
+    }
+    // MIDI LEARN: an external controller turns this control itself (MidiLearn.h).
+    if (auto* learn = p.midiLearn(); learn != nullptr && p.apvts().getParameter (parameterId) != nullptr)
+    {
+        menu.addSeparator();
+        menu.addSectionHeader ("MIDI LEARN");
+        const int cc = learn->controllerFor (parameterId);
+        const bool learning = learn->learningParameter() == parameterId;
+        const auto name = p.apvts().getParameter (parameterId)->getName (40).toUpperCase();
+        if (learning)
+            menu.addItem (juce::String::fromUTF8 ("Learning: move a controller\xe2\x80\xa6"), true, true, [learn] { learn->cancelLearn(); });
+        else
+            menu.addItem (cc >= 0 ? "Learn MIDI CC (now CC " + juce::String (cc) + ")" : juce::String ("Learn MIDI CC"), [learn, parameterId, safe, name] {
+                learn->learn (parameterId);
+                if (safe != nullptr)
+                    safe->showNotice ("Move a MIDI controller to control " + name);
+            });
+        if (cc >= 0)
+            menu.addItem ("Forget MIDI CC " + juce::String (cc), [learn, parameterId] { learn->forget (parameterId); });
     }
     menu.addSeparator();
     menu.addSubMenu ("MIDI Controllers", modui::controllerMenu (p));
