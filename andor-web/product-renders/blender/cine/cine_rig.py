@@ -58,6 +58,9 @@ ap.add_argument("--still-width", type=int, default=1920)
 ap.add_argument("--still-samples", type=int, default=128)
 ap.add_argument("--still-noise", type=float, default=0.01)
 ap.add_argument("--textures", default=None, help="the interface texture directory (default: andor_scene.py's, the release interface)")
+ap.add_argument("--device", default="CPU", choices=["CPU", "CUDA", "OPTIX", "HIP", "METAL", "ONEAPI"],
+                help="Cycles device (GPU benchmark: the machine's backend; falls back to CPU, and says so, if none is found)")
+ap.add_argument("--final", action="store_true", help="a final-quality render: refuse unless the textures match their FROZEN.json")
 ap.add_argument("--depth", default="auto", choices=["auto", "8", "16"], help="PNG bit depth; auto: 8 for draft sizes (< 1920 px), else 16")
 args = ap.parse_args(argv)
 spec = json.load(open(args.spec))
@@ -75,11 +78,43 @@ noise = args.still_noise if args.still is not None else args.noise
 sys.argv = ["andor_scene.py", "--", "--setup", spec["setup"], "--shot", spec["base_shot"], "--res", str(res[0]), str(res[1]),
             "--samples", str(samples), "--noise", str(noise)] + (["--textures", args.textures] if args.textures else [])
 g = runpy.run_path(os.path.join(SCRIPTS, "andor_scene.py"), run_name="__main__")
+
+
+def frozen_check(tex):
+    """True when tex/FROZEN.json exists and every listed file matches its checksum."""
+    import hashlib
+    mp = os.path.join(tex, "FROZEN.json")
+    if not os.path.exists(mp):
+        return False, "no FROZEN.json"
+    man = json.load(open(mp))
+    for f, h in man["files"].items():
+        if hashlib.sha256(open(os.path.join(tex, f), "rb").read()).hexdigest() != h:
+            return False, f + " does not match FROZEN.json"
+    return True, man.get("approved_commit", "")
+
+
+FROZEN_OK, FROZEN_NOTE = frozen_check(g["TEX"])
+# Final-quality work (asked for, or still-size and still-quality) is only ever rendered from the frozen,
+# approved interface: old interface graphics must never reach an expensive final asset.
+if (args.final or (res[0] >= 1920 and samples >= 96)) and not FROZEN_OK:
+    raise SystemExit(f"cine: refusing a final-quality render: interface textures not frozen ({FROZEN_NOTE}): {g['TEX']}")
 bpy, Vector, Euler = g["bpy"], g["Vector"], g["Euler"]
 from mathutils import Matrix, Quaternion  # noqa: E402
 scene = bpy.context.scene
 scene.render.fps, scene.render.fps_base = FPS, 1.0
 scene.cycles.seed, scene.cycles.use_animated_seed = 0, False
+if args.device != "CPU":
+    prefs = bpy.context.preferences.addons["cycles"].preferences
+    prefs.compute_device_type = args.device
+    prefs.get_devices()
+    used = [d for d in prefs.devices if d.type == args.device]
+    for d in prefs.devices:
+        d.use = d.type == args.device
+    scene.cycles.device = "GPU" if used else "CPU"
+    DEVICE_NAMES = [d.name for d in used] or ["(no %s device found: rendered on CPU)" % args.device]
+else:
+    import platform
+    DEVICE_NAMES = [platform.processor() or platform.machine()]
 scene.render.image_settings.color_depth = args.depth if args.depth != "auto" else ("8" if res[0] < 1920 else "16")
 ROT = math.radians(g["ROT"])
 Q_ROT = Quaternion((0, 0, 1), ROT)
@@ -465,7 +500,7 @@ else:
             bpy.ops.render.render(write_still=True)
             rec["render_s"] = round(time.time() - t0, 1)
         log.append(rec)
-json.dump({"interface_textures": os.path.basename(os.path.normpath(g["TEX"])), "spec": spec, "pass": args.pass_, "res": res, "samples": samples, "noise": noise, "fps": FPS,
+json.dump({"interface_textures": os.path.basename(os.path.normpath(g["TEX"])), "device": args.device, "devices": DEVICE_NAMES, "interface_frozen": FROZEN_OK, "interface_commit": FROZEN_NOTE if FROZEN_OK else None, "spec": spec, "pass": args.pass_, "res": res, "samples": samples, "noise": noise, "fps": FPS,
            "frames_total": N, "handles_s": HANDLE, "blender": bpy.app.version_string, "frames": log},
           open(os.path.join(args.out, f"{spec['id']}_{'keyframes' if args.keyframes else (args.pass_ if args.still is None else 'still')}_meta.json"), "w"), indent=1)
 print("done", spec["id"], args.pass_ if args.still is None else "still")

@@ -1,6 +1,6 @@
 # Release interface check: the model's face texture against the beta candidate
 
-**Status:** **approved and applied (20 Nov).** The owner approved `32e0bee` (0.9.0-beta.1) as the release interface. It is now the one fixed interface for all launch photography and animation.
+**Status:** **approved, applied and frozen (20 Nov).** See *Freeze (R4)* at the end for the re-check at the beta head `6ef3376`. The owner approved `32e0bee` (0.9.0-beta.1) as the release interface. It is now the one fixed interface for all launch photography and animation.
 
 ## Applied
 
@@ -80,3 +80,41 @@ No other geometry or material changes. Every approved camera, light and material
 2. Write the textures to a **new** directory, `textures_0.9.0-beta.1/`.
 3. Keep `textures_current/` (the 17 Nov version) archived, unchanged, for reproducibility.
 4. Point the scene at the new directory, then re-render one reference still for comparison before any final render.
+
+## Freeze (R4, 20 Nov): the beta head re-checked
+
+The R3 review asked for one immutable, approved final texture commit, compared against the current beta release interface before any final rendering.
+
+**The beta branch had moved.** `claude/macos-release` was at `6ef3376`, three commits past `32e0bee`:
+- MIDI Learn (`e655115`);
+- the granular POS-line flicker fix (`c74b6af`);
+- the Custom Pattern UX redesign R2 (`6ef3376`).
+
+The version is unchanged: 0.9.0-beta.1, build 1.
+
+**Captured at `6ef3376`** with the same capture test and scaffolding as before (`tools/model-capture/`). The knob-review patch in the capture worktree was set aside first, so this is the beta's committed interface.
+
+| Check | Result |
+|---|---|
+| Hero capture with caps, 1x and 2x | **Identical**: 0 pixels differ |
+| Hero capture without caps, 4x (the texture source) | **Identical**: 0 pixels differ |
+| Knob geometry and component bounds (JSON) | Identical |
+| `prep_textures.py` output | **Byte-identical**: `osp_face.png` `62dc7d85…`, `geometry.json` `0bb7f55c…`, `teak_strip.png` `cb7ecafc…` |
+
+**Every visible difference between the beta head and the texture**, and why none of them reaches the model:
+
+| Change | Where it shows | In the model's state? |
+|---|---|---|
+| MIDI Learn | A MIDI LEARN section in a control's right-click menu (a pop-up), and a notice line while learning | No: menus and notices are not part of the hero state |
+| Custom Pattern UX R2 | The ARP card: one Custom Patterns row, a pattern browser, a grid-first editor | No: the ARP card is closed in the hero state |
+| Granular POS line | The position line in a granular display no longer jumps between two places while playing | No: identical pixels in the captured frame |
+
+**Frozen:** `textures_0.9.0-beta.1/` is the one approved interface texture set. Its checksums, the approved commit (`32e0bee`) and the verification at `6ef3376` are in `textures_0.9.0-beta.1/FROZEN.json`.
+
+**Enforced:** `cine_rig.py` refuses any final-quality render whose textures don't match `FROZEN.json`. A render counts as final-quality when it asks for `--final`, or is at least 1920 px wide with at least 96 samples. Two tests:
+- the archived 17 Nov set has no manifest and is refused;
+- every render records `interface_frozen` and `interface_commit` in its metadata.
+
+**If the beta moves again:** re-capture its head.
+- If the textures come out byte-identical, add the commit under `verified_identical_at`.
+- If anything differs, write a new directory and ask for approval before any final render uses it.

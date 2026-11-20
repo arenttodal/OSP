@@ -1,0 +1,166 @@
+{
+ "id": "B1_CLOSE_STUDY",
+ "family": "Editorial motion",
+ "variant": "B1: closer medium-wide (study)",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 1.0,
+ "handles": 0.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 8,
+  "position": [
+   -0.365,
+   -0.5437,
+   0.2678
+  ],
+  "target": [
+   0.0,
+   0.065,
+   0.012
+  ],
+  "focus": [
+   0.0,
+   0.065,
+   0.012
+  ]
+ },
+ "stage": {
+  "hide_floor": true,
+  "cyc": {
+   "rgb": [
+    0.6,
+    0.565,
+    0.52
+   ],
+   "roughness": 0.9,
+   "radius": 1.4,
+   "wall": 2.2,
+   "height": 5.0,
+   "width": 14.0
+  },
+  "remove_lights": [
+   "Key softbox",
+   "Edge strip",
+   "Overhead",
+   "Fill",
+   "Front kicker",
+   "Low rake"
+  ],
+  "add_lights": [
+   {
+    "name": "Key",
+    "position": [
+     -0.8,
+     0.5,
+     0.26
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     0.8,
+     0.45
+    ],
+    "power": 34,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 180,
+    "link": null,
+    "glossy_only": false
+   },
+   {
+    "name": "Edge strip",
+    "position": [
+     0.85,
+     0.55,
+     0.16
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     0.05,
+     0.5
+    ],
+    "power": 7,
+    "rgb": [
+     1.0,
+     0.975,
+     0.95
+    ],
+    "spread": 60,
+    "link": "product",
+    "glossy_only": false
+   }
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   },
+   {
+    "name": "Negative fill",
+    "mode": "negative",
+    "position": [
+     0.48,
+     -0.26,
+     0.1
+    ],
+    "target": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     1.4,
+     0.7
+    ]
+   },
+   {
+    "name": "Top flag",
+    "mode": "negative",
+    "position": [
+     0.15,
+     -0.1,
+     0.75
+    ],
+    "target": [
+     0,
+     0,
+     0
+    ],
+    "size": [
+     1.0,
+     1.0
+    ]
+   }
+  ]
+ },
+ "rationale": "The ivory portrait: a seamless warm cyclorama (no horizon line). One small, low key rakes from behind left, so the ceramic turns from light to shade across its width and every knob throws a short shadow; a large black flag close on the right and another overhead keep the right half in true shadow, with only a thin strip on the right cheek. A long soft shadow falls toward the viewer.",
+ "world": 0.1,
+ "exposure": -0.15,
+ "from_still": "SF_B1",
+ "notes": "Study: B1's direction at 0.68x its distance, aimed at the display row; the edge strip lowered and narrowed to control the glass reflection."
+}

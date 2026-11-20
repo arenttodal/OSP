@@ -1,0 +1,287 @@
+{
+ "id": "R02_DIM_R4",
+ "family": "R02 Silhouette",
+ "variant": "The pool of light, returning to dim (R4: peak -0.3 EV)",
+ "narrative": "Dim: the ceramic and the knobs are only just there, a faint rim along the edge. A narrow strip of light crosses the controls; behind it a soft pool gathers over the macro row and the labels come up into the light. Then, as slowly as it came, the light withdraws and the instrument returns to the dim it began in - shape still visible, nothing black. The camera does not move; the last frame is the first.",
+ "setup": "ANDOR_FLOATING",
+ "base_shot": "B1_R4",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 11.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 8,
+  "position": [
+   [
+    0.0,
+    [
+     0.1278,
+     -0.5973,
+     0.5557
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     -0.04,
+     -0.03,
+     0.0
+    ]
+   ]
+  ]
+ },
+ "stage": {
+  "remove_lights": [
+   "Key softbox",
+   "Top line",
+   "Front kicker",
+   "Fill",
+   "Floor overhead",
+   "Floor rake"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Strip",
+    "position": [
+     -0.42,
+     -0.3,
+     0.14
+    ],
+    "target": [
+     -0.2,
+     -0.06,
+     0.0
+    ],
+    "size": [
+     0.03,
+     0.6
+    ],
+    "power": 0.5,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 40,
+    "link": "product"
+   },
+   {
+    "name": "Pool",
+    "position": [
+     -0.08,
+     -0.08,
+     0.7
+    ],
+    "target": [
+     -0.06,
+     -0.06,
+     0.0
+    ],
+    "size": [
+     0.14,
+     0.14
+    ],
+    "power": 0.6,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 16,
+    "link": "product"
+   }
+  ]
+ },
+ "lights": {
+  "Rim strip": {
+   "energy": [
+    [
+     0.0,
+     0.14
+    ]
+   ]
+  },
+  "Strip": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     [
+      0.5,
+      0.0,
+      0.4,
+      1.0
+     ]
+    ],
+    [
+     1.4,
+     0.6904,
+     "hold"
+    ],
+    [
+     4.2,
+     0.6904,
+     "smooth"
+    ],
+    [
+     6.4,
+     0.0
+    ]
+   ],
+   "translate": [
+    [
+     0.0,
+     [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "hold"
+    ],
+    [
+     0.6,
+     [
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.45,
+      0.0,
+      0.55,
+      1.0
+     ]
+    ],
+    [
+     6.2,
+     [
+      0.36,
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  "Pool": {
+   "energy": [
+    [
+     0.0,
+     0.0,
+     "hold"
+    ],
+    [
+     2.6,
+     0.0,
+     [
+      0.55,
+      0.0,
+      0.35,
+      1.0
+     ]
+    ],
+    [
+     6.2,
+     0.6092,
+     [
+      0.45,
+      0.0,
+      0.6,
+      1.0
+     ]
+    ],
+    [
+     10.6,
+     0.0
+    ]
+   ],
+   "translate": [
+    [
+     0.0,
+     [
+      0.0,
+      0.0,
+      -0.14
+     ],
+     "hold"
+    ],
+    [
+     2.6,
+     [
+      0.0,
+      0.0,
+      -0.14
+     ],
+     [
+      0.4,
+      0.0,
+      0.3,
+      1.0
+     ]
+    ],
+    [
+     6.2,
+     [
+      0.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  }
+ },
+ "world": 0.045,
+ "exposure": 0.0,
+ "emission": [
+  [
+   0.0,
+   0.0,
+   "hold"
+  ],
+  [
+   4.0,
+   0.0,
+   [
+    0.5,
+    0.0,
+    0.4,
+    1.0
+   ]
+  ],
+  [
+   6.4,
+   0.1787,
+   [
+    0.45,
+    0.0,
+    0.6,
+    1.0
+   ]
+  ],
+  [
+   10.6,
+   0.0
+  ]
+ ],
+ "notes": "R4: the strip, the pool and the display glow peak 0.3 EV lower (x 0.812); the dim level (Rim strip, world), the movement and the timing are R3's. Loop: every channel has the same value at 0 s and 11 s."
+}

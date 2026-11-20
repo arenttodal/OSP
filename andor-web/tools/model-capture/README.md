@@ -6,7 +6,7 @@ component's bounds. This folder keeps the capture test so a texture set can be r
 
 | Texture set | OSP commit | Interface |
 |---|---|---|
-| `textures_0.9.0-beta.1/` | `32e0bee` (`claude/macos-release`) | ANDOR OSP 0.9.0-beta.1: **the release interface** (approved 20 Nov) |
+| `textures_0.9.0-beta.1/` | `32e0bee` (`claude/macos-release`); verified byte-identical at `6ef3376` | ANDOR OSP 0.9.0-beta.1: **the frozen release interface** (approved 20 Nov; `FROZEN.json`) |
 | `textures_current/` | `08ebd01` (default branch, 17 Nov) | archived: every render before 20 Nov |
 
 To rebuild (from a detached worktree of the commit, never committed there):
@@ -21,4 +21,9 @@ To rebuild (from a detached worktree of the commit, never committed there):
 4. `python3 product-renders/blender/scripts/prep_textures.py --capture <dir>/cur-hero-3L-nocaps@4x.png
    --knobs <dir>/cur-hero-3L-nocaps.json --bounds <dir>/cur-hero-3L-bounds.json --out <texture dir>`.
 
-Checksums of the committed sets are in `product-renders/documentation/interface_release_check.md`.
+Checksums of the committed sets are in `product-renders/documentation/interface_release_check.md`; the frozen set's are also in
+`textures_0.9.0-beta.1/FROZEN.json`, which `cine_rig.py` checks before any final-quality render (it refuses a set that does not match).
+
+When the beta branch moves, re-capture its head and compare: if `prep_textures.py` writes byte-identical files, record the commit
+under `verified_identical_at` in `FROZEN.json`; if anything differs, write a new texture directory and ask for approval before
+any final render uses it.
