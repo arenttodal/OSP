@@ -1,5 +1,26 @@
 # Status
 
+> **20 Nov 2026, rack modulation steps 1-2 (owner's request: "MOD and LFO on the parameters
+> inside the FX racks"; `docs/research/rack-modulation.md`):**
+> - **New destinations (per voice):** the FILTER rack's MIN, MAX, DRIVE, ENV AMOUNT, ENV
+>   ATTACK and ENV DECAY (the envelope's times taken as each note starts, as the amp
+>   envelope's), and each layer's SYNTH page DETUNE, TONE, IMPRINT and MOTION. Every source
+>   reaches them (poly LFOs, envelopes, VEL and NOTE included).
+> - **Saved like VIBRATO and SYNTH before them:** appended to the route's second destination
+>   parameter (`mod.routeN.destExt`, choices 11-28). The frozen `dest` list and every earlier
+>   choice keep their meaning; older sessions open unchanged. The parameter-schema golden
+>   gains the 18 choice names (intentional).
+> - **Interface:** right-click on those knobs (the rack's and the SYNTH page's), the routes
+>   popover's + menu, and halos drawn in each knob's own units.
+> - **Shared:** engine and interface code are shared; ANDOR ANALOG gets the same destinations
+>   wherever it shows these controls (it has no CHARACTER rack or SYNTH page today).
+> - **Fix found on the way:** a reused voice set its first filter value with the previous
+>   note's route offsets (they were cleared a few lines too late). Now cleared first; this also
+>   applied to the existing CUTOFF and RESONANCE routes.
+> - **NEXT (steps 3-5, not started):** SPACE / ECHO / MOVEMENT rack parameters (shared stages:
+>   global sources only), the FX library's effects, then an interface and ANALOG pass.
+> - **Tests:** `[rackmod]` (4 cases).
+>
 > **20 Nov 2026, DAMPEN on by default (owner's choice; ANDOR OSP only):**
 > - Every layer of the seven built-in Starting States has DAMPEN on, so a new instance (which
 >   opens on Starting State 1) starts with it on.

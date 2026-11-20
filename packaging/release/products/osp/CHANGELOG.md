@@ -47,6 +47,9 @@ The first signed and notarized beta of ANDOR OSP, for invited testers (November 
   controller: it now turns that control (the knob moves, and your DAW can record it). Forget it
   from the same menu. Your controller setup is saved with the project and stays when you change
   presets.
+- **More things to modulate:** the FILTER rack's MIN, MAX, DRIVE, ENV AMOUNT, ENV ATTACK and
+  ENV DECAY, and each SYNTH page's DETUNE, TONE, IMPRINT and MOTION. Right-click the knob and
+  assign an LFO, an envelope, VEL, NOTE, the MOD WHEEL or a CC; each note follows its own.
 - The Library and preset browser, seven built-in Starting States, ANDOR Learn lessons and
   tutorials.
 

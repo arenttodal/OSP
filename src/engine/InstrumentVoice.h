@@ -515,6 +515,10 @@ private:
     double keyDnaSmoothing = 1.0;
     double modDampenAmount = 0.0, modDampenShelf = 0.0, modDampenCutoff = 0.0;
     double modVibratoDepth = 0.0, modVibratoAmount = 0.0;   ///< VIBRATO DEPTH (cents) and AMOUNT routes
+    // The FILTER rack's routes (MIN / MAX in octaves, DRIVE and ENV AMOUNT added to the
+    // settings) and the layer's SYNTH page's (DETUNE in cents, TONE, IMPRINT, MOTION).
+    double modFilterMin = 0.0, modFilterMax = 0.0, modFilterDrive = 0.0, modFilterEnvAmount = 0.0;
+    double modSynthDetune = 0.0, modSynthTone = 0.0, modSynthImprint = 0.0, modSynthMotion = 0.0;
     // VIBRATO (per note): the engine's settings, this note's phase and age.
     const vibrato::Settings* vibratoSettings = nullptr;
     vibrato::Voice vibratoVoice;

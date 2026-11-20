@@ -70,6 +70,8 @@ namespace
     constexpr double ampDecayOctaves = 14.287712379549449;    // DECAY 1 ms .. 20 s
     constexpr double ampReleaseOctaves = 9.550746785383243;   // RELEASE 20 ms .. 15 s
     constexpr double envTimeOctaves = 13.287712379549449;     // ENV times (0) 1 ms .. 10 s
+    constexpr double filterAttackOctaves = 10.965784284662087;   // FILTER ENV ATTACK (0) 1 ms .. 2 s
+    constexpr double filterDecayOctaves = 9.228818690495881;     // FILTER ENV DECAY 20 ms .. 12 s
 
     constexpr std::array<DestInfo, static_cast<std::size_t> (Dest::product0)> registry { {
         { "none", "-", Owner::global, -1, Domain::unit, 0.0, Update::continuous },
@@ -170,6 +172,27 @@ namespace
         // The MOD WHEEL's VIBRATO (per voice): DEPTH across its 0..100 cents, AMOUNT 0..1.
         { "vibratoDepth", "VIBRATO DEPTH", Owner::voice, -1, Domain::cents, 100.0, Update::continuous },
         { "vibratoAmount", "VIBRATO AMOUNT", Owner::voice, -1, Domain::unit, 1.0, Update::continuous },
+        // The FILTER rack (CHARACTER: the host names it; per voice): MIN and MAX across 20 Hz .. 20 kHz, DRIVE 0..1, ENV
+        // AMOUNT -1..1; the envelope's times taken as a note starts.
+        { "filterMin", "CHARACTER MIN", Owner::voice, -1, Domain::octaves, eqFrequencyOctaves, Update::continuous },
+        { "filterMax", "CHARACTER MAX", Owner::voice, -1, Domain::octaves, eqFrequencyOctaves, Update::continuous },
+        { "filterDrive", "CHARACTER DRIVE", Owner::voice, -1, Domain::unit, 1.0, Update::continuous },
+        { "filterEnvAmount", "CHARACTER ENV AMOUNT", Owner::voice, -1, Domain::unit, 2.0, Update::continuous },
+        { "filterEnvAttack", "CHARACTER ENV ATTACK", Owner::voice, -1, Domain::octaves, filterAttackOctaves, Update::noteOn, Source::none, 0.0, 2.0 },
+        { "filterEnvDecay", "CHARACTER ENV DECAY", Owner::voice, -1, Domain::octaves, filterDecayOctaves, Update::noteOn, Source::none, 0.02, 12.0 },
+        // Each layer's SYNTH page (per voice): DETUNE 0..50 cents, TONE, IMPRINT, MOTION 0..1.
+        { "synthDetuneA", "SYNTH A DETUNE", Owner::voice, 0, Domain::cents, 50.0, Update::continuous },
+        { "synthDetuneB", "SYNTH B DETUNE", Owner::voice, 1, Domain::cents, 50.0, Update::continuous },
+        { "synthDetuneC", "SYNTH C DETUNE", Owner::voice, 2, Domain::cents, 50.0, Update::continuous },
+        { "synthToneA", "SYNTH A TONE", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
+        { "synthToneB", "SYNTH B TONE", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
+        { "synthToneC", "SYNTH C TONE", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
+        { "synthImprintA", "SYNTH A IMPRINT", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
+        { "synthImprintB", "SYNTH B IMPRINT", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
+        { "synthImprintC", "SYNTH C IMPRINT", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
+        { "synthMotionA", "SYNTH A MOTION", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
+        { "synthMotionB", "SYNTH B MOTION", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
+        { "synthMotionC", "SYNTH C MOTION", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
     } };
 
     bool isEnvelope (Source s) noexcept { return s == Source::env1 || s == Source::env2; }

@@ -327,6 +327,9 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         tRemaining = std::max (1, static_cast<int> (shape.transientPreserveSeconds * sampleRate));
     }
 
+    // The previous note's route offsets go before anything reads them (the filter's first
+    // setting below included): a reused voice starts from none.
+    clearModulation();
     // CHARACTER: velocity coupling (DYNAMICS x TONE) and the filter envelope start here.
     driftToneTarget = 0.0;   // driftTone starts part-way through its glide (above)
     if (shapingState != nullptr)
@@ -351,7 +354,6 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     appliedBright = appliedBody = 1.0e9f; // force coefficient update
     filtersActive = false;
 
-    clearModulation();
     // DAMPEN: the sounding key (the arpeggiator's octaves included, not pitch bend).
     dampenLive = params.dampen;
     dampenNote = params.note;
@@ -370,6 +372,18 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
         noteAdsr.decaySeconds = mod::modulatedSeconds (mod::Dest::ampDecay, adsrSettings.decaySeconds, modState.offset (rt, mod::Dest::ampDecay));
         noteAdsr.sustainLevel = std::clamp (adsrSettings.sustainLevel + modSustain, 0.0, 1.0);
         appliedSustain = noteAdsr.sustainLevel;
+        // The FILTER envelope's times, as the amp envelope's: taken as the note starts (from
+        // 1 ms when the knob is at 0, so a route can open a zero ATTACK).
+        if (shapingState != nullptr && (rt.compiled.has (mod::Dest::filterEnvAttack) || rt.compiled.has (mod::Dest::filterEnvDecay)))
+        {
+            const auto& sh = shapingState->shaping;
+            const double attack = mod::modulatedSeconds (mod::Dest::filterEnvAttack, std::max (0.001, sh.envAttackSeconds), modState.offset (rt, mod::Dest::filterEnvAttack));
+            const double decay = mod::modulatedSeconds (mod::Dest::filterEnvDecay, sh.envDecaySeconds, modState.offset (rt, mod::Dest::filterEnvDecay));
+            if (rt.compiled.has (mod::Dest::filterEnvAttack))
+                filterEnvStep = static_cast<double> (controlInterval) / (std::max (0.0005, attack) * sampleRate);
+            if (rt.compiled.has (mod::Dest::filterEnvDecay))
+                filterEnvDecay = std::exp (-4.6 * static_cast<double> (controlInterval) / (std::max (0.02, decay) * sampleRate));
+        }
     }
     envelope.prepare (sampleRate, noteAdsr);
     envelope.reset();
@@ -1046,23 +1060,29 @@ void InstrumentVoice::updateCharacter (bool immediate) noexcept
         rangeLoOctaves = shaping::rangeOctaves (rangeMinHz);
         rangeHiOctaves = shaping::rangeOctaves (rangeMaxHz);
     }
-    const double target = shaping::cutoffOctaves (rangeLoOctaves, rangeHiOctaves, shapingState->character);
+    // MIN and MAX routes move the range's ends (in octaves, within 20 Hz .. 20 kHz).
+    double lo = rangeLoOctaves, hi = rangeHiOctaves;
+    if (modFilterMin != 0.0)
+        lo = std::clamp (lo + modFilterMin, shaping::rangeOctaves (20.0), shaping::rangeOctaves (20000.0));
+    if (modFilterMax != 0.0)
+        hi = std::clamp (hi + modFilterMax, shaping::rangeOctaves (20.0), shaping::rangeOctaves (20000.0));
+    const double target = shaping::cutoffOctaves (lo, hi, shapingState->character);
     charOctaves = immediate ? target : charOctaves + (target - charOctaves) * charSmoothing;
-    const double env = shaping::envelopeOctaves (s.envAmount) * filterEnv * envelopeScale;
+    const double envAmount = modFilterEnvAmount != 0.0 ? std::clamp (s.envAmount + modFilterEnvAmount, -1.0, 1.0) : s.envAmount;
+    const double env = shaping::envelopeOctaves (envAmount) * filterEnv * envelopeScale;
     // A CUTOFF route moves along the filter's travel (1 = min to max), never past its ends.
-    const double travel = modCutoff == 0.0 ? charOctaves
-                                           : std::clamp (charOctaves + modCutoff * (rangeHiOctaves - rangeLoOctaves), std::min (rangeLoOctaves, rangeHiOctaves),
-                                                         std::max (rangeLoOctaves, rangeHiOctaves));
+    const double travel = modCutoff == 0.0 ? charOctaves : std::clamp (charOctaves + modCutoff * (hi - lo), std::min (lo, hi), std::max (lo, hi));
     const double octaves = travel + env + velocityOctaves + driftTone;
     // Telemetry only (CharacterTap): nothing below reads it.
     tapBaseOctaves = travel + velocityOctaves + driftTone;
-    tapDepthOctaves = shaping::envelopeOctaves (s.envAmount) * envelopeScale;
+    tapDepthOctaves = shaping::envelopeOctaves (envAmount) * envelopeScale;
     tapCutoffOctaves = octaves;
     tapEnvPeak = std::max (tapEnvPeak, filterEnv);
     // TILT: the knob rotates dark <-> bright (+-12 dB), the envelope and velocity lean it.
     const double tiltDb = (std::clamp (shapingState->character, 0.0, 1.0) - 0.5) * 24.0 + 3.0 * (env + velocityOctaves + driftTone);
     const double resonance = modResonance != 0.0 ? std::clamp (s.resonance + modResonance, 0.0, 1.0) : s.resonance;
-    charFilter.setParameters (s.filterType, std::exp2 (octaves), resonance, s.drive, tiltDb);
+    const double drive = modFilterDrive != 0.0 ? std::clamp (s.drive + modFilterDrive, 0.0, 1.0) : s.drive;
+    charFilter.setParameters (s.filterType, std::exp2 (octaves), resonance, drive, tiltDb);
 }
 
 void InstrumentVoice::prepareSatellite() noexcept
@@ -1185,6 +1205,8 @@ void InstrumentVoice::clearModulation() noexcept
     modGrainPosition = modGrainSpread = modGrainSize = modGrainDensity = 0.0;
     modKeyDnaAmount = modSynthAmount = 0.0;
     modVibratoDepth = modVibratoAmount = 0.0;
+    modFilterMin = modFilterMax = modFilterDrive = modFilterEnvAmount = 0.0;
+    modSynthDetune = modSynthTone = modSynthImprint = modSynthMotion = 0.0;
     appliedSustain = -1.0;
 }
 
@@ -1241,6 +1263,14 @@ void InstrumentVoice::updateModulation (bool advance) noexcept
     modSynthAmount = modState.offset (rt, layerDest (mod::Dest::synthAmountA));
     modVibratoDepth = modState.offset (rt, mod::Dest::vibratoDepth);
     modVibratoAmount = modState.offset (rt, mod::Dest::vibratoAmount);
+    modFilterMin = modState.offset (rt, mod::Dest::filterMin);
+    modFilterMax = modState.offset (rt, mod::Dest::filterMax);
+    modFilterDrive = modState.offset (rt, mod::Dest::filterDrive);
+    modFilterEnvAmount = modState.offset (rt, mod::Dest::filterEnvAmount);
+    modSynthDetune = modState.offset (rt, layerDest (mod::Dest::synthDetuneA));
+    modSynthTone = modState.offset (rt, layerDest (mod::Dest::synthToneA));
+    modSynthImprint = modState.offset (rt, layerDest (mod::Dest::synthImprintA));
+    modSynthMotion = modState.offset (rt, layerDest (mod::Dest::synthMotionA));
     modGrainSize = modState.offset (rt, layerDest (mod::Dest::grainSizeA));
     modGrainDensity = modState.offset (rt, layerDest (mod::Dest::grainDensityA));
     modSustain = modState.offset (rt, mod::Dest::ampSustain);
@@ -2105,7 +2135,16 @@ void InstrumentVoice::synthControl (int samplesToNext) noexcept
         }
         synthPitchHz *= synthTrackRatio * synthRootCorrection;
     }
-    synthVoice.setPitch (synthPitchHz, *synthSettingsLive);
+    if (modSynthDetune != 0.0 || modSynthTone != 0.0)
+    {
+        // DETUNE and TONE routes: this voice's own copy of the page (no allocation).
+        auto own = *synthSettingsLive;
+        own.detuneCents = std::clamp (own.detuneCents + modSynthDetune, 0.0, synth::Settings::maxDetuneCents);
+        own.tone = std::clamp (own.tone + modSynthTone, 0.0, 1.0);
+        synthVoice.setPitch (synthPitchHz, own);
+    }
+    else
+        synthVoice.setPitch (synthPitchHz, *synthSettingsLive);
     imprintControl (samplesToNext);
 }
 
@@ -2118,14 +2157,18 @@ void InstrumentVoice::imprintControl (int samplesToNext) noexcept
     // mid-note joins the recording where the note is, not at its attack.
     const auto clock = imprintClock;
     imprintClock += samplesToNext;
-    if (imprintProfile == nullptr || (! s.imprinting() && ! imprintShaper.active()))
+    // IMPRINT and MOTION routes add to the page's (in Imprint mode only, as the knobs).
+    const double imprintValue = modSynthImprint != 0.0 ? std::clamp (s.imprint + modSynthImprint, 0.0, 1.0) : s.imprint;
+    const double motion = modSynthMotion != 0.0 ? std::clamp (s.motion + modSynthMotion, 0.0, 1.0) : s.motion;
+    const bool imprinting = s.mode == synth::Mode::imprint && imprintValue > 0.0;
+    if (imprintProfile == nullptr || (! imprinting && ! imprintShaper.active()))
         return;
-    const double amount = s.imprinting() ? std::clamp (s.imprint, 0.0, 1.0) : 0.0;
+    const double amount = imprinting ? std::clamp (imprintValue, 0.0, 1.0) : 0.0;
     // MOTION: the recording's own frames, the attack in order, then back and forth through its
     // sustain at the recording's pace (no seam; its release is never replayed while held).
     double framePosition = -1.0;
     const auto& p = *imprintProfile;
-    if (s.motion > 0.0 && p.frameCount() > 0)
+    if (motion > 0.0 && p.frameCount() > 0)
     {
         const double f = static_cast<double> (clock) / sampleRate / p.frameSeconds;
         if (f < p.sustainBegin)
@@ -2137,7 +2180,7 @@ void InstrumentVoice::imprintControl (int samplesToNext) noexcept
             framePosition = p.sustainBegin + (u < span ? u : 2.0 * span - u);
         }
     }
-    imprintShaper.setTarget (p, amount, framePosition, s.motion, synthPitchHz, imprint::defaultFormantFollow, samplesToNext);
+    imprintShaper.setTarget (p, amount, framePosition, motion, synthPitchHz, imprint::defaultFormantFollow, samplesToNext);
 }
 
 double InstrumentVoice::recordedPitchRatio() const noexcept

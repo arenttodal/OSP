@@ -253,6 +253,15 @@ enum class Dest : std::uint8_t
     // The MOD WHEEL's VIBRATO (per voice, the whole instrument): DEPTH in cents, AMOUNT the
     // share of it CONTROL = ASSIGNED plays (Vibrato.h).
     vibratoDepth, vibratoAmount,
+    // The FILTER rack (per voice, the whole instrument): MIN and MAX in octaves of their
+    // 20 Hz .. 20 kHz knobs, DRIVE, ENV AMOUNT (-1..1), and its envelope's ATTACK and DECAY
+    // (taken as each note starts, as the amp envelope's).
+    filterMin, filterMax, filterDrive, filterEnvAmount, filterEnvAttack, filterEnvDecay,
+    // Each layer's SYNTH page (per voice): DETUNE in cents, TONE, IMPRINT and MOTION.
+    synthDetuneA, synthDetuneB, synthDetuneC,
+    synthToneA, synthToneB, synthToneC,
+    synthImprintA, synthImprintB, synthImprintC,
+    synthMotionA, synthMotionB, synthMotionC,
     // An instrument's own controls: products built from the ANDOR Instrument Shell name them
     // (setProductDestinations); ANDOR OSP names none, so it never offers or reads these.
     product0,
@@ -358,9 +367,16 @@ inline int choiceOf (Dest d) noexcept
     in that parameter's choice order after "None" (append only): the frozen `dest` list keeps
     its automation, and a route whose `destExt` is set plays that destination instead.
 */
-inline constexpr std::array<Dest, 10> extendedDests { Dest::keyDnaAmountA, Dest::keyDnaAmountB, Dest::keyDnaAmountC, Dest::mixPosition, Dest::mixTowardsC,
+inline constexpr std::array<Dest, 28> extendedDests { Dest::keyDnaAmountA, Dest::keyDnaAmountB, Dest::keyDnaAmountC, Dest::mixPosition, Dest::mixTowardsC,
                                                       Dest::synthAmountA, Dest::synthAmountB, Dest::synthAmountC,
-                                                      Dest::vibratoDepth, Dest::vibratoAmount };
+                                                      Dest::vibratoDepth, Dest::vibratoAmount,
+                                                      // (rack modulation: the FILTER rack, then each layer's SYNTH page)
+                                                      Dest::filterMin, Dest::filterMax, Dest::filterDrive, Dest::filterEnvAmount,
+                                                      Dest::filterEnvAttack, Dest::filterEnvDecay,
+                                                      Dest::synthDetuneA, Dest::synthDetuneB, Dest::synthDetuneC,
+                                                      Dest::synthToneA, Dest::synthToneB, Dest::synthToneC,
+                                                      Dest::synthImprintA, Dest::synthImprintB, Dest::synthImprintC,
+                                                      Dest::synthMotionA, Dest::synthMotionB, Dest::synthMotionC };
 constexpr int extendedChoiceCount = 1 + static_cast<int> (extendedDests.size());
 inline Dest destFromExtendedChoice (int choice) noexcept
 {

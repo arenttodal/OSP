@@ -77,6 +77,11 @@ namespace
         return static_cast<mod::Dest> (static_cast<int> (first) + layer);
     }
 
+    bool isSynthDetune (mod::Dest d)
+    {
+        return d == mod::Dest::synthDetuneA || d == mod::Dest::synthDetuneB || d == mod::Dest::synthDetuneC;
+    }
+
     /** Every control that is a destination (its parameter ID), in a stable order. */
     const juce::StringArray& destinationParameters()
     {
@@ -101,6 +106,12 @@ namespace
             list.add (modui::mixTargetId);
             for (int l = 0; l < InstrumentHost::numLayers; ++l)
                 list.add (InstrumentHost::synthesizeId (l));   // (appended: the SYNTH chip, Phase S2)
+            // (appended: rack modulation) the FILTER rack's controls, then each SYNTH page's.
+            for (const char* name : { "character.min", "character.max", "character.drive", "character.envAmount", "character.envAttack", "character.envDecay" })
+                list.add (name);
+            for (int l = 0; l < InstrumentHost::numLayers; ++l)
+                for (const char* name : { "detune", "tone", "imprint", "motion" })
+                    list.add (InstrumentHost::synthParameterId (l, name));
             // A product's own controls (mod::setProductDestinations; ANDOR OSP has none).
             for (int k = 0; k < mod::productDestCount(); ++k)
                 list.add (mod::destInfo (mod::productDest (k)).id);
@@ -285,6 +296,12 @@ namespace modui
                     return static_cast<Dest> (static_cast<int> (first) + k);
         }
         if (id == "character.resonance") return Dest::resonance;
+        if (id == "character.min") return Dest::filterMin;
+        if (id == "character.max") return Dest::filterMax;
+        if (id == "character.drive") return Dest::filterDrive;
+        if (id == "character.envAmount") return Dest::filterEnvAmount;
+        if (id == "character.envAttack") return Dest::filterEnvAttack;
+        if (id == "character.envDecay") return Dest::filterEnvDecay;
         if (id == "attack") return Dest::ampAttack;
         if (id == "decay") return Dest::ampDecay;
         if (id == "sustainLevel") return Dest::ampSustain;
@@ -309,6 +326,10 @@ namespace modui
             if (id == InstrumentHost::dampenParameterId (l, "cutoff")) return offsetDest (Dest::dampenCutoffA, l);
             if (id == InstrumentHost::keyDnaAmountId (l)) return offsetDest (Dest::keyDnaAmountA, l);
             if (id == InstrumentHost::synthesizeId (l)) return offsetDest (Dest::synthAmountA, l);
+            if (id == InstrumentHost::synthParameterId (l, "detune")) return offsetDest (Dest::synthDetuneA, l);
+            if (id == InstrumentHost::synthParameterId (l, "tone")) return offsetDest (Dest::synthToneA, l);
+            if (id == InstrumentHost::synthParameterId (l, "imprint")) return offsetDest (Dest::synthImprintA, l);
+            if (id == InstrumentHost::synthParameterId (l, "motion")) return offsetDest (Dest::synthMotionA, l);
         }
         // The header MIX (no parameter of its own: it moves ab.blend, or mix.x and mix.y).
         if (id == mixTargetId) return Dest::mixPosition;
@@ -1899,8 +1920,9 @@ juce::PopupMenu ModRoutesPopup::addMenu()
     juce::PopupMenu macros, character, ampEnv;
     for (auto d : { mod::Dest::life, mod::Dest::drive, mod::Dest::character, mod::Dest::movement, mod::Dest::space })
         add (macros, d);
-    add (character, mod::Dest::cutoff);
-    add (character, mod::Dest::resonance);
+    for (auto d : { mod::Dest::cutoff, mod::Dest::resonance, mod::Dest::filterMin, mod::Dest::filterMax, mod::Dest::filterDrive, mod::Dest::filterEnvAmount,
+                    mod::Dest::filterEnvAttack, mod::Dest::filterEnvDecay })
+        add (character, d);
     for (auto d : { mod::Dest::ampAttack, mod::Dest::ampDecay, mod::Dest::ampSustain, mod::Dest::ampRelease })
         add (ampEnv, d);
     menu.addSubMenu ("Macros", macros);
@@ -1914,7 +1936,8 @@ juce::PopupMenu ModRoutesPopup::addMenu()
                             mod::Dest::eqBellGainA, mod::Dest::eqLowShelfGainA, mod::Dest::eqHighShelfGainA, mod::Dest::keyDnaAmountA })
             add (layer, offsetDest (first, l));
         if (ospProcessor.hasSynthesize())
-            add (layer, offsetDest (mod::Dest::synthAmountA, l));
+            for (auto first : { mod::Dest::synthAmountA, mod::Dest::synthDetuneA, mod::Dest::synthToneA, mod::Dest::synthImprintA, mod::Dest::synthMotionA })
+                add (layer, offsetDest (first, l));
         menu.addSubMenu ("Layer " + InstrumentHost::layerName (l), layer);
     }
     // The balance between the layers (towards C only with three).
@@ -2211,8 +2234,18 @@ float ModulationOverlay::positionOf (const Target& t, double offset, mod::Dest d
         case mod::Domain::unit:
         case mod::Domain::pan: value = base + x * (length > 2.5 ? 100.0 : 1.0); break;
         case mod::Domain::decibels: value = base + x; break;
-        case mod::Domain::cents: value = base + x / 100.0; break;   // the knob is in semitones
-        case mod::Domain::octaves: value = base > 0.0 ? base * std::exp2 (x) : base; break;   // CHARACTER's cutoff is in its travel (unit)
+        case mod::Domain::cents:
+            // The layers' TUNE knobs are in semitones; a SYNTH page's DETUNE is in cents.
+            value = base + (isSynthDetune (dest) ? x : x / 100.0);
+            break;
+        case mod::Domain::octaves:
+            // (CHARACTER's cutoff is in its travel: unit.) The FILTER envelope's ATTACK at 0
+            // moves from 1 ms, as the engine takes it.
+            if (dest == mod::Dest::filterEnvAttack && base <= 0.0 && x != 0.0)
+                value = std::exp2 (x);
+            else
+                value = base > 0.0 ? base * std::exp2 (x) : base;
+            break;
     }
     value = std::clamp (value, static_cast<double> (range.start), static_cast<double> (range.end));
     return param->convertTo0to1 (static_cast<float> (value));
