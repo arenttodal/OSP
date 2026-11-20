@@ -72,5 +72,45 @@
    ]
   }
  },
- "_note": "multiply mode: the letters keep `darken` of the background's brightness (compose_style_type: ink = 1 - v * (1 - darken))"
+ "_note": "multiply mode: the letters keep `darken` of the background's brightness (compose_style_type: ink = 1 - v * (1 - darken))",
+ "H01_A_R4": {
+  "wordmark": {
+   "cap_height": 0.3,
+   "y": 0.115,
+   "ink": [
+    104,
+    95,
+    86
+   ],
+   "alpha": 0.9,
+   "blur": 0,
+   "falloff": {
+    "centre": [
+     0.5,
+     0.3
+    ],
+    "radius": 0.55,
+    "floor": 0.45
+   }
+  }
+ },
+ "H01_B_R4": {
+  "wordmark": {
+   "cap_height": 0.3,
+   "y": 0.115,
+   "mode": "multiply",
+   "darken": 0.78,
+   "alpha": 1.0,
+   "blur": 0,
+   "falloff": {
+    "centre": [
+     0.5,
+     0.3
+    ],
+    "radius": 0.6,
+    "floor": 0.55
+   }
+  }
+ },
+ "_note_r4": "R4: the instrument spans 78.8 % of the width with its back edge at 35.5 % of the height; cap 0.30 puts the wordmark at 91 % of the width and lets the back edge cover the bottom fifth of the letters. H01_C_R4 is a clean website plate: no wordmark, the headline and the button are native HTML (launch-kit/web/h01_c_hero.html)."
 }

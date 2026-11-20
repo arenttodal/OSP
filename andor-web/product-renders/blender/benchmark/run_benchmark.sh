@@ -7,8 +7,9 @@
 # No account, upload or external spend is made by this script.
 set -e
 DEV=${1:?device}; BL=${2:-blender}
+cd "$(dirname "$0")/andor-web"
 SPEC=product-renders/blender/cine/shots/R04_WIN16.json; RIG=product-renders/blender/cine/cine_rig.py
-OUT=bench_$DEV; mkdir -p "$OUT"
+OUT=../bench_$DEV; mkdir -p "$OUT"
 run() { "$BL" -b --python "$RIG" -- --spec "$SPEC" --device "$DEV" --final "$@"; }
 # parity: production settings at 1920 px, the frames the CPU reference holds
 for f in 25 217; do run --out "$OUT/parity" --width 1920 --samples 96 --noise 0.01 --frames $f $f; cp "$OUT/parity/R04_WIN16_beauty_meta.json" "$OUT/parity/meta_$f.json"; done
