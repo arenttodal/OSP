@@ -57,14 +57,14 @@
       "webm": {
         "path": "e1-save-preset/e1-save-preset.webm",
         "codec": "vp9",
-        "bytes": 337410,
-        "sha256": "c5b7fe2f6b39cafe2f70c16349ab77410553f280badb3a5c14ea2d8430d14401"
+        "bytes": 337355,
+        "sha256": "7fc5fd44309f5dc3b59ae82fa0a30451dff4bc89688f1975b640a0923045a9dd"
       },
       "mp4": {
         "path": "e1-save-preset/e1-save-preset.mp4",
         "codec": "h264",
-        "bytes": 401256,
-        "sha256": "171e73ebebbfb57a0ada86ae05c71ff788b466ed03903206c4358687cb2b6504"
+        "bytes": 401844,
+        "sha256": "78bbb0d2f13adf1ea96b0bc3310f37d16c9906f03d90d2b55ac43685f1310cad"
       }
     }
   },
@@ -81,13 +81,13 @@
   "poster": {
     "path": "e1-save-preset/poster.webp",
     "frame": 261,
-    "sha256": "864adce5446f47029f4baae664d20ef603ab2cfb9af15f76b1f444298938d6e1",
+    "sha256": "87bb0f43edd5b5d5ee3c1bb3ab8dba59af30ad882baefc924c331be5bf16f44c",
     "master": "learn/capture/out/e1-save-preset/poster.png"
   },
   "run": {
-    "wallSeconds": 65.735,
-    "meanFrameMs": 204.7,
-    "slowdown": 6.14,
+    "wallSeconds": 64.738,
+    "meanFrameMs": 200.7,
+    "slowdown": 6.02,
     "notesPlayed": 0
   },
   "validation": {

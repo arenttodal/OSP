@@ -59,14 +59,14 @@
       "webm": {
         "path": "i1-reimagined/i1-reimagined.webm",
         "codec": "vp9",
-        "bytes": 304547,
-        "sha256": "52685007ecf813bfcdef86559adbb4c040abaf0666272987c96dac43c1986f86"
+        "bytes": 306126,
+        "sha256": "22143447af9ef7958ea8beb0cc609cab30f99cdd8384dc64c273058771f1a01f"
       },
       "mp4": {
         "path": "i1-reimagined/i1-reimagined.mp4",
         "codec": "h264",
-        "bytes": 252651,
-        "sha256": "f71fe47e3ddd290e5bd7a28a049f5078450dbdd31bb4a546bd26e9c097833481"
+        "bytes": 252010,
+        "sha256": "076f4902dc18950671d36d7e14a7d444ef59e399fcf1bd723f5e1757738e7690"
       }
     }
   },
@@ -82,14 +82,14 @@
   },
   "poster": {
     "path": "i1-reimagined/poster.webp",
-    "frame": 229,
-    "sha256": "1adbbf017806126a06805297e078360badafc7ca02527abcf2eafed9a8ae3d6c",
+    "frame": 224,
+    "sha256": "9d8f15759d4c846b6b3bc5c9271d4ec02649f85cf0b98c24e6fba50c68c79fef",
     "master": "learn/capture/out/i1-reimagined/poster.png"
   },
   "run": {
-    "wallSeconds": 71.895,
-    "meanFrameMs": 264.0,
-    "slowdown": 7.92,
+    "wallSeconds": 71.287,
+    "meanFrameMs": 261.6,
+    "slowdown": 7.85,
     "notesPlayed": 1
   },
   "validation": {
@@ -134,7 +134,7 @@
         "detail": "0 blank"
       },
       {
-        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "check": "no frozen run longer than 2.6 s",
         "passed": true,
         "detail": "longest unchanged run 0.07 s"
       },

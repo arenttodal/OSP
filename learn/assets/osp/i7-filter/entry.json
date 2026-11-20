@@ -57,14 +57,14 @@
       "webm": {
         "path": "i7-filter/i7-filter.webm",
         "codec": "vp9",
-        "bytes": 631682,
-        "sha256": "56c6b45e752ec92d8e27ef9a03c7ab9cfda88dc35f5cbad3d413e68d71db807b"
+        "bytes": 627666,
+        "sha256": "539e6e846e5ba0fe875cb8290a987170eb319afb5a911c5373de45b0399d0d75"
       },
       "mp4": {
         "path": "i7-filter/i7-filter.mp4",
         "codec": "h264",
-        "bytes": 614898,
-        "sha256": "db275496e2fefa4ba288a86fbd8b27adb24df110f62d25aec41786a59071b4e1"
+        "bytes": 613219,
+        "sha256": "6c01b4281fc3faeaf51cbfd76ad91506afe901ec432a7226e3b4ef52dc4ecaa6"
       }
     }
   },
@@ -82,14 +82,14 @@
   },
   "poster": {
     "path": "i7-filter/poster.webp",
-    "frame": 307,
-    "sha256": "4fa36120cbb1c164006968112d21c6a5a4134d38cafd4f79f9cc0e7284f68a0d",
+    "frame": 295,
+    "sha256": "4fd8203bc5e4e14489ddf4aebfe9ea8a350518028ea0715685452e0e05edbdcc",
     "master": "learn/capture/out/i7-filter/poster.png"
   },
   "run": {
-    "wallSeconds": 98.282,
-    "meanFrameMs": 269.0,
-    "slowdown": 8.07,
+    "wallSeconds": 92.809,
+    "meanFrameMs": 254.0,
+    "slowdown": 7.62,
     "notesPlayed": 2
   },
   "validation": {
@@ -134,7 +134,7 @@
         "detail": "0 blank"
       },
       {
-        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "check": "no frozen run longer than 2.5 s",
         "passed": true,
         "detail": "longest unchanged run 0.07 s"
       },

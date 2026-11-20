@@ -56,14 +56,14 @@
       "webm": {
         "path": "g2-arp-custom/g2-arp-custom.webm",
         "codec": "vp9",
-        "bytes": 393691,
-        "sha256": "1d6e3bf7af8aad0e4889ec59aeae4cccab1c6026cd4071a3f6004a7314f1d8a0"
+        "bytes": 396371,
+        "sha256": "05b369393a3e80eef3e88425d154953249550711293d2feb0e6164083675ba38"
       },
       "mp4": {
         "path": "g2-arp-custom/g2-arp-custom.mp4",
         "codec": "h264",
-        "bytes": 340739,
-        "sha256": "400f90f0168d3281bf647aa8540cca9f41bd1f5a664813bc059a169347675eea"
+        "bytes": 342568,
+        "sha256": "0c277a88c834a31a9032e5ec669842d5d01ef91e178c0304edbad5daa4cab99e"
       }
     }
   },
@@ -77,14 +77,14 @@
   },
   "poster": {
     "path": "g2-arp-custom/poster.webp",
-    "frame": 167,
-    "sha256": "c5ea1578d439238afe02239259081e14daa5d2081714ad88551d25673d3b8d7d",
+    "frame": 185,
+    "sha256": "ed3dfbd9dbcb19ea750616c45fb60a9708ba2f76cdad2f5ddd5144d1334eaae6",
     "master": "learn/capture/out/g2-arp-custom/poster.png"
   },
   "run": {
-    "wallSeconds": 52.342,
-    "meanFrameMs": 251.7,
-    "slowdown": 7.55,
+    "wallSeconds": 49.793,
+    "meanFrameMs": 239.4,
+    "slowdown": 7.18,
     "notesPlayed": 46
   },
   "validation": {

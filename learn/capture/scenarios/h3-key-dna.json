@@ -188,6 +188,7 @@
   ],
   "frame": {
     "focus": [
+      "learn:osp.keydna.power",
       "learn:osp.keydna.graph",
       "card:A.card",
       "learn:osp.keyboard"

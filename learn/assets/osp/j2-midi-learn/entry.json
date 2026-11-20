@@ -56,14 +56,14 @@
       "webm": {
         "path": "j2-midi-learn/j2-midi-learn.webm",
         "codec": "vp9",
-        "bytes": 403786,
-        "sha256": "9fd21ee1ba729ecaf7bbd66305525d8c5e99e6223b6618dc9675b33b3e1bc8db"
+        "bytes": 403692,
+        "sha256": "a8e66ed8fe48369fdc8a1328d0de1d898745341f879330ace562e218c39a9167"
       },
       "mp4": {
         "path": "j2-midi-learn/j2-midi-learn.mp4",
         "codec": "h264",
-        "bytes": 316135,
-        "sha256": "5c0645003ba4a9d2a30bd1492e26a6872e450ebdddfce98fc3ada3bd2f49fefc"
+        "bytes": 318598,
+        "sha256": "754b00b45c7448fc397cd6b2a6d331cba967fc89f8a22ada8f41bf376e2c6ab2"
       }
     }
   },
@@ -79,14 +79,14 @@
   },
   "poster": {
     "path": "j2-midi-learn/poster.webp",
-    "frame": 212,
-    "sha256": "d0e4bf80eafd169888693d093a84ed20f0c696afdaa06e3aec53f971736c72b1",
+    "frame": 213,
+    "sha256": "f35159a9244453b0b88e15b0223013cd8f633eca053a6f9fa19ddf288a8402a7",
     "master": "learn/capture/out/j2-midi-learn/poster.png"
   },
   "run": {
-    "wallSeconds": 69.08200000000001,
-    "meanFrameMs": 269.0,
-    "slowdown": 8.07,
+    "wallSeconds": 69.345,
+    "meanFrameMs": 269.3,
+    "slowdown": 8.08,
     "notesPlayed": 1
   },
   "validation": {

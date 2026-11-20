@@ -59,14 +59,14 @@
       "webm": {
         "path": "i4-modulation/i4-modulation.webm",
         "codec": "vp9",
-        "bytes": 593090,
-        "sha256": "af460a1b3aa7590dba5e522f7e68fe029e542b352525c4ca31480c2003d850a2"
+        "bytes": 596054,
+        "sha256": "dfdc571eb4e128e68251252d8eabf433dafc32ac3653366d02b870868405b9d0"
       },
       "mp4": {
         "path": "i4-modulation/i4-modulation.mp4",
         "codec": "h264",
-        "bytes": 551642,
-        "sha256": "fafe556c1290ce410930bff6ef5c4be382b26f98d188ae1d12ab4d12da49a0cd"
+        "bytes": 547482,
+        "sha256": "57e69159c3f03b7565b2fd96b3a6320a704bff8f0482aa0285a4d06d851b1a2f"
       }
     }
   },
@@ -82,14 +82,14 @@
   },
   "poster": {
     "path": "i4-modulation/poster.webp",
-    "frame": 276,
-    "sha256": "232836496e39738ceb411034c5cf16946b192c551a7ea8ee706d3795b30b8668",
+    "frame": 273,
+    "sha256": "88f8e693b153e8908f46cf70dfcdf5a1c0cddaec0cd6b87fed492d4ebf78477a",
     "master": "learn/capture/out/i4-modulation/poster.png"
   },
   "run": {
-    "wallSeconds": 72.997,
-    "meanFrameMs": 226.7,
-    "slowdown": 6.8,
+    "wallSeconds": 70.081,
+    "meanFrameMs": 218.8,
+    "slowdown": 6.56,
     "notesPlayed": 1
   },
   "validation": {

@@ -1,5 +1,18 @@
 # Status
 
+> **20 Nov 2026, ANDOR Learn: the full capture inventory and the Learn website preview (branch
+> `feature/learn-capture-studio`; `docs/learn-studio/gate-3-report.md`):**
+> - **30 clips, one per guide**, captured from the real editor at `6ef3376` (final run 30/30, 117
+>   assertions), including **Pedal Loop** (LOOP off, Ping-Pong, sustain pedal), which Gate 0 missed.
+> - **Runner:** input now goes through the X server (XTest); clicks are quick press-release pairs in
+>   real time; menus, submenus, typing, MIDI CC, canvases for windows that grow or shrink.
+> - **`learn/site`:** Astro + MDX + Pagefind preview (30 guides, 113 step URLs, 12 reference
+>   articles, search with synonyms); 28/28 browser tests, no broken links. Not deployed.
+> - **To verify on macOS** (product, not changed): a click on "Custom Patterns ›" does not leave the
+>   browser open; the first click on ••• after saving a preset is ignored; the CAPTURE A label.
+> - **NEXT:** owner review of the clips and the preview; hosting decision; re-pin to the frozen beta
+>   UI and regenerate; approve clips; the separate in-plugin beta-readiness work.
+>
 > **20 Nov 2026, ANDOR Learn Capture Studio, Gate 1 (branch `feature/learn-capture-studio`;
 > `learn/`, `docs/learn-studio/gate-1-report.md`):**
 > - **Four pilot demonstrations, seven clips**, captured automatically from the real editor at

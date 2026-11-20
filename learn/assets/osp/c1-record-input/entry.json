@@ -39,7 +39,7 @@
     "width": 2896,
     "height": 2100,
     "fps": 30,
-    "frames": 502,
+    "frames": 499,
     "crop": [
       0,
       236,
@@ -51,28 +51,28 @@
     "width": 1600,
     "height": 1000,
     "fps": 30,
-    "frames": 502,
-    "duration": 16.733,
+    "frames": 499,
+    "duration": 16.633,
     "files": {
       "webm": {
         "path": "c1-record-input/c1-record-input.webm",
         "codec": "vp9",
-        "bytes": 429990,
-        "sha256": "3160f925c142aacce2309b702acd52ffd511bf06fc374ea113c93423f8e29253"
+        "bytes": 426832,
+        "sha256": "43a5f7c1b3814ed6591be4001f90b4a890229edeb8ba87871e559ff314318f8f"
       },
       "mp4": {
         "path": "c1-record-input/c1-record-input.mp4",
         "codec": "h264",
-        "bytes": 600497,
-        "sha256": "36bc26e96e97596a72f80feeee820909646d8c5ad5725835a800c5cfa11cefaa"
+        "bytes": 509586,
+        "sha256": "2a95b07d4f54b579f87a3a3f78a75036d55552be74a1a46f8facf6c3dc170204"
       }
     }
   },
   "marks": {
     "open-record": 0.0,
-    "record": 2.733,
-    "stop": 9.5,
-    "play-mapped": 11.233
+    "record": 2.7,
+    "stop": 9.433,
+    "play-mapped": 11.133
   },
   "steps": {
     "open-record": "c1-record-input/steps/open-record.webp",
@@ -82,14 +82,14 @@
   },
   "poster": {
     "path": "c1-record-input/poster.webp",
-    "frame": 473,
-    "sha256": "09851a1bab190f7155e25ccbdbf196ba87fef9718b289763b41530ef8650593c",
+    "frame": 497,
+    "sha256": "0b7e02335939e327b689de82bfceb699f8aa42280ec35b0a14caf2844639979c",
     "master": "learn/capture/out/c1-record-input/poster.png"
   },
   "run": {
-    "wallSeconds": 93.394,
-    "meanFrameMs": 179.5,
-    "slowdown": 5.39,
+    "wallSeconds": 84.75,
+    "meanFrameMs": 158.0,
+    "slowdown": 4.74,
     "notesPlayed": 4
   },
   "validation": {
@@ -111,10 +111,10 @@
       {
         "check": "master frame count = frames.json",
         "passed": true,
-        "detail": "502 / 502"
+        "detail": "499 / 499"
       },
       {
-        "check": "constant editor size",
+        "check": "every editor size fits the canvas",
         "passed": true,
         "detail": "[(1448, 1050)]"
       },
@@ -134,14 +134,14 @@
         "detail": "0 blank"
       },
       {
-        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "check": "no frozen run longer than 6.3 s",
         "passed": true,
-        "detail": "longest unchanged run 1.93 s"
+        "detail": "longest unchanged run 1.90 s"
       },
       {
         "check": "webm frames = master",
         "passed": true,
-        "detail": "502"
+        "detail": "499"
       },
       {
         "check": "webm size",
@@ -151,7 +151,7 @@
       {
         "check": "mp4 frames = master",
         "passed": true,
-        "detail": "502"
+        "detail": "499"
       },
       {
         "check": "mp4 size",
@@ -161,7 +161,7 @@
       {
         "check": "duration 6-15 s (one clip) or declared",
         "passed": true,
-        "detail": "16.73 s"
+        "detail": "16.63 s"
       },
       {
         "check": "poster not blank",

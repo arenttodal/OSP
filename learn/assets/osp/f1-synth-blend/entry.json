@@ -53,14 +53,14 @@
       "webm": {
         "path": "f1-synth-blend/f1-synth-blend.webm",
         "codec": "vp9",
-        "bytes": 243894,
-        "sha256": "194956e7e11e1a7b7057fd168a34a94520c0ddf65254aedd7c865b25b89c65af"
+        "bytes": 242596,
+        "sha256": "9e47f6d1dc9ce3aa60ef2f91cbf4fa6536963ef4c32811393ed13e598efe1206"
       },
       "mp4": {
         "path": "f1-synth-blend/f1-synth-blend.mp4",
         "codec": "h264",
-        "bytes": 279846,
-        "sha256": "83d9279707adfacb170809631075a64a221aabd74717cb1edcff3be393e859e6"
+        "bytes": 279115,
+        "sha256": "3a3c17ad662246f4433c425c65d7fd284d40ebf2e185ae5ba66854e2c2c37c9f"
       }
     }
   },
@@ -85,9 +85,9 @@
     "master": "learn/capture/out/f1-synth-blend/poster.png"
   },
   "run": {
-    "wallSeconds": 91.687,
-    "meanFrameMs": 250.1,
-    "slowdown": 7.5,
+    "wallSeconds": 78.842,
+    "meanFrameMs": 214.3,
+    "slowdown": 6.43,
     "notesPlayed": 1
   },
   "validation": {
@@ -132,7 +132,7 @@
         "detail": "0 blank"
       },
       {
-        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "check": "no frozen run longer than 2.5 s",
         "passed": true,
         "detail": "longest unchanged run 1.20 s"
       },

@@ -59,14 +59,14 @@
       "webm": {
         "path": "i5-user-macro/i5-user-macro.webm",
         "codec": "vp9",
-        "bytes": 417698,
-        "sha256": "84d4b7a396d1f248b5635c2980d96ec5c2fc90108adf73c4a1d63500858e28ed"
+        "bytes": 416370,
+        "sha256": "e297513f4a3e0675bdf98dd614d37240fdd37f6b2b74f06fc6985f86df59e095"
       },
       "mp4": {
         "path": "i5-user-macro/i5-user-macro.mp4",
         "codec": "h264",
-        "bytes": 423603,
-        "sha256": "434f95cc2c5a26235ae6b39f5662fb1f4f507c3e8c191cfd9d4a6629b3920229"
+        "bytes": 424004,
+        "sha256": "5d42b749b1c0abd6f8b260bdcd8273a87507f5ab0c64341024c50b8328babadf"
       }
     }
   },
@@ -89,9 +89,9 @@
     "master": "learn/capture/out/i5-user-macro/poster.png"
   },
   "run": {
-    "wallSeconds": 74.155,
-    "meanFrameMs": 200.8,
-    "slowdown": 6.02,
+    "wallSeconds": 67.111,
+    "meanFrameMs": 181.0,
+    "slowdown": 5.43,
     "notesPlayed": 1
   },
   "validation": {
@@ -136,7 +136,7 @@
         "detail": "0 blank"
       },
       {
-        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "check": "no frozen run longer than 2.5 s",
         "passed": true,
         "detail": "longest unchanged run 1.23 s"
       },

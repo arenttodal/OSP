@@ -52,14 +52,14 @@
     "frames": 378,
     "crop": [
       15,
-      78,
+      84,
       2881,
       2346
     ]
   },
   "video": {
     "width": 1600,
-    "height": 1266,
+    "height": 1262,
     "fps": 30,
     "frames": 378,
     "duration": 12.6,
@@ -67,22 +67,22 @@
       "webm": {
         "path": "d2-arp-strum/d2-arp-strum.webm",
         "codec": "vp9",
-        "bytes": 1293783,
-        "sha256": "2db9d01a687d7371a63f2cc82128b13b3a143691116e52fa63b06b76f430bbfd"
+        "bytes": 1223845,
+        "sha256": "1df27e391b0ed750add707ebb9823ca151eeb2d9947e66bb1e485ee0d95f6c8d"
       },
       "mp4": {
         "path": "d2-arp-strum/d2-arp-strum.mp4",
         "codec": "h264",
-        "bytes": 1307255,
-        "sha256": "8eca56f32fda9716bd9ab99a6cff7b16438ea4bbd4f7b4ff12462352d41bb939"
+        "bytes": 1264460,
+        "sha256": "fc09f6d6be9005e1f61fdf4d58398081776459a18020b08daa3397d23b2fac25"
       }
     }
   },
   "marks": {
     "choose-chord": 0.0,
-    "open-strum": 3.767,
-    "strum-on": 5.5,
-    "direction": 7.633,
+    "open-strum": 3.867,
+    "strum-on": 5.567,
+    "direction": 7.667,
     "spread": 9.4
   },
   "steps": {
@@ -94,15 +94,15 @@
   },
   "poster": {
     "path": "d2-arp-strum/poster.webp",
-    "frame": 370,
-    "sha256": "548d63107dc97fe837f44181452df34aded94afdcd576850d68d99678f5d1c68",
+    "frame": 356,
+    "sha256": "46ba41933bc2884a330d3ba4e0b9d19a209c4dbe25280e441c3007b78bdaacf9",
     "master": "learn/capture/out/d2-arp-strum/poster.png"
   },
   "run": {
-    "wallSeconds": 104.749,
-    "meanFrameMs": 259.0,
-    "slowdown": 7.77,
-    "notesPlayed": 288
+    "wallSeconds": 100.861,
+    "meanFrameMs": 237.9,
+    "slowdown": 7.14,
+    "notesPlayed": 285
   },
   "validation": {
     "status": "passed",
@@ -126,7 +126,7 @@
         "detail": "378 / 378"
       },
       {
-        "check": "constant editor size",
+        "check": "every editor size fits the canvas",
         "passed": true,
         "detail": "[(1448, 1173)]"
       },
@@ -146,9 +146,9 @@
         "detail": "0 blank"
       },
       {
-        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "check": "no frozen run longer than 2.6 s",
         "passed": true,
-        "detail": "longest unchanged run 0.03 s"
+        "detail": "longest unchanged run 0.07 s"
       },
       {
         "check": "webm frames = master",
@@ -158,7 +158,7 @@
       {
         "check": "webm size",
         "passed": true,
-        "detail": "1600x1266"
+        "detail": "1600x1262"
       },
       {
         "check": "mp4 frames = master",
@@ -168,7 +168,7 @@
       {
         "check": "mp4 size",
         "passed": true,
-        "detail": "1600x1266"
+        "detail": "1600x1262"
       },
       {
         "check": "duration 6-15 s (one clip) or declared",

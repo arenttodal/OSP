@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.h3-key-dna",
   "title": "Vary the sound from key to key (KEY DNA)",
-  "scenarioDigest": "sha256:03483530e00031fe972b68d1acbd9770f85ab0c3459328f4fd6b7307ae21e082",
+  "scenarioDigest": "sha256:87802eff5f3078f8872c1b198be128bed83326b3480fc2a5acb567183c622382",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -43,14 +43,14 @@
     "frames": 457,
     "crop": [
       0,
-      179,
+      8,
       2896,
       2100
     ]
   },
   "video": {
     "width": 1600,
-    "height": 1060,
+    "height": 1156,
     "fps": 30,
     "frames": 457,
     "duration": 15.233,
@@ -58,14 +58,14 @@
       "webm": {
         "path": "h3-key-dna/h3-key-dna.webm",
         "codec": "vp9",
-        "bytes": 347479,
-        "sha256": "6b132571d6fba67102c04224bf4e2bbe54a69241775b74f18889deb5af59932f"
+        "bytes": 378410,
+        "sha256": "dc3902451366595d58b3ccfc2200925a445099522a7da43c3625730317fab82e"
       },
       "mp4": {
         "path": "h3-key-dna/h3-key-dna.mp4",
         "codec": "h264",
-        "bytes": 356269,
-        "sha256": "c59efcc4e0d13394e6bd43704e95076c479247d1e078235ccdfa531b9f1420de"
+        "bytes": 389315,
+        "sha256": "bb8736ff2d9f44194fc61b0f78719e078d5561151537483c1627ea7417822e7d"
       }
     }
   },
@@ -86,13 +86,13 @@
   "poster": {
     "path": "h3-key-dna/poster.webp",
     "frame": 427,
-    "sha256": "800c85880482953612fd0ff360f8058dde9648e0113bb1755ba3df8ef1d62cd2",
+    "sha256": "7d5e3e63ca56b03a9137676292613f9fc33580f82e6dc8f73054065a80a5a52c",
     "master": "learn/capture/out/h3-key-dna/poster.png"
   },
   "run": {
-    "wallSeconds": 102.968,
-    "meanFrameMs": 200.6,
-    "slowdown": 6.02,
+    "wallSeconds": 104.557,
+    "meanFrameMs": 203.5,
+    "slowdown": 6.11,
     "notesPlayed": 3
   },
   "validation": {
@@ -149,7 +149,7 @@
       {
         "check": "webm size",
         "passed": true,
-        "detail": "1600x1060"
+        "detail": "1600x1156"
       },
       {
         "check": "mp4 frames = master",
@@ -159,7 +159,7 @@
       {
         "check": "mp4 size",
         "passed": true,
-        "detail": "1600x1060"
+        "detail": "1600x1156"
       },
       {
         "check": "duration 6-15 s (one clip) or declared",

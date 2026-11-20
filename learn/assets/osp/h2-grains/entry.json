@@ -59,14 +59,14 @@
       "webm": {
         "path": "h2-grains/h2-grains.webm",
         "codec": "vp9",
-        "bytes": 336791,
-        "sha256": "f0d72c1f0fc326b5e0794805809d40ff02d95297af8791a299d554cb19831da6"
+        "bytes": 337052,
+        "sha256": "f0d3f73c7d83a16531e543a7faefeada73bd4e493e1ae1b2238291b69e588841"
       },
       "mp4": {
         "path": "h2-grains/h2-grains.mp4",
         "codec": "h264",
-        "bytes": 362611,
-        "sha256": "3a689991b079d0fec2793401ca8586e01178cc56505edb6ca582e4a4e080c574"
+        "bytes": 362519,
+        "sha256": "df1cb0983d82a514e2080b46f1db0eadca8dbf6ca23d0b1199032b5da5066e96"
       }
     }
   },
@@ -89,9 +89,9 @@
     "master": "learn/capture/out/h2-grains/poster.png"
   },
   "run": {
-    "wallSeconds": 82.548,
-    "meanFrameMs": 222.2,
-    "slowdown": 6.67,
+    "wallSeconds": 77.014,
+    "meanFrameMs": 206.9,
+    "slowdown": 6.21,
     "notesPlayed": 1
   },
   "validation": {
@@ -136,9 +136,9 @@
         "detail": "0 blank"
       },
       {
-        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "check": "no frozen run longer than 2.5 s",
         "passed": true,
-        "detail": "longest unchanged run 0.70 s"
+        "detail": "longest unchanged run 0.40 s"
       },
       {
         "check": "webm frames = master",

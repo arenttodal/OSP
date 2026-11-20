@@ -58,7 +58,7 @@
         "path": "e5-export-instrument/e5-export-instrument.webm",
         "codec": "vp9",
         "bytes": 291117,
-        "sha256": "beec41d6ad6173e3965f469b45aeeb4259391085180d012b7b5355a540df3871"
+        "sha256": "cc2955c4d2d8788176c8c8c1ef635bda2adfd305c67a44430f9fdc767184d580"
       },
       "mp4": {
         "path": "e5-export-instrument/e5-export-instrument.mp4",
@@ -83,9 +83,9 @@
     "master": "learn/capture/out/e5-export-instrument/poster.png"
   },
   "run": {
-    "wallSeconds": 39.305,
-    "meanFrameMs": 175.5,
-    "slowdown": 5.27,
+    "wallSeconds": 39.042,
+    "meanFrameMs": 173.2,
+    "slowdown": 5.2,
     "notesPlayed": 0
   },
   "validation": {

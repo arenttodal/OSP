@@ -48,7 +48,7 @@
     "width": 2896,
     "height": 2100,
     "fps": 30,
-    "frames": 428,
+    "frames": 425,
     "crop": [
       0,
       236,
@@ -60,28 +60,28 @@
     "width": 1600,
     "height": 1000,
     "fps": 30,
-    "frames": 428,
-    "duration": 14.267,
+    "frames": 425,
+    "duration": 14.167,
     "files": {
       "webm": {
         "path": "b-phrase-map-notes/b-phrase-map-notes.webm",
         "codec": "vp9",
-        "bytes": 462177,
-        "sha256": "06cb6204e58b97aaf57916e868edd0812e807ea61121895947f2f343d6662b6c"
+        "bytes": 478108,
+        "sha256": "5333b7881f7f252d7097d75d8ab6e65f2a4f85e9ce7263123d47324f3c5974a8"
       },
       "mp4": {
         "path": "b-phrase-map-notes/b-phrase-map-notes.mp4",
         "codec": "h264",
-        "bytes": 487878,
-        "sha256": "89d897c8005281818b163c1d41ac5996d7726492722c7f392907674ed43a3e39"
+        "bytes": 491277,
+        "sha256": "d4741062e1398526e4ae3a792849ed8d8e5caf3d292a86abb853533d4172fda7"
       }
     }
   },
   "marks": {
     "drop-phrase": 0.0,
-    "map-notes": 3.267,
-    "open-notes": 5.3,
-    "play-mapped": 8.1
+    "map-notes": 3.333,
+    "open-notes": 5.233,
+    "play-mapped": 8.0
   },
   "steps": {
     "drop-phrase": "b-phrase-map-notes/steps/drop-phrase.webp",
@@ -91,14 +91,14 @@
   },
   "poster": {
     "path": "b-phrase-map-notes/poster.webp",
-    "frame": 408,
-    "sha256": "c1e683e6a0dc66808cc716f179db4c938f8bde0c2ecfab719aa4816fb6760d40",
+    "frame": 396,
+    "sha256": "5ebaa04a0da43a73725675069f3d46a37c6ac0266edc88a1045bd88ddb9a4dbb",
     "master": "learn/capture/out/b-phrase-map-notes/poster.png"
   },
   "run": {
-    "wallSeconds": 82.648,
-    "meanFrameMs": 185.5,
-    "slowdown": 5.57,
+    "wallSeconds": 76.09700000000001,
+    "meanFrameMs": 165.1,
+    "slowdown": 4.95,
     "notesPlayed": 4
   },
   "validation": {
@@ -120,10 +120,10 @@
       {
         "check": "master frame count = frames.json",
         "passed": true,
-        "detail": "428 / 428"
+        "detail": "425 / 425"
       },
       {
-        "check": "constant editor size",
+        "check": "every editor size fits the canvas",
         "passed": true,
         "detail": "[(1448, 1050)]"
       },
@@ -143,14 +143,14 @@
         "detail": "0 blank"
       },
       {
-        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "check": "no frozen run longer than 2.6 s",
         "passed": true,
-        "detail": "longest unchanged run 2.10 s"
+        "detail": "longest unchanged run 1.67 s"
       },
       {
         "check": "webm frames = master",
         "passed": true,
-        "detail": "428"
+        "detail": "425"
       },
       {
         "check": "webm size",
@@ -160,7 +160,7 @@
       {
         "check": "mp4 frames = master",
         "passed": true,
-        "detail": "428"
+        "detail": "425"
       },
       {
         "check": "mp4 size",
@@ -170,7 +170,7 @@
       {
         "check": "duration 6-15 s (one clip) or declared",
         "passed": true,
-        "detail": "14.27 s"
+        "detail": "14.17 s"
       },
       {
         "check": "poster not blank",
