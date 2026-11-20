@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <thread>
 #include <cstdint>
 
 namespace osp
@@ -96,11 +97,18 @@ public:
         if (slot < 0 || slot >= capacity)
             return false;
         const auto& s = slots[static_cast<std::size_t> (slot)];
-        for (int attempt = 0; attempt < 64; ++attempt)
+        for (int attempt = 0; attempt < 256; ++attempt)
         {
             const auto before = s.seq.load (std::memory_order_acquire);
             if ((before & 1u) != 0)
-                continue;   // (being written: try again)
+            {
+                // Being written: try again; after a few spins let the writer finish (a writer
+                // pre-empted mid-publish would otherwise make the picture fall back to the
+                // stored value for a frame).
+                if (attempt >= 8)
+                    std::this_thread::yield();
+                continue;
+            }
             const bool active = s.active.load (std::memory_order_relaxed);
             Reading r;
             r.value = s.value.load (std::memory_order_relaxed);
@@ -108,7 +116,11 @@ public:
             r.high = std::max (s.high.load (std::memory_order_relaxed), s.previousHigh.load (std::memory_order_relaxed));
             std::atomic_thread_fence (std::memory_order_acquire);
             if (s.seq.load (std::memory_order_relaxed) != before)
+            {
+                if (attempt >= 8)
+                    std::this_thread::yield();
                 continue;
+            }
             if (! active)
                 return false;
             out = r;

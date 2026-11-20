@@ -5,6 +5,9 @@
 #include "MacroPopups.h"
 #include "engine/EffectiveValues.h"
 
+#include <atomic>
+#include <thread>
+
 namespace
 {
     /** The pictures in `root` (the shared popovers' and racks' wells: component ID "picture"),
@@ -209,4 +212,56 @@ TEST_CASE ("effective values: per voice - layer A's grain POSITION and START as 
     }
     CHECK_FALSE (p.effectiveValue (position, v));
     CHECK_FALSE (p.effectiveValue (start, v));
+}
+
+TEST_CASE ("effective values: per voice - a note held, its grain POSITION is published all the time (the card's POS line never falls back to the knob mid-block)", "[plugin][effective][voice]")
+{
+    // A patch whose only route is per voice (no shared-stage destination): the engine cleared the
+    // per-voice slots at every 32-sample chunk and published them after the block, so a picture
+    // reading while the audio thread rendered drew the knob, and the modulated value otherwise:
+    // the granular POS line flickered between the two (reported on older granular patches).
+    TempDir tmp;
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const auto a = writeSource (tmp.dir, "first.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    OspAudioProcessor p;
+    p.loadFile (a, 0);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    p.prepareToPlay (48000.0, 256);
+    const auto position = OspAudioProcessor::layerParameterId (0, "granular.position");
+    p.setParameterValue (OspAudioProcessor::layerParameterId (0, "sourceMode"), 1.0f);   // Granular
+    p.setParameterValue (position, 40.0f);
+    p.assignModulation (mod::Source::modWheel, mod::Dest::grainPositionA, -30.0f);
+    p.setScreenModWheel (1.0f);
+    effectiveRun (p, 30);   // a note held from the first block
+    osp::plugin::InstrumentHost::EffectiveValue v;
+    REQUIRE (p.effectiveValue (position, v));
+    CHECK (v.value == Approx (10.0f).margin (0.5));
+
+    std::atomic<bool> running { true };
+    std::atomic<int> reads { 0 }, knobReads { 0 };
+    std::thread reader ([&] {
+        while (running.load())
+        {
+            osp::plugin::InstrumentHost::EffectiveValue r;
+            if (! p.effectiveValue (position, r))
+                knobReads.fetch_add (1);
+            reads.fetch_add (1);
+        }
+    });
+    juce::AudioBuffer<float> buffer (2, 256);
+    for (int i = 0; i < 600 || reads.load() < 2000; ++i)
+    {
+        juce::MidiBuffer midi;
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        if (i > 20000)
+            break;
+    }
+    running.store (false);
+    reader.join();
+    INFO (knobReads.load() << " of " << reads.load() << " reads fell back to the knob");
+    CHECK (reads.load() >= 2000);
+    CHECK (knobReads.load() == 0);
 }

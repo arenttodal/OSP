@@ -1076,7 +1076,12 @@ void InstrumentEngine::publishVoiceEffective() noexcept
 
 void InstrumentEngine::clearEffective() noexcept
 {
-    for (int i = 0; i < static_cast<int> (EffectiveSlot::count); ++i)
+    // The shared stages' and EQ's slots only. The per-voice slots (grain POSITION, SPREAD, START)
+    // belong to publishVoiceEffective, once per block after rendering: clearing them here, at
+    // every 32-sample chunk of a patch whose routes are all per voice, left them inactive for
+    // most of each block, so the card read the knobs and the modulated value by turns and its
+    // POS line flickered between the two.
+    for (int i = 0; i < static_cast<int> (EffectiveSlot::voiceFirst); ++i)
         effective.clear (i);
 }
 

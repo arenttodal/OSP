@@ -1,5 +1,21 @@
 # Status
 
+> **20 Nov 2026, granular POS line flicker (owner's report, ANDOR OSP and the shell):**
+> - **Symptom:** on older granular patches the POS line (with its flare) jumped between where
+>   it should be and another place, often the left edge of the sample.
+> - **Cause:** in a patch whose only modulation routes are per voice (an envelope or LFO on
+>   grain POS, SPREAD or START), `applyGlobalModulation` cleared every effective slot at each
+>   32-sample chunk, the per-voice ones included, and `publishVoiceEffective` set them again
+>   only after the block. For most of every block the card read "no value" and drew the knob,
+>   the rest of the time the modulated value: the line flipped between the two.
+> - **Fix:** `clearEffective` clears only the shared-stage and EQ slots (the per-voice slots
+>   belong to `publishVoiceEffective`). The reader also yields when it meets the audio thread
+>   mid-write, instead of giving up after 64 spins.
+> - **Test:** `[plugin][effective][voice]` holds a note while a second thread reads POS during
+>   rendering: no read may fall back to the knob. Without the fix, 92 % did.
+> - **Note:** the line now shows steadily what the newest note plays. If an old patch has a
+>   route that pulls POS to 0, the line stays at the left, and so does the sound.
+>
 > **19 Nov 2026, macOS release infrastructure and ANDOR OSP 0.9.0-beta.1 (branch
 > `claude/macos-release`, from `claude/custom-arp`; `docs/release/`, `packaging/release/`):**
 > - **One release command:** `packaging/release/andor-release.sh --product osp`. It runs
