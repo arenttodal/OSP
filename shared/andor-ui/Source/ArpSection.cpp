@@ -1294,7 +1294,15 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
     }
     if (const int row = rowAt (e.position); row >= arp::patternCount)
     {
-        openCustomBrowser();   // (choosing there turns CUSTOM on; opening alone changes nothing)
+        // (choosing there turns CUSTOM on; opening alone changes nothing.) Opened after this
+        // press, not in it: the host's outside-click watcher hears the press after us, on this
+        // list - not on the browser's anchor - and closed the browser as it opened, so a click on
+        // the row showed nothing (ANDOR OSP and every shell product).
+        juce::Component::SafePointer<ArpInlinePanel> safe (this);
+        juce::MessageManager::callAsync ([safe] {
+            if (safe != nullptr)
+                safe->openCustomBrowser();
+        });
         return;
     }
     if (const int row = rowAt (e.position); row >= 0)

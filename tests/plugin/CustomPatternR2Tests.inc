@@ -260,6 +260,91 @@ TEST_CASE ("custom pattern r2: the row opens the browser; Edit and + New Pattern
     w.ui->closePopup();
 }
 
+TEST_CASE ("custom pattern r2: clicks: the row opens the browser and it stays open; a pattern, + New Pattern, Edit and the pencil work by click, on every card", "[plugin][arp-custom][arp-custom-r2]")
+{
+    // Through the real window where there is one (PopoverRig): JUCE gives the press to the list,
+    // then to the editor's outside-click watcher. The browser once opened inside the press and the
+    // watcher, seeing a press on the list rather than the browser's anchor, closed it at once: a
+    // click on the row showed nothing (the tests above open it by calling, so they missed it).
+    using namespace customr2;
+    Library library;
+    PopoverRig rig;
+    rig.p.setParameterValue ("arp.enabled", 1.0f);
+    rig.p.setParameterValue ("arp.link", 0.0f);
+    rig.ui->arpControl().onToggleEditor();
+    rig.editor->setSize (1448, juce::roundToInt (rig.ui->instrumentHeight()));
+    rig.ui->refreshNow();
+    auto& arp = rig.ui->arpInlinePanel();
+    auto click = [&] (juce::Component& c, juce::Point<float> local) {
+        const auto at = rig.inEditor (c, local);
+        rig.press (at);
+        rig.release (at);
+        pumpMessages();
+    };
+    auto customRow = [&arp] {
+        for (int i = 0; i < 40 && arp.customRowArea (0).isEmpty(); ++i)
+        {
+            juce::MouseWheelDetails wheel;
+            wheel.deltaY = -0.2f;
+            const auto at = arp.patternListArea().getCentre();
+            arp.mouseWheelMove (juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), at, {}, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &arp, &arp,
+                                                  juce::Time::getCurrentTime(), at, juce::Time::getCurrentTime(), 0, false),
+                                wheel);
+        }
+        return arp.customRowArea (0);
+    };
+    auto browser = [&rig] { return dynamic_cast<Browser*> (rig.ui->openPopupPanel()); };
+    auto editor = [&rig] { return dynamic_cast<Editor*> (rig.ui->openPopupPanel()); };
+    for (int card = 0; card < 3; ++card)
+    {
+        INFO ("card " << card << (rig.realWindow() ? " (real window)" : " (routed)"));
+        arp.setEditCard (card);
+        arp.refresh();
+        REQUIRE_FALSE (customRow().isEmpty());
+        click (arp, customRow().getCentre());
+        REQUIRE (browser() != nullptr);
+        CHECK (rig.p.customArpDocument (card) == nullptr);   // (opening it changes nothing)
+
+        const int fresh = browser()->find (Browser::Kind::newPattern);
+        REQUIRE (fresh >= 0);
+        click (*browser(), browser()->rowArea (fresh).getCentre().toFloat());
+        REQUIRE (editor() != nullptr);
+        rig.ui->closePopup();
+
+        click (arp, customRow().getCentre());
+        REQUIRE (browser() != nullptr);
+        if (! browser()->factoryExpanded())
+        {
+            const int heading = browser()->find (Browser::Kind::factoryHeading);
+            REQUIRE (heading >= 0);
+            click (*browser(), browser()->rowArea (heading).getCentre().toFloat());
+            REQUIRE (browser() != nullptr);
+        }
+        const auto& factory = ap::factoryPatterns()[static_cast<std::size_t> (card)];
+        const int pick = browser()->find (Browser::Kind::factory, juce::String (factory.name));
+        REQUIRE (pick >= 0);
+        click (*browser(), browser()->rowArea (pick).getCentre().toFloat());
+        CHECK (rig.ui->openPopupPanel() == nullptr);
+        REQUIRE (rig.p.customArpDocument (card) != nullptr);
+        CHECK (juce::String (rig.p.customArpDocument (card)->name) == juce::String (factory.name));
+        arp.refresh();
+
+        REQUIRE_FALSE (arp.pencilArea().isEmpty());
+        click (arp, arp.pencilArea().getCentre());
+        REQUIRE (editor() != nullptr);
+        CHECK (juce::String (editor()->document().name) == juce::String (factory.name));
+        rig.ui->closePopup();
+
+        click (arp, customRow().getCentre());
+        REQUIRE (browser() != nullptr);
+        REQUIRE (browser()->find (Browser::Kind::current) >= 0);
+        click (*browser(), browser()->editArea().getCentre().toFloat());
+        REQUIRE (editor() != nullptr);
+        CHECK (juce::String (editor()->document().name) == juce::String (factory.name));
+        rig.ui->closePopup();
+    }
+}
+
 TEST_CASE ("custom pattern r2: linked and unlinked cards: the row, the name and the browser follow the card being edited", "[plugin][arp-custom][arp-custom-r2]")
 {
     using namespace customr2;
