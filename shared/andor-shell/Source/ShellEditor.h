@@ -263,6 +263,9 @@ private:
     void showLayerMenu (int layer, juce::Component& target);
     void chooseFile (int layer);
     void choosePresetFile (bool save);
+    /** SAVE: the open preset updated in place when it is the musician's own (writable, not a
+        factory preset), otherwise Save As (as ANDOR OSP's SAVE). */
+    void saveInstrument();
     void selectModulation (int source, int slot);
     void dragModulation (int source, juce::Point<float> where);
     int dragHoverCard = -1;               ///< the Granular card a source being dragged rests on

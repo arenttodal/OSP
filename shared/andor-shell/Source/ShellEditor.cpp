@@ -184,7 +184,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     // components overlap the same way.)
     presetBar.onChange = [this] { timerCallback(); };
     content.addAndMakeVisible (presetBar);
-    savePresetButton.onClick = [this] { choosePresetFile (true); };
+    savePresetButton.onClick = [this] { saveInstrument(); };
     content.addAndMakeVisible (savePresetButton);
     content.addAndMakeVisible (volume);
     menuButton.setTooltip ("Sounds, presets, undo");
@@ -987,7 +987,17 @@ void ShellEditor::showLayerMenu (int layer, juce::Component& target)
         // The generator's recording: replaced (or relinked, when its file went missing) or removed.
         menu.addSectionHeader (shell.product().hybridSampleName);
         menuicons::addItem (menu, Kind::replace, "Replace or relink recording" + ellipsis, true, [this] { chooseFile (ShellProcessor::hybridLayer); });
-        menuicons::addItem (menu, Kind::remove, "Remove recording", true, [this] { shell.removeLayer (ShellProcessor::hybridLayer); timerCallback(); }, true);
+        // Removing asks once more (a sub-menu, as ANDOR OSP's source menus).
+        juce::PopupMenu confirm;
+        menuicons::addItem (confirm, Kind::remove, "Remove " + shell.product().hybridSampleName.toLowerCase(), true,
+                            [this] { shell.removeLayer (ShellProcessor::hybridLayer); timerCallback(); }, true);
+        {
+            juce::PopupMenu::Item remove ("Remove recording");
+            remove.setImage (menuicons::make (Kind::remove));
+            remove.subMenu = std::make_unique<juce::PopupMenu> (std::move (confirm));
+            remove.setColour (menuicons::destructiveInk());
+            menu.addItem (std::move (remove));
+        }
         if (const auto& action = shell.product().hybridAction; action.label.isNotEmpty() && action.run != nullptr)
             menuicons::addItem (menu, Kind::blank, action.label + ellipsis, true, [this] { shell.product().hybridAction.run (shell); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target));
@@ -1010,7 +1020,16 @@ void ShellEditor::showLayerMenu (int layer, juce::Component& target)
                                 file.isNotEmpty() ? juce::File::createFileWithoutCheckingPath (file).getFileNameWithoutExtension() : "Layer " + letter,
                                 file.isNotEmpty() ? file : juce::String ("Empty"));
     menuicons::addItem (menu, Kind::replace, "Replace sound" + ellipsis, true, [this, layer] { chooseFile (layer); });
-    menuicons::addItem (menu, Kind::remove, "Remove layer", true, [this, layer] { shell.removeLayer (layer); timerCallback(); }, true);
+    juce::PopupMenu confirm;
+    menuicons::addItem (confirm, Kind::remove, "Remove " + (file.isNotEmpty() ? juce::File::createFileWithoutCheckingPath (file).getFileName() : "layer " + letter), true,
+                        [this, layer] { shell.removeLayer (layer); timerCallback(); }, true);
+    {
+        juce::PopupMenu::Item remove ("Remove layer");
+        remove.setImage (menuicons::make (Kind::remove));
+        remove.subMenu = std::make_unique<juce::PopupMenu> (std::move (confirm));
+        remove.setColour (menuicons::destructiveInk());
+        menu.addItem (std::move (remove));
+    }
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target));
 }
 
@@ -1036,13 +1055,20 @@ void ShellEditor::showMenu()
         menu.addSeparator();
     }
     menuicons::addItem (menu, Kind::open, "Open preset" + ellipsis, true, [this] { choosePresetFile (false); });
-    menuicons::addItem (menu, Kind::save, "Save preset" + ellipsis, true, [this] { choosePresetFile (true); });
+    // SAVE updates the open preset (the musician's own); Save As always asks for a name. A
+    // factory preset is never updated in place.
+    menuicons::addItem (menu, Kind::save, "Save preset", true, [this] { saveInstrument(); });
+    menuicons::addItem (menu, Kind::saveAs, "Save preset as" + ellipsis, true, [this] { choosePresetFile (true); });
     menuicons::addItem (menu, Kind::init, "Init", true, [this] { shell.initPatch(); timerCallback(); });
     menuicons::addItem (menu, Kind::reset, "Reset settings", true, [this] { shell.resetSettings(); timerCallback(); });
     menu.addSeparator();
     // (Showing and hiding the AUX strip is D's, beneath ARP: no menu item for it.)
-    menuicons::addItem (menu, Kind::undo, "Undo", shell.undoManager.canUndo(), [this] { shell.undoManager.undo(); });
-    menuicons::addItem (menu, Kind::redo, "Redo", shell.undoManager.canRedo(), [this] { shell.undoManager.redo(); });
+    // The shortcuts the editor really handles, shown at the right (as ANDOR OSP's menu).
+    const auto command = juce::ModifierKeys::commandModifier;
+    menuicons::addItem (menu, Kind::undo, "Undo", shell.undoManager.canUndo(), [this] { shell.undoManager.undo(); }, false,
+                        juce::KeyPress ('z', command, 0).getTextDescriptionWithIcons());
+    menuicons::addItem (menu, Kind::redo, "Redo", shell.undoManager.canRedo(), [this] { shell.undoManager.redo(); }, false,
+                        juce::KeyPress ('z', command | juce::ModifierKeys::shiftModifier, 0).getTextDescriptionWithIcons());
     if (learn != nullptr)
         learn->addMenuItems (menu);   // Learn: Tutorials..., Reset Tutorials... (the product's opt-in)
     menuicons::decorate (menu, { { "Learn", Kind::tutorials } });
@@ -1054,7 +1080,50 @@ void ShellEditor::showMenu()
         showMenuForTest (menu);
         return;
     }
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton));
+    // Under its key, its card's right edge on the key's, as ANDOR OSP's main menu (the key is at
+    // the window's right: a menu that opened rightwards from it would leave the plugin). The
+    // window is the rows' width plus JUCE's border on each side; the look then moves it a shadow
+    // margin left.
+    int width = 120;
+    for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+    {
+        const auto& item = it.getItem();
+        if (item.isSeparator)
+            continue;
+        int w = 0, h = 0;
+        const auto measured = item.shortcutKeyDescription.isNotEmpty() ? item.text + "      " + item.shortcutKeyDescription : item.text;
+        lookAndFeel.getIdealPopupMenuItemSize (measured, false, -1, w, h);
+        if (item.isSectionHeader)
+            w += w / 4;
+        width = std::max (width, w);
+    }
+    const auto key = menuButton.getScreenBounds();
+    const int margin = lookAndFeel.getPopupMenuBorderSize() - osp::plugin::OspLookAndFeel::popupPadding;
+    const int window = width + 2 * lookAndFeel.getPopupMenuBorderSize();
+    // (The key stays the target: JUCE scales the menu as the editor is scaled, the screen area
+    // in its units.)
+    const float k = juce::Component::getApproximateScaleFactorForComponent (&menuButton);
+    const auto area = juce::Rectangle<float> (static_cast<float> (key.getRight()) - k * static_cast<float> (window - 2 * margin), static_cast<float> (key.getY()),
+                                              k * static_cast<float> (width), static_cast<float> (key.getHeight()));
+    menu.showMenuAsync (juce::PopupMenu::Options()
+                            .withTargetComponent (&menuButton)
+                            .withTargetScreenArea (area.toNearestInt())
+                            .withMinimumWidth (width)
+                            .withDeletionCheck (*this));
+}
+
+void ShellEditor::saveInstrument()
+{
+    if (! shell.canSaveInPlace())
+    {
+        choosePresetFile (true);
+        return;
+    }
+    const auto file = shell.currentPresetFile();
+    const bool ok = shell.savePreset (file);
+    modOverlay.showStatusNotice (ok ? "Saved " + file.getFileNameWithoutExtension() : "Could not save " + file.getFileName());
+    presetBar.refresh();
+    timerCallback();
 }
 
 void ShellEditor::choosePresetFile (bool save)
@@ -1062,7 +1131,14 @@ void ShellEditor::choosePresetFile (bool save)
     const auto folder = shell.presetFolder();
     folder.createDirectory();
     const auto pattern = "*" + shell.product().presetExtension;
-    chooser = std::make_unique<juce::FileChooser> (save ? "Save preset" : "Open preset", folder, pattern);
+    // Save As starts at the musician's own open preset (its name offered), never inside the
+    // factory folder: a factory preset is saved as a new preset of one's own.
+    auto start = folder;
+    if (const auto current = shell.currentPresetFile(); save && current.existsAsFile() && ! shell.isFactoryPreset (current))
+        start = current;
+    else if (save && current.existsAsFile())
+        start = folder.getChildFile (current.getFileName());
+    chooser = std::make_unique<juce::FileChooser> (save ? "Save preset as" : "Open preset", start, pattern);
     juce::Component::SafePointer<ShellEditor> safe (this);
     const auto flags = save ? juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting
                             : juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
@@ -1441,6 +1517,19 @@ void ShellEditor::mouseDownAnywhere (juce::Component* c)
         bool own = false;
         for (auto& row : userRow)
             own = own || c == &row.slider || row.slider.isParentOf (c) || (row.label != nullptr && c == row.label.get());
+        // A control the chosen macro moves (turned in a popover or on the instrument) keeps its
+        // range shown: that is the control being worked on, not "elsewhere" (ANDOR OSP's
+        // UserMacroController does the same).
+        if (! own)
+        {
+            auto* slider = dynamic_cast<juce::Slider*> (c);
+            if (slider == nullptr)
+                slider = c->findParentComponentOfClass<juce::Slider>();
+            const auto& hooks = shell.product().userMacros;
+            if (slider != nullptr && hooks.has_value() && hooks->targets != nullptr)
+                if (const auto id = slider->getProperties()["paramId"].toString(); id.isNotEmpty())
+                    own = hooks->targets (shell, chosenMacro).contains (id);
+        }
         if (! own)
         {
             chosenMacro = -1;   // (a click elsewhere: back to the quiet arcs)

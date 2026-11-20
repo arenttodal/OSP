@@ -1,5 +1,30 @@
 # Status
 
+> **20 Nov 2026, ANDOR ANALOG parity R1: the shell's preset saving and menus (branch
+> `claude/analog-parity-r1`, on the default line plus `claude/shell-window-once`; ANALOG's
+> `docs/OSP_PARITY_AUDIT.md`):** what ANDOR OSP's own editor gained (79e56e82, 0719b910, 897d1130)
+> now reaches every shell product (ANDOR ANALOG, the example product).
+> - **SAVE** updates the open preset in place when it is the musician's own (writable, not under
+>   `Presets/Factory`), as OSP's SAVE; otherwise it asks for a name. The main menu has **Save
+>   preset** and **Save preset as...**; Save As starts at the musician's preset, or beside the
+>   factory one opened, never inside Factory. Saving into Factory on purpose still works (a
+>   product's installer keeps the musician's files there, as ANALOG's does).
+> - **The flat preset menu** lists the factory set first under "Factory", then the musician's
+>   under "Your presets" (`PresetEntry::context` `origin:factory|user`; the arrows walk the same
+>   order). One kind only: "Presets", as before. "Save starting state..." is no longer shown
+>   where no handler is set (it did nothing in shell products).
+> - **Confirmations:** removing a layer or the generator's recording asks once more (a sub-menu,
+>   as OSP's source menus). **Shortcuts** are shown on Undo / Redo.
+> - **USER MACROS:** turning a control the chosen macro moves keeps its ranges shown (OSP's
+>   `UserMacroController` did; the shell's own glue cleared them).
+> - Products without factory presets or USER MACROS see no change. ANDOR OSP's editor is not
+>   touched.
+> - **NEXT (ANALOG parity, OSP side):** move the shell onto `UserMacroController` (one copy of
+>   the glue); upstream ANALOG's V6 MAIN + SEND, RETRO 100 % and AUX identity into the shared FX,
+>   and SUB vibrato into `osp::sub::SubOsc`, so ANALOG can drop its copies (ANALOG's
+>   `docs/OSP_PARITY_AUDIT.md`, section 5). Custom ARP reaches ANALOG with its pin once the
+>   Custom Pattern work is approved (R2).
+
 > **18 Nov 2026, ARP STRUM (branch `claude/arp-strum`; `docs/research/arp-strum/`):** a CHORD
 > step's notes one after another, inside the one arpeggiator.
 > - **Engine:** a bounded pending note-on queue; UP / DOWN / RANDOM / ALTERNATE; FREE ms or

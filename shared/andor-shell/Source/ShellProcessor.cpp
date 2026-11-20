@@ -1769,6 +1769,13 @@ bool ShellProcessor::savePreset (const juce::File& file)
     return true;
 }
 
+bool ShellProcessor::canSaveInPlace() const
+{
+    const auto file = lastPresetFile;
+    return file != juce::File() && file.existsAsFile() && file.hasFileExtension (productInfo().presetExtension)
+        && file.hasWriteAccess() && ! isFactoryPreset (file);
+}
+
 bool ShellProcessor::loadPreset (const juce::File& file)
 {
     const auto xml = juce::XmlDocument::parse (file);
@@ -1832,13 +1839,19 @@ std::vector<InstrumentHost::PresetEntry> ShellProcessor::presetList() const
     std::vector<PresetEntry> list;
     auto files = presetFolder().findChildFiles (juce::File::findFiles, true, "*" + productInfo().presetExtension);
     files.sort();
-    for (const auto& f : files)
-    {
-        PresetEntry e;
-        e.name = f.getFileNameWithoutExtension();
-        e.file = f;
-        list.push_back (e);
-    }
+    // The factory set first, then the musician's own (the quick menu shows them under their
+    // own headings, and the arrows walk the same order).
+    for (const bool factory : { true, false })
+        for (const auto& f : files)
+        {
+            if (isFactoryPreset (f) != factory)
+                continue;
+            PresetEntry e;
+            e.name = f.getFileNameWithoutExtension();
+            e.file = f;
+            e.context = factory ? "origin:factory" : "origin:user";
+            list.push_back (e);
+        }
     return list;
 }
 

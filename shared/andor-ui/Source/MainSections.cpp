@@ -860,6 +860,8 @@ juce::PopupMenu PresetBar::presetMenu()
             menu.addItem (std::move (item));
         };
         auto saveState = [&] {
+            if (onSaveStartingState == nullptr)
+                return;   // (a host with no starting states of its own: no dead item)
             menuicons::addItem (menu, Kind::startingState, "Save starting state" + ellipsis, true, [safe] {
                 if (safe != nullptr && safe->onSaveStartingState != nullptr)
                     safe->onSaveStartingState();
@@ -871,15 +873,33 @@ juce::PopupMenu PresetBar::presetMenu()
         plain ("INIT", current == "INIT", [safe, opened] { if (safe != nullptr) safe->processor.initPatch(), opened(); }, Kind::init);
         plain ("Reset settings", false, [safe, opened] { if (safe != nullptr) safe->processor.resetSettings(), opened(); }, Kind::reset);
         menu.addSeparator();
+        // A host that tells its factory presets from the musician's own (context "origin:...")
+        // gets the two headings; otherwise one "Presets" list, as before.
+        const auto origin = [] (const InstrumentHost::PresetEntry& e) { return e.context.fromFirstOccurrenceOf ("origin:", false, false); };
+        bool hasFactory = false, hasUser = false;
+        for (const auto& entry : list)
+        {
+            hasFactory = hasFactory || (! entry.startingState && origin (entry) == "factory");
+            hasUser = hasUser || (! entry.startingState && origin (entry) == "user");
+        }
+        const bool split = hasFactory && hasUser;
         bool presetsHeader = false;
+        juce::String heading;
         for (const auto& entry : list)
         {
             if (! entry.startingState && ! presetsHeader)
             {
                 saveState();
-                menu.addSectionHeader ("Presets");
                 presetsHeader = true;
+                if (! split)
+                    menu.addSectionHeader ("Presets");
             }
+            if (split && ! entry.startingState)
+                if (const auto wanted = origin (entry) == "factory" ? juce::String ("Factory") : juce::String ("Your presets"); wanted != heading)
+                {
+                    menu.addSectionHeader (wanted);
+                    heading = wanted;
+                }
             plain (entry.name, entry.name == current, [safe, entry, opened] {
                 if (safe == nullptr)
                     return;

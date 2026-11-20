@@ -332,6 +332,15 @@ public:
     juce::File presetFolder() const { return documentsFolder().getChildFile ("Presets"); }
     /** The product's own sample store (copies of the dropped files; env ANDOR_SAMPLE_STORE overrides). */
     juce::File sampleStoreFolder() const;
+    /** Where the product's factory presets are installed (Presets/Factory). */
+    juce::File factoryPresetFolder() const { return presetFolder().getChildFile ("Factory"); }
+    /** True for a file in the factory folder. SAVE never updates one in place (it asks for a
+        name instead); a musician who saves into that folder on purpose keeps their file (the
+        installer replaces only the files it wrote). */
+    bool isFactoryPreset (const juce::File& file) const { return file.isAChildOf (factoryPresetFolder()); }
+    /** SAVE can update the open preset in place: a writable preset file of this product, not a
+        factory one (as ANDOR OSP's SAVE). Otherwise SAVE asks for a name (Save As). */
+    bool canSaveInPlace() const;
     bool savePreset (const juce::File& file);
     bool loadPreset (const juce::File& file);
     juce::File currentPresetFile() const { return lastPresetFile; }

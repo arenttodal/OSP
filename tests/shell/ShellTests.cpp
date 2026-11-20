@@ -21,6 +21,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#if JUCE_LINUX
+ #include <dlfcn.h>
+#endif
 #include <cstdlib>
 #include <filesystem>
 
@@ -30,6 +33,36 @@ using andor::shell::ShellProcessor;
 
 namespace
 {
+#if JUCE_LINUX
+    /** Xvfb with no window manager lacks the _NET_WM_* / WM_* atoms JUCE looks up only if they
+        exist, once, when it first talks to the display: made here, before any test (a product's
+        menu and window tests open real windows), on a connection kept open for the whole run so
+        the server never resets and drops them. Nothing happens without a display. */
+    void prepareXServer()
+    {
+        if (juce::SystemStats::getEnvironmentVariable ("DISPLAY", {}).isEmpty())
+            return;
+        auto* x11 = dlopen ("libX11.so.6", RTLD_NOW);
+        if (x11 == nullptr)
+            return;
+        using Open = void* (*) (const char*);
+        using Intern = unsigned long (*) (void*, const char*, int);
+        auto open = reinterpret_cast<Open> (dlsym (x11, "XOpenDisplay"));
+        auto intern = reinterpret_cast<Intern> (dlsym (x11, "XInternAtom"));
+        if (open == nullptr || intern == nullptr)
+            return;
+        static void* keptOpen = open (nullptr);
+        if (keptOpen == nullptr)
+            return;
+        for (const auto* name : { "WM_PROTOCOLS", "WM_TAKE_FOCUS", "WM_DELETE_WINDOW", "_NET_WM_PING", "WM_CHANGE_STATE", "WM_STATE",
+                                  "_NET_WM_WINDOW_TYPE", "_NET_WM_STATE", "_NET_WM_STATE_HIDDEN", "_NET_WM_STATE_FULLSCREEN",
+                                  "_NET_WM_MOVERESIZE", "_NET_FRAME_EXTENTS", "_NET_WORKAREA", "_MOTIF_WM_HINTS", "_WIN_HINTS",
+                                  "KWM_WIN_DECORATION", "_KDE_NET_WM_WINDOW_TYPE_OVERRIDE", "_NET_WM_WINDOW_TYPE_NORMAL",
+                                  "_NET_WM_WINDOW_TYPE_COMBO", "_NET_WM_ALLOWED_ACTIONS" })
+            intern (keptOpen, name, 0);
+    }
+#endif
+
     void setEnvironment (const char* name, const juce::String& value)
     {
 #if JUCE_WINDOWS
@@ -250,6 +283,13 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
             ospChoices.removeRange (osp::mod::baseSourceCount + 1, choice->choices.size() - osp::mod::baseSourceCount - 1);
             juce::AudioParameterChoice asOsp ({ id, ranged->getVersionHint() }, ranged->getName (128), ospChoices, 0);
             line = parameterschema::describe (&asOsp);
+        }
+        if (id.startsWith ("arp.strum."))
+        {
+            // STRUM's version hint is the product's (ProductInfo::strumParameterHint: above its
+            // own hints, ANDOR ANALOG's 40); the rest of the line is ANDOR OSP's, at OSP's hint.
+            CHECK (ranged->getVersionHint() == andor::shell::productInfo().strumParameterHint);
+            line = line.replace (" v" + juce::String (ranged->getVersionHint()) + " ", " v" + juce::String (andor::shell::ProductInfo {}.strumParameterHint) + " ");
         }
         const bool isOwn = line.startsWith (prefix);
         // ANDOR OSP's parameters added after products shipped (the MOD WHEEL's vibrato.*, then
@@ -512,6 +552,67 @@ TEST_CASE ("shell: a new sound replaces a layer's on the audio thread without a 
     p.pollLoads();
     CHECK (p.currentInstrument (0) != nullptr);
     CHECK (p.statusMessage().isNotEmpty());
+}
+
+TEST_CASE ("shell: SAVE updates only the musician's own preset; factory presets first, then theirs, under their headings", "[shell][presets]")
+{
+    ShellProcessor p;
+    const auto ext = andor::shell::productInfo().presetExtension;
+    const auto factoryFile = p.factoryPresetFolder().getChildFile ("ZZ Test Factory" + ext);
+    const auto mine = p.presetFolder().getChildFile ("AA Test Mine" + ext);
+    CHECK_FALSE (p.canSaveInPlace());   // (INIT: nothing to update; SAVE asks for a name)
+    // A factory file (written as an installer would place it) and one of the musician's.
+    REQUIRE (p.savePreset (factoryFile));
+    CHECK (p.isFactoryPreset (factoryFile));
+    CHECK_FALSE (p.canSaveInPlace());   // a factory preset is never updated in place
+    REQUIRE (p.savePreset (mine));
+    CHECK_FALSE (p.isFactoryPreset (mine));
+    CHECK (p.canSaveInPlace());
+    // The list: the factory set first, then the musician's (whatever the names' order).
+    const auto list = p.presetList();
+    int factoryAt = -1, mineAt = -1;
+    for (int i = 0; i < static_cast<int> (list.size()); ++i)
+    {
+        const auto& e = list[static_cast<std::size_t> (i)];
+        CHECK (e.context == (p.isFactoryPreset (e.file) ? "origin:factory" : "origin:user"));
+        if (e.file == factoryFile) factoryAt = i;
+        if (e.file == mine) mineAt = i;
+    }
+    REQUIRE (factoryAt >= 0);
+    REQUIRE (mineAt >= 0);
+    CHECK (factoryAt < mineAt);
+    // The quick menu: "Factory", then "Your presets"; no "Save starting state" without a handler.
+    {
+        std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<ShellEditor*> (editor.get());
+        REQUIRE (ui != nullptr);
+        auto& bar = dynamic_cast<osp::plugin::PresetBar&> (ui->presetBarComponent());
+        juce::StringArray headers, texts;
+        for (juce::PopupMenu::MenuItemIterator it (bar.presetMenu()); it.next();)
+            (it.getItem().isSectionHeader ? headers : texts).add (it.getItem().text);
+        CHECK (headers.indexOf ("Factory") >= 0);
+        CHECK (headers.indexOf ("Factory") < headers.indexOf ("Your presets"));
+        for (const auto& t : texts)
+            CHECK_FALSE (t.startsWithIgnoreCase ("Save starting state"));
+        // The main menu: SAVE and Save As, Undo / Redo with their shortcuts.
+        juce::PopupMenu main;
+        ui->showMenuForTest = [&] (juce::PopupMenu& m) { main = m; };
+        ui->openMainMenu();
+        ui->showMenuForTest = nullptr;
+        bool save = false, saveAs = false, undoShortcut = false;
+        for (juce::PopupMenu::MenuItemIterator it (main); it.next();)
+        {
+            const auto& item = it.getItem();
+            save = save || item.text == "Save preset";
+            saveAs = saveAs || item.text == juce::String::fromUTF8 ("Save preset as\xe2\x80\xa6");
+            undoShortcut = undoShortcut || (item.text == "Undo" && item.shortcutKeyDescription.isNotEmpty());
+        }
+        CHECK (save);
+        CHECK (saveAs);
+        CHECK (undoShortcut);
+    }
+    factoryFile.deleteFile();
+    mine.deleteFile();
 }
 
 TEST_CASE ("shell: presets and sessions save and reload; another product's state is never read", "[shell][presets]")
@@ -850,6 +951,9 @@ int main (int argc, char* argv[])
                           .getChildFile ("andor-shell-test-" + juce::String (juce::Random::getSystemRandom().nextInt64()));
     setEnvironment ("ANDOR_SAMPLE_STORE", base.getChildFile ("samples").getFullPathName());
     setEnvironment ("ANDOR_DOCUMENTS_DIR", base.getChildFile ("documents").getFullPathName());
+#if JUCE_LINUX
+    prepareXServer();
+#endif
     juce::ScopedJuceInitialiser_GUI juceInit;
     const int result = Catch::Session().run (argc, argv);
     base.deleteRecursively();
