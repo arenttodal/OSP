@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.d3-satellite",
+  "title": "Move each layer in the stereo field",
+  "scenarioDigest": "sha256:d9a8e2b3ae962860cb5dea488bdf40aeeaf4013d46d9fdefa22f064d52fb1c1c",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.arp.satellite"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "targets": [
+    "osp.arp.panel"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    },
+    {
+      "id": "tutorial:voice",
+      "file": "Tutorial Voice A3.wav",
+      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
+      "bytes": 1440104
+    },
+    {
+      "id": "tutorial:pluck",
+      "file": "Tutorial Pluck A3.wav",
+      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+      "bytes": 230504
+    }
+  ],
+  "disclosures": [
+    "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2346,
+    "fps": 30,
+    "frames": 389,
+    "crop": [
+      15,
+      199,
+      2881,
+      2097
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1060,
+    "fps": 30,
+    "frames": 389,
+    "duration": 12.967,
+    "files": {
+      "webm": {
+        "path": "d3-satellite/d3-satellite.webm",
+        "codec": "vp9",
+        "bytes": 1222971,
+        "sha256": "38b17567835da61f41f4b6fee07f04ec13bc01c01da7f0fe419dd166f5bfd7ec"
+      },
+      "mp4": {
+        "path": "d3-satellite/d3-satellite.mp4",
+        "codec": "h264",
+        "bytes": 1109787,
+        "sha256": "6d670f7f715b081857b1e7f6914ed7fc03e31ff189201ebd1db7e8ce9d4c1e22"
+      }
+    }
+  },
+  "marks": {
+    "open-satellite": 0.0,
+    "satellite-on": 2.867,
+    "orbit": 5.8,
+    "rate": 9.167
+  },
+  "steps": {
+    "open-satellite": "d3-satellite/steps/open-satellite.webp",
+    "satellite-on": "d3-satellite/steps/satellite-on.webp",
+    "orbit": "d3-satellite/steps/orbit.webp",
+    "rate": "d3-satellite/steps/rate.webp"
+  },
+  "poster": {
+    "path": "d3-satellite/poster.webp",
+    "frame": 369,
+    "sha256": "cc94409dc06b18a5b34a683c47b9bd2971d144d21fd72e06781262fd5cef68b4",
+    "master": "learn/capture/out/d3-satellite/poster.png"
+  },
+  "run": {
+    "wallSeconds": 103.802,
+    "meanFrameMs": 250.3,
+    "slowdown": 7.51,
+    "notesPlayed": 4
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "4/4",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "4 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "389 / 389"
+      },
+      {
+        "check": "constant editor size",
+        "passed": true,
+        "detail": "[(1448, 1173)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 0.03 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "389"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1060"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "389"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1060"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "12.97 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

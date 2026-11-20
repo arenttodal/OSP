@@ -1,5 +1,20 @@
 # Status
 
+> **20 Nov 2026, ANDOR Learn Capture Studio, Gate 1 (branch `feature/learn-capture-studio`;
+> `learn/`, `docs/learn-studio/gate-1-report.md`):**
+> - **Four pilot demonstrations, seven clips**, captured automatically from the real editor at
+>   `6ef3376`: load and play; phrase → MAP NOTES → NOTES; RECORD and GRAB LAST from a
+>   deterministic input fixture; per-layer ARP (LINK, EDIT, PLAYS), STRUM with Chord, SATELLITE.
+>   WebM, MP4, poster, step stills and a manifest entry each; review board `learn/review/`.
+> - **Runner:** `osp_learn_capture` (`-DOSP_BUILD_LEARN_CAPTURE=ON`, off by default; not in the
+>   bundles, the release script or ctest). Real window events on Xvfb + openbox; audio through the
+>   processor per frame; every step asserted; direct state only in set-up. No plugin source changed.
+> - **Reliability:** 40 more `[popover]` and 10 `[menu-visual]` runs, no failure; every capture
+>   run passed; negative scenarios fail closed and write no asset.
+> - **NEXT:** owner review of the clips; Gate 2 (Astro + MDX + Pagefind preview); the separate
+>   in-plugin beta-readiness Learn work (`docs/learn-studio/beta-readiness-in-plugin-learn.md`),
+>   including the CAPTURE A label check on macOS.
+>
 > **20 Nov 2026, ANDOR Learn: public visual guides and capture studio, Gate 0 (branch
 > `feature/learn-capture-studio`, from `6ef3376`; `docs/learn-studio/`):**
 > - **Discovery only:** no product, test or website code changed. Report, coverage matrix

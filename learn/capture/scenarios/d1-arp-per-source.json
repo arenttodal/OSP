@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.d1-arp-per-source",
+  "product": "osp",
+  "title": "Give each layer its own arpeggio",
+  "guides": [
+    "osp.guide.arp.per-source"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.arp"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "three layers (bowed, voice, pluck), ARP panel open, ARP on, LINK on, a chord held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed",
+          "voice",
+          "pluck"
+        ]
+      },
+      {
+        "do": "expandArp"
+      },
+      {
+        "do": "setParam",
+        "id": "arp.enabled",
+        "value": 1
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          48,
+          55,
+          60,
+          64
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 1.0
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "linked",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 1.2
+        }
+      ],
+      "expect": [
+        {
+          "linked": true
+        }
+      ]
+    },
+    {
+      "mark": "link-off",
+      "do": [
+        {
+          "do": "click",
+          "target": "arp:link",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.7
+        }
+      ],
+      "expect": [
+        {
+          "linked": false
+        },
+        {
+          "target": "arp:edit.B"
+        }
+      ]
+    },
+    {
+      "mark": "edit-b",
+      "do": [
+        {
+          "do": "click",
+          "target": "arp:edit.B",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "click",
+          "target": "arp:pattern.1",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "arp.cardB.pattern",
+          "equals": "DOWN"
+        }
+      ]
+    },
+    {
+      "mark": "edit-c",
+      "do": [
+        {
+          "do": "click",
+          "target": "arp:edit.C",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "click",
+          "target": "arp:pattern.2",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "arp.cardC.pattern",
+          "equals": "UP/DOWN"
+        }
+      ]
+    },
+    {
+      "mark": "plays-off-a",
+      "do": [
+        {
+          "do": "click",
+          "target": "arp:chip.A",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 2.2
+        }
+      ],
+      "expect": [
+        {
+          "param": "arp.cardA",
+          "equals": 0
+        },
+        {
+          "param": "arp.cardB",
+          "equals": 1
+        },
+        {
+          "param": "arp.cardC",
+          "equals": 1
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:A.card",
+      "card:C.card",
+      "arp:panel",
+      "learn:osp.keyboard"
+    ],
+    "context": 0.02,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.arp.panel"
+    ],
+    "parameters": [
+      "arp.link",
+      "arp.cardA",
+      "arp.cardB.pattern",
+      "arp.cardC.pattern"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/ArpSection.cpp",
+      "shared/andor-ui/Source/CardArpLanes.h",
+      "apps/plugin/Source/PluginEditor.cpp"
+    ]
+  },
+  "disclosures": [
+    "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

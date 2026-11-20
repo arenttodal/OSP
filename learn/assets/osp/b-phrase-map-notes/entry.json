@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.b-phrase-map-notes",
+  "title": "Turn a phrase into an instrument",
+  "scenarioDigest": "sha256:a4c1c7ea45c1b4231243ec0af27682873a8eb09a7f9337b3cf76717a0f473d0b",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.make.phrase-map-notes"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.phrase"
+    ],
+    "steps": [
+      "osp.phrase/setup",
+      "osp.phrase/map",
+      "osp.phrase/notes",
+      "osp.phrase/play"
+    ]
+  },
+  "targets": [
+    "osp.source.dropZone",
+    "osp.source.mapNotes",
+    "osp.source.notes",
+    "osp.source.mapped",
+    "osp.keyboard"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:phrase",
+      "file": "Tutorial Phrase A3.wav",
+      "sha256": "a954dd075da497a314c18a99a10c75581be19253d45e1554187ffe32e6b3c1e4",
+      "bytes": 1036904
+    }
+  ],
+  "disclosures": [
+    "The file arrives through the editor's own drop handler (filesDropped); the travelling file badge is drawn in post-production. It is not a recording of an operating-system drag-and-drop."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 428,
+    "crop": [
+      0,
+      236,
+      2896,
+      2046
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1000,
+    "fps": 30,
+    "frames": 428,
+    "duration": 14.267,
+    "files": {
+      "webm": {
+        "path": "b-phrase-map-notes/b-phrase-map-notes.webm",
+        "codec": "vp9",
+        "bytes": 462177,
+        "sha256": "06cb6204e58b97aaf57916e868edd0812e807ea61121895947f2f343d6662b6c"
+      },
+      "mp4": {
+        "path": "b-phrase-map-notes/b-phrase-map-notes.mp4",
+        "codec": "h264",
+        "bytes": 487878,
+        "sha256": "89d897c8005281818b163c1d41ac5996d7726492722c7f392907674ed43a3e39"
+      }
+    }
+  },
+  "marks": {
+    "drop-phrase": 0.0,
+    "map-notes": 3.267,
+    "open-notes": 5.3,
+    "play-mapped": 8.1
+  },
+  "steps": {
+    "drop-phrase": "b-phrase-map-notes/steps/drop-phrase.webp",
+    "map-notes": "b-phrase-map-notes/steps/map-notes.webp",
+    "open-notes": "b-phrase-map-notes/steps/open-notes.webp",
+    "play-mapped": "b-phrase-map-notes/steps/play-mapped.webp"
+  },
+  "poster": {
+    "path": "b-phrase-map-notes/poster.webp",
+    "frame": 408,
+    "sha256": "c1e683e6a0dc66808cc716f179db4c938f8bde0c2ecfab719aa4816fb6760d40",
+    "master": "learn/capture/out/b-phrase-map-notes/poster.png"
+  },
+  "run": {
+    "wallSeconds": 82.648,
+    "meanFrameMs": 185.5,
+    "slowdown": 5.57,
+    "notesPlayed": 4
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "7/7",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "7 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "428 / 428"
+      },
+      {
+        "check": "constant editor size",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 2.10 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "428"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1000"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "428"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1000"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "14.27 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

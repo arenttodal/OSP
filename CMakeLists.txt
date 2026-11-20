@@ -258,6 +258,13 @@ add_subdirectory(apps/research-renderer)
 
 if(OSP_BUILD_PLUGIN)
     add_subdirectory(apps/plugin)
+    # ANDOR Learn Capture Studio (docs/learn-studio): a development-only scenario runner that
+    # films the real editor for the public guides. Off by default; never part of the plugin
+    # bundles, the release script or ctest.
+    option(OSP_BUILD_LEARN_CAPTURE "Build the ANDOR Learn capture runner (development only)" OFF)
+    if(OSP_BUILD_LEARN_CAPTURE)
+        add_subdirectory(learn/capture/runner)
+    endif()
     # ANDOR Memo Lab: recordings (iCloud Voice Memos) to instruments, around OSP's processor.
     add_subdirectory(apps/memo-lab)
     # ANDOR instruments built from the ANDOR Instrument Shell (shared/andor-shell).

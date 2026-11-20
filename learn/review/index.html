@@ -1,0 +1,268 @@
+<meta charset="utf-8">
+<title>ANDOR Learn Gate 1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Review board: the four pilot demonstrations side by side; each card plays its real capture,
+   its steps seek the video, and its checks come from the capture manifest. ANDOR web tokens v1. */
+:root {
+  --bg: #f7f6f2; --bg-2: #edebe5; --bg-elev: #fcfbf8;
+  --text: #242723; --text-2: #5c635a; --muted: #656c63;
+  --accent: #bd653d; --accent-strong: #a4532e;
+  --border: #d8d9d1; --border-strong: #858c82;
+  --display: #1d2321; --ok: #3f7a52; --bad: #a4532e;
+  --sans: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1f2521; --bg-2: #272e29; --bg-elev: #2b332d; --text: #f4f1e9; --text-2: #c4cec1; --muted: #9aa597;
+  --accent: #d08a63; --accent-strong: #d08a63; --border: #3c463e; --border-strong: #7f897f; --display: #151a18;
+  --ok: #7fbf8f; --bad: #e09a74; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #1f2521; --bg-2: #272e29; --bg-elev: #2b332d; --text: #f4f1e9; --text-2: #c4cec1; --muted: #9aa597;
+  --accent: #d08a63; --accent-strong: #d08a63; --border: #3c463e; --border-strong: #7f897f; --display: #151a18;
+  --ok: #7fbf8f; --bad: #e09a74; color-scheme: dark }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.5 var(--sans); }
+.wrap { max-width: 1480px; margin: 0 auto; padding-block: 32px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.label { font: 500 12px/1.3 var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+h1 { font-weight: 500; font-size: clamp(30px, 4vw, 46px); letter-spacing: -.03em; line-height: 1.05; margin: 6px 0 10px; }
+.lede { color: var(--text-2); max-width: 75ch; margin: 0 0 16px; font-size: 17px; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 0 20px; border-bottom: 1px solid var(--border); }
+.bar button { font: 500 13px var(--sans); border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.bar button:hover { border-color: var(--text); }
+.bar .sum { margin-left: auto; font: 13px var(--mono); color: var(--muted); }
+nav.jump { display: flex; flex-wrap: wrap; gap: 6px; }
+nav.jump a { font: 500 13px var(--mono); color: var(--text); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; }
+h2 { display: flex; align-items: center; gap: 12px; font-weight: 500; font-size: 26px; letter-spacing: -.02em; margin: 40px 0 14px; }
+.letter { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--text); color: var(--bg); font: 600 16px var(--mono); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 20px; align-items: start; }
+.scene { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.scene header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.scene h3 { margin: 0; font-size: 18px; font-weight: 600; }
+.pill { font: 500 12px var(--mono); border-radius: 999px; padding: 2px 9px; border: 1px solid currentColor; }
+.pill.passed { color: var(--ok); } .pill.failed { color: var(--bad); }
+.player { background: var(--display); border-radius: 8px; overflow: hidden; }
+video { display: block; width: 100%; height: auto; }
+ol.steps { list-style: none; margin: 12px 0 0; padding: 0; }
+.step { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: start; width: 100%; padding: 7px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.step:hover .tx { color: var(--text); }
+.step:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
+.step .n { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border-strong); font: 500 12px/20px var(--mono); text-align: center; }
+.step.on .n { background: var(--text); color: var(--bg); border-color: var(--text); }
+.step .tx { color: var(--text-2); font-size: 14px; }
+.step.on .tx { color: var(--text); }
+.step .tm { font: 12px var(--mono); color: var(--muted); padding-top: 2px; }
+dl.meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 16px; margin: 12px 0; font-size: 13px; }
+dl.meta dt { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+dl.meta dd { margin: 0; font-variant-numeric: tabular-nums; }
+details summary { cursor: pointer; font-size: 13px; color: var(--text-2); }
+ul.checks, ul.plain { margin: 8px 0; padding-left: 18px; font-size: 13px; }
+ul.checks { list-style: none; padding-left: 0; }
+ul.checks li.ok { color: var(--text-2); } ul.checks li.bad { color: var(--bad); font-weight: 600; }
+h4 { margin: 12px 0 4px; font-size: 13px; }
+code { font: 12px var(--mono); background: var(--bg-2); padding: 1px 4px; border-radius: 4px; word-break: break-all; }
+.sha { font: 11px var(--mono); color: var(--muted); }
+.small { font-size: 12px; color: var(--muted); }
+a { color: var(--accent-strong); }
+.missing { display: grid; place-items: center; color: var(--muted); min-height: 120px; }
+</style>
+
+<div class="wrap">
+  <div class="label">ANDOR Learn Capture Studio · Gate 1 review</div>
+  <h1>Four pilot demonstrations</h1>
+  <p class="lede">Every frame is the real ANDOR OSP editor driven by real window events, with audio running through the instrument. Click a step to jump to it. The pointer, outline and file badge are drawn afterwards from the exact positions the capture runner used.</p>
+  <div class="bar">
+    <button type="button" id="playAll">Play all from the start</button>
+    <button type="button" id="pauseAll">Pause all</button>
+    <nav class="jump"><a href="#demo-A">A</a><a href="#demo-B">B</a><a href="#demo-C">C</a><a href="#demo-D">D</a></nav>
+    <span class="sum">7 of 7 scenes passed validation · product commit 6ef3376 · none approved yet</span>
+  </div>
+  <section class="demo" id="demo-A"><h2><span class="letter">A</span>Load and play</h2><div class="grid">
+    <article class="scene" id="a-load-and-play">
+      <header><h3>Load a sound and play it</h3><span class="pill passed">passed</span></header>
+      <div class="player">
+        <video muted loop playsinline preload="metadata" poster="../assets/osp/a-load-and-play/poster.webp" width="1600" height="1000">
+          <source src="../assets/osp/a-load-and-play/a-load-and-play.webm" type="video/webm">
+          <source src="../assets/osp/a-load-and-play/a-load-and-play.mp4" type="video/mp4">
+        </video>
+      </div>
+      <ol class="steps"><li><button type="button" class="step" data-t="0.0"><span class="n">1</span><span class="tx">Drag an audio file onto the empty sound area.</span><span class="tm">0.0 s</span></button></li><li><button type="button" class="step" data-t="2.4"><span class="n">2</span><span class="tx">OSP analyses the recording; the card shows it.</span><span class="tm">2.4 s</span></button></li><li><button type="button" class="step" data-t="3.433"><span class="n">3</span><span class="tx">Play notes from the keyboard.</span><span class="tm">3.4 s</span></button></li></ol>
+      <dl class="meta">
+        <div><dt>Duration</dt><dd>9.6 s · 287 frames · 30 fps</dd></div>
+        <div><dt>Output</dt><dd>1600×1000 · WebM 476 KB · MP4 478 KB</dd></div>
+        <div><dt>Expectations</dt><dd>4/4 passed</dd></div>
+        <div><dt>Capture</dt><dd>198 ms per frame (slowdown ×5.94)</dd></div>
+      </dl>
+      <details><summary>Checks, fixtures and disclosures</summary>
+        <ul class="checks"><li class="ok">✓ runner status</li><li class="ok">✓ expectations — 4 passed</li><li class="ok">✓ master frame count = frames.json — 287 / 287</li><li class="ok">✓ constant editor size — [(1448, 1050)]</li><li class="ok">✓ encoder exit (libvpx-vp9)</li><li class="ok">✓ encoder exit (libx264)</li><li class="ok">✓ no blank frames — 0 blank</li><li class="ok">✓ no frozen run longer than the longest declared hold + 1 s — longest unchanged run 2.13 s</li><li class="ok">✓ webm frames = master — 287</li><li class="ok">✓ webm size — 1600x1000</li><li class="ok">✓ mp4 frames = master — 287</li><li class="ok">✓ mp4 size — 1600x1000</li><li class="ok">✓ duration 6-15 s (one clip) or declared — 9.57 s</li><li class="ok">✓ poster not blank</li><li class="ok">✓ approved baseline — none yet: first capture (to be approved)</li></ul>
+        <h4>Fixtures</h4><ul class="plain"><li><code>tutorial:bowed</code> Tutorial Bowed Note C3.wav <span class="sha">8f857b2573da</span></li></ul>
+        <h4>Disclosures</h4><ul class='plain'><li>The file arrives through the editor&#x27;s own drop handler (filesDropped); the travelling file badge is drawn in post-production. It is not a recording of an operating-system drag-and-drop.</li></ul>
+        <p class="small">Scenario <code>osp.scene.a-load-and-play</code> · product commit <code>6ef3376</code> ·
+        <a href="../assets/osp/a-load-and-play/a-load-and-play.mp4">MP4</a> · <a href="../assets/osp/a-load-and-play/a-load-and-play.webm">WebM</a> · <a href="../assets/osp/a-load-and-play/poster.webp">poster</a></p>
+      </details>
+    </article></div></section><section class="demo" id="demo-B"><h2><span class="letter">B</span>Phrase Transformer</h2><div class="grid">
+    <article class="scene" id="b-phrase-map-notes">
+      <header><h3>Turn a phrase into an instrument</h3><span class="pill passed">passed</span></header>
+      <div class="player">
+        <video muted loop playsinline preload="metadata" poster="../assets/osp/b-phrase-map-notes/poster.webp" width="1600" height="1000">
+          <source src="../assets/osp/b-phrase-map-notes/b-phrase-map-notes.webm" type="video/webm">
+          <source src="../assets/osp/b-phrase-map-notes/b-phrase-map-notes.mp4" type="video/mp4">
+        </video>
+      </div>
+      <ol class="steps"><li><button type="button" class="step" data-t="0.0"><span class="n">1</span><span class="tx">Drop a recording of several notes. OSP asks: Identify notes?</span><span class="tm">0.0 s</span></button></li><li><button type="button" class="step" data-t="3.267"><span class="n">2</span><span class="tx">Click MAP NOTES. Each note found is placed on its own key.</span><span class="tm">3.3 s</span></button></li><li><button type="button" class="step" data-t="5.3"><span class="n">3</span><span class="tx">Click NOTES to see the notes and the keys they play.</span><span class="tm">5.3 s</span></button></li><li><button type="button" class="step" data-t="8.1"><span class="n">4</span><span class="tx">Play the keys: each plays a recorded note.</span><span class="tm">8.1 s</span></button></li></ol>
+      <dl class="meta">
+        <div><dt>Duration</dt><dd>14.3 s · 428 frames · 30 fps</dd></div>
+        <div><dt>Output</dt><dd>1600×1000 · WebM 451 KB · MP4 476 KB</dd></div>
+        <div><dt>Expectations</dt><dd>7/7 passed</dd></div>
+        <div><dt>Capture</dt><dd>186 ms per frame (slowdown ×5.57)</dd></div>
+      </dl>
+      <details><summary>Checks, fixtures and disclosures</summary>
+        <ul class="checks"><li class="ok">✓ runner status</li><li class="ok">✓ expectations — 7 passed</li><li class="ok">✓ master frame count = frames.json — 428 / 428</li><li class="ok">✓ constant editor size — [(1448, 1050)]</li><li class="ok">✓ encoder exit (libvpx-vp9)</li><li class="ok">✓ encoder exit (libx264)</li><li class="ok">✓ no blank frames — 0 blank</li><li class="ok">✓ no frozen run longer than the longest declared hold + 1 s — longest unchanged run 2.10 s</li><li class="ok">✓ webm frames = master — 428</li><li class="ok">✓ webm size — 1600x1000</li><li class="ok">✓ mp4 frames = master — 428</li><li class="ok">✓ mp4 size — 1600x1000</li><li class="ok">✓ duration 6-15 s (one clip) or declared — 14.27 s</li><li class="ok">✓ poster not blank</li><li class="ok">✓ approved baseline — none yet: first capture (to be approved)</li></ul>
+        <h4>Fixtures</h4><ul class="plain"><li><code>tutorial:phrase</code> Tutorial Phrase A3.wav <span class="sha">a954dd075da4</span></li></ul>
+        <h4>Disclosures</h4><ul class='plain'><li>The file arrives through the editor&#x27;s own drop handler (filesDropped); the travelling file badge is drawn in post-production. It is not a recording of an operating-system drag-and-drop.</li></ul>
+        <p class="small">Scenario <code>osp.scene.b-phrase-map-notes</code> · product commit <code>6ef3376</code> ·
+        <a href="../assets/osp/b-phrase-map-notes/b-phrase-map-notes.mp4">MP4</a> · <a href="../assets/osp/b-phrase-map-notes/b-phrase-map-notes.webm">WebM</a> · <a href="../assets/osp/b-phrase-map-notes/poster.webp">poster</a></p>
+      </details>
+    </article></div></section><section class="demo" id="demo-C"><h2><span class="letter">C</span>Live recording</h2><div class="grid">
+    <article class="scene" id="c1-record-input">
+      <header><h3>Record from an audio input</h3><span class="pill passed">passed</span></header>
+      <div class="player">
+        <video muted loop playsinline preload="metadata" poster="../assets/osp/c1-record-input/poster.webp" width="1600" height="1000">
+          <source src="../assets/osp/c1-record-input/c1-record-input.webm" type="video/webm">
+          <source src="../assets/osp/c1-record-input/c1-record-input.mp4" type="video/mp4">
+        </video>
+      </div>
+      <ol class="steps"><li><button type="button" class="step" data-t="0.0"><span class="n">1</span><span class="tx">On an empty instrument, click Record… to open CAPTURE.</span><span class="tm">0.0 s</span></button></li><li><button type="button" class="step" data-t="2.733"><span class="n">2</span><span class="tx">Click RECORD and play into the input.</span><span class="tm">2.7 s</span></button></li><li><button type="button" class="step" data-t="9.5"><span class="n">3</span><span class="tx">Click STOP. The take is trimmed and its notes are mapped.</span><span class="tm">9.5 s</span></button></li><li><button type="button" class="step" data-t="11.233"><span class="n">4</span><span class="tx">Play the keys: each plays a recorded note.</span><span class="tm">11.2 s</span></button></li></ol>
+      <dl class="meta">
+        <div><dt>Duration</dt><dd>16.7 s · 502 frames · 30 fps</dd></div>
+        <div><dt>Output</dt><dd>1600×1000 · WebM 419 KB · MP4 586 KB</dd></div>
+        <div><dt>Expectations</dt><dd>7/7 passed</dd></div>
+        <div><dt>Capture</dt><dd>180 ms per frame (slowdown ×5.39)</dd></div>
+      </dl>
+      <details><summary>Checks, fixtures and disclosures</summary>
+        <ul class="checks"><li class="ok">✓ runner status</li><li class="ok">✓ expectations — 7 passed</li><li class="ok">✓ master frame count = frames.json — 502 / 502</li><li class="ok">✓ constant editor size — [(1448, 1050)]</li><li class="ok">✓ encoder exit (libvpx-vp9)</li><li class="ok">✓ encoder exit (libx264)</li><li class="ok">✓ no blank frames — 0 blank</li><li class="ok">✓ no frozen run longer than the longest declared hold + 1 s — longest unchanged run 1.93 s</li><li class="ok">✓ webm frames = master — 502</li><li class="ok">✓ webm size — 1600x1000</li><li class="ok">✓ mp4 frames = master — 502</li><li class="ok">✓ mp4 size — 1600x1000</li><li class="ok">✓ duration 6-15 s (one clip) or declared — 16.73 s</li><li class="ok">✓ poster not blank</li><li class="ok">✓ approved baseline — none yet: first capture (to be approved)</li></ul>
+        <h4>Fixtures</h4><ul class="plain"><li><code>input:phrase-d4</code> input-phrase-d4.wav <span class="sha">30def4e04ee5</span></li></ul>
+        <h4>Disclosures</h4><ul class='plain'><li>The input audio is a deterministic fixture (five sung vowels, D4 F4 A4 C5 A4) fed into OSP&#x27;s Sidechain input bus by the capture runner, block by block, as a host would send it. The meter, level picture, trim, analysis and note mapping are OSP&#x27;s own. Routing a DAW track to that input has not yet been verified in Logic, Ableton or Reaper.</li></ul>
+        <p class="small">Scenario <code>osp.scene.c1-record-input</code> · product commit <code>6ef3376</code> ·
+        <a href="../assets/osp/c1-record-input/c1-record-input.mp4">MP4</a> · <a href="../assets/osp/c1-record-input/c1-record-input.webm">WebM</a> · <a href="../assets/osp/c1-record-input/poster.webp">poster</a></p>
+      </details>
+    </article>
+    <article class="scene" id="c2-grab-last">
+      <header><h3>Grab what you just played</h3><span class="pill passed">passed</span></header>
+      <div class="player">
+        <video muted loop playsinline preload="metadata" poster="../assets/osp/c2-grab-last/poster.webp" width="1600" height="1000">
+          <source src="../assets/osp/c2-grab-last/c2-grab-last.webm" type="video/webm">
+          <source src="../assets/osp/c2-grab-last/c2-grab-last.mp4" type="video/mp4">
+        </video>
+      </div>
+      <ol class="steps"><li><button type="button" class="step" data-t="0.0"><span class="n">1</span><span class="tx">Click REC on the card while audio arrives at the input.</span><span class="tm">0.0 s</span></button></li><li><button type="button" class="step" data-t="4.1"><span class="n">2</span><span class="tx">Click 10 s under GRAB LAST to keep what was just played.</span><span class="tm">4.1 s</span></button></li><li><button type="button" class="step" data-t="5.867"><span class="n">3</span><span class="tx">Play the keys: each plays a recorded note.</span><span class="tm">5.9 s</span></button></li></ol>
+      <dl class="meta">
+        <div><dt>Duration</dt><dd>11.4 s · 343 frames · 30 fps</dd></div>
+        <div><dt>Output</dt><dd>1600×1000 · WebM 407 KB · MP4 575 KB</dd></div>
+        <div><dt>Expectations</dt><dd>6/6 passed</dd></div>
+        <div><dt>Capture</dt><dd>221 ms per frame (slowdown ×6.64)</dd></div>
+      </dl>
+      <details><summary>Checks, fixtures and disclosures</summary>
+        <ul class="checks"><li class="ok">✓ runner status</li><li class="ok">✓ expectations — 6 passed</li><li class="ok">✓ master frame count = frames.json — 343 / 343</li><li class="ok">✓ constant editor size — [(1448, 1050)]</li><li class="ok">✓ encoder exit (libvpx-vp9)</li><li class="ok">✓ encoder exit (libx264)</li><li class="ok">✓ no blank frames — 0 blank</li><li class="ok">✓ no frozen run longer than the longest declared hold + 1 s — longest unchanged run 1.43 s</li><li class="ok">✓ webm frames = master — 343</li><li class="ok">✓ webm size — 1600x1000</li><li class="ok">✓ mp4 frames = master — 343</li><li class="ok">✓ mp4 size — 1600x1000</li><li class="ok">✓ duration 6-15 s (one clip) or declared — 11.43 s</li><li class="ok">✓ poster not blank</li><li class="ok">✓ approved baseline — none yet: first capture (to be approved)</li></ul>
+        <h4>Fixtures</h4><ul class="plain"><li><code>tutorial:bowed</code> Tutorial Bowed Note C3.wav <span class="sha">8f857b2573da</span></li><li><code>input:phrase-d4</code> input-phrase-d4.wav <span class="sha">30def4e04ee5</span></li></ul>
+        <h4>Disclosures</h4><ul class='plain'><li>The input audio is a deterministic fixture (five sung vowels, D4 F4 A4 C5 A4) fed into OSP&#x27;s Sidechain input bus by the capture runner, block by block, as a host would send it. The meter, level picture, trim, analysis and note mapping are OSP&#x27;s own. Routing a DAW track to that input has not yet been verified in Logic, Ableton or Reaper.</li><li>The input history before the first frame (2.4 s of the phrase) was fed during set-up, unfilmed.</li></ul>
+        <p class="small">Scenario <code>osp.scene.c2-grab-last</code> · product commit <code>6ef3376</code> ·
+        <a href="../assets/osp/c2-grab-last/c2-grab-last.mp4">MP4</a> · <a href="../assets/osp/c2-grab-last/c2-grab-last.webm">WebM</a> · <a href="../assets/osp/c2-grab-last/poster.webp">poster</a></p>
+      </details>
+    </article></div></section><section class="demo" id="demo-D"><h2><span class="letter">D</span>Arpeggiator</h2><div class="grid">
+    <article class="scene" id="d1-arp-per-source">
+      <header><h3>Give each layer its own arpeggio</h3><span class="pill passed">passed</span></header>
+      <div class="player">
+        <video muted loop playsinline preload="metadata" poster="../assets/osp/d1-arp-per-source/poster.webp" width="1600" height="1188">
+          <source src="../assets/osp/d1-arp-per-source/d1-arp-per-source.webm" type="video/webm">
+          <source src="../assets/osp/d1-arp-per-source/d1-arp-per-source.mp4" type="video/mp4">
+        </video>
+      </div>
+      <ol class="steps"><li><button type="button" class="step" data-t="0.0"><span class="n">1</span><span class="tx">With LINK on, every layer plays the same pattern.</span><span class="tm">0.0 s</span></button></li><li><button type="button" class="step" data-t="1.2"><span class="n">2</span><span class="tx">Click LINK to turn it off. EDIT A | B | C appears.</span><span class="tm">1.2 s</span></button></li><li><button type="button" class="step" data-t="3.333"><span class="n">3</span><span class="tx">Choose EDIT B, then a pattern for layer B (Down).</span><span class="tm">3.3 s</span></button></li><li><button type="button" class="step" data-t="6.0"><span class="n">4</span><span class="tx">Choose EDIT C, then another pattern (Up/Down).</span><span class="tm">6.0 s</span></button></li><li><button type="button" class="step" data-t="8.667"><span class="n">5</span><span class="tx">Click A under PLAYS: layer A holds the chord while B and C arpeggiate.</span><span class="tm">8.7 s</span></button></li></ol>
+      <dl class="meta">
+        <div><dt>Duration</dt><dd>12.1 s · 362 frames · 30 fps</dd></div>
+        <div><dt>Output</dt><dd>1600×1188 · WebM 1044 KB · MP4 1102 KB</dd></div>
+        <div><dt>Expectations</dt><dd>8/8 passed</dd></div>
+        <div><dt>Capture</dt><dd>261 ms per frame (slowdown ×7.83)</dd></div>
+      </dl>
+      <details><summary>Checks, fixtures and disclosures</summary>
+        <ul class="checks"><li class="ok">✓ runner status</li><li class="ok">✓ expectations — 8 passed</li><li class="ok">✓ master frame count = frames.json — 362 / 362</li><li class="ok">✓ constant editor size — [(1448, 1173)]</li><li class="ok">✓ encoder exit (libvpx-vp9)</li><li class="ok">✓ encoder exit (libx264)</li><li class="ok">✓ no blank frames — 0 blank</li><li class="ok">✓ no frozen run longer than the longest declared hold + 1 s — longest unchanged run 0.03 s</li><li class="ok">✓ webm frames = master — 362</li><li class="ok">✓ webm size — 1600x1188</li><li class="ok">✓ mp4 frames = master — 362</li><li class="ok">✓ mp4 size — 1600x1188</li><li class="ok">✓ duration 6-15 s (one clip) or declared — 12.07 s</li><li class="ok">✓ poster not blank</li><li class="ok">✓ approved baseline — none yet: first capture (to be approved)</li></ul>
+        <h4>Fixtures</h4><ul class="plain"><li><code>tutorial:bowed</code> Tutorial Bowed Note C3.wav <span class="sha">8f857b2573da</span></li><li><code>tutorial:voice</code> Tutorial Voice A3.wav <span class="sha">6dcbb65d5144</span></li><li><code>tutorial:pluck</code> Tutorial Pluck A3.wav <span class="sha">15df7b312f57</span></li></ul>
+        <h4>Disclosures</h4><ul class='plain'><li>The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard.</li></ul>
+        <p class="small">Scenario <code>osp.scene.d1-arp-per-source</code> · product commit <code>6ef3376</code> ·
+        <a href="../assets/osp/d1-arp-per-source/d1-arp-per-source.mp4">MP4</a> · <a href="../assets/osp/d1-arp-per-source/d1-arp-per-source.webm">WebM</a> · <a href="../assets/osp/d1-arp-per-source/poster.webp">poster</a></p>
+      </details>
+    </article>
+    <article class="scene" id="d2-arp-strum">
+      <header><h3>Strum a chord</h3><span class="pill passed">passed</span></header>
+      <div class="player">
+        <video muted loop playsinline preload="metadata" poster="../assets/osp/d2-arp-strum/poster.webp" width="1600" height="1266">
+          <source src="../assets/osp/d2-arp-strum/d2-arp-strum.webm" type="video/webm">
+          <source src="../assets/osp/d2-arp-strum/d2-arp-strum.mp4" type="video/mp4">
+        </video>
+      </div>
+      <ol class="steps"><li><button type="button" class="step" data-t="0.0"><span class="n">1</span><span class="tx">With EDIT C chosen, choose Chord in PATTERN.</span><span class="tm">0.0 s</span></button></li><li><button type="button" class="step" data-t="3.767"><span class="n">2</span><span class="tx">Click the name STRUM to open its panel.</span><span class="tm">3.8 s</span></button></li><li><button type="button" class="step" data-t="5.5"><span class="n">3</span><span class="tx">Switch STRUM on: the chord&#x27;s notes now follow one another.</span><span class="tm">5.5 s</span></button></li><li><button type="button" class="step" data-t="7.633"><span class="n">4</span><span class="tx">Choose DOWN to strum from the top note.</span><span class="tm">7.6 s</span></button></li><li><button type="button" class="step" data-t="9.4"><span class="n">5</span><span class="tx">Turn SPREAD to lengthen the strum.</span><span class="tm">9.4 s</span></button></li></ol>
+      <dl class="meta">
+        <div><dt>Duration</dt><dd>12.6 s · 378 frames · 30 fps</dd></div>
+        <div><dt>Output</dt><dd>1600×1266 · WebM 1263 KB · MP4 1276 KB</dd></div>
+        <div><dt>Expectations</dt><dd>5/5 passed</dd></div>
+        <div><dt>Capture</dt><dd>259 ms per frame (slowdown ×7.77)</dd></div>
+      </dl>
+      <details><summary>Checks, fixtures and disclosures</summary>
+        <ul class="checks"><li class="ok">✓ runner status</li><li class="ok">✓ expectations — 5 passed</li><li class="ok">✓ master frame count = frames.json — 378 / 378</li><li class="ok">✓ constant editor size — [(1448, 1173)]</li><li class="ok">✓ encoder exit (libvpx-vp9)</li><li class="ok">✓ encoder exit (libx264)</li><li class="ok">✓ no blank frames — 0 blank</li><li class="ok">✓ no frozen run longer than the longest declared hold + 1 s — longest unchanged run 0.03 s</li><li class="ok">✓ webm frames = master — 378</li><li class="ok">✓ webm size — 1600x1266</li><li class="ok">✓ mp4 frames = master — 378</li><li class="ok">✓ mp4 size — 1600x1266</li><li class="ok">✓ duration 6-15 s (one clip) or declared — 12.60 s</li><li class="ok">✓ poster not blank</li><li class="ok">✓ approved baseline — none yet: first capture (to be approved)</li></ul>
+        <h4>Fixtures</h4><ul class="plain"><li><code>tutorial:bowed</code> Tutorial Bowed Note C3.wav <span class="sha">8f857b2573da</span></li><li><code>tutorial:voice</code> Tutorial Voice A3.wav <span class="sha">6dcbb65d5144</span></li><li><code>tutorial:pluck</code> Tutorial Pluck A3.wav <span class="sha">15df7b312f57</span></li></ul>
+        <h4>Disclosures</h4><ul class='plain'><li>The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard.</li></ul>
+        <p class="small">Scenario <code>osp.scene.d2-arp-strum</code> · product commit <code>6ef3376</code> ·
+        <a href="../assets/osp/d2-arp-strum/d2-arp-strum.mp4">MP4</a> · <a href="../assets/osp/d2-arp-strum/d2-arp-strum.webm">WebM</a> · <a href="../assets/osp/d2-arp-strum/poster.webp">poster</a></p>
+      </details>
+    </article>
+    <article class="scene" id="d3-satellite">
+      <header><h3>Move each layer in the stereo field</h3><span class="pill passed">passed</span></header>
+      <div class="player">
+        <video muted loop playsinline preload="metadata" poster="../assets/osp/d3-satellite/poster.webp" width="1600" height="1060">
+          <source src="../assets/osp/d3-satellite/d3-satellite.webm" type="video/webm">
+          <source src="../assets/osp/d3-satellite/d3-satellite.mp4" type="video/mp4">
+        </video>
+      </div>
+      <ol class="steps"><li><button type="button" class="step" data-t="0.0"><span class="n">1</span><span class="tx">Click the name SATELLITE to open its panel.</span><span class="tm">0.0 s</span></button></li><li><button type="button" class="step" data-t="2.867"><span class="n">2</span><span class="tx">Switch layer A&#x27;s SATELLITE on: it moves between L and R.</span><span class="tm">2.9 s</span></button></li><li><button type="button" class="step" data-t="5.8"><span class="n">3</span><span class="tx">Choose ORBIT: a round path, quieter and darker behind.</span><span class="tm">5.8 s</span></button></li><li><button type="button" class="step" data-t="9.167"><span class="n">4</span><span class="tx">Turn RATE to change how fast it moves (a note value in SYNC).</span><span class="tm">9.2 s</span></button></li></ol>
+      <dl class="meta">
+        <div><dt>Duration</dt><dd>13.0 s · 389 frames · 30 fps</dd></div>
+        <div><dt>Output</dt><dd>1600×1060 · WebM 1194 KB · MP4 1083 KB</dd></div>
+        <div><dt>Expectations</dt><dd>4/4 passed</dd></div>
+        <div><dt>Capture</dt><dd>250 ms per frame (slowdown ×7.51)</dd></div>
+      </dl>
+      <details><summary>Checks, fixtures and disclosures</summary>
+        <ul class="checks"><li class="ok">✓ runner status</li><li class="ok">✓ expectations — 4 passed</li><li class="ok">✓ master frame count = frames.json — 389 / 389</li><li class="ok">✓ constant editor size — [(1448, 1173)]</li><li class="ok">✓ encoder exit (libvpx-vp9)</li><li class="ok">✓ encoder exit (libx264)</li><li class="ok">✓ no blank frames — 0 blank</li><li class="ok">✓ no frozen run longer than the longest declared hold + 1 s — longest unchanged run 0.03 s</li><li class="ok">✓ webm frames = master — 389</li><li class="ok">✓ webm size — 1600x1060</li><li class="ok">✓ mp4 frames = master — 389</li><li class="ok">✓ mp4 size — 1600x1060</li><li class="ok">✓ duration 6-15 s (one clip) or declared — 12.97 s</li><li class="ok">✓ poster not blank</li><li class="ok">✓ approved baseline — none yet: first capture (to be approved)</li></ul>
+        <h4>Fixtures</h4><ul class="plain"><li><code>tutorial:bowed</code> Tutorial Bowed Note C3.wav <span class="sha">8f857b2573da</span></li><li><code>tutorial:voice</code> Tutorial Voice A3.wav <span class="sha">6dcbb65d5144</span></li><li><code>tutorial:pluck</code> Tutorial Pluck A3.wav <span class="sha">15df7b312f57</span></li></ul>
+        <h4>Disclosures</h4><ul class='plain'><li>The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard.</li></ul>
+        <p class="small">Scenario <code>osp.scene.d3-satellite</code> · product commit <code>6ef3376</code> ·
+        <a href="../assets/osp/d3-satellite/d3-satellite.mp4">MP4</a> · <a href="../assets/osp/d3-satellite/d3-satellite.webm">WebM</a> · <a href="../assets/osp/d3-satellite/poster.webp">poster</a></p>
+      </details>
+    </article></div></section>
+</div>
+<script>
+(() => {
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const videos = [...document.querySelectorAll('video')];
+  const play = v => { const p = v.play(); if (p && p.catch) p.catch(() => {}); };
+  if (!reduce && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? play(e.target) : e.target.pause()), { threshold: 0.35 });
+    videos.forEach(v => io.observe(v));
+  }
+  document.getElementById('playAll').addEventListener('click', () => videos.forEach(v => { v.currentTime = 0; play(v); }));
+  document.getElementById('pauseAll').addEventListener('click', () => videos.forEach(v => v.pause()));
+  document.querySelectorAll('.scene').forEach(card => {
+    const v = card.querySelector('video');
+    const steps = [...card.querySelectorAll('.step')];
+    if (!v) return;
+    steps.forEach(b => b.addEventListener('click', () => { v.currentTime = parseFloat(b.dataset.t) + 0.02; play(v); }));
+    v.addEventListener('timeupdate', () => {
+      let on = 0;
+      steps.forEach((b, i) => { if (v.currentTime + 0.05 >= parseFloat(b.dataset.t)) on = i; });
+      steps.forEach((b, i) => b.classList.toggle('on', i === on));
+    });
+  });
+})();
+</script>

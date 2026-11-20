@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.a-load-and-play",
+  "title": "Load a sound and play it",
+  "scenarioDigest": "sha256:f23496bd3eda68a10461a6a149b75ebb08a7ab203cc46acbefdfdd43a6ded939",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.make.load-and-play"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.quickstart"
+    ],
+    "steps": [
+      "osp.quickstart/setup",
+      "osp.quickstart/play"
+    ]
+  },
+  "targets": [
+    "osp.source.dropZone",
+    "osp.source.ready",
+    "osp.keyboard"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    }
+  ],
+  "disclosures": [
+    "The file arrives through the editor's own drop handler (filesDropped); the travelling file badge is drawn in post-production. It is not a recording of an operating-system drag-and-drop."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 287,
+    "crop": [
+      0,
+      236,
+      2896,
+      2046
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1000,
+    "fps": 30,
+    "frames": 287,
+    "duration": 9.567,
+    "files": {
+      "webm": {
+        "path": "a-load-and-play/a-load-and-play.webm",
+        "codec": "vp9",
+        "bytes": 487990,
+        "sha256": "134b481ff2da371d8b7407f1fcc4de9b0336c17de73af80b8ffacffca6f8f208"
+      },
+      "mp4": {
+        "path": "a-load-and-play/a-load-and-play.mp4",
+        "codec": "h264",
+        "bytes": 489633,
+        "sha256": "1676cc0e97062ee856568a48c4131daf1648cdc6873a2ab4607a7083a7e0e477"
+      }
+    }
+  },
+  "marks": {
+    "drop-file": 0.0,
+    "wait-ready": 2.4,
+    "play-keys": 3.433
+  },
+  "steps": {
+    "drop-file": "a-load-and-play/steps/drop-file.webp",
+    "wait-ready": "a-load-and-play/steps/wait-ready.webp",
+    "play-keys": "a-load-and-play/steps/play-keys.webp"
+  },
+  "poster": {
+    "path": "a-load-and-play/poster.webp",
+    "frame": 263,
+    "sha256": "ce1c21b5976bb79b4561fac5d10ff31aec1bab9a47c699ec32929705ab9805ab",
+    "master": "learn/capture/out/a-load-and-play/poster.png"
+  },
+  "run": {
+    "wallSeconds": 59.888,
+    "meanFrameMs": 198.1,
+    "slowdown": 5.94,
+    "notesPlayed": 3
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "4/4",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "4 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "287 / 287"
+      },
+      {
+        "check": "constant editor size",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 2.13 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "287"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1000"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "287"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1000"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "9.57 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

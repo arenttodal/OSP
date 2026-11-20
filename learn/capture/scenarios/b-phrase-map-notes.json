@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.b-phrase-map-notes",
+  "product": "osp",
+  "title": "Turn a phrase into an instrument",
+  "guides": [
+    "osp.guide.make.phrase-map-notes"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.phrase"
+    ],
+    "steps": [
+      "osp.phrase/setup",
+      "osp.phrase/map",
+      "osp.phrase/notes",
+      "osp.phrase/play"
+    ]
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 16.0,
+  "start": {
+    "state": "empty instrument",
+    "input": false,
+    "setup": []
+  },
+  "steps": [
+    {
+      "mark": "drop-phrase",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.8
+        },
+        {
+          "do": "drop",
+          "sound": "phrase",
+          "target": "learn:osp.source.dropZone",
+          "seconds": 1.0
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "card:A.mapNotes"
+          },
+          "timeout": 40
+        },
+        {
+          "do": "hold",
+          "seconds": 0.9
+        }
+      ],
+      "expect": [
+        {
+          "layers": 1
+        },
+        {
+          "state": "osp.source.phrase"
+        }
+      ]
+    },
+    {
+      "mark": "map-notes",
+      "do": [
+        {
+          "do": "click",
+          "target": "card:A.mapNotes",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "mapped": "A"
+          },
+          "timeout": 60
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.source.mapped"
+        }
+      ]
+    },
+    {
+      "mark": "open-notes",
+      "do": [
+        {
+          "do": "click",
+          "target": "card:A.notes",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.6
+        }
+      ],
+      "expect": [
+        {
+          "notesOpen": "A"
+        }
+      ]
+    },
+    {
+      "mark": "play-mapped",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "learn:osp.keyboard"
+        },
+        {
+          "do": "key",
+          "note": 57,
+          "seconds": 0.55,
+          "after": 0.1
+        },
+        {
+          "do": "key",
+          "note": 60,
+          "seconds": 0.55,
+          "after": 0.1
+        },
+        {
+          "do": "key",
+          "note": 64,
+          "seconds": 0.55,
+          "after": 0.1
+        },
+        {
+          "do": "key",
+          "note": 69,
+          "seconds": 0.8,
+          "after": 0.1
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.2
+        }
+      ],
+      "expect": [
+        {
+          "notesPlayed": 4
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.source.dropZone",
+      "card:A.card",
+      "learn:osp.keyboard"
+    ],
+    "context": 0.04,
+    "aspect": "16:10"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.source.dropZone",
+      "osp.source.mapNotes",
+      "osp.source.notes",
+      "osp.source.mapped",
+      "osp.keyboard"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/EngineCard.cpp",
+      "apps/plugin/Source/PluginEditor.cpp",
+      "apps/plugin/Source/PluginProcessor.cpp",
+      "shared/andor-ui/Source/NoteMapEditor.cpp",
+      "apps/plugin/Source/TutorialSounds.cpp"
+    ]
+  },
+  "disclosures": [
+    "The file arrives through the editor's own drop handler (filesDropped); the travelling file badge is drawn in post-production. It is not a recording of an operating-system drag-and-drop."
+  ]
+}

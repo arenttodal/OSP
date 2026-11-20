@@ -56,3 +56,7 @@ __pycache__/
 
 # Release outputs (packaging/release/andor-release.sh): installers are kept, never committed.
 /dist/
+
+# ANDOR Learn capture: frame sequences and masters stay outside Git
+learn/capture/out/
+learn/capture/fixtures/Tutorial *.wav

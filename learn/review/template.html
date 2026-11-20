@@ -1,0 +1,107 @@
+<meta charset="utf-8">
+<title>ANDOR Learn Gate 1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Review board: the four pilot demonstrations side by side; each card plays its real capture,
+   its steps seek the video, and its checks come from the capture manifest. ANDOR web tokens v1. */
+:root {
+  --bg: #f7f6f2; --bg-2: #edebe5; --bg-elev: #fcfbf8;
+  --text: #242723; --text-2: #5c635a; --muted: #656c63;
+  --accent: #bd653d; --accent-strong: #a4532e;
+  --border: #d8d9d1; --border-strong: #858c82;
+  --display: #1d2321; --ok: #3f7a52; --bad: #a4532e;
+  --sans: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1f2521; --bg-2: #272e29; --bg-elev: #2b332d; --text: #f4f1e9; --text-2: #c4cec1; --muted: #9aa597;
+  --accent: #d08a63; --accent-strong: #d08a63; --border: #3c463e; --border-strong: #7f897f; --display: #151a18;
+  --ok: #7fbf8f; --bad: #e09a74; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #1f2521; --bg-2: #272e29; --bg-elev: #2b332d; --text: #f4f1e9; --text-2: #c4cec1; --muted: #9aa597;
+  --accent: #d08a63; --accent-strong: #d08a63; --border: #3c463e; --border-strong: #7f897f; --display: #151a18;
+  --ok: #7fbf8f; --bad: #e09a74; color-scheme: dark }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.5 var(--sans); }
+.wrap { max-width: 1480px; margin: 0 auto; padding-block: 32px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.label { font: 500 12px/1.3 var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+h1 { font-weight: 500; font-size: clamp(30px, 4vw, 46px); letter-spacing: -.03em; line-height: 1.05; margin: 6px 0 10px; }
+.lede { color: var(--text-2); max-width: 75ch; margin: 0 0 16px; font-size: 17px; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 0 20px; border-bottom: 1px solid var(--border); }
+.bar button { font: 500 13px var(--sans); border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.bar button:hover { border-color: var(--text); }
+.bar .sum { margin-left: auto; font: 13px var(--mono); color: var(--muted); }
+nav.jump { display: flex; flex-wrap: wrap; gap: 6px; }
+nav.jump a { font: 500 13px var(--mono); color: var(--text); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; }
+h2 { display: flex; align-items: center; gap: 12px; font-weight: 500; font-size: 26px; letter-spacing: -.02em; margin: 40px 0 14px; }
+.letter { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--text); color: var(--bg); font: 600 16px var(--mono); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 20px; align-items: start; }
+.scene { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.scene header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.scene h3 { margin: 0; font-size: 18px; font-weight: 600; }
+.pill { font: 500 12px var(--mono); border-radius: 999px; padding: 2px 9px; border: 1px solid currentColor; }
+.pill.passed { color: var(--ok); } .pill.failed { color: var(--bad); }
+.player { background: var(--display); border-radius: 8px; overflow: hidden; }
+video { display: block; width: 100%; height: auto; }
+ol.steps { list-style: none; margin: 12px 0 0; padding: 0; }
+.step { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: start; width: 100%; padding: 7px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.step:hover .tx { color: var(--text); }
+.step:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
+.step .n { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border-strong); font: 500 12px/20px var(--mono); text-align: center; }
+.step.on .n { background: var(--text); color: var(--bg); border-color: var(--text); }
+.step .tx { color: var(--text-2); font-size: 14px; }
+.step.on .tx { color: var(--text); }
+.step .tm { font: 12px var(--mono); color: var(--muted); padding-top: 2px; }
+dl.meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 16px; margin: 12px 0; font-size: 13px; }
+dl.meta dt { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+dl.meta dd { margin: 0; font-variant-numeric: tabular-nums; }
+details summary { cursor: pointer; font-size: 13px; color: var(--text-2); }
+ul.checks, ul.plain { margin: 8px 0; padding-left: 18px; font-size: 13px; }
+ul.checks { list-style: none; padding-left: 0; }
+ul.checks li.ok { color: var(--text-2); } ul.checks li.bad { color: var(--bad); font-weight: 600; }
+h4 { margin: 12px 0 4px; font-size: 13px; }
+code { font: 12px var(--mono); background: var(--bg-2); padding: 1px 4px; border-radius: 4px; word-break: break-all; }
+.sha { font: 11px var(--mono); color: var(--muted); }
+.small { font-size: 12px; color: var(--muted); }
+a { color: var(--accent-strong); }
+.missing { display: grid; place-items: center; color: var(--muted); min-height: 120px; }
+</style>
+
+<div class="wrap">
+  <div class="label">ANDOR Learn Capture Studio · Gate 1 review</div>
+  <h1>Four pilot demonstrations</h1>
+  <p class="lede">Every frame is the real ANDOR OSP editor driven by real window events, with audio running through the instrument. Click a step to jump to it. The pointer, outline and file badge are drawn afterwards from the exact positions the capture runner used.</p>
+  <div class="bar">
+    <button type="button" id="playAll">Play all from the start</button>
+    <button type="button" id="pauseAll">Pause all</button>
+    <nav class="jump"><a href="#demo-A">A</a><a href="#demo-B">B</a><a href="#demo-C">C</a><a href="#demo-D">D</a></nav>
+    <span class="sum">{{SUMMARY}}</span>
+  </div>
+  {{SECTIONS}}
+</div>
+<script>
+(() => {
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const videos = [...document.querySelectorAll('video')];
+  const play = v => { const p = v.play(); if (p && p.catch) p.catch(() => {}); };
+  if (!reduce && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? play(e.target) : e.target.pause()), { threshold: 0.35 });
+    videos.forEach(v => io.observe(v));
+  }
+  document.getElementById('playAll').addEventListener('click', () => videos.forEach(v => { v.currentTime = 0; play(v); }));
+  document.getElementById('pauseAll').addEventListener('click', () => videos.forEach(v => v.pause()));
+  document.querySelectorAll('.scene').forEach(card => {
+    const v = card.querySelector('video');
+    const steps = [...card.querySelectorAll('.step')];
+    if (!v) return;
+    steps.forEach(b => b.addEventListener('click', () => { v.currentTime = parseFloat(b.dataset.t) + 0.02; play(v); }));
+    v.addEventListener('timeupdate', () => {
+      let on = 0;
+      steps.forEach((b, i) => { if (v.currentTime + 0.05 >= parseFloat(b.dataset.t)) on = i; });
+      steps.forEach((b, i) => b.classList.toggle('on', i === on));
+    });
+  });
+})();
+</script>

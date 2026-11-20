@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.c1-record-input",
+  "title": "Record from an audio input",
+  "scenarioDigest": "sha256:119a0e3f49e8eabd3bcf1a485da1e7768277c3081fa76a6bfbee82c4281a8b38",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.make.record-input"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "targets": [
+    "osp.source.dropZone",
+    "osp.source.mapped",
+    "osp.keyboard"
+  ],
+  "fixtures": [
+    {
+      "id": "input:phrase-d4",
+      "file": "input-phrase-d4.wav",
+      "sha256": "30def4e04ee5bb3a860e4b42aa4ae62aed081aa06fcecde9975d83d1e50fb36b",
+      "bytes": 1497704
+    }
+  ],
+  "disclosures": [
+    "The input audio is a deterministic fixture (five sung vowels, D4 F4 A4 C5 A4) fed into OSP's Sidechain input bus by the capture runner, block by block, as a host would send it. The meter, level picture, trim, analysis and note mapping are OSP's own. Routing a DAW track to that input has not yet been verified in Logic, Ableton or Reaper."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 502,
+    "crop": [
+      0,
+      236,
+      2896,
+      2046
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1000,
+    "fps": 30,
+    "frames": 502,
+    "duration": 16.733,
+    "files": {
+      "webm": {
+        "path": "c1-record-input/c1-record-input.webm",
+        "codec": "vp9",
+        "bytes": 429990,
+        "sha256": "3160f925c142aacce2309b702acd52ffd511bf06fc374ea113c93423f8e29253"
+      },
+      "mp4": {
+        "path": "c1-record-input/c1-record-input.mp4",
+        "codec": "h264",
+        "bytes": 600497,
+        "sha256": "36bc26e96e97596a72f80feeee820909646d8c5ad5725835a800c5cfa11cefaa"
+      }
+    }
+  },
+  "marks": {
+    "open-record": 0.0,
+    "record": 2.733,
+    "stop": 9.5,
+    "play-mapped": 11.233
+  },
+  "steps": {
+    "open-record": "c1-record-input/steps/open-record.webp",
+    "record": "c1-record-input/steps/record.webp",
+    "stop": "c1-record-input/steps/stop.webp",
+    "play-mapped": "c1-record-input/steps/play-mapped.webp"
+  },
+  "poster": {
+    "path": "c1-record-input/poster.webp",
+    "frame": 473,
+    "sha256": "09851a1bab190f7155e25ccbdbf196ba87fef9718b289763b41530ef8650593c",
+    "master": "learn/capture/out/c1-record-input/poster.png"
+  },
+  "run": {
+    "wallSeconds": 93.394,
+    "meanFrameMs": 179.5,
+    "slowdown": 5.39,
+    "notesPlayed": 4
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "7/7",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "7 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "502 / 502"
+      },
+      {
+        "check": "constant editor size",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 1.93 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "502"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1000"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "502"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1000"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "16.73 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

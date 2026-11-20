@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.c2-grab-last",
+  "title": "Grab what you just played",
+  "scenarioDigest": "sha256:747381694aa8941b6b0eb370eb7585c6bd2b4c62a04485c41cb6de6d9b5e4e71",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.make.grab-last"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "targets": [
+    "osp.source.mapped",
+    "osp.keyboard"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    },
+    {
+      "id": "input:phrase-d4",
+      "file": "input-phrase-d4.wav",
+      "sha256": "30def4e04ee5bb3a860e4b42aa4ae62aed081aa06fcecde9975d83d1e50fb36b",
+      "bytes": 1497704
+    }
+  ],
+  "disclosures": [
+    "The input audio is a deterministic fixture (five sung vowels, D4 F4 A4 C5 A4) fed into OSP's Sidechain input bus by the capture runner, block by block, as a host would send it. The meter, level picture, trim, analysis and note mapping are OSP's own. Routing a DAW track to that input has not yet been verified in Logic, Ableton or Reaper.",
+    "The input history before the first frame (2.4 s of the phrase) was fed during set-up, unfilmed."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 343,
+    "crop": [
+      0,
+      236,
+      2896,
+      2046
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1000,
+    "fps": 30,
+    "frames": 343,
+    "duration": 11.433,
+    "files": {
+      "webm": {
+        "path": "c2-grab-last/c2-grab-last.webm",
+        "codec": "vp9",
+        "bytes": 416991,
+        "sha256": "e60eb349b2506b9bb9d10c45330b295ffdcad2390d6461fb8f5e7fb6d6b54db2"
+      },
+      "mp4": {
+        "path": "c2-grab-last/c2-grab-last.mp4",
+        "codec": "h264",
+        "bytes": 588955,
+        "sha256": "a37364e38b1fb49f9b104a435146826cc6d251873dbb209046aaaa05edef0d9d"
+      }
+    }
+  },
+  "marks": {
+    "open-capture": 0.0,
+    "grab-last": 4.1,
+    "play-mapped": 5.867
+  },
+  "steps": {
+    "open-capture": "c2-grab-last/steps/open-capture.webp",
+    "grab-last": "c2-grab-last/steps/grab-last.webp",
+    "play-mapped": "c2-grab-last/steps/play-mapped.webp"
+  },
+  "poster": {
+    "path": "c2-grab-last/poster.webp",
+    "frame": 315,
+    "sha256": "12eca0a440f7d79eefdf1ea14f9e7125efa44481142b0d1d17d282d1e0bcc248",
+    "master": "learn/capture/out/c2-grab-last/poster.png"
+  },
+  "run": {
+    "wallSeconds": 80.132,
+    "meanFrameMs": 221.2,
+    "slowdown": 6.64,
+    "notesPlayed": 4
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "6/6",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "6 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "343 / 343"
+      },
+      {
+        "check": "constant editor size",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 1.43 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "343"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1000"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "343"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1000"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "11.43 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

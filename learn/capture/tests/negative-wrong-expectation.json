@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.test-negative-wrong-expectation",
+  "product": "osp",
+  "title": "Negative test: an expectation that cannot hold",
+  "guides": [
+    "osp.guide.make.load-and-play"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.quickstart"
+    ],
+    "steps": [
+      "osp.quickstart/setup",
+      "osp.quickstart/play"
+    ]
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "start": {
+    "state": "empty instrument",
+    "input": false,
+    "setup": []
+  },
+  "steps": [
+    {
+      "mark": "drop-file",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.8
+        },
+        {
+          "do": "drop",
+          "sound": "bowed",
+          "target": "learn:osp.source.dropZone",
+          "seconds": 1.1
+        }
+      ]
+    },
+    {
+      "mark": "wait-ready",
+      "do": [
+        {
+          "do": "waitFor",
+          "until": {
+            "state": "osp.source.ready"
+          },
+          "timeout": 30
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "layers": 2
+        }
+      ]
+    },
+    {
+      "mark": "play-keys",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "learn:osp.keyboard"
+        },
+        {
+          "do": "key",
+          "note": 48,
+          "seconds": 0.9
+        },
+        {
+          "do": "key",
+          "note": 55,
+          "seconds": 0.9
+        },
+        {
+          "do": "key",
+          "note": 60,
+          "seconds": 1.2
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.2
+        }
+      ],
+      "expect": [
+        {
+          "notesPlayed": 3
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.source.card",
+      "learn:osp.source.dropZone",
+      "learn:osp.keyboard"
+    ],
+    "context": 0.06,
+    "aspect": "16:10"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.source.dropZone",
+      "osp.source.ready",
+      "osp.keyboard"
+    ],
+    "sources": [
+      "apps/plugin/Source/PluginEditor.cpp",
+      "shared/andor-ui/Source/InstrumentFrame.cpp",
+      "shared/andor-ui/Source/EngineCard.cpp",
+      "apps/plugin/Source/TutorialSounds.cpp"
+    ]
+  },
+  "disclosures": [
+    "The file arrives through the editor's own drop handler (filesDropped); the travelling file badge is drawn in post-production. It is not a recording of an operating-system drag-and-drop."
+  ]
+}

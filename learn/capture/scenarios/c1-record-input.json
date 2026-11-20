@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.c1-record-input",
+  "product": "osp",
+  "title": "Record from an audio input",
+  "guides": [
+    "osp.guide.make.record-input"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 18.0,
+  "start": {
+    "state": "empty instrument, Sidechain input connected",
+    "input": true,
+    "setup": []
+  },
+  "steps": [
+    {
+      "mark": "open-record",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.8
+        },
+        {
+          "do": "click",
+          "target": "button:Record",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "capturePage": true
+        }
+      ]
+    },
+    {
+      "mark": "record",
+      "do": [
+        {
+          "do": "click",
+          "target": "capture:record",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "input",
+          "fixture": "input:phrase-d4"
+        },
+        {
+          "do": "hold",
+          "seconds": 5.3
+        }
+      ],
+      "expect": [
+        {
+          "recording": "A"
+        }
+      ]
+    },
+    {
+      "mark": "stop",
+      "do": [
+        {
+          "do": "click",
+          "target": "capture:record",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "mapped": "A"
+          },
+          "timeout": 60
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "recording": "none"
+        },
+        {
+          "layers": 1
+        },
+        {
+          "state": "osp.source.mapped"
+        }
+      ]
+    },
+    {
+      "mark": "play-mapped",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "learn:osp.keyboard"
+        },
+        {
+          "do": "key",
+          "note": 62,
+          "seconds": 0.45,
+          "after": 0.1
+        },
+        {
+          "do": "key",
+          "note": 65,
+          "seconds": 0.45,
+          "after": 0.1
+        },
+        {
+          "do": "key",
+          "note": 69,
+          "seconds": 0.45,
+          "after": 0.1
+        },
+        {
+          "do": "key",
+          "note": 72,
+          "seconds": 0.7,
+          "after": 0.1
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "notesPlayed": 4
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.source.dropZone",
+      "capture:page",
+      "card:A.card",
+      "learn:osp.keyboard"
+    ],
+    "context": 0.04,
+    "aspect": "16:10"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.source.dropZone",
+      "osp.source.mapped",
+      "osp.keyboard"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/EngineCard.cpp",
+      "apps/plugin/Source/PluginEditor.cpp",
+      "apps/plugin/Source/PluginProcessor.cpp",
+      "shared/andor-ui/Source/EqEditor.cpp",
+      "src/audio/capture/CaptureBuffer.cpp"
+    ]
+  },
+  "disclosures": [
+    "The input audio is a deterministic fixture (five sung vowels, D4 F4 A4 C5 A4) fed into OSP's Sidechain input bus by the capture runner, block by block, as a host would send it. The meter, level picture, trim, analysis and note mapping are OSP's own. Routing a DAW track to that input has not yet been verified in Logic, Ableton or Reaper."
+  ]
+}

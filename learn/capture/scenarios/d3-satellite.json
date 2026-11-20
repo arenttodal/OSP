@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.d3-satellite",
+  "product": "osp",
+  "title": "Move each layer in the stereo field",
+  "guides": [
+    "osp.guide.arp.satellite"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "three layers, ARP panel open, ARP off (SATELLITE does not need it), a chord held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed",
+          "voice",
+          "pluck"
+        ]
+      },
+      {
+        "do": "expandArp"
+      },
+      {
+        "do": "setParam",
+        "id": "arp.enabled",
+        "value": 0
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          48,
+          55,
+          60,
+          64
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 1.0
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-satellite",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.8
+        },
+        {
+          "do": "click",
+          "target": "arp:satellite.name",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "popover": true
+        },
+        {
+          "param": "arp.enabled",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "mark": "satellite-on",
+      "do": [
+        {
+          "do": "click",
+          "target": "param:layerA.satellite.enabled",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 2.0
+        }
+      ],
+      "expect": [
+        {
+          "param": "layerA.satellite.enabled",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "mark": "orbit",
+      "do": [
+        {
+          "do": "click",
+          "target": "param:layerA.satellite.mode#1/3",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 2.4
+        }
+      ],
+      "expect": [
+        {
+          "param": "layerA.satellite.mode",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "mark": "rate",
+      "do": [
+        {
+          "do": "drag",
+          "target": "param:layerA.satellite.division",
+          "dy": -50,
+          "seconds": 0.9
+        },
+        {
+          "do": "hold",
+          "seconds": 2.2
+        }
+      ],
+      "expect": []
+    }
+  ],
+  "frame": {
+    "focus": [
+      "arp:panel",
+      "popover:open",
+      "card:A.card"
+    ],
+    "context": 0.02,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.arp.panel"
+    ],
+    "parameters": [
+      "layerA.satellite.enabled",
+      "layerA.satellite.mode",
+      "layerA.satellite.division"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/SatellitePanel.cpp",
+      "src/engine/SatelliteMotion.h",
+      "shared/andor-ui/Source/ArpSection.cpp",
+      "shared/andor-ui/Source/CardArpLanes.h",
+      "apps/plugin/Source/PluginEditor.cpp"
+    ]
+  },
+  "disclosures": [
+    "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

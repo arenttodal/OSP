@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.d2-arp-strum",
+  "product": "osp",
+  "title": "Strum a chord",
+  "guides": [
+    "osp.guide.arp.strum"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "three layers, ARP panel open, ARP on, LINK off, EDIT C, a chord held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed",
+          "voice",
+          "pluck"
+        ]
+      },
+      {
+        "do": "expandArp"
+      },
+      {
+        "do": "setParam",
+        "id": "arp.enabled",
+        "value": 1
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          48,
+          55,
+          60,
+          64
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "arpLink",
+        "value": false
+      },
+      {
+        "do": "arpEditCard",
+        "layer": 2
+      },
+      {
+        "do": "settle",
+        "seconds": 1.0
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "choose-chord",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.8
+        },
+        {
+          "do": "scrollUntil",
+          "target": "arp:list",
+          "until": "arp:pattern.5"
+        },
+        {
+          "do": "click",
+          "target": "arp:pattern.5",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "arp.cardC.pattern",
+          "equals": "CHORD"
+        }
+      ]
+    },
+    {
+      "mark": "open-strum",
+      "do": [
+        {
+          "do": "click",
+          "target": "arp:strum.name",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "popover": true
+        }
+      ]
+    },
+    {
+      "mark": "strum-on",
+      "do": [
+        {
+          "do": "click",
+          "target": "param:arp.cardC.strum.on",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.2
+        }
+      ],
+      "expect": [
+        {
+          "param": "arp.cardC.strum.on",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "mark": "direction",
+      "do": [
+        {
+          "do": "click",
+          "target": "param:arp.cardC.strum.direction#1/4",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "arp.cardC.strum.direction",
+          "equals": "DOWN"
+        }
+      ]
+    },
+    {
+      "mark": "spread",
+      "do": [
+        {
+          "do": "drag",
+          "target": "param:arp.cardC.strum.ms",
+          "dy": -60,
+          "seconds": 0.9
+        },
+        {
+          "do": "hold",
+          "seconds": 1.6
+        }
+      ],
+      "expect": [
+        {
+          "param": "arp.cardC.strum.ms",
+          "min": 25
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:C.card",
+      "arp:panel",
+      "popover:open",
+      "learn:osp.keyboard"
+    ],
+    "context": 0.02,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.arp.panel"
+    ],
+    "parameters": [
+      "arp.cardC.pattern",
+      "arp.cardC.strum.on",
+      "arp.cardC.strum.direction",
+      "arp.cardC.strum.ms"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/ArpSection.cpp",
+      "shared/andor-ui/Source/CardArpLanes.h",
+      "apps/plugin/Source/PluginEditor.cpp",
+      "shared/andor-ui/Source/StrumPanel.cpp"
+    ]
+  },
+  "disclosures": [
+    "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}
