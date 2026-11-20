@@ -127,6 +127,9 @@ public:
     void openModulationPopup (int which, int source);
     MiniPanel* openPopupPanel() noexcept { return popup.get(); }
     void closePopup();
+    /** Closes the popup as the musician asked (Escape, a click outside, its anchor again): the
+        panel may keep itself open to ask first (MiniPanel::dismissRequested). */
+    void requestClosePopup();
     int openPopupIndex() const noexcept { return popupIndex; }
     /** A mouse press anywhere on the desktop (from the global listener): a press elsewhere in
         this editor closes the open popup. Public for tests. */

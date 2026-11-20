@@ -1,5 +1,104 @@
 # Status
 
+> **20 Nov 2026, Custom Pattern UX redesign R2 (owner's spec; shared, so ANDOR OSP and every
+> shell product; `docs/research/custom-arp/05-r2.md`):**
+> - **ARP list:** the three custom rows became one, **Custom Patterns ›**, which opens a
+>   browser: the card's pattern with Edit, recent ones, your library, the nine factory patterns
+>   (a collapsible group), + New Pattern. A click chooses (CUSTOM on, one undo step) and closes;
+>   opening and closing it changes nothing. The pattern field shows the pattern's name and a
+>   pencil that opens the editor.
+> - **Editor (700 × 424):**
+>   - one dominant grid; the original take folds into a strip;
+>   - TIMING / GRID / MAPPING selectors and LENGTH − +;
+>   - a contextual toolbar (Split, Make Rest, Add Step, Transform ▾; Merge and Extend when they
+>     apply; Undo, Redo);
+>   - Preview, Cancel, Apply Pattern (the one accent);
+>   - the library in the ··· menu; help and close icons.
+> - **Direct manipulation:** double-click a rest for a note, drag a note's edge for its length
+>   (the pattern's length kept), and a right-click menu that keeps "make a rest" apart from
+>   "remove its time". Delete makes a rest, Shift-Delete removes the time. Long patterns scroll.
+> - **Safety:**
+>   - A rebuild from the take asks only when manual edits would be lost; so do Record and Import.
+>   - Undo restores whole documents (TIMING with its pattern).
+>   - Changes neither applied nor saved ask "Discard changes to this pattern?" through the
+>     hosts' new dismissal hook (`MiniPanel::dismissRequested`), never from a destructor.
+> - **Model:** `edit::resizeEnd`, `resizeStart` and `placeNote`, plus
+>   `SnapshotHistory<Document>`, all pure and tested.
+> - **Unchanged:** the engine, the file format, the state, the parameter IDs and the factory
+>   patterns.
+> - **Tests:** `[arp-custom-r2]` (17 cases), `[arp-pattern-r2]` (3), the shell's R2 case, and
+>   the updated `[arp-custom-ui]`. Screenshots: `[custom-arp-shots]`.
+>
+> **20 Nov 2026, granular POS line flicker (owner's report, ANDOR OSP and the shell):**
+> - **Symptom:** on older granular patches the POS line (with its flare) jumped between where
+>   it should be and another place, often the left edge of the sample.
+> - **Cause:** in a patch whose only modulation routes are per voice (an envelope or LFO on
+>   grain POS, SPREAD or START), `applyGlobalModulation` cleared every effective slot at each
+>   32-sample chunk, the per-voice ones included, and `publishVoiceEffective` set them again
+>   only after the block. For most of every block the card read "no value" and drew the knob,
+>   the rest of the time the modulated value: the line flipped between the two.
+> - **Fix:** `clearEffective` clears only the shared-stage and EQ slots (the per-voice slots
+>   belong to `publishVoiceEffective`). The reader also yields when it meets the audio thread
+>   mid-write, instead of giving up after 64 spins.
+> - **Test:** `[plugin][effective][voice]` holds a note while a second thread reads POS during
+>   rendering: no read may fall back to the knob. Without the fix, 92 % did.
+> - **Note:** the line now shows steadily what the newest note plays. If an old patch has a
+>   route that pulls POS to 0, the line stays at the left, and so does the sound.
+>
+> **19 Nov 2026, macOS release infrastructure and ANDOR OSP 0.9.0-beta.1 (branch
+> `claude/macos-release`, from `claude/custom-arp`; `docs/release/`, `packaging/release/`):**
+> - **One release command:** `packaging/release/andor-release.sh --product osp`. It runs
+>   preflight, a fresh universal Release build (OSP_FACTORY_AUTHORING OFF) and the full ctest,
+>   then signs inside-out (hardened runtime, secure timestamps, the app's audio-input
+>   entitlement only). It builds a PKG with selectable AU / VST3 / app choices and an optional,
+>   unticked move of earlier per-user test builds (moved, never deleted). It notarizes
+>   (Accepted with no issues, or it stops), staples and verifies (codesign, pkgutil, spctl,
+>   stapler), checks the payload, and writes a SHA-256, a release manifest
+>   (`andor.release-manifest` 1), release notes and a verification report. `--install-test`
+>   also installs and runs auval, pluginval and a launch. Every mandatory step fails closed.
+> - **Version:** one source, `packaging/release/products/osp/version.env`: 0.9.0-beta.1,
+>   build 1, CFBundleVersion 0.9.0.1, channel beta. CMake reads it; the About panel shows
+>   version, build and commit. The identity is unchanged: `com.osp.instrument`, AU
+>   `aumu Osp1 Ospx`, parameter IDs and state.
+> - **Reusable:** product-specific values live in `products/<product>/`; ANALOG and Modular add
+>   their own.
+> - **GitHub Actions:** `release-macos.yml`, run by hand. It is guarded by two environments
+>   with the owner as required reviewer, signs from a temporary keychain and notarizes with an
+>   App Store Connect API key. It only ever creates a draft pre-release. `ci.yml` stays
+>   unsigned, and now also runs the release scripts' tests (25 checks, stand-in Apple tools).
+> - **Tested here (Linux):** the release flow and each fail-closed gate with stand-in tools.
+>   **Not run yet:** any real signing, notarization or installation. That runs on the owner's
+>   Mac (`docs/release/RELEASE_RUNBOOK.md`).
+> - **NOTES FILL (owner's request):** a phrase made into NOTES (dropped, RECORDed, GRABbed)
+>   starts with FILL at ±24 st (`atlas::Mapping::phraseFillSemitones`), set in
+>   `loadAnalysedRecording`. Saved atlases keep their reach, as do multi-sample sets, the
+>   research renders and the goldens (the struct default stays 12). Checked in the plugin's
+>   phrase test (`[phase4]`).
+> - **DETECTION FEWER minimum (owner's request):** with FEWER no note is shorter than 0.4 s
+>   (`AnalysisSettings::fewerMinNoteSeconds`). Before, FEWER only made the splitting rules
+>   stricter, so a phrase of clearly separated notes looked the same at all three settings.
+>   - A shorter piece joined to a neighbour becomes part of it (the nearer in pitch, else the
+>     longer).
+>   - A lone short note stays in the atlas, switched off.
+>
+>   NORMAL and MORE are unchanged; the settings digest gains the minimum.
+>   `[phrase][fewer]` covers it on contours and on synthesized audio.
+> - **MIDI LEARN (owner's request, ANDOR OSP and the shell):** right-click a control, **Learn
+>   MIDI CC**, move a controller. That controller now turns the parameter itself, through the
+>   host, in a change gesture (`shared/andor-ui/Source/MidiLearn`).
+>   - The audio thread only posts the value; a 60 Hz message timer applies it (no lock, no
+>     allocation; tested).
+>   - Mappings are saved with the session only: presets never carry them, and loading a preset
+>     keeps them.
+>   - A learned controller takes over the built-in CC 20-27 macro shortcut.
+>
+>   Tests: `[midi-learn]` (plugin, 3 cases) and the shell test.
+> - **NEXT:**
+>   - the owner runs the release on the Mac, then the manual checklist
+>     (`docs/release/BETA_TESTING.md`);
+>   - the GitHub secrets (`docs/release/OWNER_SETUP_MACOS.md`);
+>   - factory packs (none pinned yet);
+>   - the ceramic cache fix (resize speed and memory), still unmerged.
 > **20 Nov 2026, ANDOR ANALOG parity R1: the shell's preset saving and menus (branch
 > `claude/analog-parity-r1`, on the default line plus `claude/shell-window-once`; ANALOG's
 > `docs/OSP_PARITY_AUDIT.md`):** what ANDOR OSP's own editor gained (79e56e82, 0719b910, 897d1130)

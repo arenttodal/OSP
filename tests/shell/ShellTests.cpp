@@ -5,6 +5,8 @@
 // run by ctest after osp_visual_reference).
 
 #include "Binding.h"
+#include "CustomPatternBrowser.h"
+#include "CustomPatternEditor.h"
 #include "ShellEditor.h"
 #include "ShellProcessor.h"
 
@@ -1428,4 +1430,43 @@ TEST_CASE ("shell: custom ARP patterns are saved with the state and presets; a s
     r.setStateInformation (older.getData(), static_cast<int> (older.getSize()));
     CHECK (r.customArpDocument (2) == nullptr);
     CHECK (r.customArpPattern (2) == nullptr);
+}
+
+TEST_CASE ("shell: the custom pattern browser and editor (R2) work through the shell's popover host; the discard question is asked, not skipped", "[shell][arp-custom][arp-custom-r2]")
+{
+    // The same shared panels as ANDOR OSP: the browser opens from the ARP list's one row, the
+    // editor asks before discarding through the host's dismissal (Escape, a click outside), and
+    // the host closing it for its own reasons restores the card without asking.
+    ShellProcessor p;
+    if (! p.runsArpeggiator())
+        return;   // (a product without the arpeggiator has no patterns to edit)
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<ShellEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    auto& arp = ui->arpInlinePanel();
+    CHECK (osp::plugin::ArpInlinePanel::listRows == osp::arp::patternCount + 1);
+    arp.openCustomBrowser();
+    auto* browser = dynamic_cast<osp::plugin::CustomPatternBrowser*> (ui->openPopupPanel());
+    REQUIRE (browser != nullptr);
+    CHECK (browser->find (osp::plugin::CustomPatternBrowser::Kind::newPattern) >= 0);
+    ui->requestClosePopup();
+    CHECK (ui->openPopupPanel() == nullptr);
+
+    arp.openCustomEditor (true);
+    auto* e = dynamic_cast<osp::plugin::CustomPatternEditor*> (ui->openPopupPanel());
+    REQUIRE (e != nullptr);
+    ui->requestClosePopup();   // untouched: closes at once
+    CHECK (ui->openPopupPanel() == nullptr);
+    arp.openCustomEditor (true);
+    e = dynamic_cast<osp::plugin::CustomPatternEditor*> (ui->openPopupPanel());
+    REQUIRE (e != nullptr);
+    e->useTake ({ { 0.0, 0.2, 60, 100 }, { 0.25, 0.2, 64, 100 }, { 0.5, 0.2, 67, 100 } }, 120.0);
+    e->perform (osp::plugin::CustomPatternEditor::Action::preview);
+    ui->requestClosePopup();
+    REQUIRE (ui->openPopupPanel() == e);   // asked first
+    CHECK (e->dialogShown());
+    ui->closePopup();   // the host's own close: no question, the card as it was
+    CHECK (ui->openPopupPanel() == nullptr);
+    CHECK (p.customArpPattern (0) == nullptr);
+    CHECK (p.customArpDocument (0) == nullptr);
 }

@@ -131,6 +131,17 @@ namespace edit
     void rotate (Pattern&, int events);
     bool setLength (Pattern&, int ticks);                  ///< longer: a rest at the end; shorter: only trailing rest is cut
     void setMapping (Pattern&, arp::CustomMapping);
+    /** R2, an edge dragged on the grid (the pattern's length kept). The end of event `index` moves
+        so that it lasts `duration` ticks: longer takes the time from the rest after it (never
+        from a note), shorter gives it to that rest (or a new rest). Every event, and any rest
+        left, keeps at least arp::minEventTicks. */
+    bool resizeEnd (Pattern&, int index, int duration);
+    /** The start of event `index` moves (its end stays) so that it lasts `duration` ticks: the
+        time comes from, or goes to, the rest before it (or a new rest). Not for the first event. */
+    bool resizeStart (Pattern&, int index, int duration);
+    /** A note of `duration` ticks, rank `rank`, `offset` ticks into the rest `index`: what is left
+        of the rest on either side stays rests (each at least arp::minEventTicks, or none). */
+    bool placeNote (Pattern&, int index, int offset, int duration, int rank);
 }
 
 /** A bounded undo history of whole patterns (one entry per completed gesture). */
@@ -153,6 +164,67 @@ public:
 
 private:
     std::vector<Pattern> states;
+    int position = 0;
+};
+
+/**
+    A bounded undo history of whole states (R2: the editor keeps whole documents, so undoing a
+    rebuild from the take restores TIMING and MAPPING with the pattern). Header-only.
+*/
+template <typename State>
+class SnapshotHistory
+{
+public:
+    static constexpr int capacity = 200;
+    void reset (const State& now)
+    {
+        states.assign (1, now);
+        position = 0;
+    }
+    /** After a successful edit: `now` is the new state (a new edit drops the redo branch). */
+    void push (const State& now)
+    {
+        if (states.empty())
+        {
+            reset (now);
+            return;
+        }
+        states.resize (static_cast<std::size_t> (position + 1));
+        states.push_back (now);
+        if (static_cast<int> (states.size()) > capacity)
+            states.erase (states.begin());
+        position = static_cast<int> (states.size()) - 1;
+    }
+    bool canUndo() const noexcept { return position > 0; }
+    bool canRedo() const noexcept { return position + 1 < static_cast<int> (states.size()); }
+    const State& undo()
+    {
+        if (canUndo())
+            --position;
+        return current();
+    }
+    const State& redo()
+    {
+        if (canRedo())
+            ++position;
+        return current();
+    }
+    const State& current() const
+    {
+        static const State none {};
+        return states.empty() ? none : states[static_cast<std::size_t> (position)];
+    }
+    int size() const noexcept { return static_cast<int> (states.size()); }
+    /** Changes every state at once (what is not an undo step, such as a pattern's name). */
+    template <typename Fn>
+    void updateAll (Fn fn)
+    {
+        for (auto& s : states)
+            fn (s);
+    }
+
+private:
+    std::vector<State> states;
     int position = 0;
 };
 

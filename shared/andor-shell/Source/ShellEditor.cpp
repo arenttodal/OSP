@@ -1167,7 +1167,7 @@ bool ShellEditor::keyPressed (const juce::KeyPress& key)
         return true;
     if (key == juce::KeyPress::escapeKey && popup != nullptr)
     {
-        closePopup();
+        requestClosePopup();
         return true;
     }
     if (key == juce::KeyPress::escapeKey && isWellEditorShown())
@@ -1422,6 +1422,13 @@ void ShellEditor::closePopup()
     popupIndex = -1;
 }
 
+void ShellEditor::requestClosePopup()
+{
+    if (popup != nullptr && ! popup->dismissRequested())
+        return;
+    closePopup();
+}
+
 void ShellEditor::openAnchoredPopover (std::unique_ptr<osp::plugin::MiniPanel> panel, juce::Component& anchor)
 {
     closePopup();
@@ -1431,7 +1438,7 @@ void ShellEditor::openAnchoredPopover (std::unique_ptr<osp::plugin::MiniPanel> p
     popupAnchor = &anchor;
     // The backdrop: the click that closes the panel goes nowhere else.
     juce::Component::SafePointer<ShellEditor> safe (this);
-    popupBackdrop.onPress = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closePopup(); }); };
+    popupBackdrop.onPress = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->requestClosePopup(); }); };
     popupBackdrop.setBounds (content.getLocalBounds());
     content.addAndMakeVisible (popupBackdrop);
     presentPopup (anchoredPopup);
@@ -1445,7 +1452,7 @@ bool ShellEditor::anchoredPopoverOpenFrom (const juce::Component& anchor) const
 void ShellEditor::closeAnchoredPopover()
 {
     if (popupIndex == anchoredPopup)
-        closePopup();
+        requestClosePopup();   // (its anchor again: as the musician asked)
 }
 
 //==============================================================================

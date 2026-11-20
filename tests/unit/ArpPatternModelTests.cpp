@@ -303,3 +303,116 @@ TEST_CASE ("arp pattern model: MIDI import keeps tracks, channels, tempo, PPQ, v
     CHECK (readMidiPhrases (bad.path, error).empty());
     CHECK_FALSE (error.empty());
 }
+
+TEST_CASE ("arp pattern model: an edge dragged keeps the pattern's length, never covers a note, keeps the shortest event (R2)", "[unit][arp-pattern][arp-pattern-r2]")
+{
+    // note 1 step, rest 2 steps, note 1 step: 4 steps.
+    auto p = simple ({ { 0, T }, { -1, 2 * T }, { 2, T } }, 2);
+    const int length = p.lengthTicks();
+    // The end later: into the rest after it (part, then all of it).
+    auto a = p;
+    CHECK (ap::edit::resizeEnd (a, 0, T + T / 2));
+    CHECK (a.events[0].duration == T + T / 2);
+    CHECK (a.events[1].rest);
+    CHECK (a.events[1].duration == T + T / 2);
+    CHECK (a.lengthTicks() == length);
+    CHECK (ap::edit::resizeEnd (a, 0, 3 * T));   // the rest used up: it goes
+    CHECK (a.events.size() == 2);
+    CHECK (a.lengthTicks() == length);
+    // Never over the next note, never past the end, never a sliver of rest.
+    auto b = p;
+    CHECK_FALSE (ap::edit::resizeEnd (b, 0, 3 * T + 1));
+    CHECK_FALSE (ap::edit::resizeEnd (b, 0, 3 * T - arp::minEventTicks / 2));
+    CHECK_FALSE (ap::edit::resizeEnd (b, 2, 2 * T));   // the last event: no rest after it
+    CHECK (b == p);
+    // The end earlier: the time becomes rest (the rest after grows, or a new one).
+    CHECK (ap::edit::resizeEnd (b, 0, T / 2));
+    CHECK (b.events[1].duration == 2 * T + T / 2);
+    CHECK (ap::edit::resizeEnd (b, 2, T / 4));   // the last note: a new rest after it
+    REQUIRE (b.events.size() == 4);
+    CHECK (b.events[3].rest);
+    CHECK (b.events[3].duration == T - T / 4);
+    CHECK (b.lengthTicks() == length);
+    CHECK_FALSE (ap::edit::resizeEnd (b, 0, arp::minEventTicks - 1));   // the shortest event
+    // The start: from or into the rest before it; never the first event's.
+    auto c = p;
+    CHECK (ap::edit::resizeStart (c, 2, 2 * T));   // starts a step earlier
+    CHECK (c.events[1].duration == T);
+    CHECK (c.events[2].duration == 2 * T);
+    CHECK (c.lengthTicks() == length);
+    CHECK (ap::edit::resizeStart (c, 2, T / 2));   // later: the rest before it grows
+    CHECK (c.events[1].duration == T + 3 * T / 2);
+    CHECK_FALSE (ap::edit::resizeStart (c, 0, 2 * T));
+    auto d = simple ({ { 0, T }, { 1, T } }, 1);
+    CHECK_FALSE (ap::edit::resizeStart (d, 1, 2 * T));   // the note before it stays whole
+    CHECK (ap::edit::resizeStart (d, 1, T / 2));         // a rest opens between them
+    REQUIRE (d.events.size() == 3);
+    CHECK (d.events[1].rest);
+    CHECK (d.events[1].duration == T / 2);
+    CHECK (d.lengthTicks() == 2 * T);
+    // Across several rests in a row (as long as no note is in the way).
+    auto f = simple ({ { 0, T }, { -1, T }, { -1, T }, { 1, T } }, 1);
+    CHECK (ap::edit::resizeEnd (f, 0, 2 * T + T / 2));
+    REQUIRE (f.events.size() == 3);
+    CHECK (f.events[1].rest);
+    CHECK (f.events[1].duration == T / 2);
+    CHECK (f.lengthTicks() == 4 * T);
+    auto g = simple ({ { 0, T }, { -1, T }, { -1, T }, { 1, T } }, 1);
+    CHECK (ap::edit::resizeStart (g, 3, 3 * T));   // back to the first note's end
+    REQUIRE (g.events.size() == 2);
+    CHECK (g.events[1].duration == 3 * T);
+    CHECK_FALSE (ap::edit::resizeStart (g, 1, 4 * T));   // never over the note before
+    // Every result stays exact integer ticks and valid.
+    for (const auto* q : { &a, &b, &c, &d, &f, &g })
+        CHECK (q->valid());
+}
+
+TEST_CASE ("arp pattern model: a note placed inside a rest, the rest's time around it kept (R2)", "[unit][arp-pattern][arp-pattern-r2]")
+{
+    auto p = simple ({ { 0, T }, { -1, 4 * T } }, 0);
+    CHECK (ap::edit::placeNote (p, 1, T, T, 3));   // the second step of the rest
+    REQUIRE (p.events.size() == 4);
+    CHECK (p.events[1].rest);
+    CHECK (p.events[1].duration == T);
+    CHECK_FALSE (p.events[2].rest);
+    CHECK (p.events[2].rank == 3);
+    CHECK (p.events[2].duration == T);
+    CHECK (p.events[3].rest);
+    CHECK (p.events[3].duration == 2 * T);
+    CHECK (p.maxRank == 3);
+    CHECK (p.lengthTicks() == 5 * T);
+    // At the rest's start or end: no empty rest left behind.
+    auto q = simple ({ { -1, 2 * T } }, 0);
+    CHECK (ap::edit::placeNote (q, 0, 0, T, 0));
+    CHECK (q.events.size() == 2);
+    CHECK (ap::edit::placeNote (q, 1, 0, T, 1));
+    CHECK (q.events.size() == 2);
+    CHECK (q.notes() == 2);
+    // Refused: on a note, past the rest, a sliver of rest, a rank beyond the limit.
+    auto r = simple ({ { 0, T }, { -1, T } }, 0);
+    CHECK_FALSE (ap::edit::placeNote (r, 0, 0, T, 1));
+    CHECK_FALSE (ap::edit::placeNote (r, 1, T / 2, T, 1));
+    CHECK_FALSE (ap::edit::placeNote (r, 1, arp::minEventTicks / 2, T / 2, 1));
+    CHECK_FALSE (ap::edit::placeNote (r, 1, 0, T, ap::maxRankLimit + 1));
+    CHECK (r == simple ({ { 0, T }, { -1, T } }, 0));
+}
+
+TEST_CASE ("arp pattern model: the document history restores whole documents and renames every state (R2)", "[unit][arp-pattern][arp-pattern-r2]")
+{
+    ap::SnapshotHistory<ap::Document> h;
+    ap::Document d;
+    d.id = "x";
+    d.name = "First";
+    d.interpretation.timing = ap::Interpretation::Timing::steps;
+    h.reset (d);
+    d.interpretation.timing = ap::Interpretation::Timing::rhythm;
+    d.pattern = simple ({ { 0, T } }, 0);
+    h.push (d);
+    h.updateAll ([] (ap::Document& s) { s.name = "Renamed"; });
+    const auto& back = h.undo();
+    CHECK (back.interpretation.timing == ap::Interpretation::Timing::steps);   // the reading with the pattern
+    CHECK (back.pattern.events.empty());
+    CHECK (back.name == "Renamed");
+    CHECK (h.redo().pattern.events.size() == 1);
+    CHECK_FALSE (h.canRedo());
+}
