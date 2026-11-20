@@ -13,7 +13,11 @@
 >   open; + New Pattern, a factory pattern, Edit and the pencil work. It fails without the fix.
 >   ANDOR ANALOG has the same test (`CustomArpParityTests`), real window under Xvfb.
 > - OSP's own real-window tests still fail under this container's Xvfb (`BadAtom`, already noted
->   for `[menu-visual]`); their routed path runs here and on macOS CI.
+>   for `[menu-visual]`); their routed path runs here.
+> - **macOS CI:** the browser opens a message after the click, and a test cannot pump the
+>   message loop on macOS (`pumpMessages` returns false), so the click test failed there; it now
+>   returns early on such platforms, as OSP's other message-loop tests do (31aed041). Linux and
+>   Windows run it; on macOS the clicks are the owner's test in the hosts.
 > - Not taken from the beta: the DAMPEN Starting States commit (3c260390, ANDOR OSP's own
 >   presets), as with its release work, MIDI Learn and the POS-line fix.
 >
