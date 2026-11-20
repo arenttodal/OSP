@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.i6-echo-space",
+  "product": "osp",
+  "title": "Add ECHO and SPACE",
+  "guides": [
+    "osp.guide.shape.effects"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.sound"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "marginRight": 260
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (pluck)",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "pluck"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "echo",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "highlight",
+          "target": "macroknob:echo"
+        },
+        {
+          "do": "drag",
+          "target": "macroknob:echo",
+          "dy": -80,
+          "seconds": 0.9
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "key",
+          "note": 60,
+          "seconds": 0.3,
+          "after": 0.1
+        },
+        {
+          "do": "hold",
+          "seconds": 1.4
+        }
+      ],
+      "expect": [
+        {
+          "param": "echo",
+          "min": 20
+        }
+      ]
+    },
+    {
+      "mark": "open-space",
+      "do": [
+        {
+          "do": "click",
+          "target": "macrolabel:space",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "popover": true
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hold",
+          "seconds": 0.5
+        }
+      ]
+    },
+    {
+      "mark": "space-type",
+      "do": [
+        {
+          "do": "click",
+          "target": "popsel:0",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:Plate"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "click",
+          "target": "menu:Plate"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "space.type",
+          "equals": "Plate"
+        }
+      ]
+    },
+    {
+      "mark": "space-amount",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "macroknob:space"
+        },
+        {
+          "do": "drag",
+          "target": "macroknob:space",
+          "dy": -80,
+          "seconds": 0.9
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "key",
+          "note": 60,
+          "seconds": 0.3,
+          "after": 0.1
+        },
+        {
+          "do": "hold",
+          "seconds": 1.6
+        }
+      ],
+      "expect": [
+        {
+          "param": "space",
+          "min": 20
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.macros",
+      "popover:open",
+      "menuOpen:",
+      "learn:osp.keyboard"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.macro.echo",
+      "osp.macro.space"
+    ],
+    "parameters": [
+      "echo",
+      "space",
+      "space.type"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/MacroPopups.cpp"
+    ]
+  },
+  "disclosures": []
+}

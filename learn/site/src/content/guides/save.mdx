@@ -1,0 +1,23 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.make.save
+product: osp
+group: make-an-instrument
+order: 50
+title: "Save the sound as a preset"
+purpose: "Keep the sound in the Library on this computer."
+tags: ["save", "preset", "library"]
+synonyms: ["save", "preset", "library", "keep sound", "store"]
+learn: { lessons: ["osp.presets"], info: [] }
+reference: osp.ref.presets
+related: ["osp.guide.make.export", "osp.guide.play.presets"]
+preconditions: []
+scene: osp.scene.e1-save-preset
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: open-library, instruction: "Click LIBRARY beside the keyboard.", result: "The Library opens." }
+  - { id: save, instruction: "Click Save….", result: "The Save to Library sheet opens." }
+  - { id: name, instruction: "Double-click the name, type a new one and click Save to Library.", result: "The preset is kept in the Library." }
+---

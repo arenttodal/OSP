@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.g3-sub",
+  "title": "Add SUB under your keys",
+  "scenarioDigest": "sha256:136652ae743e12a377a8533c30310980f7673967456ba5f47abbbf11ea837930",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.arp.sub"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.sub"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "osp.sub.row",
+    "osp.popup.sub.open"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    }
+  ],
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 343,
+    "crop": [
+      0,
+      219,
+      2896,
+      2063
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1018,
+    "fps": 30,
+    "frames": 343,
+    "duration": 11.433,
+    "files": {
+      "webm": {
+        "path": "g3-sub/g3-sub.webm",
+        "codec": "vp9",
+        "bytes": 653809,
+        "sha256": "ebcad682c61305b3c66d60a348ac6003c0ecd300c6bb2e1a98eab41d3e4a893a"
+      },
+      "mp4": {
+        "path": "g3-sub/g3-sub.mp4",
+        "codec": "h264",
+        "bytes": 619868,
+        "sha256": "d7e44a1e6ddc812c8172e5e4843e0d663b21113f524d8296e22784e814b317d4"
+      }
+    }
+  },
+  "marks": {
+    "open-sub": 0.0,
+    "sub-on": 2.9,
+    "play-chord": 4.333,
+    "level": 5.967,
+    "wave": 8.467
+  },
+  "steps": {
+    "open-sub": "g3-sub/steps/open-sub.webp",
+    "sub-on": "g3-sub/steps/sub-on.webp",
+    "play-chord": "g3-sub/steps/play-chord.webp",
+    "level": "g3-sub/steps/level.webp",
+    "wave": "g3-sub/steps/wave.webp"
+  },
+  "poster": {
+    "path": "g3-sub/poster.webp",
+    "frame": 315,
+    "sha256": "7173e576efbc4bb5d7652080233b6faddbf6eef5298278eb8b8e3bdbfd3b04ee",
+    "master": "learn/capture/out/g3-sub/poster.png"
+  },
+  "run": {
+    "wallSeconds": 75.864,
+    "meanFrameMs": 203.6,
+    "slowdown": 6.11,
+    "notesPlayed": 3
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "3/3",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "3 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "343 / 343"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 1.63 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "343"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1018"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "343"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1018"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "11.43 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

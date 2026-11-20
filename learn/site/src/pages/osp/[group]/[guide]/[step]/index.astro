@@ -1,0 +1,10 @@
+---
+import GuidePage from '../../../../../components/GuidePage.astro';
+import { allGuides, slugOf } from '../../../../../lib/guides';
+export async function getStaticPaths() {
+  const gs = await allGuides();
+  return gs.flatMap((g, i) => g.data.steps.map((s) => ({ params: { group: g.data.group, guide: slugOf(g), step: s.id }, props: { guide: g, prev: gs[i - 1], next: gs[i + 1], step: s.id } })));
+}
+const { guide, prev, next, step } = Astro.props;
+---
+<GuidePage guide={guide} prev={prev} next={next} step={step} />

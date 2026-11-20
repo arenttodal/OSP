@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.i4-modulation",
+  "product": "osp",
+  "title": "Make FILTER move with an LFO",
+  "guides": [
+    "osp.guide.shape.modulation"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.modulation"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed), a note held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          48
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "lfo-tab",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "learn:osp.mod.lfo1",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.mod.tab.lfo1"
+        }
+      ]
+    },
+    {
+      "mark": "connect",
+      "do": [
+        {
+          "do": "drag",
+          "target": "learn:osp.mod.lfo1",
+          "to": "learn:osp.macro.filter",
+          "seconds": 1.4
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.mod.lfo1.routed"
+        }
+      ]
+    },
+    {
+      "mark": "depth",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "learn:osp.mod.halo"
+        },
+        {
+          "do": "drag",
+          "target": "learn:osp.mod.halo",
+          "dy": -30,
+          "seconds": 0.8
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 2.4
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:A.card",
+      "learn:osp.mod.panel",
+      "learn:osp.macros"
+    ],
+    "context": 0.02,
+    "aspect": "16:10"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.mod.lfo1",
+      "osp.macro.filter",
+      "osp.mod.halo"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/ModulationPanel.cpp",
+      "shared/andor-ui/Source/ModulationOverlay.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

@@ -1,0 +1,27 @@
+---
+schemaVersion: 1
+kind: andor.learn.reference
+id: osp.ref.pedal-loop
+product: osp
+title: "PEDAL LOOP"
+function: "Lets the sustain pedal hold a One Shot note in a loop of the recording, so a decaying sound can be held as long as the pedal is down."
+location: "The playback key at the top right of each card opens a menu; PEDAL LOOP is its lower section. Each layer has its own setting. Nothing else is added to the card."
+parameters:
+  - { name: "Normal", values: "Standard sustain pedal", does: "The pedal sustains notes as usual." }
+  - { name: "Forward", values: "Hold a forward loop", does: "While the pedal is down, the note repeats a short loop of the recording, read forward." }
+  - { name: "Ping-Pong", values: "Hold a forward/reverse loop", does: "While the pedal is down, the note reads a short loop forward and back." }
+dependencies: ["One Shot playback (in Granular the three choices are shown inactive).", "A sustain pedal (MIDI CC 64)."]
+example: "Turn the layer's LOOP off, choose Ping-Pong, play a note and press the pedal halfway through its decay: the note holds near that point, reading back and forth, until you release the pedal."
+guides: ["osp.guide.play.pedal-loop"]
+synonyms: ["sustain pedal", "pedal loop", "ping pong", "ping-pong loop", "hold a note", "freeze", "forward loop", "damper pedal"]
+parameterIds: ["layerA.pedalLoop", "layerB.pedalLoop", "layerC.pedalLoop"]
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "docs/learn-studio/gate-1-report.md and the Gate 0/1 fact sheets" }
+---
+## How the loop is chosen
+
+OSP analyses a recording's loop regions in the background. A sound that sustains gets its best loop; a decaying sound (a pluck, a piano note) gets up to eight short regions along its decay. When the pedal goes down, the note loops in the first region that is still ahead of where it is playing, so a pedal pressed late in the decay holds the sound close to where it already is.
+
+- **With LOOP on**, a sustaining sound already holds through the layer's own loop; Forward then changes nothing there. Ping-Pong always takes over while the pedal is down.
+- **Pedal up, key still held:** the note continues from the loop into the rest of the recording.
+- **Key up, pedal still down:** the note keeps looping until the pedal is released.
+- If a recording has no usable loop, the menu shows "No suitable loop found for this recording".

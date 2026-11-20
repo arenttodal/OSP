@@ -1,0 +1,23 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.shape.effects
+product: osp
+group: shape-and-finish
+order: 50
+title: "Add ECHO and SPACE"
+purpose: "Add repeats and a room around the sound."
+tags: ["echo", "space", "effects"]
+synonyms: ["echo", "delay", "space", "reverb", "plate", "hall", "room", "effects"]
+learn: { lessons: ["osp.sound"], info: [] }
+related: ["osp.guide.shape.filter"]
+preconditions: []
+scene: osp.scene.i6-echo-space
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: echo, instruction: "Turn ECHO up and play.", result: "Repeats follow each note." }
+  - { id: open-space, instruction: "Click SPACE above its knob.", result: "Its settings open." }
+  - { id: space-type, instruction: "Choose a space, such as Plate.", result: "SPACE uses that reverb." }
+  - { id: space-amount, instruction: "Turn SPACE up and play.", result: "The sound sits in a larger space." }
+---

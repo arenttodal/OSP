@@ -1,0 +1,39 @@
+---
+import '../styles/global.css';
+import { productCommit } from '../lib/scenes';
+interface Props { title: string; description?: string; current?: 'home' | 'guides' | 'reference' | 'search'; }
+const { title, description = 'Short, silent demonstrations of each task in ANDOR OSP, recorded from the real instrument.', current } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex" />
+  </head>
+  <body>
+    <a class="sr-only" href="#main">Skip to content</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href={`${base}osp/`}>ANDOR<span>/OSP</span></a>
+        <nav aria-label="Main">
+          <a href={`${base}osp/`} aria-current={current === 'home' ? 'page' : undefined}>Learn</a>
+          <a href={`${base}osp/reference/`} aria-current={current === 'reference' ? 'page' : undefined}>Reference</a>
+        </nav>
+        <span class="spacer"></span>
+        <a class="head-search" href={`${base}osp/search/`}>Search<span class="long"> guides</span></a>
+      </div>
+    </header>
+    <main id="main"><slot /></main>
+    <footer class="site-foot">
+      <div class="wrap">
+        <span>ANDOR OSP 0.9.0-beta.1 · guides captured at {productCommit}</span>
+        <span>Silent demonstrations recorded from the real instrument</span>
+        <span>Preview build · not published</span>
+      </div>
+    </footer>
+  </body>
+</html>

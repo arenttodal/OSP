@@ -1,0 +1,22 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.play.vibrato
+product: osp
+group: play-and-layer
+order: 40
+title: "Add vibrato with the mod wheel"
+purpose: "Let the mod wheel bring in vibrato as you hold a note."
+tags: ["vibrato", "mod wheel"]
+synonyms: ["vibrato", "mod wheel", "modulation wheel", "pitch wobble"]
+learn: { lessons: ["osp.vibrato"], info: [] }
+related: ["osp.guide.play.midi-learn"]
+preconditions: []
+scene: osp.scene.j1-vibrato
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: open-mod, instruction: "Click MOD beneath the modulation wheel.", result: "The MOD WHEEL settings open." }
+  - { id: vibrato-on, instruction: "Choose ON beside VIBRATO.", result: "Vibrato is ready; with MOD WHEEL under CONTROL, the wheel sets how much." }
+  - { id: play-raise, instruction: "Hold a note and raise the mod wheel.", result: "The vibrato grows with the wheel." }
+---

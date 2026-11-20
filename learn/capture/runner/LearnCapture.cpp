@@ -23,6 +23,10 @@
 #include "EqEditor.h"
 #include "ArpSection.h"
 #include "LearnController.h"
+#include "LibraryPanel.h"
+#include "CustomPatternBrowser.h"
+#include "UserMacroController.h"
+#include "ShapingPopups.h"
 
 #include "audio/utility/TestSignals.h"
 #include "io/AudioFileIO.h"
@@ -40,6 +44,7 @@
 #include <mutex>
 #include <thread>
 #include <cstdio>
+#include <dlfcn.h>
 #include <cstring>
 
 using namespace osp::plugin;
@@ -81,6 +86,65 @@ void pumpMessages()
     {
     }
 }
+
+//==============================================================================
+/** Input through the X server itself (XTest): the pointer the window system knows moves with
+    every event, so code that asks where the mouse is (popup menus, their submenus, the
+    editor's outside-click watcher) sees the same place the video shows. Loaded at run time. */
+struct XInput
+{
+    using OpenFn = void* (*) (const char*);
+    using MotionFn = int (*) (void*, int, int, int, unsigned long);
+    using ButtonFn = int (*) (void*, unsigned int, int, unsigned long);
+    using SyncFn = int (*) (void*, int);
+    void* display = nullptr;
+    MotionFn motion = nullptr;
+    ButtonFn button = nullptr;
+    SyncFn sync = nullptr;
+
+    XInput()
+    {
+        auto* x11 = dlopen ("libX11.so.6", RTLD_NOW);
+        auto* xtst = dlopen ("libXtst.so.6", RTLD_NOW);
+        if (x11 == nullptr || xtst == nullptr)
+            return;
+        auto open = reinterpret_cast<OpenFn> (dlsym (x11, "XOpenDisplay"));
+        sync = reinterpret_cast<SyncFn> (dlsym (x11, "XSync"));
+        motion = reinterpret_cast<MotionFn> (dlsym (xtst, "XTestFakeMotionEvent"));
+        button = reinterpret_cast<ButtonFn> (dlsym (xtst, "XTestFakeButtonEvent"));
+        key = reinterpret_cast<KeyFn> (dlsym (xtst, "XTestFakeKeyEvent"));
+        keysym = reinterpret_cast<KeysymFn> (dlsym (x11, "XStringToKeysym"));
+        keycode = reinterpret_cast<KeycodeFn> (dlsym (x11, "XKeysymToKeycode"));
+        if (open != nullptr && sync != nullptr && motion != nullptr && button != nullptr)
+            display = open (nullptr);
+    }
+    using KeyFn = int (*) (void*, unsigned int, int, unsigned long);
+    using KeysymFn = unsigned long (*) (const char*);
+    using KeycodeFn = unsigned char (*) (void*, unsigned long);
+    KeyFn key = nullptr;
+    KeysymFn keysym = nullptr;
+    KeycodeFn keycode = nullptr;
+    bool ok() const noexcept { return display != nullptr; }
+    /** One character typed as a key press and release (letters, digits, space). */
+    void type (juce::juce_wchar c)
+    {
+        if (key == nullptr || keysym == nullptr || keycode == nullptr)
+            return;
+        const juce::String name = c == ' ' ? juce::String ("space") : juce::String::charToString (c);
+        const bool upper = juce::CharacterFunctions::isUpperCase (c);
+        const auto code = keycode (display, keysym (name.toLowerCase().toRawUTF8()));
+        const auto shift = keycode (display, keysym ("Shift_L"));
+        if (upper)
+            key (display, shift, 1, 0);
+        key (display, code, 1, 0);
+        key (display, code, 0, 0);
+        if (upper)
+            key (display, shift, 0, 0);
+        sync (display, 0);
+    }
+    void moveTo (juce::Point<int> screen) { motion (display, -1, screen.x, screen.y, 0); sync (display, 0); }
+    void press (unsigned int b, bool down) { button (display, b, down ? 1 : 0, 0); sync (display, 0); }
+};
 
 //==============================================================================
 /** The frames, as they are taken, into a lossless master (FFmpeg, RGB, x264 at CRF 0) on a
@@ -207,6 +271,7 @@ struct FrameRecord
     juce::StringArray marks;
     juce::Rectangle<int> editorBounds;
     juce::Rectangle<int> focus;   ///< the union of the scenario's focus targets shown in this frame
+    bool sustain = false;         ///< the sustain pedal (CC 64) is down: drawn as a label in post
 };
 
 class Runner
@@ -230,6 +295,17 @@ public:
                 setupAction (a);
             settle (0.6);
             checkNoUnexpected();
+            if (str (scenario["editor"], "canvas") == "arpExpanded")
+            {
+                const bool was = ui->isArpExpanded();
+                ui->setArpExpanded (true);
+                resizeEditor();
+                canvasHeight = editor->getHeight();
+                ui->setArpExpanded (was);
+                resizeEditor();
+                settle (0.3);
+            }
+            canvasHeight = std::max (canvasHeight, editor->getHeight());   // (a window that shrinks later stays on one canvas)
             writer = std::make_unique<FrameWriter> (out.getChildFile ("master.mkv"));
             clockStart = std::chrono::steady_clock::now();
             for (const auto& step : *scenario["steps"].getArray())
@@ -258,6 +334,7 @@ public:
         result->setProperty ("meanSnapshotMs", records.empty() ? 0.0 : snapshotMs / static_cast<double> (records.size()));
         result->setProperty ("meanWriteWaitMs", records.empty() ? 0.0 : writeWaitMs / static_cast<double> (records.size()));
         result->setProperty ("fps", fps);
+        result->setProperty ("input", xinput.ok() ? "XTest (window-system events)" : "component peer events");
         result->setProperty ("scale", captureScale);
         result->setProperty ("fixtures", fixtureLog);
         result->setProperty ("notesPlayed", processor != nullptr ? processor->playedVelocityCount() : 0);
@@ -316,6 +393,7 @@ private:
         if (peer == nullptr)
             throw Failure ("no desktop peer: run under learn/capture/tools/xvfb-wm.sh");
         editor->toFront (true);
+        peer->grabFocus();   // (the window has the keyboard, as the front window of a person's desktop does)
         // Tooltips: the capture runs slower than real time (each frame takes longer than 1/30 s),
         // so a pointer that rests a fraction of a second in the video would have rested long
         // enough in wall-clock time to raise a tooltip a person moving at that speed never sees.
@@ -324,6 +402,11 @@ private:
                 tips->setMillisecondsBeforeTipAppears (1 << 30);
         ui->refreshNow();
         pointer = { static_cast<float> (editor->getWidth()) * 0.62f, static_cast<float> (editor->getHeight()) * 0.30f };
+        if (xinput.ok())
+        {
+            xinput.moveTo ((editor->getScreenPosition().toFloat() + pointer).roundToInt());
+            settleInput();
+        }
     }
 
     void resizeEditor()
@@ -417,6 +500,26 @@ private:
         {
             for (const auto& n : *a["keys"].getArray())
                 pendingMidi.push_back (juce::MidiMessage::noteOn (1, static_cast<int> (n), static_cast<juce::uint8> (num (a, "velocity", 90))));
+        }
+        else if (kind == "customPattern")
+        {
+            // A factory pattern chosen for the edited card through the browser's own code (set-up,
+            // not filmed): openCustomBrowser, expand FACTORY PATTERNS if needed, activate the row.
+            ui->arpInlinePanel().openCustomBrowser();
+            pumpMessages();
+            auto* b = dynamic_cast<CustomPatternBrowser*> (ui->openPopupPanel());
+            if (b == nullptr)
+                throw Failure ("the Custom Patterns browser did not open in set-up");
+            using K = CustomPatternBrowser::Kind;
+            if (! b->factoryExpanded())
+                b->activate (b->find (K::factoryHeading));
+            const int row = b->find (K::factory, str (a, "name"));
+            if (row < 0)
+                throw Failure ("no factory pattern " + str (a, "name").toStdString());
+            b->activate (row);
+            pumpMessages();
+            if (ui->openPopupPanel() != nullptr)
+                ui->closePopup();
         }
         else if (kind == "settle")
             settle (num (a, "seconds", 0.5));
@@ -532,6 +635,21 @@ private:
         return nullptr;
     }
 
+    static juce::Component* findMenuItem (juce::Component& root, const juce::String& text)
+    {
+        for (auto* child : root.getChildren())
+        {
+            if (! child->isVisible())
+                continue;
+            if (auto* h = child->getAccessibilityHandler(); h != nullptr && h->getRole() == juce::AccessibilityRole::menuItem
+                                                             && h->getTitle().trim() == text)
+                return child;
+            if (auto* found = findMenuItem (*child, text))
+                return found;
+        }
+        return nullptr;
+    }
+
     CaptureEditor* capturePage()
     {
         if (auto* page = ui->newLayerCaptureComponent(); page != nullptr && page->isShowing())
@@ -628,6 +746,13 @@ private:
             auto& c = ui->arpControl();
             if (arg == "light")
                 return inEditor (c, c.lightArea());
+            if (arg == "sub.light")
+                return inEditor (c, c.secondLightArea());
+            if (arg == "sub.name")
+            {
+                const auto row = c.secondRowArea(), l = c.secondLightArea();
+                return inEditor (c, row.withTrimmedLeft (l.getRight() - row.getX() + 4.0f).withWidth (std::max (8.0f, row.getWidth() * 0.45f)));
+            }
             if (arg == "name")
             {
                 const auto l = c.lightArea(), ch = c.chevronArea();
@@ -647,6 +772,12 @@ private:
                 return inEditor (arp, arp.editTabArea (cardIndex (arg.fromFirstOccurrenceOf (".", false, false))));
             if (arg.startsWith ("pattern."))
                 return inEditor (arp, arp.patternRowArea (arg.fromFirstOccurrenceOf (".", false, false).getIntValue()));
+            if (arg.startsWith ("octave."))
+                return inEditor (arp, arp.octaveKeyArea (arg.fromFirstOccurrenceOf (".", false, false).getIntValue()));
+            if (arg == "custom")
+                return inEditor (arp, arp.customRowArea());
+            if (arg == "pencil")
+                return inEditor (arp, arp.pencilArea());
             if (arg == "list")
                 return inEditor (arp, arp.patternListArea());
             if (arg == "field")
@@ -671,6 +802,160 @@ private:
                 return key (arp.satelliteKey(), false);
             return {};
         }
+        if (kind == "menu")
+        {
+            // An item of an open popup menu, by the text the menu gives it (newest menu first).
+            const auto origin = editor->getScreenPosition();
+            auto& desktop = juce::Desktop::getInstance();
+            for (int i = desktop.getNumComponents(); --i >= 0;)
+                if (auto* w = desktop.getComponent (i); w != nullptr && w != editor.get() && w->isVisible()
+                                                        && juce::String (typeid (*w).name()).contains ("MenuWindow"))
+                    if (auto* item = findMenuItem (*w, arg))
+                        return (item->getScreenBounds() - origin).toFloat();
+            return {};
+        }
+        if (kind == "menuOpen")
+        {
+            auto& desktop = juce::Desktop::getInstance();
+            for (int i = 0; i < desktop.getNumComponents(); ++i)
+                if (auto* w = desktop.getComponent (i); w != nullptr && w->isVisible() && juce::String (typeid (*w).name()).contains ("MenuWindow"))
+                    return (w->getScreenBounds() - editor->getScreenPosition()).toFloat();
+            return {};
+        }
+        if (kind == "macroknob" || kind == "macrolabel")
+        {
+            static const juce::StringArray names { "life", "drive", "filter", "movement", "space", "echo" };
+            const int i = names.indexOf (arg);
+            if (i < 0)
+                return {};
+            auto& m = ui->macroRow()[static_cast<std::size_t> (i)];
+            juce::Component* c = kind == "macroknob" ? static_cast<juce::Component*> (&m.slider) : m.label.get();
+            return c != nullptr && c->isShowing() ? inEditor (*c, c->getLocalBounds().toFloat()) : juce::Rectangle<float>();
+        }
+        if (kind == "userbank")
+        {
+            if (auto* tab = ui->userMacros().tab(); tab != nullptr && tab->isShowing())
+                return inEditor (*tab, tab->tabArea (arg.getIntValue()));
+            return {};
+        }
+        if (kind == "library")
+        {
+            auto* lib = ui->libraryWindow();
+            if (lib == nullptr || ! lib->isShowing())
+                return {};
+            if (arg.startsWith ("state."))
+                if (auto* t = lib->stateTile (arg.fromFirstOccurrenceOf (".", false, false).getIntValue()); t != nullptr && t->isShowing())
+                    return inEditor (*t, t->getLocalBounds().toFloat());
+            if (arg == "save")
+                return inEditor (lib->saveKey(), lib->saveKey().getLocalBounds().toFloat());
+            if (arg == "window")
+                return inEditor (*lib, lib->getLocalBounds().toFloat());
+            return {};
+        }
+        if (kind == "synth" || kind == "synthpage")
+        {
+            // "A.label" | "A.amount" (the card's SYNTH chip); "A.<row>#i/n" | "A.imprint" | "A.motion" | "A.page"
+            auto& card = ui->engineCard (cardIndex (arg));
+            const auto part = arg.fromFirstOccurrenceOf (".", false, false);
+            if (kind == "synth")
+            {
+                auto* chip = card.synthesizeControl();
+                if (chip == nullptr || ! chip->isShowing())
+                    return {};
+                return inEditor (*chip, part == "amount" ? chip->amountArea() : part == "label" ? chip->labelArea() : chip->getLocalBounds().toFloat());
+            }
+            auto* page = card.synthEditorComponent();
+            if (page == nullptr || ! page->isShowing())
+                return {};
+            if (part == "page")
+                return inEditor (*page, page->getLocalBounds().toFloat());
+            if (part == "imprint")
+                return inEditor (*page, page->imprintFieldArea());
+            if (part == "motion")
+                return inEditor (*page, page->motionFieldArea());
+            auto r = page->choiceArea (part.upToFirstOccurrenceOf ("#", false, false));
+            if (part.contains ("#") && ! r.isEmpty())
+            {
+                const auto seg = part.fromFirstOccurrenceOf ("#", false, false);
+                const int i = seg.upToFirstOccurrenceOf ("/", false, false).getIntValue();
+                const int n = std::max (1, seg.fromFirstOccurrenceOf ("/", false, false).getIntValue());
+                const float w = r.getWidth() / static_cast<float> (n);
+                r = { r.getX() + w * static_cast<float> (i), r.getY(), w, r.getHeight() };
+            }
+            return inEditor (*page, r);
+        }
+        if (kind == "popsel")
+        {
+            // The n-th dropdown (ValueSelector) of the open popover, left to right then top down.
+            auto* panel = ui->openPopupPanel();
+            if (panel == nullptr || ! panel->isShowing())
+                return {};
+            std::vector<juce::Component*> found;
+            std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+                for (auto* child : c.getChildren())
+                {
+                    if (! child->isVisible())
+                        continue;
+                    if (dynamic_cast<ValueSelector*> (child) != nullptr)
+                        found.push_back (child);
+                    walk (*child);
+                }
+            };
+            walk (*panel);
+            std::sort (found.begin(), found.end(), [this] (juce::Component* x, juce::Component* y) {
+                const auto a1 = editor->getLocalArea (x, x->getLocalBounds()), b1 = editor->getLocalArea (y, y->getLocalBounds());
+                return a1.getY() / 8 != b1.getY() / 8 ? a1.getY() < b1.getY() : a1.getX() < b1.getX();
+            });
+            const int n = arg.getIntValue();
+            return n < static_cast<int> (found.size()) ? inEditor (*found[static_cast<std::size_t> (n)], found[static_cast<std::size_t> (n)]->getLocalBounds().toFloat())
+                                                      : juce::Rectangle<float>();
+        }
+        if (kind == "browser")
+        {
+            // A row of the Custom Patterns browser: "factoryHeading" or a factory pattern's name.
+            auto* b = dynamic_cast<CustomPatternBrowser*> (ui->openPopupPanel());
+            if (b == nullptr || ! b->isShowing())
+                return {};
+            using K = CustomPatternBrowser::Kind;
+            const int row = arg == "factoryHeading" ? b->find (K::factoryHeading) : arg == "newPattern" ? b->find (K::newPattern) : b->find (K::factory, arg);
+            return row >= 0 ? inEditor (*b, b->rowArea (row).toFloat()) : juce::Rectangle<float>();
+        }
+        if (kind == "textfield")
+        {
+            // A text field by the hint it shows while empty (e.g. "My Evolving Texture").
+            std::function<juce::Component* (juce::Component&)> find = [&] (juce::Component& c) -> juce::Component* {
+                for (auto* child : c.getChildren())
+                {
+                    if (! child->isVisible())
+                        continue;
+                    if (auto* te = dynamic_cast<juce::TextEditor*> (child); te != nullptr && te->getTextToShowWhenEmpty() == arg)
+                        return te;
+                    if (auto* f = find (*child))
+                        return f;
+                }
+                return nullptr;
+            };
+            if (auto* te = find (*editor))
+                return inEditor (*te, te->getLocalBounds().toFloat());
+            return {};
+        }
+        if (kind == "droptarget")
+        {
+            // Where the editor's own drop logic answers `arg` ("add B", "replace A", "drop"):
+            // the centre of the matching area, found on a 12 px grid (valid while a drag is on).
+            juce::Rectangle<int> area;
+            for (int y = 6; y < editor->getHeight(); y += 12)
+                for (int x = 6; x < editor->getWidth(); x += 12)
+                    if (ui->dropTargetAt ({ x, y }) == arg)
+                        area = area.isEmpty() ? juce::Rectangle<int> (x, y, 1, 1) : area.getUnion ({ x, y, 1, 1 });
+            return area.toFloat();
+        }
+        if (kind == "point")
+        {
+            // "x,y" in editor coordinates (a place, not a control: e.g. beside a card while dropping)
+            return juce::Rectangle<float> (2.0f, 2.0f).withCentre ({ arg.upToFirstOccurrenceOf (",", false, false).getFloatValue(),
+                                                                     arg.fromFirstOccurrenceOf (",", false, false).getFloatValue() });
+        }
         if (kind == "popover")
             if (auto* panel = ui->openPopupPanel(); panel != nullptr && panel->isShowing())
                 return inEditor (*panel, panel->getLocalBounds().toFloat());
@@ -684,8 +969,13 @@ private:
         auto r = locate (spec);
         if (r.isEmpty())
             throw Failure ("target not shown: " + spec.toStdString());
-        if (! editor->getLocalBounds().toFloat().contains (r.getCentre()))
-            throw Failure ("target outside the editor: " + spec.toStdString());
+        // Inside the filmed canvas: the window, plus the desktop margins a scene declares (menus
+        // may open beyond the window's edge, as they do over a host).
+        const auto canvas = editor->getLocalBounds().toFloat()
+                                .withTrimmedRight (-static_cast<float> (num (scenario["editor"], "marginRight", 0)))
+                                .withTrimmedBottom (-static_cast<float> (num (scenario["editor"], "marginBottom", 0) + std::max (0, canvasHeight - editor->getHeight())));
+        if (! canvas.contains (r.getCentre()))
+            throw Failure ("target outside the filmed canvas: " + spec.toStdString());
         return r;
     }
 
@@ -725,6 +1015,25 @@ private:
             if (c.hasProperty ("max"))
                 ok = ok && v <= static_cast<float> (static_cast<double> (c["max"]));
             return ok;
+        }
+        if (c.hasProperty ("libraryStatus"))
+        {
+            auto* lib = ui->libraryWindow();
+            describe = "library status \"" + (lib != nullptr ? lib->statusText() : juce::String()) + "\"";
+            return lib != nullptr && lib->statusText().startsWith (str (c, "libraryStatus"));
+        }
+        if (c.hasProperty ("libraryStates"))
+        {
+            auto* lib = ui->libraryWindow();
+            describe = "library shows starting states";
+            return lib != nullptr && lib->isShowing() && lib->stateCount() > 0;
+        }
+        if (c.hasProperty ("fileIn"))
+        {
+            // A file the instrument wrote, under the scene's scratch folder (e.g. "documents/Presets").
+            const auto dir = out.getChildFile ("scratch").getChildFile (str (c, "fileIn"));
+            describe = "a file in scratch/" + str (c, "fileIn");
+            return dir.isDirectory() && ! dir.findChildFiles (juce::File::findFiles, true).isEmpty();
         }
         if (c.hasProperty ("paramText"))
         {
@@ -819,7 +1128,20 @@ private:
 
     juce::Image snapshot()
     {
-        auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, captureScale);
+        auto shot = editor->createComponentSnapshot (editor->getLocalBounds(), true, captureScale);
+        juce::Image image = shot;
+        const int marginRight = static_cast<int> (num (scenario["editor"], "marginRight", 0));
+        const int marginBottom = static_cast<int> (num (scenario["editor"], "marginBottom", 0));
+        if (canvasHeight != editor->getHeight() || marginRight > 0 || marginBottom > 0)
+        {
+            // One canvas for every frame: the window drawn at its top left, the space it grows
+            // into (ARP's panel) and the desktop around it (where a menu may open) left plain.
+            const int w = editor->getWidth() + marginRight, h = std::max (canvasHeight, editor->getHeight()) + marginBottom;
+            image = juce::Image (juce::Image::ARGB, juce::roundToInt (static_cast<float> (w) * captureScale), juce::roundToInt (static_cast<float> (h) * captureScale), true);
+            juce::Graphics cg (image);
+            cg.fillAll (juce::Colour (0xff2b2f2d));
+            cg.drawImageAt (shot, 0, 0);
+        }
         // Menus open as their own desktop windows (as in a host): drawn where they stand.
         const auto origin = editor->getScreenPosition();
         auto& desktop = juce::Desktop::getInstance();
@@ -867,7 +1189,8 @@ private:
         r.t = static_cast<double> (records.size()) / fps;
         r.pointer = pointer;
         r.pointerShown = pointerShown;
-        r.pressed = buttonDown;
+        r.pressed = buttonDown || flashPress;
+        flashPress = false;
         if (highlightSpec.isNotEmpty())
             r.highlight = locate (highlightSpec).getSmallestIntegerContainer();
         r.badge = badge;
@@ -875,6 +1198,7 @@ private:
         r.marks = pendingMarks;
         pendingMarks.clear();
         r.editorBounds = editor->getLocalBounds();
+        r.sustain = sustainDown;
         if (auto* focusList = scenario["frame"]["focus"].getArray())
             for (const auto& f : *focusList)
                 if (const auto b = locate (f.toString()).getSmallestIntegerContainer(); ! b.isEmpty())
@@ -898,28 +1222,85 @@ private:
     //==========================================================================
     // Pointer: real window events through the editor's peer
 
+    /** The desktop window under an editor point: an open menu window if one is there (they
+        stand above the editor, the newest on top), else the editor's own. */
+    juce::Component* windowAt (juce::Point<float> at)
+    {
+        const auto screen = editor->getScreenPosition().toFloat() + at;
+        auto& desktop = juce::Desktop::getInstance();
+        for (int i = desktop.getNumComponents(); --i >= 0;)
+            if (auto* c = desktop.getComponent (i); c != nullptr && c != editor.get() && c->isVisible() && c->getPeer() != nullptr
+                                                    && c->getScreenBounds().toFloat().contains (screen))
+                return c;
+        return editor.get();
+    }
+
+    /** Lets the window system's events reach the editor (they arrive on JUCE's own connection). */
+    void settleInput()
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            pumpMessages();
+            juce::Thread::sleep (2);
+        }
+        pumpMessages();
+    }
+
     void sendMouse (juce::Point<float> at, bool down, juce::ModifierKeys extra = {})
     {
-        const auto buttons = down ? juce::ModifierKeys::leftButtonModifier : 0;
+        if (xinput.ok() && extra.getRawFlags() == 0)
+        {
+            const auto screen = (editor->getScreenPosition().toFloat() + at).roundToInt();
+            xinput.moveTo (screen);
+            if (down != buttonDown)
+                xinput.press (rightButton ? 3u : 1u, down);
+            settleInput();
+            pointer = at;
+            buttonDown = down;
+            return;
+        }
+        const auto buttons = down ? (rightButton ? juce::ModifierKeys::rightButtonModifier : juce::ModifierKeys::leftButtonModifier) : 0;
         const juce::ModifierKeys mods (buttons | extra.getRawFlags());
         juce::ModifierKeys::currentModifiers = mods;
-        peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, at, mods, juce::MouseInputSource::defaultPressure,
-                                juce::MouseInputSource::defaultOrientation, juce::Time::currentTimeMillis());
+        // A press stays with the window it began in (as an OS delivers a drag); otherwise the
+        // event goes to the window under the pointer, in that window's own coordinates.
+        juce::Component* window = (buttonDown && pressWindow != nullptr) ? pressWindow.getComponent() : windowAt (at);
+        if (window == nullptr)
+            window = editor.get();
+        if (down && ! buttonDown)
+            pressWindow = window;
+        if (auto* p = window->getPeer())
+        {
+            const auto local = at + editor->getScreenPosition().toFloat() - window->getScreenPosition().toFloat();
+            if (window != lastWindow.getComponent() && lastWindow != nullptr && lastWindow->getPeer() != nullptr && lastWindow != window)
+            {
+                // leaving the previous window: an exit there, as the OS reports one
+                const auto prev = at + editor->getScreenPosition().toFloat() - lastWindow->getScreenPosition().toFloat();
+                lastWindow->getPeer()->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, prev + juce::Point<float> (-10000.0f, -10000.0f), {},
+                                                         juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation, juce::Time::currentTimeMillis());
+            }
+            p->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local, mods, juce::MouseInputSource::defaultPressure,
+                                 juce::MouseInputSource::defaultOrientation, juce::Time::currentTimeMillis());
+            lastWindow = window;
+        }
         pointer = at;
         buttonDown = down;
+        if (! down)
+            pressWindow = nullptr;
     }
 
     static float ease (float x) { return x < 0.5f ? 4.0f * x * x * x : 1.0f - std::pow (-2.0f * x + 2.0f, 3.0f) / 2.0f; }
 
     /** Glides the pointer to `to` (mouse moves, or drags while pressed) over `seconds`. */
-    void glide (juce::Point<float> to, double seconds)
+    void glide (juce::Point<float> to, double seconds, bool eased = true)
     {
         pointerShown = true;
         const auto from = pointer;
         const int n = std::max (1, juce::roundToInt (seconds * fps));
         for (int i = 1; i <= n; ++i)
         {
-            const float k = ease (static_cast<float> (i) / static_cast<float> (n));
+            const float t = static_cast<float> (i) / static_cast<float> (n);
+            const float k = eased ? ease (t) : t;
             sendMouse (from + (to - from) * k, buttonDown);
             frame();
         }
@@ -932,15 +1313,28 @@ private:
         glide (target, seconds > 0 ? seconds : juce::jlimit (0.35, 0.9, distance / 900.0));
     }
 
-    void click (const juce::String& spec, double moveSeconds)
+    void click (const juce::String& spec, double moveSeconds, bool right = false, int count = 1)
     {
         moveTo (spec, moveSeconds);
+        rightButton = right;
         frames (0.12);
         const auto at = require (spec).getCentre();   // (found again: a layout may have moved)
-        sendMouse (at, true);
+        // A click as a hand makes one: press and release about 70 ms apart in real time. (Frames
+        // take longer than 1/30 s to render here, so holding the button for a few frames would be
+        // a long press in the window system's time: a menu that opens under the pointer would
+        // take the release as a choice, and a slider would start a gesture.) The press is still
+        // shown in the video on the next frame.
+        for (int i = 0; i < count; ++i)
+        {
+            if (i > 0)
+                juce::Thread::sleep (90);   // (a double-click: well inside the system's interval)
+            sendMouse (at, true);
+            juce::Thread::sleep (70);
+            sendMouse (at, false);
+        }
+        rightButton = false;
+        flashPress = true;
         frames (0.12);
-        sendMouse (at, false);
-        frame();
     }
 
     //==========================================================================
@@ -979,7 +1373,41 @@ private:
                 highlightSpec = str (a, "target");
                 frames (0.3);
             }
-            click (str (a, "target"), num (a, "move", 0));
+            click (str (a, "target"), num (a, "move", 0), str (a, "button") == "right", static_cast<int> (num (a, "count", 1)));
+        }
+        else if (kind == "type")
+        {
+            // Text typed on the keyboard (the window system's key events), a character a frame or two.
+            if (! xinput.ok())
+                throw Failure ("typing needs XTest");
+            if (auto* focused = juce::Component::getCurrentlyFocusedComponent(); focused == nullptr || dynamic_cast<juce::TextEditor*> (focused) == nullptr)
+                throw Failure ("typing: no text field has the keyboard focus");
+            for (auto c : str (a, "text"))
+            {
+                xinput.type (c);
+                settleInput();
+                frames (0.07);
+            }
+        }
+        else if (kind == "hover")
+        {
+            moveTo (str (a, "target"), num (a, "move", 0));
+            frames (num (a, "seconds", 0.5));
+        }
+        else if (kind == "cc")
+        {
+            // A MIDI controller moved from `from` to `to` over `seconds` (a hardware knob or wheel).
+            const int cc = static_cast<int> (num (a, "controller", 1));
+            const int from = static_cast<int> (num (a, "from", 0)), to = static_cast<int> (num (a, "to", 127));
+            const int n = std::max (1, juce::roundToInt (num (a, "seconds", 1.0) * fps));
+            for (int i = 1; i <= n; ++i)
+            {
+                const int value = juce::jlimit (0, 127, from + (to - from) * i / n);
+                pendingMidi.push_back (juce::MidiMessage::controllerEvent (1, cc, value));
+                if (cc == 64)
+                    sustainDown = value >= 64;
+                frame();
+            }
         }
         else if (kind == "key")
         {
@@ -997,13 +1425,28 @@ private:
         else if (kind == "drag")
         {
             const auto spec = str (a, "target");
-            moveTo (spec, num (a, "move", 0));
+            // "from" / "toFrac": points inside the target as fractions of its bounds (a stroke
+            // across a graph); otherwise from its centre by dx / dy, or to another target.
+            const auto box = require (spec);
+            auto fracPoint = [&box] (const juce::var& v) {
+                return juce::Point<float> (box.getX() + box.getWidth() * static_cast<float> (static_cast<double> (v[0])),
+                                           box.getY() + box.getHeight() * static_cast<float> (static_cast<double> (v[1])));
+            };
+            const auto start = a.hasProperty ("from") ? fracPoint (a["from"]) : box.getCentre();
+            glide (start, num (a, "move", 0) > 0 ? num (a, "move", 0) : juce::jlimit (0.35, 0.9, pointer.getDistanceFrom (start) / 900.0));
             frames (0.12);
-            const auto start = require (spec).getCentre();
             sendMouse (start, true);
             frames (0.1);
-            glide (start + juce::Point<float> (static_cast<float> (num (a, "dx", 0)), static_cast<float> (num (a, "dy", 0))), num (a, "seconds", 0.8));
-            frames (0.1);
+            const auto end = a.hasProperty ("toFrac") ? fracPoint (a["toFrac"])
+                             : a.hasProperty ("to") ? require (str (a, "to")).getCentre()
+                                                  : start + juce::Point<float> (static_cast<float> (num (a, "dx", 0)), static_cast<float> (num (a, "dy", 0)));
+            // Onto another control: travel at an even speed and let go on arrival. (Slow frames
+            // would otherwise make the pointer rest over the target for longer in real time than
+            // a hand does, and the target opens its hover popover.)
+            const bool onto = a.hasProperty ("to");
+            glide (end, num (a, "seconds", 0.8), ! onto);
+            if (! onto)
+                frames (0.1);
             sendMouse (pointer, false);
             frame();
         }
@@ -1020,7 +1463,15 @@ private:
                 w.isReversed = false;
                 w.isSmooth = false;
                 w.isInertial = false;
-                peer->handleMouseWheel (juce::MouseInputSource::InputSourceType::mouse, pointer, juce::Time::currentTimeMillis(), w);
+                if (xinput.ok())
+                {
+                    const unsigned int b = w.deltaY < 0 ? 5u : 4u;   // X wheel: 4 up, 5 down
+                    xinput.press (b, true);
+                    xinput.press (b, false);
+                    settleInput();
+                }
+                else
+                    peer->handleMouseWheel (juce::MouseInputSource::InputSourceType::mouse, pointer, juce::Time::currentTimeMillis(), w);
                 frames (0.1);
             }
         }
@@ -1039,7 +1490,15 @@ private:
                 w.isReversed = false;
                 w.isSmooth = false;
                 w.isInertial = false;
-                peer->handleMouseWheel (juce::MouseInputSource::InputSourceType::mouse, pointer, juce::Time::currentTimeMillis(), w);
+                if (xinput.ok())
+                {
+                    const unsigned int b = w.deltaY < 0 ? 5u : 4u;   // X wheel: 4 up, 5 down
+                    xinput.press (b, true);
+                    xinput.press (b, false);
+                    settleInput();
+                }
+                else
+                    peer->handleMouseWheel (juce::MouseInputSource::InputSourceType::mouse, pointer, juce::Time::currentTimeMillis(), w);
                 frames (0.08);
             }
             frames (0.15);
@@ -1050,6 +1509,8 @@ private:
             // travels there. Not an OS drag-and-drop: those cannot be produced on a virtual
             // display. The import and analysis that follow are the instrument's own.
             const auto file = tutorialFile (str (a, "sound"));
+            if (str (a, "target").startsWith ("droptarget:"))
+                ui->fileDragEnter ({ file.getFullPathName() }, editor->getWidth() - 40, editor->getHeight() / 3);   // (the drag has begun: targets exist)
             const auto target = require (str (a, "target")).getCentre();
             badge = file.getFileName();
             pointerShown = true;
@@ -1063,10 +1524,16 @@ private:
                 const float k = ease (static_cast<float> (i) / static_cast<float> (n));
                 pointer = from + (target - from) * k;
                 badgeAt = pointer;
+                // The editor's drag-hover handlers, as a host calls them during a file drag.
+                if (i == 1)
+                    ui->fileDragEnter ({ file.getFullPathName() }, juce::roundToInt (pointer.x), juce::roundToInt (pointer.y));
+                else
+                    ui->fileDragMove ({ file.getFullPathName() }, juce::roundToInt (pointer.x), juce::roundToInt (pointer.y));
                 frame();
             }
-            ui->fileDragEnter ({ file.getFullPathName() }, juce::roundToInt (target.x), juce::roundToInt (target.y));
-            frames (0.2);
+            // (the drag's own hover handlers ran along the way: see the loop above)
+            ui->fileDragMove ({ file.getFullPathName() }, juce::roundToInt (target.x), juce::roundToInt (target.y));
+            frames (0.25);
             ui->filesDropped ({ file.getFullPathName() }, juce::roundToInt (target.x), juce::roundToInt (target.y));
             badge.clear();
             frame();
@@ -1134,6 +1601,8 @@ private:
                 o->setProperty ("marks", r.marks.joinIntoString (","));
             if (! r.focus.isEmpty())
                 o->setProperty ("focus", juce::Array<juce::var> { r.focus.getX(), r.focus.getY(), r.focus.getWidth(), r.focus.getHeight() });
+            if (r.sustain)
+                o->setProperty ("sustain", true);
             o->setProperty ("w", r.editorBounds.getWidth());
             o->setProperty ("h", r.editorBounds.getHeight());
             list.add (juce::var (o));
@@ -1155,7 +1624,12 @@ private:
     std::vector<FrameRecord> records;
     std::chrono::steady_clock::time_point clockStart;
     juce::Point<float> pointer, badgeAt;
-    bool pointerShown = false, buttonDown = false;
+    bool pointerShown = false, buttonDown = false, rightButton = false;
+    int canvasHeight = 0;
+    bool flashPress = false;
+    XInput xinput;
+    bool sustainDown = false;
+    juce::Component::SafePointer<juce::Component> pressWindow, lastWindow;
     juce::String highlightSpec, badge;
     juce::StringArray pendingMarks;
     std::vector<juce::MidiMessage> pendingMidi;

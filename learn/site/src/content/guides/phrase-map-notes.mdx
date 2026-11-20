@@ -1,0 +1,24 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.make.phrase-map-notes
+product: osp
+group: make-an-instrument
+order: 20
+title: "Turn a phrase into an instrument"
+purpose: "Map the notes of a melody to keys, so each key plays a real recorded note."
+tags: ["phrase", "notes", "map notes"]
+synonyms: ["phrase transformer", "map notes", "note atlas", "melody", "phrase", "notes", "identify notes", "chop", "slice"]
+learn: { lessons: ["osp.phrase"], info: [] }
+reference: osp.ref.notes
+related: ["osp.guide.make.record-input", "osp.guide.make.grab-last"]
+preconditions: ["A recording of separate notes, one after another."]
+scene: osp.scene.b-phrase-map-notes
+quick: true
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: drop-phrase, instruction: "Drag a recording of several notes onto DROP A SOUND.", result: "OSP asks Identify notes? and says how many it heard." }
+  - { id: map-notes, instruction: "Click MAP NOTES.", result: "Each note OSP found is placed on its own key." }
+  - { id: open-notes, instruction: "Click NOTES on the card.", result: "The note map shows each note and the key it plays." }
+  - { id: play-mapped, instruction: "Play the keys.", result: "Each key plays the recorded note nearest to it." }
+---

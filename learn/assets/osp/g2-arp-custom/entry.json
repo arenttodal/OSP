@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.g2-arp-custom",
+  "title": "Use a custom pattern",
+  "scenarioDigest": "sha256:1305cce12ae5f2b97de61379ab97ffdf29fa4ec867dc13568fe8f915341b9caa",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.arp.custom"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "targets": [
+    "osp.arp.panel"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:pluck",
+      "file": "Tutorial Pluck A3.wav",
+      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+      "bytes": 230504
+    }
+  ],
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard.",
+    "The pattern was chosen in set-up through the browser's own code: a real click on Custom Patterns \u203a did not leave the browser open in the capture environment (see docs/learn-studio/gate-3-report.md, findings)."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2474,
+    "fps": 30,
+    "frames": 190,
+    "crop": [
+      0,
+      219,
+      2896,
+      2205
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1096,
+    "fps": 30,
+    "frames": 190,
+    "duration": 6.333,
+    "files": {
+      "webm": {
+        "path": "g2-arp-custom/g2-arp-custom.webm",
+        "codec": "vp9",
+        "bytes": 393691,
+        "sha256": "1d6e3bf7af8aad0e4889ec59aeae4cccab1c6026cd4071a3f6004a7314f1d8a0"
+      },
+      "mp4": {
+        "path": "g2-arp-custom/g2-arp-custom.mp4",
+        "codec": "h264",
+        "bytes": 340739,
+        "sha256": "400f90f0168d3281bf647aa8540cca9f41bd1f5a664813bc059a169347675eea"
+      }
+    }
+  },
+  "marks": {
+    "pattern": 0.0,
+    "edit": 2.6
+  },
+  "steps": {
+    "pattern": "g2-arp-custom/steps/pattern.webp",
+    "edit": "g2-arp-custom/steps/edit.webp"
+  },
+  "poster": {
+    "path": "g2-arp-custom/poster.webp",
+    "frame": 167,
+    "sha256": "c5ea1578d439238afe02239259081e14daa5d2081714ad88551d25673d3b8d7d",
+    "master": "learn/capture/out/g2-arp-custom/poster.png"
+  },
+  "run": {
+    "wallSeconds": 52.342,
+    "meanFrameMs": 251.7,
+    "slowdown": 7.55,
+    "notesPlayed": 46
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "3/3",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "3 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "190 / 190"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1237)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than 3.4 s",
+        "passed": true,
+        "detail": "longest unchanged run 0.03 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "190"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1096"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "190"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1096"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "6.33 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

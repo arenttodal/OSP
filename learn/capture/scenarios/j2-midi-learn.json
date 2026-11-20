@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.j2-midi-learn",
+  "product": "osp",
+  "title": "Control a knob from a MIDI controller",
+  "guides": [
+    "osp.guide.play.midi-learn"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "marginRight": 260,
+    "marginBottom": 420
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed), a note held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          48
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "right-click",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "macroknob:filter",
+          "highlight": true,
+          "button": "right"
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:Learn MIDI CC"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hold",
+          "seconds": 0.4
+        }
+      ]
+    },
+    {
+      "mark": "learn",
+      "do": [
+        {
+          "do": "click",
+          "target": "menu:Learn MIDI CC"
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ]
+    },
+    {
+      "mark": "move-controller",
+      "do": [
+        {
+          "do": "cc",
+          "controller": 74,
+          "from": 100,
+          "to": 20,
+          "seconds": 1.4
+        },
+        {
+          "do": "cc",
+          "controller": 74,
+          "from": 20,
+          "to": 90,
+          "seconds": 1.2
+        },
+        {
+          "do": "hold",
+          "seconds": 1.2
+        }
+      ],
+      "expect": [
+        {
+          "param": "character",
+          "min": 50
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.macros",
+      "menuOpen:",
+      "card:A.card"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.macro.filter"
+    ],
+    "parameters": [
+      "character"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/MidiLearn.cpp",
+      "shared/andor-ui/Source/ModulationPanel.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard.",
+    "The controller (MIDI CC 74) is sent by the runner, as a hardware knob would send it."
+  ]
+}

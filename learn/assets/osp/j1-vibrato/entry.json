@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.j1-vibrato",
+  "title": "Add vibrato with the mod wheel",
+  "scenarioDigest": "sha256:b5ef5c1c37e8e3b4fc5e1328d9a17c74a5327f4f89d23a6b22bacc65b0f42822",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.play.vibrato"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.vibrato"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "osp.wheel.mod",
+    "osp.vibrato.enable"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    }
+  ],
+  "disclosures": [
+    "The held note and the mod wheel (MIDI CC 1) are sent as MIDI by the runner, as a keyboard would; the on-screen wheel moves as it does for a hardware wheel."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 295,
+    "crop": [
+      0,
+      179,
+      2896,
+      2100
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1060,
+    "fps": 30,
+    "frames": 295,
+    "duration": 9.833,
+    "files": {
+      "webm": {
+        "path": "j1-vibrato/j1-vibrato.webm",
+        "codec": "vp9",
+        "bytes": 526908,
+        "sha256": "0b5a5f891cf6c68c348a5ee0380df43228c25dda3290d28433705945f0954db2"
+      },
+      "mp4": {
+        "path": "j1-vibrato/j1-vibrato.mp4",
+        "codec": "h264",
+        "bytes": 515458,
+        "sha256": "6685a0a74df634c0a9f633f45d8fd6afebf96623c0b4dd51ee003a0ff035661b"
+      }
+    }
+  },
+  "marks": {
+    "open-mod": 0.0,
+    "vibrato-on": 2.8,
+    "play-raise": 4.467
+  },
+  "steps": {
+    "open-mod": "j1-vibrato/steps/open-mod.webp",
+    "vibrato-on": "j1-vibrato/steps/vibrato-on.webp",
+    "play-raise": "j1-vibrato/steps/play-raise.webp"
+  },
+  "poster": {
+    "path": "j1-vibrato/poster.webp",
+    "frame": 271,
+    "sha256": "62e3be3ebae90e32689e1dbf0ac23797da736638263595f1a35fbb2554b2adcd",
+    "master": "learn/capture/out/j1-vibrato/poster.png"
+  },
+  "run": {
+    "wallSeconds": 60.687000000000005,
+    "meanFrameMs": 190.7,
+    "slowdown": 5.72,
+    "notesPlayed": 1
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "2/2",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "2 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "295 / 295"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 1.63 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "295"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1060"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "295"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1060"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "9.83 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

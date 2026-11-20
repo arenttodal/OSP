@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.f2-synth-imprint",
+  "product": "osp",
+  "title": "Colour SYNTH with IMPRINT",
+  "guides": [
+    "osp.guide.synth.imprint"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (voice), SYNTH at 60 %, a note held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "voice"
+        ]
+      },
+      {
+        "do": "setParam",
+        "id": "layerA.synthesize",
+        "value": 60
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          57
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-synth",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "synth:A.label",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ]
+    },
+    {
+      "mark": "mode-imprint",
+      "do": [
+        {
+          "do": "click",
+          "target": "synthpage:A.mode#1/2",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "synthpage:A.imprint"
+          },
+          "timeout": 10
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "layerA.synth.mode",
+          "equals": "Imprint"
+        }
+      ]
+    },
+    {
+      "mark": "imprint",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "synthpage:A.imprint"
+        },
+        {
+          "do": "drag",
+          "target": "synthpage:A.imprint",
+          "dy": 60,
+          "seconds": 0.9
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ]
+    },
+    {
+      "mark": "motion",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "synthpage:A.motion"
+        },
+        {
+          "do": "drag",
+          "target": "synthpage:A.motion",
+          "dy": 80,
+          "seconds": 0.9
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.4
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:A.card"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "parameters": [
+      "layerA.synth.mode",
+      "layerA.synth.imprint",
+      "layerA.synth.motion"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/EqEditor.cpp",
+      "src/engine/SynthVoice.h"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

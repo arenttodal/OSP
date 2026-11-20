@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.i5-user-macro",
+  "product": "osp",
+  "title": "Assign a USER macro",
+  "guides": [
+    "osp.guide.shape.user-macro"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.usermacros"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "marginRight": 260
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (pluck)",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "pluck"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "user-bank",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "userbank:1",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ],
+      "expect": [
+        {
+          "state": "macros.bank.user"
+        }
+      ]
+    },
+    {
+      "mark": "right-click",
+      "do": [
+        {
+          "do": "click",
+          "target": "learn:osp.source.level",
+          "highlight": true,
+          "button": "right"
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:Assign to Macro"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hold",
+          "seconds": 0.5
+        }
+      ]
+    },
+    {
+      "mark": "assign",
+      "do": [
+        {
+          "do": "hover",
+          "target": "menu:Assign to Macro",
+          "seconds": 0.6
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:Macro 1"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "click",
+          "target": "menu:Macro 1"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.usermacro.1.level"
+        }
+      ]
+    },
+    {
+      "mark": "turn",
+      "do": [
+        {
+          "do": "midi",
+          "keys": [
+            57
+          ],
+          "state": "on",
+          "velocity": 90
+        },
+        {
+          "do": "highlight",
+          "target": "learn:usermacro.0"
+        },
+        {
+          "do": "drag",
+          "target": "learn:usermacro.0",
+          "dy": -90,
+          "seconds": 1.2
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.2
+        },
+        {
+          "do": "midi",
+          "keys": [
+            57
+          ],
+          "state": "off"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.4
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:A.card",
+      "learn:osp.macros",
+      "menuOpen:"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "macros.bank",
+      "osp.source.level",
+      "usermacro.0"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/UserMacroController.cpp",
+      "shared/andor-ui/Source/ModulationPanel.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

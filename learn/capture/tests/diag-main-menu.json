@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.test-main-menu",
+  "product": "osp",
+  "title": "Load a sound and play it",
+  "guides": [
+    "osp.guide.make.load-and-play"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.quickstart"
+    ],
+    "steps": [
+      "osp.quickstart/setup",
+      "osp.quickstart/play"
+    ]
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "marginRight": 260,
+    "marginBottom": 300
+  },
+  "fps": 30,
+  "start": {
+    "state": "one layer",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "menu",
+      "do": [
+        {
+          "do": "click",
+          "target": "learn:osp.header.menu"
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menuOpen:"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hold",
+          "seconds": 0.5
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.source.card",
+      "learn:osp.source.dropZone",
+      "learn:osp.keyboard"
+    ],
+    "context": 0.06,
+    "aspect": "16:10"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.source.dropZone",
+      "osp.source.ready",
+      "osp.keyboard"
+    ],
+    "sources": [
+      "apps/plugin/Source/PluginEditor.cpp",
+      "shared/andor-ui/Source/InstrumentFrame.cpp",
+      "shared/andor-ui/Source/EngineCard.cpp",
+      "apps/plugin/Source/TutorialSounds.cpp"
+    ]
+  },
+  "disclosures": [
+    "The file arrives through the editor's own drop handler (filesDropped); the travelling file badge is drawn in post-production. It is not a recording of an operating-system drag-and-drop."
+  ]
+}

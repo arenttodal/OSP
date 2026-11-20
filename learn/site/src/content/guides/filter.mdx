@@ -1,0 +1,23 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.shape.filter
+product: osp
+group: shape-and-finish
+order: 60
+title: "Shape the tone with FILTER"
+purpose: "Darken the sound, choose a filter type and sweep it."
+tags: ["filter"]
+synonyms: ["filter", "cutoff", "low pass", "band pass", "tone", "dark"]
+learn: { lessons: ["osp.sound"], info: [] }
+related: ["osp.guide.shape.effects"]
+preconditions: []
+scene: osp.scene.i7-filter
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: filter, instruction: "Turn FILTER down while you play.", result: "The sound gets darker." }
+  - { id: open-filter, instruction: "Click FILTER above its knob.", result: "Its settings open." }
+  - { id: type, instruction: "Choose a type, such as BP12.", result: "The filter keeps a band of the sound." }
+  - { id: sweep, instruction: "Sweep FILTER.", result: "The band moves through the sound." }
+---

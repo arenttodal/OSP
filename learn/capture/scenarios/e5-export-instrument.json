@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.e5-export-instrument",
+  "product": "osp",
+  "title": "Export a portable instrument",
+  "guides": [
+    "osp.guide.make.export"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.presets"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "marginRight": 260
+  },
+  "fps": 30,
+  "maxSeconds": 16.0,
+  "start": {
+    "state": "one layer (bowed)",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-menu",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 1.0
+        },
+        {
+          "do": "click",
+          "target": "learn:osp.header.menu",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:Export portable instrument\u2026"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hold",
+          "seconds": 1.2
+        }
+      ]
+    },
+    {
+      "mark": "export",
+      "do": [
+        {
+          "do": "hover",
+          "target": "menu:Export portable instrument\u2026",
+          "seconds": 2.8
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.header.menu",
+      "menuOpen:",
+      "card:A.card"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.header.menu"
+    ],
+    "sources": [
+      "apps/plugin/Source/PluginEditor.cpp"
+    ]
+  },
+  "disclosures": [
+    "The clip stops at the menu item: choosing it opens the system's save dialog, which is not filmed."
+  ]
+}

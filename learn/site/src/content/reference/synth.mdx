@@ -1,0 +1,24 @@
+---
+schemaVersion: 1
+kind: andor.learn.reference
+id: osp.ref.synth
+product: osp
+title: "SYNTH and IMPRINT"
+function: "Blends an oscillator into a layer's sound. In IMPRINT mode the oscillator takes on the recording's own colour."
+location: "The SYNTH chip at the top right of each card's waveform shows the amount. Click its name to open the SYNTH page over the waveform; drag its amount to change it."
+parameters:
+  - { name: "Mode", values: "ANALOG · IMPRINT", does: "A plain oscillator, or one coloured by the recording's spectral shape." }
+  - { name: "AMOUNT", values: "0–100 %", does: "How much oscillator is blended in." }
+  - { name: "WAVE", values: "saw · square · triangle · sine", does: "The oscillator's waveform (drawn as symbols)." }
+  - { name: "OCTAVE", values: "-2 · -1 · 0 · +1", does: "Relative to the note played." }
+  - { name: "DETUNE · TONE", values: "0–50 cents · %", does: "Two oscillators apart; brightness." }
+  - { name: "SHAPE", values: "Held · Follow", does: "Follow: the oscillator follows the recording's own loudness. Held: full for the whole note, shaped by AMP." }
+  - { name: "PITCH", values: "Keys · Recording", does: "Follows the key played, or the recording's own tuning and vibrato." }
+  - { name: "IMPRINT · MOTION", values: "0–100 %", does: "How much of the recording's colour reaches the oscillator; how much that colour follows the recording through the note." }
+dependencies: ["IMPRINT needs a moment to prepare (Preparing spectral imprint…)."]
+guides: ["osp.guide.synth.blend", "osp.guide.synth.imprint"]
+synonyms: ["synth", "synthesize", "oscillator", "imprint", "spectral", "hybrid", "analog"]
+parameterIds: ["layerA.synthesize", "layerA.synth.mode", "layerA.synth.wave", "layerA.synth.imprint"]
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "docs/learn-studio/gate-1-report.md and the Gate 0/1 fact sheets" }
+---
+

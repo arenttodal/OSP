@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.h3-key-dna",
+  "title": "Vary the sound from key to key (KEY DNA)",
+  "scenarioDigest": "sha256:03483530e00031fe972b68d1acbd9770f85ab0c3459328f4fd6b7307ae21e082",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.granular.key-dna"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.keydna"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "osp.source.keyDna",
+    "osp.keydna.power",
+    "osp.keydna.depth",
+    "osp.keydna.graph"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    }
+  ],
+  "disclosures": [],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 457,
+    "crop": [
+      0,
+      179,
+      2896,
+      2100
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1060,
+    "fps": 30,
+    "frames": 457,
+    "duration": 15.233,
+    "files": {
+      "webm": {
+        "path": "h3-key-dna/h3-key-dna.webm",
+        "codec": "vp9",
+        "bytes": 347479,
+        "sha256": "6b132571d6fba67102c04224bf4e2bbe54a69241775b74f18889deb5af59932f"
+      },
+      "mp4": {
+        "path": "h3-key-dna/h3-key-dna.mp4",
+        "codec": "h264",
+        "bytes": 356269,
+        "sha256": "c59efcc4e0d13394e6bd43704e95076c479247d1e078235ccdfa531b9f1420de"
+      }
+    }
+  },
+  "marks": {
+    "open": 0.0,
+    "power": 3.5,
+    "draw-keys": 5.567,
+    "depth": 8.433,
+    "play-keys": 10.933
+  },
+  "steps": {
+    "open": "h3-key-dna/steps/open.webp",
+    "power": "h3-key-dna/steps/power.webp",
+    "draw-keys": "h3-key-dna/steps/draw-keys.webp",
+    "depth": "h3-key-dna/steps/depth.webp",
+    "play-keys": "h3-key-dna/steps/play-keys.webp"
+  },
+  "poster": {
+    "path": "h3-key-dna/poster.webp",
+    "frame": 427,
+    "sha256": "800c85880482953612fd0ff360f8058dde9648e0113bb1755ba3df8ef1d62cd2",
+    "master": "learn/capture/out/h3-key-dna/poster.png"
+  },
+  "run": {
+    "wallSeconds": 102.968,
+    "meanFrameMs": 200.6,
+    "slowdown": 6.02,
+    "notesPlayed": 3
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "4/4",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "4 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "457 / 457"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than 2.5 s",
+        "passed": true,
+        "detail": "longest unchanged run 2.17 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "457"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1060"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "457"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1060"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "15.23 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

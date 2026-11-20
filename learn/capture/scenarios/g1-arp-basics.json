@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.g1-arp-basics",
+  "product": "osp",
+  "title": "Arpeggiate held notes",
+  "guides": [
+    "osp.guide.arp.basics"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.arp"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "canvas": "arpExpanded"
+  },
+  "fps": 30,
+  "maxSeconds": 16.0,
+  "start": {
+    "state": "one layer (pluck), a chord held, ARP closed",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "pluck"
+        ]
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          57,
+          60,
+          64
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-arp",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.6
+        },
+        {
+          "do": "click",
+          "target": "arpctl:name",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.arp.panel.open"
+        }
+      ]
+    },
+    {
+      "mark": "arp-on",
+      "do": [
+        {
+          "do": "click",
+          "target": "arpctl:light",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.6
+        }
+      ],
+      "expect": [
+        {
+          "param": "arp.enabled",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "mark": "pattern",
+      "do": [
+        {
+          "do": "click",
+          "target": "arp:pattern.2",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.4
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "arp.pattern",
+          "equals": "UP/DOWN"
+        }
+      ]
+    },
+    {
+      "mark": "rate",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "param:arp.rate"
+        },
+        {
+          "do": "drag",
+          "target": "param:arp.rate",
+          "dy": -86,
+          "seconds": 1.0
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.4
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "arp.rate",
+          "equals": "1/16"
+        }
+      ]
+    },
+    {
+      "mark": "octaves",
+      "do": [
+        {
+          "do": "click",
+          "target": "arp:octave.2",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.6
+        }
+      ],
+      "expect": [
+        {
+          "param": "arp.octaves",
+          "equals": 2
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:A.card",
+      "learn:osp.keyboard",
+      "arp:panel"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.arp.control",
+      "osp.arp.panel"
+    ],
+    "parameters": [
+      "arp.enabled",
+      "arp.pattern",
+      "arp.rate",
+      "arp.octaves"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/ArpSection.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

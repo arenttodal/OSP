@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.i1-reimagined",
+  "product": "osp",
+  "title": "Reimagine a sound",
+  "guides": [
+    "osp.guide.shape.reimagined"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.reimagined"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "marginRight": 260
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed), a note held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          48
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-modes",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "learn:osp.source.reimagined.label",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.popup.reimagined.open"
+        }
+      ]
+    },
+    {
+      "mark": "choose-mode",
+      "do": [
+        {
+          "do": "click",
+          "target": "learn:osp.reimagined.mode",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:Tape Frame"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "click",
+          "target": "menu:Tape Frame"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ]
+    },
+    {
+      "mark": "amount",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "learn:osp.source.reimagined"
+        },
+        {
+          "do": "drag",
+          "target": "learn:osp.source.reimagined",
+          "dy": -110,
+          "seconds": 1.4
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.6
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:A.card",
+      "popover:open",
+      "menuOpen:"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.source.reimagined.label",
+      "osp.reimagined.mode",
+      "osp.source.reimagined"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/MacroPopups.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

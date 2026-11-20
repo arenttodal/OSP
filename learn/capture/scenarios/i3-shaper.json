@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.i3-shaper",
+  "product": "osp",
+  "title": "Use a SHAPER pattern",
+  "guides": [
+    "osp.guide.shape.shaper"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (voice), a note held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "voice"
+        ]
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          57
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-movement",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "macrolabel:movement",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "state": "osp.popup.movement.open"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hold",
+          "seconds": 0.4
+        }
+      ]
+    },
+    {
+      "mark": "shaper",
+      "do": [
+        {
+          "do": "click",
+          "target": "learn:osp.movement.mode",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:Shaper"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "click",
+          "target": "menu:Shaper"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "movement.mode",
+          "equals": "Shaper"
+        }
+      ]
+    },
+    {
+      "mark": "pattern",
+      "do": [
+        {
+          "do": "click",
+          "target": "popsel:1",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:EUCLID 5"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "click",
+          "target": "menu:EUCLID 5"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "movement.shaper.pattern",
+          "equals": "EUCLID 5"
+        }
+      ]
+    },
+    {
+      "mark": "depth",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "macroknob:movement"
+        },
+        {
+          "do": "drag",
+          "target": "macroknob:movement",
+          "dy": -110,
+          "seconds": 1.0
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 2.0
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.macros",
+      "popover:open",
+      "menuOpen:"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "parameters": [
+      "movement.mode",
+      "movement.shaper.pattern",
+      "motion"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/MacroPopups.cpp",
+      "src/engine/RhythmicShaper.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

@@ -1,0 +1,22 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.make.export
+product: osp
+group: make-an-instrument
+order: 55
+title: "Export a portable instrument"
+purpose: "Take a sound, with its recordings, to another computer."
+tags: ["export", "instrument"]
+synonyms: ["export", "ospinstrument", "share", "another computer", "portable", "backup", "send"]
+learn: { lessons: ["osp.presets"], info: [] }
+reference: osp.ref.presets
+related: ["osp.guide.make.save"]
+preconditions: []
+scene: osp.scene.e5-export-instrument
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: open-menu, instruction: "Click the ••• menu at the top right.", result: "The menu opens." }
+  - { id: export, instruction: "Choose Export portable instrument….", result: "A save dialog asks where to write one .ospinstrument file with the settings and copies of the recordings." }
+---

@@ -20,6 +20,7 @@ while they play.
 | Custom Patterns | `osp.arp.custom` "Use a custom pattern": open Custom Patterns ›, choose a factory pattern, open the editor | Custom Patterns row, pencil, editor | `osp.arp.custom.row`, `.pencil`, `.browser`, `.editor` |
 | STRUM | `osp.arp.strum` "Strum a chord": Chord, STRUM on, direction, SPREAD | STRUM key (including "plays only with Chord") | `osp.arp.strum`, `.light`, `.panel` |
 | SATELLITE | `osp.satellite` "Move each layer in the stereo field": open, on, mode, RATE | SATELLITE key and panel | `osp.arp.satellite`, `.light`, `.panel` |
+| PEDAL LOOP | `osp.pedalloop` "Hold a note with the pedal": LOOP off, Ping-Pong, play, pedal | the playback key's PEDAL LOOP section | `osp.source.mode` exists; `osp.source.loop` (the card's LOOP key) |
 | SYNTH / IMPRINT | `osp.synth` "Blend in SYNTH and IMPRINT": the chip, AMOUNT, WAVE, SHAPE, IMPRINT, MOTION | SYNTH chip, SYNTH page | `osp.source.synth`, `osp.synth.page`, `.mode`, `.wave`, `.shape`, `.imprint`; state `osp.synth.open` |
 | MIDI Learn (after beta) | — | the right-click MIDI LEARN section | — |
 
@@ -29,6 +30,22 @@ the `[learn]` suite (catalog validity, geometry at 869 / 1086 / 1448 px, navigat
 the sound).
 
 ## Also in this work item
+
+- **Verify on macOS: a click on "Custom Patterns ›" may not open the browser.** In the capture
+  environment (real X server events) a click on the row opened the browser and the editor's
+  outside-click watcher closed it again at once, with a quick click and with a long one. The code
+  shows why: `openCustomBrowser()` anchors the popover to an invisible `browserAnchor`, and
+  `mouseDownAnywhere` closes any popover whose anchor does not contain the pressed component
+  (`PluginEditor.cpp` ~177, `ArpSection.cpp` 817-832). The R2 tests open the browser by calling
+  `openCustomBrowser()` directly, so they would not catch it. If confirmed, beta testers cannot reach
+  Custom Patterns from the list. The pencil in the pattern field works.
+- **Verify on macOS: the first click on ••• after saving a preset is ignored.** In the capture
+  environment, after Save to Library closed the Library, one click on the ••• key opened nothing; a
+  second click a second later opened the menu (reproduced twice with scenario
+  `learn/capture/tests/diag-menu-after-save*.json`). May be window-focus behaviour of the test
+  environment; check in the standalone app.
+- **Pedal Loop has no lesson or INFO topic of its own** (only a sentence in the playback mode's
+  INFO text). Add it to the playback lesson or as its own short lesson.
 
 - **UI verification item: the CAPTURE page's tab label.** In the headless Linux render the
   "CAPTURE A" label in the page's top-left looks overdrawn by the card's tool icons

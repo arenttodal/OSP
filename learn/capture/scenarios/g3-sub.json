@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.g3-sub",
+  "product": "osp",
+  "title": "Add SUB under your keys",
+  "guides": [
+    "osp.guide.arp.sub"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.sub"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed)",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-sub",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.6
+        },
+        {
+          "do": "click",
+          "target": "arpctl:sub.name",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.popup.sub.open"
+        }
+      ]
+    },
+    {
+      "mark": "sub-on",
+      "do": [
+        {
+          "do": "click",
+          "target": "arpctl:sub.light",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.5
+        }
+      ],
+      "expect": [
+        {
+          "param": "sub.enabled",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "mark": "play-chord",
+      "do": [
+        {
+          "do": "midi",
+          "keys": [
+            45,
+            52,
+            57
+          ],
+          "state": "on",
+          "velocity": 95
+        },
+        {
+          "do": "hold",
+          "seconds": 1.6
+        }
+      ]
+    },
+    {
+      "mark": "level",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "param:sub.level"
+        },
+        {
+          "do": "drag",
+          "target": "param:sub.level",
+          "dy": -40,
+          "seconds": 0.8
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ]
+    },
+    {
+      "mark": "wave",
+      "do": [
+        {
+          "do": "click",
+          "target": "param:sub.wave#3/4",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.4
+        },
+        {
+          "do": "midi",
+          "keys": [
+            45,
+            52,
+            57
+          ],
+          "state": "off"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ],
+      "expect": [
+        {
+          "param": "sub.wave",
+          "equals": 3
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.keyboard",
+      "popover:open",
+      "card:A.card"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.sub.row",
+      "osp.popup.sub.open"
+    ],
+    "parameters": [
+      "sub.enabled",
+      "sub.level",
+      "sub.wave"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/AndorSubPanel.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

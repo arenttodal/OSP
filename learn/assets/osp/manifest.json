@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets",
   "product": "osp",
   "productCommit": "6ef3376",
-  "studioCommit": "9ac0ae3",
+  "studioCommit": "bd7b70b",
   "scenes": [
     {
       "schemaVersion": 1,
@@ -1295,6 +1295,4129 @@
             "check": "duration 6-15 s (one clip) or declared",
             "passed": true,
             "detail": "12.97 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.e1-save-preset",
+      "title": "Save the sound as a preset",
+      "scenarioDigest": "sha256:3f6288dd0b6939df69951886f6d4d3195e5c6a4ff63f105ad3a040be086cbcb3",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.make.save-export"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.presets"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.library",
+        "osp.library.save",
+        "osp.header.menu"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [],
+      "source": {
+        "width": 3416,
+        "height": 2100,
+        "fps": 30,
+        "frames": 291,
+        "crop": [
+          0,
+          0,
+          2938,
+          1928
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1050,
+        "fps": 30,
+        "frames": 291,
+        "duration": 9.7,
+        "files": {
+          "webm": {
+            "path": "e1-save-preset/e1-save-preset.webm",
+            "codec": "vp9",
+            "bytes": 337410,
+            "sha256": "c5b7fe2f6b39cafe2f70c16349ab77410553f280badb3a5c14ea2d8430d14401"
+          },
+          "mp4": {
+            "path": "e1-save-preset/e1-save-preset.mp4",
+            "codec": "h264",
+            "bytes": 401256,
+            "sha256": "171e73ebebbfb57a0ada86ae05c71ff788b466ed03903206c4358687cb2b6504"
+          }
+        }
+      },
+      "marks": {
+        "open-library": 0.0,
+        "save": 2.767,
+        "name": 4.833
+      },
+      "steps": {
+        "open-library": "e1-save-preset/steps/open-library.webp",
+        "save": "e1-save-preset/steps/save.webp",
+        "name": "e1-save-preset/steps/name.webp"
+      },
+      "poster": {
+        "path": "e1-save-preset/poster.webp",
+        "frame": 261,
+        "sha256": "864adce5446f47029f4baae664d20ef603ab2cfb9af15f76b1f444298938d6e1",
+        "master": "learn/capture/out/e1-save-preset/poster.png"
+      },
+      "run": {
+        "wallSeconds": 65.735,
+        "meanFrameMs": 204.7,
+        "slowdown": 6.14,
+        "notesPlayed": 0
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "2/2",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "2 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "291 / 291"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than 2.5 s",
+            "passed": true,
+            "detail": "longest unchanged run 1.70 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "291"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1050"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "291"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1050"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "9.70 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.e2-add-layers",
+      "title": "Add a second and third sound",
+      "scenarioDigest": "sha256:5da299b073bc604db65e87bb686a689296f39e9a3cd0af5108d0719a62a5d1a2",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.play.layers"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.layers"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.keyboard"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        },
+        {
+          "id": "tutorial:voice",
+          "file": "Tutorial Voice A3.wav",
+          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
+          "bytes": 1440104
+        },
+        {
+          "id": "tutorial:pluck",
+          "file": "Tutorial Pluck A3.wav",
+          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+          "bytes": 230504
+        }
+      ],
+      "disclosures": [
+        "The file arrives through the editor's own drop handlers (fileDragEnter, fileDragMove, filesDropped); the travelling file badge is drawn in post-production. It is not a recording of an operating-system drag-and-drop."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 269,
+        "crop": [
+          0,
+          0,
+          2896,
+          2100
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1160,
+        "fps": 30,
+        "frames": 269,
+        "duration": 8.967,
+        "files": {
+          "webm": {
+            "path": "e2-add-layers/e2-add-layers.webm",
+            "codec": "vp9",
+            "bytes": 576912,
+            "sha256": "65fba19500e711bfd3244e8c927d10aa1d247908304380b85edec106d68bd268"
+          },
+          "mp4": {
+            "path": "e2-add-layers/e2-add-layers.mp4",
+            "codec": "h264",
+            "bytes": 672148,
+            "sha256": "44e0cf9536a770d56c43251c4623e605dbb68ead34eda829cfc35f1d5b870595"
+          }
+        }
+      },
+      "marks": {
+        "add-b": 0.0,
+        "add-c": 3.267,
+        "play-all": 5.933
+      },
+      "steps": {
+        "add-b": "e2-add-layers/steps/add-b.webp",
+        "add-c": "e2-add-layers/steps/add-c.webp",
+        "play-all": "e2-add-layers/steps/play-all.webp"
+      },
+      "poster": {
+        "path": "e2-add-layers/poster.webp",
+        "frame": 256,
+        "sha256": "124a953443ea15e771c510e6b0407dd9c201f6fdcb92fb3a4f2b6a195bbe2eb1",
+        "master": "learn/capture/out/e2-add-layers/poster.png"
+      },
+      "run": {
+        "wallSeconds": 50.805,
+        "meanFrameMs": 169.6,
+        "slowdown": 5.09,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "5/5",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "5 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "269 / 269"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 986), (1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 1.60 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "269"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1160"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "269"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1160"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "8.97 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.e3-mix-layers",
+      "title": "Balance, mute and solo layers",
+      "scenarioDigest": "sha256:c354cd28a4692fb979c062964b864f6c03cc0f0a54a3879317ae97d2c1fc3531",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.play.mix"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.layers"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.source.B.level",
+        "osp.source.B.solo",
+        "osp.source.A.mute"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        },
+        {
+          "id": "tutorial:voice",
+          "file": "Tutorial Voice A3.wav",
+          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
+          "bytes": 1440104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 284,
+        "crop": [
+          0,
+          177,
+          2896,
+          1381
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 664,
+        "fps": 30,
+        "frames": 284,
+        "duration": 9.467,
+        "files": {
+          "webm": {
+            "path": "e3-mix-layers/e3-mix-layers.webm",
+            "codec": "vp9",
+            "bytes": 438973,
+            "sha256": "ed1f042bf7f95df6ced18f15b960a39ccca55d3ccb0bde50a3d80b67dc08c6ea"
+          },
+          "mp4": {
+            "path": "e3-mix-layers/e3-mix-layers.mp4",
+            "codec": "h264",
+            "bytes": 592831,
+            "sha256": "265a61daf1b2facbafbc25233b5e6d5173c74a06e54e4023ce7c0ebabe9ca6fb"
+          }
+        }
+      },
+      "marks": {
+        "level-b": 0.0,
+        "solo-b": 2.9,
+        "unsolo-b": 5.367,
+        "mute-a": 6.9
+      },
+      "steps": {
+        "level-b": "e3-mix-layers/steps/level-b.webp",
+        "solo-b": "e3-mix-layers/steps/solo-b.webp",
+        "unsolo-b": "e3-mix-layers/steps/unsolo-b.webp",
+        "mute-a": "e3-mix-layers/steps/mute-a.webp"
+      },
+      "poster": {
+        "path": "e3-mix-layers/poster.webp",
+        "frame": 271,
+        "sha256": "655a8b3d840338f7d52c6b8050b8b635500470b7a7ed195f6caf4080a12cc531",
+        "master": "learn/capture/out/e3-mix-layers/poster.png"
+      },
+      "run": {
+        "wallSeconds": 72.686,
+        "meanFrameMs": 235.9,
+        "slowdown": 7.08,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "4/4",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "4 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "284 / 284"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 0.03 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "284"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x664"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "284"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x664"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "9.47 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.e4-starting-state",
+      "title": "Load a starting state",
+      "scenarioDigest": "sha256:8bd4f04f056d0637196978ccc1ce9a32f61a43b5df04824a1cae95af20b2db7d",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.play.presets"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.presets"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "keyboard.library",
+        "osp.library"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 320,
+        "crop": [
+          12,
+          0,
+          2884,
+          2100
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1170,
+        "fps": 30,
+        "frames": 320,
+        "duration": 10.667,
+        "files": {
+          "webm": {
+            "path": "e4-starting-state/e4-starting-state.webm",
+            "codec": "vp9",
+            "bytes": 531767,
+            "sha256": "3638f489db5d80a640e748c2d6883b5b234cc668bc50b9c507d285805918aec3"
+          },
+          "mp4": {
+            "path": "e4-starting-state/e4-starting-state.mp4",
+            "codec": "h264",
+            "bytes": 533026,
+            "sha256": "82f7e0fa683379f7e4994de003745b211eadcd26acbd1ffe73256e5d3c5a427c"
+          }
+        }
+      },
+      "marks": {
+        "open-library": 0.0,
+        "choose-state": 2.767,
+        "play": 5.633
+      },
+      "steps": {
+        "open-library": "e4-starting-state/steps/open-library.webp",
+        "choose-state": "e4-starting-state/steps/choose-state.webp",
+        "play": "e4-starting-state/steps/play.webp"
+      },
+      "poster": {
+        "path": "e4-starting-state/poster.webp",
+        "frame": 305,
+        "sha256": "a101baa3e26d9bdec4410518f7424b8bdc8f6307494092fad6657659c8d4b3bd",
+        "master": "learn/capture/out/e4-starting-state/poster.png"
+      },
+      "run": {
+        "wallSeconds": 58.574,
+        "meanFrameMs": 164.3,
+        "slowdown": 4.93,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "4/4",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "4 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "320 / 320"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than 2.5 s",
+            "passed": true,
+            "detail": "longest unchanged run 1.83 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "320"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1170"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "320"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1170"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "10.67 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.e5-export-instrument",
+      "title": "Export a portable instrument",
+      "scenarioDigest": "sha256:fdae8b3deb8c97f7c4158bd7af9dbbd8e5143cafd8855ef3ae852f3b0ab90899",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.make.export"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.presets"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.header.menu"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [
+        "The clip stops at the menu item: choosing it opens the system's save dialog, which is not filmed."
+      ],
+      "source": {
+        "width": 3416,
+        "height": 2100,
+        "fps": 30,
+        "frames": 201,
+        "crop": [
+          0,
+          17,
+          2923,
+          1775
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 962,
+        "fps": 30,
+        "frames": 201,
+        "duration": 6.7,
+        "files": {
+          "webm": {
+            "path": "e5-export-instrument/e5-export-instrument.webm",
+            "codec": "vp9",
+            "bytes": 291117,
+            "sha256": "beec41d6ad6173e3965f469b45aeeb4259391085180d012b7b5355a540df3871"
+          },
+          "mp4": {
+            "path": "e5-export-instrument/e5-export-instrument.mp4",
+            "codec": "h264",
+            "bytes": 212802,
+            "sha256": "98eeb19b9bd2393982724759ab00948ddefdc26c4c3a9b82e534c62c2691e9b7"
+          }
+        }
+      },
+      "marks": {
+        "open-menu": 0.0,
+        "export": 3.367
+      },
+      "steps": {
+        "open-menu": "e5-export-instrument/steps/open-menu.webp",
+        "export": "e5-export-instrument/steps/export.webp"
+      },
+      "poster": {
+        "path": "e5-export-instrument/poster.webp",
+        "frame": 171,
+        "sha256": "a8010c27ae8d15d484517b8376ba0b3ca7cd9e9c26f320e7b6bf9a2f85ffcddb",
+        "master": "learn/capture/out/e5-export-instrument/poster.png"
+      },
+      "run": {
+        "wallSeconds": 39.305,
+        "meanFrameMs": 175.5,
+        "slowdown": 5.27,
+        "notesPlayed": 0
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "1/1",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "1 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "201 / 201"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than 3.8 s",
+            "passed": true,
+            "detail": "longest unchanged run 2.87 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "201"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x962"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "201"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x962"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "6.70 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.f1-synth-blend",
+      "title": "Blend in SYNTH",
+      "scenarioDigest": "sha256:c92c89b18c1f86c0b8e7cf4dc4bc742872c70024c4771c5983f56cdaa07cb62a",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.synth.blend"
+      ],
+      "learn": {
+        "lessons": [],
+        "steps": []
+      },
+      "targets": [],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 330,
+        "crop": [
+          0,
+          177,
+          2896,
+          1381
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 664,
+        "fps": 30,
+        "frames": 330,
+        "duration": 11.0,
+        "files": {
+          "webm": {
+            "path": "f1-synth-blend/f1-synth-blend.webm",
+            "codec": "vp9",
+            "bytes": 243894,
+            "sha256": "194956e7e11e1a7b7057fd168a34a94520c0ddf65254aedd7c865b25b89c65af"
+          },
+          "mp4": {
+            "path": "f1-synth-blend/f1-synth-blend.mp4",
+            "codec": "h264",
+            "bytes": 279846,
+            "sha256": "83d9279707adfacb170809631075a64a221aabd74717cb1edcff3be393e859e6"
+          }
+        }
+      },
+      "marks": {
+        "open-synth": 0.0,
+        "amount": 2.433,
+        "wave": 4.933,
+        "octave": 7.2,
+        "shape": 8.9
+      },
+      "steps": {
+        "open-synth": "f1-synth-blend/steps/open-synth.webp",
+        "amount": "f1-synth-blend/steps/amount.webp",
+        "wave": "f1-synth-blend/steps/wave.webp",
+        "octave": "f1-synth-blend/steps/octave.webp",
+        "shape": "f1-synth-blend/steps/shape.webp"
+      },
+      "poster": {
+        "path": "f1-synth-blend/poster.webp",
+        "frame": 300,
+        "sha256": "2bd876b227b0bacc0ad71da492f1c5b5f38ae9635df51129b80165d7208f15e9",
+        "master": "learn/capture/out/f1-synth-blend/poster.png"
+      },
+      "run": {
+        "wallSeconds": 91.687,
+        "meanFrameMs": 250.1,
+        "slowdown": 7.5,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "5/5",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "5 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "330 / 330"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 1.20 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "330"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x664"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "330"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x664"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "11.00 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.f2-synth-imprint",
+      "title": "Colour SYNTH with IMPRINT",
+      "scenarioDigest": "sha256:742b94ff4d0f183a6d60fea26455b475caf848405e4fae30a0513a3ed489f235",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.synth.imprint"
+      ],
+      "learn": {
+        "lessons": [],
+        "steps": []
+      },
+      "targets": [],
+      "fixtures": [
+        {
+          "id": "tutorial:voice",
+          "file": "Tutorial Voice A3.wav",
+          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
+          "bytes": 1440104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 309,
+        "crop": [
+          0,
+          177,
+          2896,
+          1381
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 664,
+        "fps": 30,
+        "frames": 309,
+        "duration": 10.3,
+        "files": {
+          "webm": {
+            "path": "f2-synth-imprint/f2-synth-imprint.webm",
+            "codec": "vp9",
+            "bytes": 236371,
+            "sha256": "f480ddf7c564a75b6efd6de213bf052effde15f24e594d65f1ed09305324a7ca"
+          },
+          "mp4": {
+            "path": "f2-synth-imprint/f2-synth-imprint.mp4",
+            "codec": "h264",
+            "bytes": 289331,
+            "sha256": "73b60bd9add5e92f4073680fb9b3344d221224f896fe2df6d7c5549e1db62101"
+          }
+        }
+      },
+      "marks": {
+        "open-synth": 0.0,
+        "mode-imprint": 2.133,
+        "imprint": 4.6,
+        "motion": 7.3
+      },
+      "steps": {
+        "open-synth": "f2-synth-imprint/steps/open-synth.webp",
+        "mode-imprint": "f2-synth-imprint/steps/mode-imprint.webp",
+        "imprint": "f2-synth-imprint/steps/imprint.webp",
+        "motion": "f2-synth-imprint/steps/motion.webp"
+      },
+      "poster": {
+        "path": "f2-synth-imprint/poster.webp",
+        "frame": 279,
+        "sha256": "cd207c35e77ee16e3ab836673c8d43bcfe09b3dc2eb98c0e6f593efc57da0e6e",
+        "master": "learn/capture/out/f2-synth-imprint/poster.png"
+      },
+      "run": {
+        "wallSeconds": 84.304,
+        "meanFrameMs": 237.3,
+        "slowdown": 7.12,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "2/2",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "2 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "309 / 309"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 1.37 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "309"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x664"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "309"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x664"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "10.30 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.g1-arp-basics",
+      "title": "Arpeggiate held notes",
+      "scenarioDigest": "sha256:1374978b5f095b5c213f53440d4aeee99a35a4efd1d72071b66ef56fa1a0a7cc",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.arp.basics"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.arp"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.arp.control",
+        "osp.arp.panel"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:pluck",
+          "file": "Tutorial Pluck A3.wav",
+          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+          "bytes": 230504
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2474,
+        "fps": 30,
+        "frames": 408,
+        "crop": [
+          0,
+          182,
+          2896,
+          2474
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1266,
+        "fps": 30,
+        "frames": 408,
+        "duration": 13.6,
+        "files": {
+          "webm": {
+            "path": "g1-arp-basics/g1-arp-basics.webm",
+            "codec": "vp9",
+            "bytes": 783384,
+            "sha256": "e65487d3ee5da3c47ce17b2b6fedf48a5b2bb61be26da9071937f64fa5bb2829"
+          },
+          "mp4": {
+            "path": "g1-arp-basics/g1-arp-basics.mp4",
+            "codec": "h264",
+            "bytes": 694251,
+            "sha256": "a3d7cb5a3515f00d4ba97f0c86c54e54829bf8592ae369cf77b1ac144509cf74"
+          }
+        }
+      },
+      "marks": {
+        "open-arp": 0.0,
+        "arp-on": 2.867,
+        "pattern": 5.4,
+        "rate": 7.967,
+        "octaves": 11.067
+      },
+      "steps": {
+        "open-arp": "g1-arp-basics/steps/open-arp.webp",
+        "arp-on": "g1-arp-basics/steps/arp-on.webp",
+        "pattern": "g1-arp-basics/steps/pattern.webp",
+        "rate": "g1-arp-basics/steps/rate.webp",
+        "octaves": "g1-arp-basics/steps/octaves.webp"
+      },
+      "poster": {
+        "path": "g1-arp-basics/poster.webp",
+        "frame": 383,
+        "sha256": "92ab447d48165f24bddaa8b26889daf9ed0523602e28eccdca2a1f5eeee88f89",
+        "master": "learn/capture/out/g1-arp-basics/poster.png"
+      },
+      "run": {
+        "wallSeconds": 98.366,
+        "meanFrameMs": 224.2,
+        "slowdown": 6.73,
+        "notesPlayed": 62
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "5/5",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "5 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "408 / 408"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050), (1448, 1237)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 1.37 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "408"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1266"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "408"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1266"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "13.60 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.g2-arp-custom",
+      "title": "Use a custom pattern",
+      "scenarioDigest": "sha256:1305cce12ae5f2b97de61379ab97ffdf29fa4ec867dc13568fe8f915341b9caa",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.arp.custom"
+      ],
+      "learn": {
+        "lessons": [],
+        "steps": []
+      },
+      "targets": [
+        "osp.arp.panel"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:pluck",
+          "file": "Tutorial Pluck A3.wav",
+          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+          "bytes": 230504
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard.",
+        "The pattern was chosen in set-up through the browser's own code: a real click on Custom Patterns \u203a did not leave the browser open in the capture environment (see docs/learn-studio/gate-3-report.md, findings)."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2474,
+        "fps": 30,
+        "frames": 190,
+        "crop": [
+          0,
+          219,
+          2896,
+          2205
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1096,
+        "fps": 30,
+        "frames": 190,
+        "duration": 6.333,
+        "files": {
+          "webm": {
+            "path": "g2-arp-custom/g2-arp-custom.webm",
+            "codec": "vp9",
+            "bytes": 393691,
+            "sha256": "1d6e3bf7af8aad0e4889ec59aeae4cccab1c6026cd4071a3f6004a7314f1d8a0"
+          },
+          "mp4": {
+            "path": "g2-arp-custom/g2-arp-custom.mp4",
+            "codec": "h264",
+            "bytes": 340739,
+            "sha256": "400f90f0168d3281bf647aa8540cca9f41bd1f5a664813bc059a169347675eea"
+          }
+        }
+      },
+      "marks": {
+        "pattern": 0.0,
+        "edit": 2.6
+      },
+      "steps": {
+        "pattern": "g2-arp-custom/steps/pattern.webp",
+        "edit": "g2-arp-custom/steps/edit.webp"
+      },
+      "poster": {
+        "path": "g2-arp-custom/poster.webp",
+        "frame": 167,
+        "sha256": "c5ea1578d439238afe02239259081e14daa5d2081714ad88551d25673d3b8d7d",
+        "master": "learn/capture/out/g2-arp-custom/poster.png"
+      },
+      "run": {
+        "wallSeconds": 52.342,
+        "meanFrameMs": 251.7,
+        "slowdown": 7.55,
+        "notesPlayed": 46
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "3/3",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "3 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "190 / 190"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1237)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than 3.4 s",
+            "passed": true,
+            "detail": "longest unchanged run 0.03 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "190"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1096"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "190"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1096"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "6.33 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.g3-sub",
+      "title": "Add SUB under your keys",
+      "scenarioDigest": "sha256:136652ae743e12a377a8533c30310980f7673967456ba5f47abbbf11ea837930",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.arp.sub"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.sub"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.sub.row",
+        "osp.popup.sub.open"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 343,
+        "crop": [
+          0,
+          219,
+          2896,
+          2063
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1018,
+        "fps": 30,
+        "frames": 343,
+        "duration": 11.433,
+        "files": {
+          "webm": {
+            "path": "g3-sub/g3-sub.webm",
+            "codec": "vp9",
+            "bytes": 653809,
+            "sha256": "ebcad682c61305b3c66d60a348ac6003c0ecd300c6bb2e1a98eab41d3e4a893a"
+          },
+          "mp4": {
+            "path": "g3-sub/g3-sub.mp4",
+            "codec": "h264",
+            "bytes": 619868,
+            "sha256": "d7e44a1e6ddc812c8172e5e4843e0d663b21113f524d8296e22784e814b317d4"
+          }
+        }
+      },
+      "marks": {
+        "open-sub": 0.0,
+        "sub-on": 2.9,
+        "play-chord": 4.333,
+        "level": 5.967,
+        "wave": 8.467
+      },
+      "steps": {
+        "open-sub": "g3-sub/steps/open-sub.webp",
+        "sub-on": "g3-sub/steps/sub-on.webp",
+        "play-chord": "g3-sub/steps/play-chord.webp",
+        "level": "g3-sub/steps/level.webp",
+        "wave": "g3-sub/steps/wave.webp"
+      },
+      "poster": {
+        "path": "g3-sub/poster.webp",
+        "frame": 315,
+        "sha256": "7173e576efbc4bb5d7652080233b6faddbf6eef5298278eb8b8e3bdbfd3b04ee",
+        "master": "learn/capture/out/g3-sub/poster.png"
+      },
+      "run": {
+        "wallSeconds": 75.864,
+        "meanFrameMs": 203.6,
+        "slowdown": 6.11,
+        "notesPlayed": 3
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "3/3",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "3 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "343 / 343"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 1.63 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "343"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1018"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "343"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1018"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "11.43 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.h1-oneshot-granular",
+      "title": "Switch between One Shot and Granular",
+      "scenarioDigest": "sha256:c61c3c17de6f85c707cc9fd7579afc56103345e45597be3ff751fd0240d7dfbc",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.play.oneshot-granular"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.playback"
+        ],
+        "steps": [
+          "osp.playback/selector",
+          "osp.playback/granular",
+          "osp.playback/compare"
+        ]
+      },
+      "targets": [
+        "osp.source.mode",
+        "osp.keyboard"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [],
+      "source": {
+        "width": 3416,
+        "height": 2100,
+        "fps": 30,
+        "frames": 306,
+        "crop": [
+          0,
+          77,
+          3237,
+          2100
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1000,
+        "fps": 30,
+        "frames": 306,
+        "duration": 10.2,
+        "files": {
+          "webm": {
+            "path": "h1-oneshot-granular/h1-oneshot-granular.webm",
+            "codec": "vp9",
+            "bytes": 446473,
+            "sha256": "88d56f1da99c1c0988aad586537a6e1dc087516aa0ce0b51fbd091df87e38628"
+          },
+          "mp4": {
+            "path": "h1-oneshot-granular/h1-oneshot-granular.mp4",
+            "codec": "h264",
+            "bytes": 459499,
+            "sha256": "ed0debe13016e92e971b709b7feca0c54d1050830784827d0d79b83b9cf9487d"
+          }
+        }
+      },
+      "marks": {
+        "oneshot-play": 0.0,
+        "open-mode": 2.767,
+        "choose-granular": 4.867,
+        "granular-play": 6.3
+      },
+      "steps": {
+        "oneshot-play": "h1-oneshot-granular/steps/oneshot-play.webp",
+        "open-mode": "h1-oneshot-granular/steps/open-mode.webp",
+        "choose-granular": "h1-oneshot-granular/steps/choose-granular.webp",
+        "granular-play": "h1-oneshot-granular/steps/granular-play.webp"
+      },
+      "poster": {
+        "path": "h1-oneshot-granular/poster.webp",
+        "frame": 276,
+        "sha256": "74acbc73ca6b5f2fbac6098b7a3d63ccbfc718cc3c2a1009d436044c596f69ca",
+        "master": "learn/capture/out/h1-oneshot-granular/poster.png"
+      },
+      "run": {
+        "wallSeconds": 68.179,
+        "meanFrameMs": 211.9,
+        "slowdown": 6.36,
+        "notesPlayed": 2
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "4/4",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "4 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "306 / 306"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 1.40 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "306"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1000"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "306"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1000"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "10.20 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.h2-grains",
+      "title": "Shape the grains",
+      "scenarioDigest": "sha256:235f0f41d57d3d71117472185eb177a411ee5719eda2b88203f3524fc647b1b8",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.granular.grains"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.playback"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.granular.position",
+        "osp.granular.size",
+        "osp.granular.density"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 327,
+        "crop": [
+          0,
+          177,
+          2896,
+          1381
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 664,
+        "fps": 30,
+        "frames": 327,
+        "duration": 10.9,
+        "files": {
+          "webm": {
+            "path": "h2-grains/h2-grains.webm",
+            "codec": "vp9",
+            "bytes": 336791,
+            "sha256": "f0d72c1f0fc326b5e0794805809d40ff02d95297af8791a299d554cb19831da6"
+          },
+          "mp4": {
+            "path": "h2-grains/h2-grains.mp4",
+            "codec": "h264",
+            "bytes": 362611,
+            "sha256": "3a689991b079d0fec2793401ca8586e01178cc56505edb6ca582e4a4e080c574"
+          }
+        }
+      },
+      "marks": {
+        "reveal": 0.0,
+        "pos": 2.133,
+        "size": 5.1,
+        "dens": 7.8
+      },
+      "steps": {
+        "reveal": "h2-grains/steps/reveal.webp",
+        "pos": "h2-grains/steps/pos.webp",
+        "size": "h2-grains/steps/size.webp",
+        "dens": "h2-grains/steps/dens.webp"
+      },
+      "poster": {
+        "path": "h2-grains/poster.webp",
+        "frame": 306,
+        "sha256": "3b2eef5e9e0e7063484141da27400f2474b6fadf49af27bb975672c4a3add6c0",
+        "master": "learn/capture/out/h2-grains/poster.png"
+      },
+      "run": {
+        "wallSeconds": 82.548,
+        "meanFrameMs": 222.2,
+        "slowdown": 6.67,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "1/1",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "1 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "327 / 327"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 0.70 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "327"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x664"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "327"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x664"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "10.90 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.h3-key-dna",
+      "title": "Vary the sound from key to key (KEY DNA)",
+      "scenarioDigest": "sha256:03483530e00031fe972b68d1acbd9770f85ab0c3459328f4fd6b7307ae21e082",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.granular.key-dna"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.keydna"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.source.keyDna",
+        "osp.keydna.power",
+        "osp.keydna.depth",
+        "osp.keydna.graph"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 457,
+        "crop": [
+          0,
+          179,
+          2896,
+          2100
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1060,
+        "fps": 30,
+        "frames": 457,
+        "duration": 15.233,
+        "files": {
+          "webm": {
+            "path": "h3-key-dna/h3-key-dna.webm",
+            "codec": "vp9",
+            "bytes": 347479,
+            "sha256": "6b132571d6fba67102c04224bf4e2bbe54a69241775b74f18889deb5af59932f"
+          },
+          "mp4": {
+            "path": "h3-key-dna/h3-key-dna.mp4",
+            "codec": "h264",
+            "bytes": 356269,
+            "sha256": "c59efcc4e0d13394e6bd43704e95076c479247d1e078235ccdfa531b9f1420de"
+          }
+        }
+      },
+      "marks": {
+        "open": 0.0,
+        "power": 3.5,
+        "draw-keys": 5.567,
+        "depth": 8.433,
+        "play-keys": 10.933
+      },
+      "steps": {
+        "open": "h3-key-dna/steps/open.webp",
+        "power": "h3-key-dna/steps/power.webp",
+        "draw-keys": "h3-key-dna/steps/draw-keys.webp",
+        "depth": "h3-key-dna/steps/depth.webp",
+        "play-keys": "h3-key-dna/steps/play-keys.webp"
+      },
+      "poster": {
+        "path": "h3-key-dna/poster.webp",
+        "frame": 427,
+        "sha256": "800c85880482953612fd0ff360f8058dde9648e0113bb1755ba3df8ef1d62cd2",
+        "master": "learn/capture/out/h3-key-dna/poster.png"
+      },
+      "run": {
+        "wallSeconds": 102.968,
+        "meanFrameMs": 200.6,
+        "slowdown": 6.02,
+        "notesPlayed": 3
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "4/4",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "4 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "457 / 457"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than 2.5 s",
+            "passed": true,
+            "detail": "longest unchanged run 2.17 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "457"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1060"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "457"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1060"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "15.23 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.i1-reimagined",
+      "title": "Reimagine a sound",
+      "scenarioDigest": "sha256:325ef573acceda11c90e49b48513f6ec0d2c845d397fe90ba6a050e12b607c08",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.shape.reimagined"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.reimagined"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.source.reimagined.label",
+        "osp.reimagined.mode",
+        "osp.source.reimagined"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 3416,
+        "height": 2100,
+        "fps": 30,
+        "frames": 243,
+        "crop": [
+          0,
+          171,
+          2940,
+          1387
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 662,
+        "fps": 30,
+        "frames": 243,
+        "duration": 8.1,
+        "files": {
+          "webm": {
+            "path": "i1-reimagined/i1-reimagined.webm",
+            "codec": "vp9",
+            "bytes": 304547,
+            "sha256": "52685007ecf813bfcdef86559adbb4c040abaf0666272987c96dac43c1986f86"
+          },
+          "mp4": {
+            "path": "i1-reimagined/i1-reimagined.mp4",
+            "codec": "h264",
+            "bytes": 252651,
+            "sha256": "f71fe47e3ddd290e5bd7a28a049f5078450dbdd31bb4a546bd26e9c097833481"
+          }
+        }
+      },
+      "marks": {
+        "open-modes": 0.0,
+        "choose-mode": 2.1,
+        "amount": 4.4
+      },
+      "steps": {
+        "open-modes": "i1-reimagined/steps/open-modes.webp",
+        "choose-mode": "i1-reimagined/steps/choose-mode.webp",
+        "amount": "i1-reimagined/steps/amount.webp"
+      },
+      "poster": {
+        "path": "i1-reimagined/poster.webp",
+        "frame": 229,
+        "sha256": "1adbbf017806126a06805297e078360badafc7ca02527abcf2eafed9a8ae3d6c",
+        "master": "learn/capture/out/i1-reimagined/poster.png"
+      },
+      "run": {
+        "wallSeconds": 71.895,
+        "meanFrameMs": 264.0,
+        "slowdown": 7.92,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "2/2",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "2 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "243 / 243"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 0.07 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "243"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x662"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "243"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x662"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "8.10 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.i2-movement",
+      "title": "Add MOVEMENT",
+      "scenarioDigest": "sha256:4ab4670d34866bb58895f414225815e75da6d10e63b55dcb1af138af98eb62b0",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.shape.movement"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.sound"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.macro.movement",
+        "osp.movement.mode"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:voice",
+          "file": "Tutorial Voice A3.wav",
+          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
+          "bytes": 1440104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 242,
+        "crop": [
+          72,
+          916,
+          1900,
+          1820
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 790,
+        "fps": 30,
+        "frames": 242,
+        "duration": 8.067,
+        "files": {
+          "webm": {
+            "path": "i2-movement/i2-movement.webm",
+            "codec": "vp9",
+            "bytes": 183409,
+            "sha256": "7fccd678e35dbdf0a1c992a8a57e293c25edee5ea43f0adc05452a98ce2faf69"
+          },
+          "mp4": {
+            "path": "i2-movement/i2-movement.mp4",
+            "codec": "h264",
+            "bytes": 182089,
+            "sha256": "75dd153d3204f1926a67bd9788119ce722e6864f1ca6d3033f99dfa7e6394d6f"
+          }
+        }
+      },
+      "marks": {
+        "open-movement": 0.0,
+        "choose-mode": 2.267,
+        "amount": 4.567
+      },
+      "steps": {
+        "open-movement": "i2-movement/steps/open-movement.webp",
+        "choose-mode": "i2-movement/steps/choose-mode.webp",
+        "amount": "i2-movement/steps/amount.webp"
+      },
+      "poster": {
+        "path": "i2-movement/poster.webp",
+        "frame": 212,
+        "sha256": "c2d7de6cc02e5cdc990b7125838696c68e34e52c66a889c3e1d5af4aa891279b",
+        "master": "learn/capture/out/i2-movement/poster.png"
+      },
+      "run": {
+        "wallSeconds": 67.032,
+        "meanFrameMs": 237.5,
+        "slowdown": 7.12,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "3/3",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "3 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "242 / 242"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 0.50 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "242"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x790"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "242"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x790"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "8.07 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.i3-shaper",
+      "title": "Use a SHAPER pattern",
+      "scenarioDigest": "sha256:437df472060a52e4725b3f510eca3f2ea7da2686615dac17144e9d1c866601f8",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.shape.shaper"
+      ],
+      "learn": {
+        "lessons": [],
+        "steps": []
+      },
+      "targets": [],
+      "fixtures": [
+        {
+          "id": "tutorial:voice",
+          "file": "Tutorial Voice A3.wav",
+          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
+          "bytes": 1440104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 311,
+        "crop": [
+          72,
+          860,
+          1900,
+          2082
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1070,
+        "fps": 30,
+        "frames": 311,
+        "duration": 10.367,
+        "files": {
+          "webm": {
+            "path": "i3-shaper/i3-shaper.webm",
+            "codec": "vp9",
+            "bytes": 350717,
+            "sha256": "c10662e449e95edadce0ce17443bba86ea9ffb7111e23745fa1e2d6d6d22cd7b"
+          },
+          "mp4": {
+            "path": "i3-shaper/i3-shaper.mp4",
+            "codec": "h264",
+            "bytes": 419654,
+            "sha256": "c70f45875490a0f42cc67d7b834c88917ca7752a404ec8d7a356aa0b02a841b2"
+          }
+        }
+      },
+      "marks": {
+        "open-movement": 0.0,
+        "shaper": 2.067,
+        "pattern": 4.367,
+        "depth": 6.667
+      },
+      "steps": {
+        "open-movement": "i3-shaper/steps/open-movement.webp",
+        "shaper": "i3-shaper/steps/shaper.webp",
+        "pattern": "i3-shaper/steps/pattern.webp",
+        "depth": "i3-shaper/steps/depth.webp"
+      },
+      "poster": {
+        "path": "i3-shaper/poster.webp",
+        "frame": 289,
+        "sha256": "738167476f5d08b7eee759a802cbb5131c7fe1e40405dccf7e4aa4f2831c5cf0",
+        "master": "learn/capture/out/i3-shaper/poster.png"
+      },
+      "run": {
+        "wallSeconds": 86.246,
+        "meanFrameMs": 244.0,
+        "slowdown": 7.32,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "5/5",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "5 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "311 / 311"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 0.07 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "311"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1070"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "311"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1070"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "10.37 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.i4-modulation",
+      "title": "Make FILTER move with an LFO",
+      "scenarioDigest": "sha256:81340b94363c4c69e8fe4159f1ce993486e82cf78e7aff732cf06c3d6d41b516",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.shape.modulation"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.modulation"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.mod.lfo1",
+        "osp.macro.filter",
+        "osp.mod.halo"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 278,
+        "crop": [
+          15,
+          125,
+          2883,
+          1917
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1000,
+        "fps": 30,
+        "frames": 278,
+        "duration": 9.267,
+        "files": {
+          "webm": {
+            "path": "i4-modulation/i4-modulation.webm",
+            "codec": "vp9",
+            "bytes": 593090,
+            "sha256": "af460a1b3aa7590dba5e522f7e68fe029e542b352525c4ca31480c2003d850a2"
+          },
+          "mp4": {
+            "path": "i4-modulation/i4-modulation.mp4",
+            "codec": "h264",
+            "bytes": 551642,
+            "sha256": "fafe556c1290ce410930bff6ef5c4be382b26f98d188ae1d12ab4d12da49a0cd"
+          }
+        }
+      },
+      "marks": {
+        "lfo-tab": 0.0,
+        "connect": 2.367,
+        "depth": 5.367
+      },
+      "steps": {
+        "lfo-tab": "i4-modulation/steps/lfo-tab.webp",
+        "connect": "i4-modulation/steps/connect.webp",
+        "depth": "i4-modulation/steps/depth.webp"
+      },
+      "poster": {
+        "path": "i4-modulation/poster.webp",
+        "frame": 276,
+        "sha256": "232836496e39738ceb411034c5cf16946b192c551a7ea8ee706d3795b30b8668",
+        "master": "learn/capture/out/i4-modulation/poster.png"
+      },
+      "run": {
+        "wallSeconds": 72.997,
+        "meanFrameMs": 226.7,
+        "slowdown": 6.8,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "2/2",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "2 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "278 / 278"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than 3.4 s",
+            "passed": true,
+            "detail": "longest unchanged run 0.07 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "278"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1000"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "278"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1000"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "9.27 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.i5-user-macro",
+      "title": "Assign a USER macro",
+      "scenarioDigest": "sha256:4eb8fc9b69b8c391f90fd59912bbf9b1b75e09106bb1325ec581de2dced7984f",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.shape.user-macro"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.usermacros"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "macros.bank",
+        "osp.source.level",
+        "usermacro.0"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:pluck",
+          "file": "Tutorial Pluck A3.wav",
+          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+          "bytes": 230504
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 3416,
+        "height": 2100,
+        "fps": 30,
+        "frames": 336,
+        "crop": [
+          0,
+          67,
+          2923,
+          2100
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1112,
+        "fps": 30,
+        "frames": 336,
+        "duration": 11.2,
+        "files": {
+          "webm": {
+            "path": "i5-user-macro/i5-user-macro.webm",
+            "codec": "vp9",
+            "bytes": 417698,
+            "sha256": "84d4b7a396d1f248b5635c2980d96ec5c2fc90108adf73c4a1d63500858e28ed"
+          },
+          "mp4": {
+            "path": "i5-user-macro/i5-user-macro.mp4",
+            "codec": "h264",
+            "bytes": 423603,
+            "sha256": "434f95cc2c5a26235ae6b39f5662fb1f4f507c3e8c191cfd9d4a6629b3920229"
+          }
+        }
+      },
+      "marks": {
+        "user-bank": 0.0,
+        "right-click": 2.567,
+        "assign": 4.533,
+        "turn": 7.067
+      },
+      "steps": {
+        "user-bank": "i5-user-macro/steps/user-bank.webp",
+        "right-click": "i5-user-macro/steps/right-click.webp",
+        "assign": "i5-user-macro/steps/assign.webp",
+        "turn": "i5-user-macro/steps/turn.webp"
+      },
+      "poster": {
+        "path": "i5-user-macro/poster.webp",
+        "frame": 306,
+        "sha256": "e78dd9ccf1f25978d8325f9a3f6f88743d6332f503fe61a35ac7b8e7732ea432",
+        "master": "learn/capture/out/i5-user-macro/poster.png"
+      },
+      "run": {
+        "wallSeconds": 74.155,
+        "meanFrameMs": 200.8,
+        "slowdown": 6.02,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "4/4",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "4 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "336 / 336"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 1.23 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "336"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1112"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "336"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1112"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "11.20 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.i6-echo-space",
+      "title": "Add ECHO and SPACE",
+      "scenarioDigest": "sha256:69328ad479dab64063a4ad3f8bcf97eeb83e2c473a16ebaea938015041d877d6",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.shape.effects"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.sound"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.macro.echo",
+        "osp.macro.space"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:pluck",
+          "file": "Tutorial Pluck A3.wav",
+          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+          "bytes": 230504
+        }
+      ],
+      "disclosures": [],
+      "source": {
+        "width": 3416,
+        "height": 2100,
+        "fps": 30,
+        "frames": 364,
+        "crop": [
+          50,
+          682,
+          2670,
+          2100
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 866,
+        "fps": 30,
+        "frames": 364,
+        "duration": 12.133,
+        "files": {
+          "webm": {
+            "path": "i6-echo-space/i6-echo-space.webm",
+            "codec": "vp9",
+            "bytes": 359057,
+            "sha256": "9db7d10cc965e4ab1196b142e6f6e96bafa629ba8da6dc67548e4897875432ed"
+          },
+          "mp4": {
+            "path": "i6-echo-space/i6-echo-space.mp4",
+            "codec": "h264",
+            "bytes": 361605,
+            "sha256": "91257b4db0f258198ea6e64518836de95b27ddee5cdf7482abe65cda13e21a84"
+          }
+        }
+      },
+      "marks": {
+        "echo": 0.0,
+        "open-space": 4.567,
+        "space-type": 6.033,
+        "space-amount": 8.133
+      },
+      "steps": {
+        "echo": "i6-echo-space/steps/echo.webp",
+        "open-space": "i6-echo-space/steps/open-space.webp",
+        "space-type": "i6-echo-space/steps/space-type.webp",
+        "space-amount": "i6-echo-space/steps/space-amount.webp"
+      },
+      "poster": {
+        "path": "i6-echo-space/poster.webp",
+        "frame": 334,
+        "sha256": "5d98697382d1b15f9feb7955c99d12858ef0d75f42d7ee4e1be395aad2bc3c2e",
+        "master": "learn/capture/out/i6-echo-space/poster.png"
+      },
+      "run": {
+        "wallSeconds": 77.488,
+        "meanFrameMs": 197.1,
+        "slowdown": 5.91,
+        "notesPlayed": 2
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "5/5",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "5 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "364 / 364"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 0.97 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "364"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x866"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "364"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x866"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "12.13 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.i7-filter",
+      "title": "Shape the tone with FILTER",
+      "scenarioDigest": "sha256:65daba1be9e71f9a11952f5fed2e88f77a1c90bdb9165b65c7c83523148a935a",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.shape.filter"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.sound"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.macro.filter"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+      ],
+      "source": {
+        "width": 3416,
+        "height": 2100,
+        "fps": 30,
+        "frames": 325,
+        "crop": [
+          0,
+          171,
+          2923,
+          1851
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 920,
+        "fps": 30,
+        "frames": 325,
+        "duration": 10.833,
+        "files": {
+          "webm": {
+            "path": "i7-filter/i7-filter.webm",
+            "codec": "vp9",
+            "bytes": 631682,
+            "sha256": "56c6b45e752ec92d8e27ef9a03c7ab9cfda88dc35f5cbad3d413e68d71db807b"
+          },
+          "mp4": {
+            "path": "i7-filter/i7-filter.mp4",
+            "codec": "h264",
+            "bytes": 614898,
+            "sha256": "db275496e2fefa4ba288a86fbd8b27adb24df110f62d25aec41786a59071b4e1"
+          }
+        }
+      },
+      "marks": {
+        "filter": 0.0,
+        "open-filter": 3.633,
+        "type": 5.033,
+        "sweep": 7.333
+      },
+      "steps": {
+        "filter": "i7-filter/steps/filter.webp",
+        "open-filter": "i7-filter/steps/open-filter.webp",
+        "type": "i7-filter/steps/type.webp",
+        "sweep": "i7-filter/steps/sweep.webp"
+      },
+      "poster": {
+        "path": "i7-filter/poster.webp",
+        "frame": 307,
+        "sha256": "4fa36120cbb1c164006968112d21c6a5a4134d38cafd4f79f9cc0e7284f68a0d",
+        "master": "learn/capture/out/i7-filter/poster.png"
+      },
+      "run": {
+        "wallSeconds": 98.282,
+        "meanFrameMs": 269.0,
+        "slowdown": 8.07,
+        "notesPlayed": 2
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "4/4",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "4 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "325 / 325"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 0.07 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "325"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x920"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "325"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x920"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "10.83 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.j1-vibrato",
+      "title": "Add vibrato with the mod wheel",
+      "scenarioDigest": "sha256:b5ef5c1c37e8e3b4fc5e1328d9a17c74a5327f4f89d23a6b22bacc65b0f42822",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.play.vibrato"
+      ],
+      "learn": {
+        "lessons": [
+          "osp.vibrato"
+        ],
+        "steps": []
+      },
+      "targets": [
+        "osp.wheel.mod",
+        "osp.vibrato.enable"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [
+        "The held note and the mod wheel (MIDI CC 1) are sent as MIDI by the runner, as a keyboard would; the on-screen wheel moves as it does for a hardware wheel."
+      ],
+      "source": {
+        "width": 2896,
+        "height": 2100,
+        "fps": 30,
+        "frames": 295,
+        "crop": [
+          0,
+          179,
+          2896,
+          2100
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1060,
+        "fps": 30,
+        "frames": 295,
+        "duration": 9.833,
+        "files": {
+          "webm": {
+            "path": "j1-vibrato/j1-vibrato.webm",
+            "codec": "vp9",
+            "bytes": 526908,
+            "sha256": "0b5a5f891cf6c68c348a5ee0380df43228c25dda3290d28433705945f0954db2"
+          },
+          "mp4": {
+            "path": "j1-vibrato/j1-vibrato.mp4",
+            "codec": "h264",
+            "bytes": 515458,
+            "sha256": "6685a0a74df634c0a9f633f45d8fd6afebf96623c0b4dd51ee003a0ff035661b"
+          }
+        }
+      },
+      "marks": {
+        "open-mod": 0.0,
+        "vibrato-on": 2.8,
+        "play-raise": 4.467
+      },
+      "steps": {
+        "open-mod": "j1-vibrato/steps/open-mod.webp",
+        "vibrato-on": "j1-vibrato/steps/vibrato-on.webp",
+        "play-raise": "j1-vibrato/steps/play-raise.webp"
+      },
+      "poster": {
+        "path": "j1-vibrato/poster.webp",
+        "frame": 271,
+        "sha256": "62e3be3ebae90e32689e1dbf0ac23797da736638263595f1a35fbb2554b2adcd",
+        "master": "learn/capture/out/j1-vibrato/poster.png"
+      },
+      "run": {
+        "wallSeconds": 60.687000000000005,
+        "meanFrameMs": 190.7,
+        "slowdown": 5.72,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "2/2",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "2 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "295 / 295"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 1.63 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "295"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1060"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "295"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1060"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "9.83 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.j2-midi-learn",
+      "title": "Control a knob from a MIDI controller",
+      "scenarioDigest": "sha256:14a5a7966121a44b81cfd4840e1d4b976563e36057515801b4fce5ae36004456",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.play.midi-learn"
+      ],
+      "learn": {
+        "lessons": [],
+        "steps": []
+      },
+      "targets": [
+        "osp.macro.filter"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:bowed",
+          "file": "Tutorial Bowed Note C3.wav",
+          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+          "bytes": 648104
+        }
+      ],
+      "disclosures": [
+        "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard.",
+        "The controller (MIDI CC 74) is sent by the runner, as a hardware knob would send it."
+      ],
+      "source": {
+        "width": 3416,
+        "height": 2940,
+        "fps": 30,
+        "frames": 235,
+        "crop": [
+          0,
+          171,
+          2923,
+          2865
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1474,
+        "fps": 30,
+        "frames": 235,
+        "duration": 7.833,
+        "files": {
+          "webm": {
+            "path": "j2-midi-learn/j2-midi-learn.webm",
+            "codec": "vp9",
+            "bytes": 403786,
+            "sha256": "9fd21ee1ba729ecaf7bbd66305525d8c5e99e6223b6618dc9675b33b3e1bc8db"
+          },
+          "mp4": {
+            "path": "j2-midi-learn/j2-midi-learn.mp4",
+            "codec": "h264",
+            "bytes": 316135,
+            "sha256": "5c0645003ba4a9d2a30bd1492e26a6872e450ebdddfce98fc3ada3bd2f49fefc"
+          }
+        }
+      },
+      "marks": {
+        "right-click": 0.0,
+        "learn": 2.233,
+        "move-controller": 4.033
+      },
+      "steps": {
+        "right-click": "j2-midi-learn/steps/right-click.webp",
+        "learn": "j2-midi-learn/steps/learn.webp",
+        "move-controller": "j2-midi-learn/steps/move-controller.webp"
+      },
+      "poster": {
+        "path": "j2-midi-learn/poster.webp",
+        "frame": 212,
+        "sha256": "d0e4bf80eafd169888693d093a84ed20f0c696afdaa06e3aec53f971736c72b1",
+        "master": "learn/capture/out/j2-midi-learn/poster.png"
+      },
+      "run": {
+        "wallSeconds": 69.08200000000001,
+        "meanFrameMs": 269.0,
+        "slowdown": 8.07,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "2/2",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "2 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "235 / 235"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than 2.5 s",
+            "passed": true,
+            "detail": "longest unchanged run 0.03 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "235"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1474"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "235"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1474"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "7.83 s"
+          },
+          {
+            "check": "poster not blank",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "approved baseline",
+            "passed": true,
+            "detail": "none yet: first capture (to be approved)"
+          }
+        ]
+      },
+      "approved": false
+    },
+    {
+      "schemaVersion": 1,
+      "kind": "andor.learn.assets.entry",
+      "scenario": "osp.scene.p1-pedal-loop-pingpong",
+      "title": "Hold a note with the sustain pedal (Pedal Loop)",
+      "scenarioDigest": "sha256:dc020509c50cf0b10600320f92d88262780c7c0b4e200c7ef8e8345b298ac6c0",
+      "product": "osp",
+      "productCommit": "6ef3376",
+      "environment": {
+        "os": "linux",
+        "display": "Xvfb + openbox",
+        "render": "JUCE software renderer, ceramic look, 2x",
+        "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+      },
+      "guides": [
+        "osp.guide.play.pedal-loop"
+      ],
+      "learn": {
+        "lessons": [],
+        "steps": []
+      },
+      "targets": [
+        "osp.source.mode",
+        "osp.keyboard"
+      ],
+      "fixtures": [
+        {
+          "id": "tutorial:pluck",
+          "file": "Tutorial Pluck A3.wav",
+          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+          "bytes": 230504
+        }
+      ],
+      "disclosures": [
+        "The held note and the sustain pedal (MIDI CC 64) are sent as MIDI by the runner, as a keyboard and pedal would send them.",
+        "The \"Sustain pedal down\" label is drawn in post-production exactly while the runner holds the pedal (CC 64 at 127); OSP itself shows no pedal indicator."
+      ],
+      "source": {
+        "width": 3416,
+        "height": 2100,
+        "fps": 30,
+        "frames": 395,
+        "crop": [
+          0,
+          77,
+          3237,
+          2100
+        ]
+      },
+      "video": {
+        "width": 1600,
+        "height": 1000,
+        "fps": 30,
+        "frames": 395,
+        "duration": 13.167,
+        "files": {
+          "webm": {
+            "path": "p1-pedal-loop-pingpong/p1-pedal-loop-pingpong.webm",
+            "codec": "vp9",
+            "bytes": 452413,
+            "sha256": "f96564a37542086b07d41447c0e04af5e6134204fa49b35d55eb90dbfe5f8de3"
+          },
+          "mp4": {
+            "path": "p1-pedal-loop-pingpong/p1-pedal-loop-pingpong.mp4",
+            "codec": "h264",
+            "bytes": 371515,
+            "sha256": "2345ac0b4a6ce4386a4e27ce723d822ce298d7056ee3b85c9944335cf4e7741d"
+          }
+        }
+      },
+      "marks": {
+        "loop-off": 0.0,
+        "choose-ping-pong": 2.567,
+        "play-note": 6.133,
+        "pedal-down": 7.067,
+        "pedal-up": 10.7
+      },
+      "steps": {
+        "loop-off": "p1-pedal-loop-pingpong/steps/loop-off.webp",
+        "choose-ping-pong": "p1-pedal-loop-pingpong/steps/choose-ping-pong.webp",
+        "play-note": "p1-pedal-loop-pingpong/steps/play-note.webp",
+        "pedal-down": "p1-pedal-loop-pingpong/steps/pedal-down.webp",
+        "pedal-up": "p1-pedal-loop-pingpong/steps/pedal-up.webp"
+      },
+      "poster": {
+        "path": "p1-pedal-loop-pingpong/poster.webp",
+        "frame": 365,
+        "sha256": "fc272f14ae8eac49ce2443474bc0692a92ffa0bfb0b16285601509ba12729b66",
+        "master": "learn/capture/out/p1-pedal-loop-pingpong/poster.png"
+      },
+      "run": {
+        "wallSeconds": 84.94800000000001,
+        "meanFrameMs": 207.1,
+        "slowdown": 6.21,
+        "notesPlayed": 1
+      },
+      "validation": {
+        "status": "passed",
+        "expectations": "4/4",
+        "blankFrames": 0,
+        "approvedPosterDiff": null,
+        "checks": [
+          {
+            "check": "runner status",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "expectations",
+            "passed": true,
+            "detail": "4 passed"
+          },
+          {
+            "check": "master frame count = frames.json",
+            "passed": true,
+            "detail": "395 / 395"
+          },
+          {
+            "check": "every editor size fits the canvas",
+            "passed": true,
+            "detail": "[(1448, 1050)]"
+          },
+          {
+            "check": "encoder exit (libvpx-vp9)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no blank frames",
+            "passed": true,
+            "detail": "0 blank"
+          },
+          {
+            "check": "no frozen run longer than the longest declared hold + 1 s",
+            "passed": true,
+            "detail": "longest unchanged run 4.00 s"
+          },
+          {
+            "check": "webm frames = master",
+            "passed": true,
+            "detail": "395"
+          },
+          {
+            "check": "webm size",
+            "passed": true,
+            "detail": "1600x1000"
+          },
+          {
+            "check": "mp4 frames = master",
+            "passed": true,
+            "detail": "395"
+          },
+          {
+            "check": "mp4 size",
+            "passed": true,
+            "detail": "1600x1000"
+          },
+          {
+            "check": "duration 6-15 s (one clip) or declared",
+            "passed": true,
+            "detail": "13.17 s"
           },
           {
             "check": "poster not blank",

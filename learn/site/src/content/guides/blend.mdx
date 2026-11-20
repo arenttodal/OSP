@@ -1,0 +1,25 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.synth.blend
+product: osp
+group: synth-imprint
+order: 10
+title: "Blend in SYNTH"
+purpose: "Add an oscillator under the recording."
+tags: ["synth", "oscillator"]
+synonyms: ["synth", "synthesize", "oscillator", "analog", "blend", "waveform"]
+learn: { lessons: [], info: [] }
+reference: osp.ref.synth
+related: ["osp.guide.synth.imprint"]
+preconditions: []
+scene: osp.scene.f1-synth-blend
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: open-synth, instruction: "Click SYNTH at the top right of the card's waveform.", result: "The SYNTH page opens." }
+  - { id: amount, instruction: "Raise AMOUNT.", result: "The oscillator blends in with the recording." }
+  - { id: wave, instruction: "Choose a waveform under WAVE.", result: "The oscillator's tone changes." }
+  - { id: octave, instruction: "Choose -1 under OCTAVE.", result: "The oscillator plays an octave below." }
+  - { id: shape, instruction: "Under SHAPE, choose Held.", result: "The oscillator stays at full level for the whole note instead of following the recording." }
+---

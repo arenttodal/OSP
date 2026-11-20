@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.h2-grains",
+  "title": "Shape the grains",
+  "scenarioDigest": "sha256:235f0f41d57d3d71117472185eb177a411ee5719eda2b88203f3524fc647b1b8",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.granular.grains"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.playback"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "osp.granular.position",
+    "osp.granular.size",
+    "osp.granular.density"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    }
+  ],
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 327,
+    "crop": [
+      0,
+      177,
+      2896,
+      1381
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 664,
+    "fps": 30,
+    "frames": 327,
+    "duration": 10.9,
+    "files": {
+      "webm": {
+        "path": "h2-grains/h2-grains.webm",
+        "codec": "vp9",
+        "bytes": 336791,
+        "sha256": "f0d72c1f0fc326b5e0794805809d40ff02d95297af8791a299d554cb19831da6"
+      },
+      "mp4": {
+        "path": "h2-grains/h2-grains.mp4",
+        "codec": "h264",
+        "bytes": 362611,
+        "sha256": "3a689991b079d0fec2793401ca8586e01178cc56505edb6ca582e4a4e080c574"
+      }
+    }
+  },
+  "marks": {
+    "reveal": 0.0,
+    "pos": 2.133,
+    "size": 5.1,
+    "dens": 7.8
+  },
+  "steps": {
+    "reveal": "h2-grains/steps/reveal.webp",
+    "pos": "h2-grains/steps/pos.webp",
+    "size": "h2-grains/steps/size.webp",
+    "dens": "h2-grains/steps/dens.webp"
+  },
+  "poster": {
+    "path": "h2-grains/poster.webp",
+    "frame": 306,
+    "sha256": "3b2eef5e9e0e7063484141da27400f2474b6fadf49af27bb975672c4a3add6c0",
+    "master": "learn/capture/out/h2-grains/poster.png"
+  },
+  "run": {
+    "wallSeconds": 82.548,
+    "meanFrameMs": 222.2,
+    "slowdown": 6.67,
+    "notesPlayed": 1
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "1/1",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "1 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "327 / 327"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 0.70 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "327"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x664"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "327"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x664"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "10.90 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

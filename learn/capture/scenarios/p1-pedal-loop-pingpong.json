@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.p1-pedal-loop-pingpong",
+  "product": "osp",
+  "title": "Hold a note with the sustain pedal (Pedal Loop)",
+  "guides": [
+    "osp.guide.play.pedal-loop"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "marginRight": 260
+  },
+  "fps": 30,
+  "maxSeconds": 18.0,
+  "start": {
+    "state": "one layer (the plucked example, a decaying note), One Shot, PEDAL LOOP Normal",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "pluck"
+        ]
+      },
+      {
+        "do": "setParam",
+        "id": "layerA.loop",
+        "value": 1
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "loop-off",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.6
+        },
+        {
+          "do": "click",
+          "target": "param:layerA.loop",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.5
+        }
+      ],
+      "expect": [
+        {
+          "param": "layerA.loop",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "mark": "choose-ping-pong",
+      "do": [
+        {
+          "do": "click",
+          "target": "learn:osp.source.mode",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:Ping-Pong"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hover",
+          "target": "menu:Ping-Pong",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "menu:Ping-Pong"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "layerA.pedalLoop",
+          "equals": "Ping-Pong"
+        }
+      ]
+    },
+    {
+      "mark": "play-note",
+      "do": [
+        {
+          "do": "pointer",
+          "shown": false
+        },
+        {
+          "do": "midi",
+          "keys": [
+            57
+          ],
+          "state": "on",
+          "velocity": 100
+        },
+        {
+          "do": "hold",
+          "seconds": 0.9
+        }
+      ]
+    },
+    {
+      "mark": "pedal-down",
+      "do": [
+        {
+          "do": "cc",
+          "controller": 64,
+          "from": 127,
+          "to": 127,
+          "seconds": 0.04
+        },
+        {
+          "do": "hold",
+          "seconds": 3.6
+        }
+      ]
+    },
+    {
+      "mark": "pedal-up",
+      "do": [
+        {
+          "do": "cc",
+          "controller": 64,
+          "from": 0,
+          "to": 0,
+          "seconds": 0.04
+        },
+        {
+          "do": "hold",
+          "seconds": 1.4
+        },
+        {
+          "do": "midi",
+          "keys": [
+            57
+          ],
+          "state": "off"
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "notesPlayed": 1
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:A.card",
+      "learn:osp.keyboard",
+      "menuOpen:"
+    ],
+    "context": 0.03,
+    "aspect": "16:10"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.source.mode",
+      "osp.keyboard"
+    ],
+    "parameters": [
+      "layerA.loop",
+      "layerA.pedalLoop"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/EngineCard.cpp",
+      "src/engine/InstrumentEngine.cpp",
+      "docs/research/pedal-loop/03-transitions.md"
+    ]
+  },
+  "disclosures": [
+    "The held note and the sustain pedal (MIDI CC 64) are sent as MIDI by the runner, as a keyboard and pedal would send them.",
+    "The \"Sustain pedal down\" label is drawn in post-production exactly while the runner holds the pedal (CC 64 at 127); OSP itself shows no pedal indicator."
+  ]
+}

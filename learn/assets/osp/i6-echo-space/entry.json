@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.i6-echo-space",
+  "title": "Add ECHO and SPACE",
+  "scenarioDigest": "sha256:69328ad479dab64063a4ad3f8bcf97eeb83e2c473a16ebaea938015041d877d6",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.shape.effects"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.sound"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "osp.macro.echo",
+    "osp.macro.space"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:pluck",
+      "file": "Tutorial Pluck A3.wav",
+      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+      "bytes": 230504
+    }
+  ],
+  "disclosures": [],
+  "source": {
+    "width": 3416,
+    "height": 2100,
+    "fps": 30,
+    "frames": 364,
+    "crop": [
+      50,
+      682,
+      2670,
+      2100
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 866,
+    "fps": 30,
+    "frames": 364,
+    "duration": 12.133,
+    "files": {
+      "webm": {
+        "path": "i6-echo-space/i6-echo-space.webm",
+        "codec": "vp9",
+        "bytes": 359057,
+        "sha256": "9db7d10cc965e4ab1196b142e6f6e96bafa629ba8da6dc67548e4897875432ed"
+      },
+      "mp4": {
+        "path": "i6-echo-space/i6-echo-space.mp4",
+        "codec": "h264",
+        "bytes": 361605,
+        "sha256": "91257b4db0f258198ea6e64518836de95b27ddee5cdf7482abe65cda13e21a84"
+      }
+    }
+  },
+  "marks": {
+    "echo": 0.0,
+    "open-space": 4.567,
+    "space-type": 6.033,
+    "space-amount": 8.133
+  },
+  "steps": {
+    "echo": "i6-echo-space/steps/echo.webp",
+    "open-space": "i6-echo-space/steps/open-space.webp",
+    "space-type": "i6-echo-space/steps/space-type.webp",
+    "space-amount": "i6-echo-space/steps/space-amount.webp"
+  },
+  "poster": {
+    "path": "i6-echo-space/poster.webp",
+    "frame": 334,
+    "sha256": "5d98697382d1b15f9feb7955c99d12858ef0d75f42d7ee4e1be395aad2bc3c2e",
+    "master": "learn/capture/out/i6-echo-space/poster.png"
+  },
+  "run": {
+    "wallSeconds": 77.488,
+    "meanFrameMs": 197.1,
+    "slowdown": 5.91,
+    "notesPlayed": 2
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "5/5",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "5 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "364 / 364"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 0.97 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "364"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x866"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "364"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x866"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "12.13 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

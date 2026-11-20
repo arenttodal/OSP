@@ -1,0 +1,24 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.arp.satellite
+product: osp
+group: arpeggiator
+order: 40
+title: "Move each layer in the stereo field"
+purpose: "Give a layer its own movement between left and right."
+tags: ["satellite", "stereo"]
+synonyms: ["satellite", "stereo", "auto pan", "pan", "orbit", "bounce", "spatial"]
+learn: { lessons: [], info: [] }
+reference: osp.ref.satellite
+related: ["osp.guide.arp.per-source"]
+preconditions: ["SATELLITE works with ARP on or off."]
+scene: osp.scene.d3-satellite
+quick: true
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: open-satellite, instruction: "Click the name SATELLITE on the ARPEGGIATOR panel.", result: "The SATELLITE panel opens." }
+  - { id: satellite-on, instruction: "Switch layer A's SATELLITE on.", result: "Its position moves between L and R." }
+  - { id: orbit, instruction: "Choose ORBIT.", result: "The path becomes round, quieter and darker behind." }
+  - { id: rate, instruction: "Turn RATE.", result: "The layer moves faster." }
+---

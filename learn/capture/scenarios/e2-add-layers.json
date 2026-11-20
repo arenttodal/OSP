@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.e2-add-layers",
+  "product": "osp",
+  "title": "Add a second and third sound",
+  "guides": [
+    "osp.guide.play.layers"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.layers"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed)",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "add-b",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.6
+        },
+        {
+          "do": "drop",
+          "sound": "voice",
+          "target": "droptarget:add B",
+          "seconds": 1.1
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "layers": 2
+          },
+          "timeout": 30
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "layers": 2
+        }
+      ]
+    },
+    {
+      "mark": "add-c",
+      "do": [
+        {
+          "do": "drop",
+          "sound": "pluck",
+          "target": "droptarget:add C",
+          "seconds": 1.1
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "layers": 3
+          },
+          "timeout": 30
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "layers": 3
+        }
+      ]
+    },
+    {
+      "mark": "play-all",
+      "do": [
+        {
+          "do": "key",
+          "note": 55,
+          "seconds": 1.0,
+          "after": 0.1
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "notesPlayed": 1
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "editor:"
+    ],
+    "context": 0.0,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.keyboard"
+    ],
+    "sources": [
+      "apps/plugin/Source/PluginEditor.cpp",
+      "shared/andor-ui/Source/EngineCard.cpp"
+    ]
+  },
+  "disclosures": [
+    "The file arrives through the editor's own drop handlers (fileDragEnter, fileDragMove, filesDropped); the travelling file badge is drawn in post-production. It is not a recording of an operating-system drag-and-drop."
+  ]
+}

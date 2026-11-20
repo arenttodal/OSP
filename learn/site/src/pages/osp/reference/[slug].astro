@@ -1,0 +1,38 @@
+---
+import Base from '../../../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
+import { byId, urlOf } from '../../../lib/guides';
+export async function getStaticPaths() {
+  const refs = (await getCollection('reference')).sort((a, b) => a.data.title.localeCompare(b.data.title));
+  return refs.map((r) => ({ params: { slug: r.data.id.split('.').pop() }, props: { entry: r, all: refs } }));
+}
+const { entry, all } = Astro.props;
+const d = entry.data;
+const { Content } = await render(entry);
+const guides = await byId();
+const base = import.meta.env.BASE_URL;
+---
+<Base title={`${d.title} · Reference · Learn OSP`} description={d.function} current="reference">
+  <div class="wrap">
+    <div class="crumbs"><a href={`${base}osp/`}>Learn OSP</a> / <a href={`${base}osp/reference/`}>Reference</a> / {d.title}</div>
+    <div class="ref">
+      <nav aria-label="Reference articles"><ul>{all.map((r) => <li><a href={`${base}osp/reference/${r.data.id.split('.').pop()}/`} aria-current={r.data.id === d.id ? 'page' : undefined}>{r.data.title}</a></li>)}</ul></nav>
+      <article data-pagefind-body>
+        <h1 data-pagefind-meta="title">{d.title}</h1>
+        <span class="sr-only" data-pagefind-meta="where">Reference</span>
+        <p class="sr-only" data-pagefind-weight="4">{d.synonyms.join(', ')}</p>
+        <h2>Function</h2><p>{d.function}</p>
+        <h2>Location</h2><p>{d.location}</p>
+        {d.parameters.length > 0 && (<>
+          <h2>Controls</h2>
+          <div class="table-scroll"><table><thead><tr><th>Control</th><th>Values</th><th>Does</th></tr></thead>
+            <tbody>{d.parameters.map((p) => <tr><td>{p.name}</td><td>{p.values}</td><td>{p.does}</td></tr>)}</tbody></table></div>
+        </>)}
+        {d.dependencies.length > 0 && (<><h2>Needs</h2><ul>{d.dependencies.map((x) => <li>{x}</li>)}</ul></>)}
+        {d.example && (<><h2>Example</h2><p>{d.example}</p></>)}
+        <Content />
+        {d.guides.length > 0 && (<><h2>Guides</h2><ul>{d.guides.map((id) => guides.get(id)).filter(Boolean).map((g) => <li><a href={urlOf(g!)}>{g!.data.title}</a></li>)}</ul></>)}
+      </article>
+    </div>
+  </div>
+</Base>

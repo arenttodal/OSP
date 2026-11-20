@@ -1,0 +1,23 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.granular.grains
+product: osp
+group: granular-key-dna
+order: 10
+title: "Shape the grains"
+purpose: "Change where grains come from, how long they are and how many there are."
+tags: ["granular", "grains"]
+synonyms: ["grain", "granular", "position", "size", "density", "texture"]
+learn: { lessons: ["osp.playback"], info: [] }
+related: ["osp.guide.granular.key-dna", "osp.guide.play.oneshot-granular"]
+preconditions: ["Granular playback."]
+scene: osp.scene.h2-grains
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: reveal, instruction: "In Granular, point at the waveform.", result: "POS, SIZE, DENS, TUNE and SPREAD appear." }
+  - { id: pos, instruction: "Turn POS.", result: "Grains come from a later part of the recording." }
+  - { id: size, instruction: "Turn SIZE.", result: "Each grain lasts longer." }
+  - { id: dens, instruction: "Turn DENS.", result: "More grains start each second." }
+---

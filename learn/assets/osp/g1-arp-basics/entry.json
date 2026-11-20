@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.g1-arp-basics",
+  "title": "Arpeggiate held notes",
+  "scenarioDigest": "sha256:1374978b5f095b5c213f53440d4aeee99a35a4efd1d72071b66ef56fa1a0a7cc",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.arp.basics"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.arp"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "osp.arp.control",
+    "osp.arp.panel"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:pluck",
+      "file": "Tutorial Pluck A3.wav",
+      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+      "bytes": 230504
+    }
+  ],
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2474,
+    "fps": 30,
+    "frames": 408,
+    "crop": [
+      0,
+      182,
+      2896,
+      2474
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1266,
+    "fps": 30,
+    "frames": 408,
+    "duration": 13.6,
+    "files": {
+      "webm": {
+        "path": "g1-arp-basics/g1-arp-basics.webm",
+        "codec": "vp9",
+        "bytes": 783384,
+        "sha256": "e65487d3ee5da3c47ce17b2b6fedf48a5b2bb61be26da9071937f64fa5bb2829"
+      },
+      "mp4": {
+        "path": "g1-arp-basics/g1-arp-basics.mp4",
+        "codec": "h264",
+        "bytes": 694251,
+        "sha256": "a3d7cb5a3515f00d4ba97f0c86c54e54829bf8592ae369cf77b1ac144509cf74"
+      }
+    }
+  },
+  "marks": {
+    "open-arp": 0.0,
+    "arp-on": 2.867,
+    "pattern": 5.4,
+    "rate": 7.967,
+    "octaves": 11.067
+  },
+  "steps": {
+    "open-arp": "g1-arp-basics/steps/open-arp.webp",
+    "arp-on": "g1-arp-basics/steps/arp-on.webp",
+    "pattern": "g1-arp-basics/steps/pattern.webp",
+    "rate": "g1-arp-basics/steps/rate.webp",
+    "octaves": "g1-arp-basics/steps/octaves.webp"
+  },
+  "poster": {
+    "path": "g1-arp-basics/poster.webp",
+    "frame": 383,
+    "sha256": "92ab447d48165f24bddaa8b26889daf9ed0523602e28eccdca2a1f5eeee88f89",
+    "master": "learn/capture/out/g1-arp-basics/poster.png"
+  },
+  "run": {
+    "wallSeconds": 98.366,
+    "meanFrameMs": 224.2,
+    "slowdown": 6.73,
+    "notesPlayed": 62
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "5/5",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "5 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "408 / 408"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050), (1448, 1237)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 1.37 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "408"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1266"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "408"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1266"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "13.60 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.e5-export-instrument",
+  "title": "Export a portable instrument",
+  "scenarioDigest": "sha256:fdae8b3deb8c97f7c4158bd7af9dbbd8e5143cafd8855ef3ae852f3b0ab90899",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.make.export"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.presets"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "osp.header.menu"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    }
+  ],
+  "disclosures": [
+    "The clip stops at the menu item: choosing it opens the system's save dialog, which is not filmed."
+  ],
+  "source": {
+    "width": 3416,
+    "height": 2100,
+    "fps": 30,
+    "frames": 201,
+    "crop": [
+      0,
+      17,
+      2923,
+      1775
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 962,
+    "fps": 30,
+    "frames": 201,
+    "duration": 6.7,
+    "files": {
+      "webm": {
+        "path": "e5-export-instrument/e5-export-instrument.webm",
+        "codec": "vp9",
+        "bytes": 291117,
+        "sha256": "beec41d6ad6173e3965f469b45aeeb4259391085180d012b7b5355a540df3871"
+      },
+      "mp4": {
+        "path": "e5-export-instrument/e5-export-instrument.mp4",
+        "codec": "h264",
+        "bytes": 212802,
+        "sha256": "98eeb19b9bd2393982724759ab00948ddefdc26c4c3a9b82e534c62c2691e9b7"
+      }
+    }
+  },
+  "marks": {
+    "open-menu": 0.0,
+    "export": 3.367
+  },
+  "steps": {
+    "open-menu": "e5-export-instrument/steps/open-menu.webp",
+    "export": "e5-export-instrument/steps/export.webp"
+  },
+  "poster": {
+    "path": "e5-export-instrument/poster.webp",
+    "frame": 171,
+    "sha256": "a8010c27ae8d15d484517b8376ba0b3ca7cd9e9c26f320e7b6bf9a2f85ffcddb",
+    "master": "learn/capture/out/e5-export-instrument/poster.png"
+  },
+  "run": {
+    "wallSeconds": 39.305,
+    "meanFrameMs": 175.5,
+    "slowdown": 5.27,
+    "notesPlayed": 0
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "1/1",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "1 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "201 / 201"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than 3.8 s",
+        "passed": true,
+        "detail": "longest unchanged run 2.87 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "201"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x962"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "201"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x962"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "6.70 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

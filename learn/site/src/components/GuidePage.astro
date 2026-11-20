@@ -1,0 +1,62 @@
+---
+import Base from '../layouts/Base.astro';
+import GuideView from './GuideView.astro';
+import { groupTitle } from '../data/groups';
+import { byId, urlOf, type Guide } from '../lib/guides';
+import { scene } from '../lib/scenes';
+import { getCollection } from 'astro:content';
+interface Props { guide: Guide; prev?: Guide; next?: Guide; step?: string }
+const { guide, prev, next, step } = Astro.props;
+const d = guide.data;
+const base = import.meta.env.BASE_URL;
+const url = urlOf(guide);
+const map = await byId();
+const related = d.related.map((id) => map.get(id)).filter(Boolean) as Guide[];
+const refs = await getCollection('reference');
+const ref = refs.find((r) => r.data.id === d.reference);
+const s = scene(d.scene);
+const stepIndex = step ? d.steps.findIndex((x) => x.id === step) : -1;
+const st = stepIndex >= 0 ? d.steps[stepIndex] : undefined;
+const title = st ? `${d.title} · Step ${stepIndex + 1}: ${st.instruction}` : d.title;
+---
+<Base title={`${title} · Learn OSP`} description={st ? st.result : d.purpose}>
+  <div class="wrap">
+    <div class="crumbs"><a href={`${base}osp/`}>Learn OSP</a> / <a href={`${base}osp/${d.group}/`}>{groupTitle(d.group)}</a> / {d.title}</div>
+    <article>
+      {st ? (
+        <div data-pagefind-body>
+          <h1 data-pagefind-meta="title">{d.title}</h1>
+          <span class="sr-only" data-pagefind-meta="where">{groupTitle(d.group)} · Step {stepIndex + 1}</span>
+          <p class="lede"><strong>Step {stepIndex + 1}.</strong> {st.instruction} {st.result}</p>
+          <p class="sr-only" data-pagefind-weight="6">{d.synonyms.join(', ')}</p>
+        </div>
+      ) : (
+        <div data-pagefind-body>
+          <h1 data-pagefind-meta="title">{d.title}</h1>
+          <span class="sr-only" data-pagefind-meta="where">{groupTitle(d.group)} · Guide</span>
+          <p class="lede">{d.purpose}</p>
+          <p class="sr-only" data-pagefind-weight="4">{d.synonyms.join(', ')} {d.tags.join(', ')}</p>
+        </div>
+      )}
+      <div class="guide">
+        <div>
+          <GuideView sceneId={d.scene} steps={d.steps} current={step} guideUrl={url} title={d.title} />
+          {d.editorial?.hostVerification && <p class="note host">{d.editorial.hostVerification}</p>}
+          <div class="pn">
+            {prev ? <a href={urlOf(prev)}>← {prev.data.title}</a> : <span></span>}
+            {next ? <a href={urlOf(next)}>{next.data.title} →</a> : <span></span>}
+          </div>
+        </div>
+        <aside class="side">
+          {d.preconditions.length > 0 && (<><div class="label">Before you start</div><ul class="pre">{d.preconditions.map((p) => <li>{p}</li>)}</ul></>)}
+          {ref && (<p class="pre">Reference: <a href={`${base}osp/reference/${ref.data.id.split('.').pop()}/`}>{ref.data.title}</a></p>)}
+          {related.length > 0 && (
+            <div class="related"><div class="label">Related</div>
+              <ul>{related.map((r) => <li><a class="chip" href={urlOf(r)}>{r.data.title}</a></li>)}</ul></div>
+          )}
+          <p class="pre" style="margin-top:24px">Recorded from ANDOR OSP at {s.productCommit}. The pointer and outlines are drawn on top of the real interface.</p>
+        </aside>
+      </div>
+    </article>
+  </div>
+</Base>

@@ -1,0 +1,23 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.shape.user-macro
+product: osp
+group: shape-and-finish
+order: 40
+title: "Assign a USER macro"
+purpose: "Control a setting with one of your own macro knobs."
+tags: ["macro", "user"]
+synonyms: ["user macro", "macro", "assign", "custom knob"]
+learn: { lessons: ["osp.usermacros"], info: ["macros.bank"] }
+related: ["osp.guide.shape.modulation"]
+preconditions: []
+scene: osp.scene.i5-user-macro
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: user-bank, instruction: "Click USER above the macro knobs.", result: "The six USER macros show." }
+  - { id: right-click, instruction: "Right-click the layer's LEVEL knob.", result: "Its menu opens." }
+  - { id: assign, instruction: "Choose Assign to Macro, then Macro 1.", result: "An arc around LEVEL shows Macro 1's range." }
+  - { id: turn, instruction: "Turn Macro 1.", result: "LEVEL follows within its range." }
+---

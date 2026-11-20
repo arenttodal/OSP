@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.e4-starting-state",
+  "product": "osp",
+  "title": "Load a starting state",
+  "guides": [
+    "osp.guide.play.presets"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.presets"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed)",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-library",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "button:Library",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "libraryStates": true
+          },
+          "timeout": 20
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ]
+    },
+    {
+      "mark": "choose-state",
+      "do": [
+        {
+          "do": "click",
+          "target": "library:state.4",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "libraryStatus": "Loaded"
+          },
+          "timeout": 5
+        },
+        {
+          "do": "hold",
+          "seconds": 1.4
+        }
+      ],
+      "expect": [
+        {
+          "libraryStatus": "Loaded Frozen"
+        }
+      ]
+    },
+    {
+      "mark": "play",
+      "do": [
+        {
+          "do": "click",
+          "target": "button:Library",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.4
+        },
+        {
+          "do": "key",
+          "note": 55,
+          "seconds": 1.2,
+          "after": 0.1
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ],
+      "expect": [
+        {
+          "notesPlayed": 1
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "library:window",
+      "learn:osp.keyboard",
+      "card:A.card"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "keyboard.library",
+      "osp.library"
+    ],
+    "sources": [
+      "apps/plugin/Source/LibraryPanel.cpp"
+    ]
+  },
+  "disclosures": []
+}

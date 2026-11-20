@@ -1,0 +1,25 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.arp.strum
+product: osp
+group: arpeggiator
+order: 30
+title: "Strum a chord"
+purpose: "Play a chord's notes one after another, like a strummed guitar."
+tags: ["strum", "arp", "chord"]
+synonyms: ["strum", "strumming", "guitar strum", "chord", "spread", "rolled chord"]
+learn: { lessons: [], info: [] }
+reference: osp.ref.strum
+related: ["osp.guide.arp.per-source"]
+preconditions: ["ARP on, with a chord held."]
+scene: osp.scene.d2-arp-strum
+quick: true
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: choose-chord, instruction: "Choose Chord in PATTERN.", result: "Each step plays the held notes together." }
+  - { id: open-strum, instruction: "Click the name STRUM.", result: "The STRUM panel opens." }
+  - { id: strum-on, instruction: "Switch STRUM on.", result: "The chord's notes now follow one another." }
+  - { id: direction, instruction: "Choose DOWN.", result: "The strum starts from the top note." }
+  - { id: spread, instruction: "Turn SPREAD.", result: "The strum takes longer from the first note to the last." }
+---

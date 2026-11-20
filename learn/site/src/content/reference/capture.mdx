@@ -1,0 +1,25 @@
+---
+schemaVersion: 1
+kind: andor.learn.reference
+id: osp.ref.capture
+product: osp
+title: "CAPTURE: RECORD and GRAB LAST"
+function: "Turns audio arriving at OSP's input into a layer of mapped notes, either by recording a take or by keeping what was just played."
+location: "The REC key on a card (a dot alone on narrow cards) opens the CAPTURE page over that card's waveform. On an empty instrument, Record… sits beside Browse… and Load example; the ••• menu has Record new source…."
+parameters:
+  - { name: "INPUT", values: "meter", does: "Shows the level arriving at the input." }
+  - { name: "RECORD / STOP", values: "up to 1:00", does: "Records a take into the layer; a quarter second before the press is kept. It stops by itself at one minute." }
+  - { name: "DISCARD", values: "while recording", does: "Throws the take away." }
+  - { name: "GRAB LAST", values: "10 s · 20 s · 30 s · 60 s", does: "Keeps the last seconds of what the input received, without pressing RECORD first." }
+dependencies: ["Audio arriving at OSP's input. In the standalone app this is the chosen audio input. In a plugin, the host must send a track to OSP's Sidechain input."]
+example: "Play a phrase into the input, open CAPTURE and click 10 s under GRAB LAST: the phrase becomes the layer's notes."
+guides: ["osp.guide.make.record-input", "osp.guide.make.grab-last"]
+synonyms: ["record", "recording", "live input", "microphone", "audio input", "sidechain", "capture", "grab", "grab last", "retrospective recording", "sample from input"]
+parameterIds: []
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "docs/learn-studio/gate-1-report.md and the Gate 0/1 fact sheets" }
+---
+## After a take
+
+A kept take is trimmed (silence before and after removed), stored with the instrument's sounds, and its notes are mapped at once: the layer becomes an instrument of the notes it heard, and NOTES shows them. Replacing a sound this way is one undo step.
+
+OSP keeps about a minute of input history while an input is connected, so GRAB LAST can reach back up to 60 seconds.

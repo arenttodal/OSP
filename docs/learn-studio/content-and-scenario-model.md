@@ -220,3 +220,19 @@ A scene is **stale** when any of these differ from its manifest entry:
 
 `learn-capture status` lists stale scenes; `learn-capture run --stale` regenerates only those;
 nothing is published automatically.
+
+## Changes made while building Gates 1–3 (schemaVersion stays 1; all additive)
+
+- **Guide → one scene.** A guide names exactly one scenario (`scene: osp.scene.…`) and its step IDs
+  are that scene's marks, so the site plays each step's own segment and the build can prove the
+  match (`learn/site/scripts/check-content.mjs`). The per-step `scene: { id, from, to }` form
+  proposed above was not needed.
+- **`quick: true`** puts a guide in the home page's "Go straight to" row.
+- **`editorial.hostVerification`** carries a host-specific caveat that the guide shows as a note
+  (RECORD and GRAB LAST: DAW routing not yet verified).
+- **Scenario additions:** `editor.marginRight` / `marginBottom` (desktop around the window, where
+  menus open), `editor.canvas: "arpExpanded"` (a window that grows), `frame.aspect: "auto"`,
+  `maxSeconds`. Actions added: `hover`, `type`, `cc`, `scrollUntil`, `drag` with `to` / `from` /
+  `toFrac`, `click` with `button: "right"` and `count: 2`. Conditions added: `paramText`,
+  `libraryStatus`, `libraryStates`, `fileIn`, `popover`, `notesOpen`, `capturePage`, `recording`.
+  Set-up actions added: `customPattern`, `inputHistory`, `holdNotes`.

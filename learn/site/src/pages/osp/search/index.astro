@@ -1,0 +1,11 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Search from '../../../components/Search.astro';
+---
+<Base title="Search · Learn OSP" current="search">
+  <div class="wrap">
+    <h1>Search</h1>
+    <p class="lede">Search by task, control name or what you want to do.</p>
+    <Search autofocus chips={['record', 'live input', 'grab last', 'phrase transformer', 'map notes', 'strum', 'satellite', 'imprint', 'key dna', 'pedal loop']} />
+  </div>
+</Base>

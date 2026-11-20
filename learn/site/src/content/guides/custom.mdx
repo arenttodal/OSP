@@ -1,0 +1,22 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.arp.custom
+product: osp
+group: arpeggiator
+order: 50
+title: "Edit a custom pattern"
+purpose: "Open a custom pattern in the pattern editor."
+tags: ["custom pattern", "arp"]
+synonyms: ["custom pattern", "pattern editor", "factory pattern", "rhythm", "gallop", "arp pattern"]
+learn: { lessons: [], info: [] }
+reference: osp.ref.arpeggiator
+related: ["osp.guide.arp.basics"]
+preconditions: ["A custom pattern on the layer: choose Custom Patterns › at the end of the PATTERN list, then a pattern."]
+scene: osp.scene.g2-arp-custom
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: pattern, instruction: "With a custom pattern chosen, the pattern field shows its name and steps.", result: "The layer plays the custom pattern." }
+  - { id: edit, instruction: "Click the pencil in the pattern field.", result: "The pattern editor opens with its grid, ready to edit." }
+---

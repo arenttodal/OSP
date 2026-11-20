@@ -23,42 +23,25 @@ root = pathlib.Path(__file__).resolve().parent.parent
 manifest = json.loads((root / "assets/osp/manifest.json").read_text())
 by_id = {e["scenario"]: e for e in manifest["scenes"]}
 
-GROUPS = [
-    ("A", "Load and play", ["osp.scene.a-load-and-play"]),
-    ("B", "Phrase Transformer", ["osp.scene.b-phrase-map-notes"]),
-    ("C", "Live recording", ["osp.scene.c1-record-input", "osp.scene.c2-grab-last"]),
-    ("D", "Arpeggiator", ["osp.scene.d1-arp-per-source", "osp.scene.d2-arp-strum", "osp.scene.d3-satellite"]),
-]
-
-STEP_TEXT = {
-    "drop-file": "Drag an audio file onto the empty sound area.",
-    "wait-ready": "OSP analyses the recording; the card shows it.",
-    "play-keys": "Play notes from the keyboard.",
-    "drop-phrase": "Drop a recording of several notes. OSP asks: Identify notes?",
-    "map-notes": "Click MAP NOTES. Each note found is placed on its own key.",
-    "open-notes": "Click NOTES to see the notes and the keys they play.",
-    "play-mapped": "Play the keys: each plays a recorded note.",
-    "open-record": "On an empty instrument, click Record… to open CAPTURE.",
-    "record": "Click RECORD and play into the input.",
-    "stop": "Click STOP. The take is trimmed and its notes are mapped.",
-    "open-capture": "Click REC on the card while audio arrives at the input.",
-    "grab-last": "Click 10 s under GRAB LAST to keep what was just played.",
-    "linked": "With LINK on, every layer plays the same pattern.",
-    "link-off": "Click LINK to turn it off. EDIT A | B | C appears.",
-    "edit-b": "Choose EDIT B, then a pattern for layer B (Down).",
-    "edit-c": "Choose EDIT C, then another pattern (Up/Down).",
-    "plays-off-a": "Click A under PLAYS: layer A holds the chord while B and C arpeggiate.",
-    "choose-chord": "With EDIT C chosen, choose Chord in PATTERN.",
-    "open-strum": "Click the name STRUM to open its panel.",
-    "strum-on": "Switch STRUM on: the chord's notes now follow one another.",
-    "direction": "Choose DOWN to strum from the top note.",
-    "spread": "Turn SPREAD to lengthen the strum.",
-    "open-satellite": "Click the name SATELLITE to open its panel.",
-    "satellite-on": "Switch layer A's SATELLITE on: it moves between L and R.",
-    "orbit": "Choose ORBIT: a round path, quieter and darker behind.",
-    "rate": "Turn RATE to change how fast it moves (a note value in SYNC).",
-}
-
+# Groups, guide titles and step captions come from the public guides (learn/site/src/content/guides),
+# so the board and the site never disagree about what a step says.
+import re
+GROUP_TITLES = [("make-an-instrument", "Make an instrument"), ("play-and-layer", "Play and layer"), ("synth-imprint", "SYNTH & IMPRINT"),
+                ("arpeggiator", "Arpeggiator"), ("granular-key-dna", "Granular & KEY DNA"), ("shape-and-finish", "Shape and finish")]
+guides = []
+for f in sorted((root / "site/src/content/guides").glob("*.mdx")):
+    fm = f.read_text().split("---")[1]
+    get = lambda k: (re.search(rf"^{k}: (.*)$", fm, re.M) or [None, ""])[1]
+    steps = {m.group(1): json.loads(m.group(2)) for m in re.finditer(r'^  - \{ id: ([a-z0-9-]+), instruction: ("(?:[^"\\]|\\.)*")', fm, re.M)}
+    guides.append({"group": get("group"), "order": int(get("order") or 0), "scene": get("scene"), "title": json.loads(get("title") or '""'), "steps": steps})
+STEP_TEXT = {}
+for g in guides:
+    for k, v in g["steps"].items():
+        STEP_TEXT[(g["scene"], k)] = v
+GROUPS = []
+for i, (slug, title) in enumerate(GROUP_TITLES):
+    ids = [g["scene"] for g in sorted(guides, key=lambda g: g["order"]) if g["group"] == slug]
+    GROUPS.append((str(i + 1), title, ids))
 
 def esc(s):
     return html.escape(str(s), quote=True)
@@ -71,7 +54,7 @@ def card(e):
     marks = sorted(e["marks"].items(), key=lambda kv: kv[1])
     steps = "".join(
         f'<li><button type="button" class="step" data-t="{t}"><span class="n">{i + 1}</span>'
-        f'<span class="tx">{esc(STEP_TEXT.get(m, m))}</span><span class="tm">{t:.1f} s</span></button></li>'
+        f'<span class="tx">{esc(STEP_TEXT.get((e["scenario"], m), m))}</span><span class="tm">{t:.1f} s</span></button></li>'
         for i, (m, t) in enumerate(marks))
     checks = "".join(
         f'<li class="{"ok" if c["passed"] else "bad"}">{"✓" if c["passed"] else "✗"} {esc(c["check"])}'

@@ -1,0 +1,25 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.arp.per-source
+product: osp
+group: arpeggiator
+order: 20
+title: "Give each layer its own arpeggio"
+purpose: "Set a different pattern per layer, or keep one layer sustained."
+tags: ["arp", "layers", "plays", "link"]
+synonyms: ["per layer arpeggiator", "independent patterns", "plays", "link", "edit", "sustained layer", "arp per source"]
+learn: { lessons: [], info: [] }
+reference: osp.ref.arpeggiator
+related: ["osp.guide.arp.strum", "osp.guide.arp.satellite"]
+preconditions: ["Two or three layers.", "ARP on, with notes held."]
+scene: osp.scene.d1-arp-per-source
+quick: true
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: linked, instruction: "With LINK on, every layer plays the same pattern.", result: "All three layers follow layer A's settings." }
+  - { id: link-off, instruction: "Click LINK to turn it off.", result: "EDIT A | B | C appears." }
+  - { id: edit-b, instruction: "Choose EDIT B, then a pattern for layer B.", result: "Layer B plays its own pattern." }
+  - { id: edit-c, instruction: "Choose EDIT C, then another pattern.", result: "Layer C plays a third pattern." }
+  - { id: plays-off-a, instruction: "Click A under PLAYS.", result: "Layer A holds the chord while B and C keep arpeggiating." }
+---

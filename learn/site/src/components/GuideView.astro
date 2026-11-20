@@ -1,0 +1,68 @@
+---
+// One guide: the silent loop, its numbered steps and their own URLs. Choosing a step plays only
+// its part of the clip; with reduced motion the step's still is shown and nothing plays.
+import { scene } from '../lib/scenes';
+interface Step { id: string; instruction: string; result: string }
+interface Props { sceneId: string; steps: Step[]; current?: string; guideUrl: string; title: string }
+const { sceneId, steps, current, guideUrl, title } = Astro.props;
+const s = scene(sceneId);
+const seg = (id: string) => s.segments.find((x) => x.id === id);
+const active = current ?? steps[0].id;
+const activeSeg = seg(active);
+---
+<div class="stage" data-guide data-scene={sceneId} data-current={active}>
+  <video muted playsinline loop preload="metadata" poster={activeSeg?.still ?? s.poster} width={s.width} height={s.height}
+         aria-label={`Silent demonstration: ${title}`} data-video>
+    <source src={s.webm} type="video/webm" />
+    <source src={s.mp4} type="video/mp4" />
+  </video>
+  <div class="stage-bar">
+    <span data-caption>Step {steps.findIndex((x) => x.id === active) + 1} of {steps.length} · silent</span>
+    <button type="button" data-toggle aria-pressed="false">Play</button>
+  </div>
+</div>
+<ol class="steps" data-pagefind-ignore>
+  {steps.map((st, i) => {
+    const g = seg(st.id);
+    return (
+      <li class="step" id={st.id} aria-current={st.id === active ? 'step' : undefined} data-step={st.id} data-start={g?.start} data-end={g?.end} data-still={g?.still}>
+        <a href={`${guideUrl}${st.id}/`}>
+          <span class="n">{i + 1}</span>
+          <span><b>{st.instruction}</b><span class="result">{st.result}</span></span>
+        </a>
+      </li>
+    );
+  })}
+</ol>
+<script>
+  for (const root of document.querySelectorAll<HTMLElement>('[data-guide]')) {
+    const video = root.querySelector<HTMLVideoElement>('[data-video]')!;
+    const toggle = root.querySelector<HTMLButtonElement>('[data-toggle]')!;
+    const caption = root.querySelector<HTMLElement>('[data-caption]')!;
+    const items = [...document.querySelectorAll<HTMLLIElement>('li[data-step]')];
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let current = items.find((li) => li.dataset.step === root.dataset.current) ?? items[0];
+    let range = { start: 0, end: Infinity };
+    const select = (li: HTMLLIElement, play: boolean) => {
+      current = li;
+      items.forEach((x) => (x === li ? x.setAttribute('aria-current', 'step') : x.removeAttribute('aria-current')));
+      range = { start: parseFloat(li.dataset.start ?? '0'), end: parseFloat(li.dataset.end ?? '1e9') };
+      caption.textContent = `Step ${items.indexOf(li) + 1} of ${items.length} · silent`;
+      if (li.dataset.still) video.poster = li.dataset.still;
+      video.currentTime = range.start + 0.01;
+      if (play && !reduce) video.play().catch(() => {});
+    };
+    video.addEventListener('timeupdate', () => { if (video.currentTime >= range.end) video.currentTime = range.start + 0.01; });
+    video.addEventListener('play', () => { toggle.textContent = 'Pause'; toggle.setAttribute('aria-pressed', 'true'); });
+    video.addEventListener('pause', () => { toggle.textContent = 'Play'; toggle.setAttribute('aria-pressed', 'false'); });
+    toggle.addEventListener('click', () => (video.paused ? video.play().catch(() => {}) : video.pause()));
+    items.forEach((li) => li.querySelector('a')!.addEventListener('click', (e) => {
+      e.preventDefault();
+      select(li, true);
+      history.replaceState(null, '', `#${li.dataset.step}`);
+    }));
+    const fromHash = items.find((li) => `#${li.dataset.step}` === location.hash);
+    video.addEventListener('loadedmetadata', () => select(fromHash ?? current, !reduce), { once: true });
+    if (video.readyState >= 1) select(fromHash ?? current, !reduce);
+  }
+</script>

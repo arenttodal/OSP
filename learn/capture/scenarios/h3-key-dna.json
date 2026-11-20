@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.h3-key-dna",
+  "product": "osp",
+  "title": "Vary the sound from key to key (KEY DNA)",
+  "guides": [
+    "osp.guide.granular.key-dna"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.keydna"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 16.0,
+  "start": {
+    "state": "one layer (bowed), Granular",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      },
+      {
+        "do": "setParam",
+        "id": "layerA.sourceMode",
+        "value": 1
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.3
+        },
+        {
+          "do": "hover",
+          "target": "card:A.card",
+          "seconds": 0.8
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "learn:osp.source.keyDna"
+          },
+          "timeout": 4
+        },
+        {
+          "do": "click",
+          "target": "learn:osp.source.keyDna",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.keydna.open"
+        }
+      ]
+    },
+    {
+      "mark": "power",
+      "do": [
+        {
+          "do": "click",
+          "target": "learn:osp.keydna.power",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.keydna.enabled"
+        }
+      ]
+    },
+    {
+      "mark": "draw-keys",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "learn:osp.keydna.graph"
+        },
+        {
+          "do": "drag",
+          "target": "learn:osp.keydna.graph",
+          "from": [
+            0.08,
+            0.78
+          ],
+          "toFrac": [
+            0.92,
+            0.22
+          ],
+          "seconds": 1.2
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.7
+        }
+      ]
+    },
+    {
+      "mark": "depth",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "learn:osp.keydna.depth"
+        },
+        {
+          "do": "drag",
+          "target": "learn:osp.keydna.depth",
+          "dy": -60,
+          "seconds": 1.0
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ]
+    },
+    {
+      "mark": "play-keys",
+      "do": [
+        {
+          "do": "key",
+          "note": 48,
+          "seconds": 0.45,
+          "after": 0.08
+        },
+        {
+          "do": "key",
+          "note": 60,
+          "seconds": 0.45,
+          "after": 0.08
+        },
+        {
+          "do": "key",
+          "note": 72,
+          "seconds": 0.6,
+          "after": 0.08
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "notesPlayed": 3
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.keydna.graph",
+      "card:A.card",
+      "learn:osp.keyboard"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.source.keyDna",
+      "osp.keydna.power",
+      "osp.keydna.depth",
+      "osp.keydna.graph"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/KeyDnaEditor.cpp"
+    ]
+  },
+  "disclosures": []
+}

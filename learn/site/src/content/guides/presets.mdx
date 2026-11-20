@@ -1,0 +1,23 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.play.presets
+product: osp
+group: play-and-layer
+order: 30
+title: "Load a starting state"
+purpose: "Apply a set of settings to the sound you have loaded."
+tags: ["presets", "starting state", "library"]
+synonyms: ["starting state", "preset", "template", "library", "load preset"]
+learn: { lessons: ["osp.presets"], info: [] }
+reference: osp.ref.presets
+related: ["osp.guide.make.save", "osp.guide.make.export"]
+preconditions: []
+scene: osp.scene.e4-starting-state
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: open-library, instruction: "Click LIBRARY beside the keyboard.", result: "The Library shows the starting states." }
+  - { id: choose-state, instruction: "Click a starting state.", result: "Its settings are applied to your sound." }
+  - { id: play, instruction: "Close the Library and play.", result: "Your sound with the new settings." }
+---

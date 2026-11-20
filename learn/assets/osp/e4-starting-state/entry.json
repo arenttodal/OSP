@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.e4-starting-state",
+  "title": "Load a starting state",
+  "scenarioDigest": "sha256:8bd4f04f056d0637196978ccc1ce9a32f61a43b5df04824a1cae95af20b2db7d",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.play.presets"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.presets"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "keyboard.library",
+    "osp.library"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    }
+  ],
+  "disclosures": [],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 320,
+    "crop": [
+      12,
+      0,
+      2884,
+      2100
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1170,
+    "fps": 30,
+    "frames": 320,
+    "duration": 10.667,
+    "files": {
+      "webm": {
+        "path": "e4-starting-state/e4-starting-state.webm",
+        "codec": "vp9",
+        "bytes": 531767,
+        "sha256": "3638f489db5d80a640e748c2d6883b5b234cc668bc50b9c507d285805918aec3"
+      },
+      "mp4": {
+        "path": "e4-starting-state/e4-starting-state.mp4",
+        "codec": "h264",
+        "bytes": 533026,
+        "sha256": "82f7e0fa683379f7e4994de003745b211eadcd26acbd1ffe73256e5d3c5a427c"
+      }
+    }
+  },
+  "marks": {
+    "open-library": 0.0,
+    "choose-state": 2.767,
+    "play": 5.633
+  },
+  "steps": {
+    "open-library": "e4-starting-state/steps/open-library.webp",
+    "choose-state": "e4-starting-state/steps/choose-state.webp",
+    "play": "e4-starting-state/steps/play.webp"
+  },
+  "poster": {
+    "path": "e4-starting-state/poster.webp",
+    "frame": 305,
+    "sha256": "a101baa3e26d9bdec4410518f7424b8bdc8f6307494092fad6657659c8d4b3bd",
+    "master": "learn/capture/out/e4-starting-state/poster.png"
+  },
+  "run": {
+    "wallSeconds": 58.574,
+    "meanFrameMs": 164.3,
+    "slowdown": 4.93,
+    "notesPlayed": 1
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "4/4",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "4 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "320 / 320"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than 2.5 s",
+        "passed": true,
+        "detail": "longest unchanged run 1.83 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "320"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1170"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "320"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1170"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "10.67 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

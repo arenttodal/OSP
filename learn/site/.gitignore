@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.astro/
+public/media/
+test-results/
+src/data/manifest.json

@@ -1,0 +1,23 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.make.load-and-play
+product: osp
+group: make-an-instrument
+order: 10
+title: "Load a sound and play it"
+purpose: "Turn one recording into an instrument you can play across the keyboard."
+tags: ["load", "one-shot", "quick start"]
+synonyms: ["load", "drag and drop", "import", "one shot", "sample", "drop a sound", "quick start", "browse"]
+learn: { lessons: ["osp.quickstart"], info: [] }
+reference: osp.ref.presets
+related: ["osp.guide.make.phrase-map-notes", "osp.guide.play.oneshot-granular"]
+preconditions: []
+scene: osp.scene.a-load-and-play
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: drop-file, instruction: "Drag an audio file onto DROP A SOUND.", result: "OSP loads it into layer A." }
+  - { id: wait-ready, instruction: "Wait a moment while OSP analyses it.", result: "The card shows the recording and its note name." }
+  - { id: play-keys, instruction: "Play a few notes on your MIDI keyboard or on the keyboard at the bottom.", result: "Each note plays the recording at that pitch." }
+---

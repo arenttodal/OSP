@@ -155,6 +155,19 @@ class Overlay:
         ImageDraw.Draw(layer).ellipse((ox - r, oy - r, ox + r, oy + r), outline=PAPER + (int(180 * (1 - age / 6)),), width=max(2, int(2 * self.k)))
         return Image.alpha_composite(img, layer)
 
+    def label(self, img, text):
+        # A quiet label for an input that has no picture in the interface (the sustain pedal).
+        pad = 8 * self.k
+        tw = self.font.getlength(text)
+        w, h = tw + pad * 2 + 14 * self.k, 28 * self.k
+        x0, y0 = 16 * self.k, img.size[1] - h - 16 * self.k
+        layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        d = ImageDraw.Draw(layer)
+        d.rounded_rectangle((x0, y0, x0 + w, y0 + h), radius=h / 2, fill=INK + (225,))
+        d.ellipse((x0 + pad, y0 + h / 2 - 4 * self.k, x0 + pad + 8 * self.k, y0 + h / 2 + 4 * self.k), fill=ACCENT + (255,))
+        d.text((x0 + pad + 14 * self.k, y0 + h / 2), text, font=self.font, fill=PAPER + (255,), anchor="lm")
+        return Image.alpha_composite(img, layer)
+
     def pointer(self, img, x, y):
         ox, oy = self.to_out(x, y)
         img.alpha_composite(self.cursor, (int(round(ox - 2)), int(round(oy - 2))))
@@ -214,8 +227,9 @@ def main():
     master = run_dir / "master.mkv"
     info = probe(master)
     check("master frame count = frames.json", info["frames"] == len(frames), f'{info["frames"]} / {len(frames)}')
-    sizes = {(f["w"], f["h"]) for f in frames}
-    check("constant editor size", len(sizes) == 1, str(sorted(sizes)))
+    sizes = sorted({(f["w"], f["h"]) for f in frames})
+    # The window may grow during a scene (ARP's panel); the runner then films it on one canvas.
+    check("every editor size fits the canvas", all(w * scale <= info["width"] + 1 and h * scale <= info["height"] + 1 for w, h in sizes), str(sizes))
 
     cfg = scenario.get("frame", {})
     crop = crop_box(frames, scale, info["width"], info["height"], float(cfg.get("context", 0.05)), cfg.get("aspect", "16:10"))
@@ -244,6 +258,7 @@ def main():
                                                "-movflags", "+faststart", str(mp4)], stdin=subprocess.PIPE))
 
     blank, prev, still_runs, run_len = 0, None, [], 0
+    prev_final = None
     diffs = []
     rendered = []
     hl_since, last_hl, last_down, press_age = 0, None, False, 99
@@ -255,8 +270,6 @@ def main():
         if prev is not None:
             d = ImageStat.Stat(ImageChops.difference(base, prev).convert("L")).mean[0]
             diffs.append(d)
-            run_len = run_len + 1 if d < 0.01 else 0
-            still_runs.append(run_len)
         prev = base
         canvas = base.convert("RGBA")
         hl = tuple(f["hl"]) if "hl" in f else None
@@ -272,9 +285,18 @@ def main():
             press_age += 1
         if "badge" in f:
             canvas = ov.badge(canvas, f["bx"], f["by"], f["badge"])
+        if f.get("sustain"):
+            canvas = ov.label(canvas, "Sustain pedal down")
         if f["shown"] or "badge" in f:
             canvas = ov.pointer(canvas, f["x"], f["y"])
         final = canvas.convert("RGB")
+        # "Frozen" is judged on what the viewer sees (the pointer moving over a still interface
+        # is not a frozen video): the annotated frame against the previous annotated frame.
+        if prev_final is not None:
+            fd = ImageStat.Stat(ImageChops.difference(final, prev_final).convert("L")).mean[0]
+            run_len = run_len + 1 if fd < 0.01 else 0
+            still_runs.append(run_len)
+        prev_final = final
         data = final.tobytes()
         for e in encoders:
             e.stdin.write(data)
@@ -309,8 +331,9 @@ def main():
     check("no blank frames", blank == 0, f"{blank} blank")
     holds = sum(float(x.get("seconds", 0)) for s in scenario["steps"] for x in s["do"] if x.get("do") == "hold")
     longest_still = max(still_runs) / fps if still_runs else 0
-    check("no frozen run longer than the longest declared hold + 1 s", longest_still <= max(x.get("seconds", 0) for s in scenario["steps"] for x in s["do"] if x.get("do") == "hold") + 1.0 + 1e-9,
-          f"longest unchanged run {longest_still:.2f} s")
+    # A stuck capture shows as a long run of identical frames; calm holds between actions are wanted.
+    limit = max(2.5, max(x.get("seconds", 0) for s in scenario["steps"] for x in s["do"] if x.get("do") in ("hold", "hover")) + 1.0)
+    check(f"no frozen run longer than {limit:.1f} s", longest_still <= limit + 1e-9, f"longest unchanged run {longest_still:.2f} s")
     w_info, m_info = probe(webm), probe(mp4)
     for name, inf in (("webm", w_info), ("mp4", m_info)):
         check(f"{name} frames = master", inf["frames"] == len(frames), f'{inf["frames"]}')

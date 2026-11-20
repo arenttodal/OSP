@@ -1,0 +1,21 @@
+{
+  "name": "andor-learn-site",
+  "private": true,
+  "type": "module",
+  "description": "ANDOR Learn: the public visual guides (local preview; not deployed)",
+  "scripts": {
+    "media": "node scripts/copy-media.mjs",
+    "build": "node scripts/check-content.mjs && node scripts/copy-media.mjs && astro build && pagefind --site dist",
+    "preview": "astro preview --port 4321",
+    "test": "node scripts/check-links.mjs && node tests/site.test.mjs"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "8.1.3",
+    "@fontsource-variable/inter-tight": "5.3.0",
+    "@fontsource/geist-mono": "5.3.0",
+    "astro": "7.4.7"
+  },
+  "devDependencies": {
+    "pagefind": "1.5.2"
+  }
+}

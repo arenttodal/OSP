@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.i7-filter",
+  "product": "osp",
+  "title": "Shape the tone with FILTER",
+  "guides": [
+    "osp.guide.shape.filter"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.sound"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "marginRight": 260
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed), a note held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          48,
+          55
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "filter",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "highlight",
+          "target": "macroknob:filter"
+        },
+        {
+          "do": "drag",
+          "target": "macroknob:filter",
+          "dy": 90,
+          "seconds": 1.2
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "param": "character",
+          "max": 60
+        }
+      ]
+    },
+    {
+      "mark": "open-filter",
+      "do": [
+        {
+          "do": "click",
+          "target": "macrolabel:filter",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "popover": true
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hold",
+          "seconds": 0.5
+        }
+      ]
+    },
+    {
+      "mark": "type",
+      "do": [
+        {
+          "do": "click",
+          "target": "popsel:0",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:BP12"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "click",
+          "target": "menu:BP12"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "character.type",
+          "equals": "BP12"
+        }
+      ]
+    },
+    {
+      "mark": "sweep",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "macroknob:filter"
+        },
+        {
+          "do": "drag",
+          "target": "macroknob:filter",
+          "dy": -120,
+          "seconds": 1.6
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.2
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.macros",
+      "popover:open",
+      "menuOpen:",
+      "card:A.card"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.macro.filter"
+    ],
+    "parameters": [
+      "character",
+      "character.type"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/MacroPopups.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

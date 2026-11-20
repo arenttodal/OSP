@@ -1,0 +1,23 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.shape.movement
+product: osp
+group: shape-and-finish
+order: 20
+title: "Add MOVEMENT"
+purpose: "Make the sound change over time."
+tags: ["movement"]
+synonyms: ["movement", "chorus", "drift", "tape", "pulse", "modulation effect"]
+learn: { lessons: ["osp.sound"], info: [] }
+reference: osp.ref.movement
+related: ["osp.guide.shape.shaper"]
+preconditions: []
+scene: osp.scene.i2-movement
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: open-movement, instruction: "Click MOVEMENT above its knob.", result: "Its settings open." }
+  - { id: choose-mode, instruction: "Choose a mode, such as Chorus.", result: "MOVEMENT uses that mode." }
+  - { id: amount, instruction: "Turn the MOVEMENT knob.", result: "More movement is heard." }
+---

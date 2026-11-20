@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.e1-save-preset",
+  "product": "osp",
+  "title": "Save the sound as a preset",
+  "guides": [
+    "osp.guide.make.save-export"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.presets"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "marginRight": 260
+  },
+  "fps": 30,
+  "maxSeconds": 16.0,
+  "start": {
+    "state": "one layer (bowed)",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-library",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "button:Library",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.library.open"
+        }
+      ]
+    },
+    {
+      "mark": "save",
+      "do": [
+        {
+          "do": "click",
+          "target": "library:save",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ]
+    },
+    {
+      "mark": "name",
+      "do": [
+        {
+          "do": "click",
+          "target": "textfield:My Evolving Texture",
+          "highlight": true,
+          "count": 2
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "type",
+          "text": "Warm Bow"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "button:Save to Library",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ],
+      "expect": [
+        {
+          "fileIn": "documents/Presets"
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "library:window"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.library",
+      "osp.library.save",
+      "osp.header.menu"
+    ],
+    "sources": [
+      "apps/plugin/Source/LibraryPanel.cpp",
+      "apps/plugin/Source/PluginEditor.cpp"
+    ]
+  },
+  "disclosures": []
+}

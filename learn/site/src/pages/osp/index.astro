@@ -1,0 +1,48 @@
+---
+import Base from '../../layouts/Base.astro';
+import Search from '../../components/Search.astro';
+import { groups } from '../../data/groups';
+import { allGuides, urlOf } from '../../lib/guides';
+import { scene } from '../../lib/scenes';
+const guides = await allGuides();
+const quick = guides.filter((g) => g.data.quick);
+const start = guides.find((g) => g.data.id === 'osp.guide.make.load-and-play')!;
+const chips = ['record', 'grab last', 'map notes', 'strum', 'satellite', 'pedal loop', 'imprint', 'key dna'];
+---
+<Base title="Learn OSP · ANDOR" current="home">
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <div class="label">ANDOR OSP · One Shot Performer</div>
+        <h1>Learn OSP</h1>
+        <p class="lede">Each guide is a short, silent demonstration recorded from the real instrument, with numbered steps you can open directly.</p>
+        <Search chips={chips} />
+      </div>
+      <a class="qcard" href={urlOf(start)}>
+        <img src={scene(start.data.scene).poster} alt="" loading="eager" width="1600" height="1000" />
+        <div><span class="label">Quick start</span><h3>{start.data.title}</h3><p>{start.data.purpose}</p></div>
+      </a>
+    </section>
+
+    <h2>Go straight to</h2>
+    <div class="quick">
+      {quick.map((g) => (
+        <a class="qcard" href={urlOf(g)}>
+          <img src={scene(g.data.scene).poster} alt="" loading="lazy" width="1600" height="1000" />
+          <div><h3>{g.data.title}</h3><p>{g.data.purpose}</p></div>
+        </a>
+      ))}
+    </div>
+
+    <h2>All guides</h2>
+    <div class="groups">
+      {groups.map((gr) => (
+        <section class="group">
+          <h3><a href={`${import.meta.env.BASE_URL}osp/${gr.slug}/`}>{gr.title}</a></h3>
+          <p>{gr.blurb}</p>
+          <ul>{guides.filter((g) => g.data.group === gr.slug).map((g) => <li><a href={urlOf(g)}>{g.data.title}</a></li>)}</ul>
+        </section>
+      ))}
+    </div>
+  </div>
+</Base>

@@ -1,0 +1,25 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.arp.basics
+product: osp
+group: arpeggiator
+order: 10
+title: "Arpeggiate held notes"
+purpose: "Play the notes you hold as a repeating pattern."
+tags: ["arp", "arpeggiator"]
+synonyms: ["arp", "arpeggiator", "arpeggio", "pattern", "rate", "octaves"]
+learn: { lessons: ["osp.arp"], info: ["osp.arp.control"] }
+reference: osp.ref.arpeggiator
+related: ["osp.guide.arp.per-source", "osp.guide.arp.strum"]
+preconditions: []
+scene: osp.scene.g1-arp-basics
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: open-arp, instruction: "Click ARP beside the keyboard.", result: "The ARPEGGIATOR panel opens." }
+  - { id: arp-on, instruction: "Click ARP's light.", result: "Held notes play one after another." }
+  - { id: pattern, instruction: "Choose a pattern, such as Up/Down.", result: "The order of the notes changes." }
+  - { id: rate, instruction: "Turn RATE to 1/16.", result: "The notes follow each other twice as fast." }
+  - { id: octaves, instruction: "Choose 2 under OCTAVES.", result: "The pattern climbs through two octaves." }
+---

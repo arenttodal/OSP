@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.h2-grains",
+  "product": "osp",
+  "title": "Shape the grains",
+  "guides": [
+    "osp.guide.granular.grains"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.playback"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed), Granular, a note held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      },
+      {
+        "do": "setParam",
+        "id": "layerA.sourceMode",
+        "value": 1
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          48
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "reveal",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "hover",
+          "target": "card:A.card",
+          "seconds": 0.8
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "learn:osp.granular.position"
+          },
+          "timeout": 4
+        },
+        {
+          "do": "hold",
+          "seconds": 0.5
+        }
+      ]
+    },
+    {
+      "mark": "pos",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "learn:osp.granular.position"
+        },
+        {
+          "do": "drag",
+          "target": "learn:osp.granular.position",
+          "dy": -45,
+          "seconds": 1.0
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ]
+    },
+    {
+      "mark": "size",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "learn:osp.granular.size"
+        },
+        {
+          "do": "drag",
+          "target": "learn:osp.granular.size",
+          "dy": -45,
+          "seconds": 1.0
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.0
+        }
+      ]
+    },
+    {
+      "mark": "dens",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "learn:osp.granular.density"
+        },
+        {
+          "do": "drag",
+          "target": "learn:osp.granular.density",
+          "dy": -45,
+          "seconds": 1.0
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.4
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:A.card"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.granular.position",
+      "osp.granular.size",
+      "osp.granular.density"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/EngineCard.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.f2-synth-imprint",
+  "title": "Colour SYNTH with IMPRINT",
+  "scenarioDigest": "sha256:742b94ff4d0f183a6d60fea26455b475caf848405e4fae30a0513a3ed489f235",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.synth.imprint"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "targets": [],
+  "fixtures": [
+    {
+      "id": "tutorial:voice",
+      "file": "Tutorial Voice A3.wav",
+      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
+      "bytes": 1440104
+    }
+  ],
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 309,
+    "crop": [
+      0,
+      177,
+      2896,
+      1381
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 664,
+    "fps": 30,
+    "frames": 309,
+    "duration": 10.3,
+    "files": {
+      "webm": {
+        "path": "f2-synth-imprint/f2-synth-imprint.webm",
+        "codec": "vp9",
+        "bytes": 236371,
+        "sha256": "f480ddf7c564a75b6efd6de213bf052effde15f24e594d65f1ed09305324a7ca"
+      },
+      "mp4": {
+        "path": "f2-synth-imprint/f2-synth-imprint.mp4",
+        "codec": "h264",
+        "bytes": 289331,
+        "sha256": "73b60bd9add5e92f4073680fb9b3344d221224f896fe2df6d7c5549e1db62101"
+      }
+    }
+  },
+  "marks": {
+    "open-synth": 0.0,
+    "mode-imprint": 2.133,
+    "imprint": 4.6,
+    "motion": 7.3
+  },
+  "steps": {
+    "open-synth": "f2-synth-imprint/steps/open-synth.webp",
+    "mode-imprint": "f2-synth-imprint/steps/mode-imprint.webp",
+    "imprint": "f2-synth-imprint/steps/imprint.webp",
+    "motion": "f2-synth-imprint/steps/motion.webp"
+  },
+  "poster": {
+    "path": "f2-synth-imprint/poster.webp",
+    "frame": 279,
+    "sha256": "cd207c35e77ee16e3ab836673c8d43bcfe09b3dc2eb98c0e6f593efc57da0e6e",
+    "master": "learn/capture/out/f2-synth-imprint/poster.png"
+  },
+  "run": {
+    "wallSeconds": 84.304,
+    "meanFrameMs": 237.3,
+    "slowdown": 7.12,
+    "notesPlayed": 1
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "2/2",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "2 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "309 / 309"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 1.37 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "309"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x664"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "309"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x664"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "10.30 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

@@ -1,0 +1,21 @@
+---
+schemaVersion: 1
+kind: andor.learn.reference
+id: osp.ref.sub
+product: osp
+title: "SUB"
+function: "Adds a sub-bass one or two octaves below the keys you hold, after the effects."
+location: "The SUB row of the key beside the keyboard (below ARP): its light switches SUB on, its name opens the SUB panel."
+parameters:
+  - { name: "WAVE", values: "SINE · TRI · SQUARE · SAW", does: "The sub's waveform." }
+  - { name: "OCT", values: "-1 · -2", does: "How far below the keys." }
+  - { name: "GRIT · LEVEL", values: "% · dB", does: "Saturation and level." }
+  - { name: "RESPONSE", values: "FLAT · TAPER", does: "With TAPER, higher keys play quieter (FROM and dB / OCT)." }
+  - { name: "Key range", values: "on the keyboard display", does: "SUB plays only the keys inside the lit range." }
+dependencies: []
+guides: ["osp.guide.arp.sub"]
+synonyms: ["sub", "sub bass", "bass", "low end", "octave below"]
+parameterIds: ["sub.enabled", "sub.wave", "sub.octave", "sub.level"]
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "docs/learn-studio/gate-1-report.md and the Gate 0/1 fact sheets" }
+---
+

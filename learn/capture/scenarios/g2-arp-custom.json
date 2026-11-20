@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.g2-arp-custom",
+  "product": "osp",
+  "title": "Use a custom pattern",
+  "guides": [
+    "osp.guide.arp.custom"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (pluck), ARP panel open, ARP on, the factory pattern Gallop chosen in set-up, a chord held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "pluck"
+        ]
+      },
+      {
+        "do": "expandArp"
+      },
+      {
+        "do": "setParam",
+        "id": "arp.enabled",
+        "value": 1
+      },
+      {
+        "do": "customPattern",
+        "name": "Gallop"
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          57,
+          60,
+          64
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.8
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "pattern",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.6
+        },
+        {
+          "do": "highlight",
+          "target": "arp:field"
+        },
+        {
+          "do": "hold",
+          "seconds": 2.0
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        }
+      ],
+      "expect": [
+        {
+          "param": "arp.custom",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "mark": "edit",
+      "do": [
+        {
+          "do": "click",
+          "target": "arp:pencil",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "popover": true
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hold",
+          "seconds": 2.4
+        }
+      ],
+      "expect": [
+        {
+          "popover": true
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "arp:panel",
+      "popover:open",
+      "card:A.card"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.arp.panel"
+    ],
+    "parameters": [
+      "arp.custom"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/CustomPatternBrowser.cpp",
+      "shared/andor-ui/Source/CustomPatternEditor.cpp",
+      "shared/andor-ui/Source/ArpSection.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard.",
+    "The pattern was chosen in set-up through the browser's own code: a real click on Custom Patterns \u203a did not leave the browser open in the capture environment (see docs/learn-studio/gate-3-report.md, findings)."
+  ]
+}

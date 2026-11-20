@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.p1-pedal-loop-pingpong",
+  "title": "Hold a note with the sustain pedal (Pedal Loop)",
+  "scenarioDigest": "sha256:dc020509c50cf0b10600320f92d88262780c7c0b4e200c7ef8e8345b298ac6c0",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.play.pedal-loop"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "targets": [
+    "osp.source.mode",
+    "osp.keyboard"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:pluck",
+      "file": "Tutorial Pluck A3.wav",
+      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+      "bytes": 230504
+    }
+  ],
+  "disclosures": [
+    "The held note and the sustain pedal (MIDI CC 64) are sent as MIDI by the runner, as a keyboard and pedal would send them.",
+    "The \"Sustain pedal down\" label is drawn in post-production exactly while the runner holds the pedal (CC 64 at 127); OSP itself shows no pedal indicator."
+  ],
+  "source": {
+    "width": 3416,
+    "height": 2100,
+    "fps": 30,
+    "frames": 395,
+    "crop": [
+      0,
+      77,
+      3237,
+      2100
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1000,
+    "fps": 30,
+    "frames": 395,
+    "duration": 13.167,
+    "files": {
+      "webm": {
+        "path": "p1-pedal-loop-pingpong/p1-pedal-loop-pingpong.webm",
+        "codec": "vp9",
+        "bytes": 452413,
+        "sha256": "f96564a37542086b07d41447c0e04af5e6134204fa49b35d55eb90dbfe5f8de3"
+      },
+      "mp4": {
+        "path": "p1-pedal-loop-pingpong/p1-pedal-loop-pingpong.mp4",
+        "codec": "h264",
+        "bytes": 371515,
+        "sha256": "2345ac0b4a6ce4386a4e27ce723d822ce298d7056ee3b85c9944335cf4e7741d"
+      }
+    }
+  },
+  "marks": {
+    "loop-off": 0.0,
+    "choose-ping-pong": 2.567,
+    "play-note": 6.133,
+    "pedal-down": 7.067,
+    "pedal-up": 10.7
+  },
+  "steps": {
+    "loop-off": "p1-pedal-loop-pingpong/steps/loop-off.webp",
+    "choose-ping-pong": "p1-pedal-loop-pingpong/steps/choose-ping-pong.webp",
+    "play-note": "p1-pedal-loop-pingpong/steps/play-note.webp",
+    "pedal-down": "p1-pedal-loop-pingpong/steps/pedal-down.webp",
+    "pedal-up": "p1-pedal-loop-pingpong/steps/pedal-up.webp"
+  },
+  "poster": {
+    "path": "p1-pedal-loop-pingpong/poster.webp",
+    "frame": 365,
+    "sha256": "fc272f14ae8eac49ce2443474bc0692a92ffa0bfb0b16285601509ba12729b66",
+    "master": "learn/capture/out/p1-pedal-loop-pingpong/poster.png"
+  },
+  "run": {
+    "wallSeconds": 84.94800000000001,
+    "meanFrameMs": 207.1,
+    "slowdown": 6.21,
+    "notesPlayed": 1
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "4/4",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "4 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "395 / 395"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 4.00 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "395"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1000"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "395"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1000"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "13.17 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

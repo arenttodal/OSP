@@ -1,0 +1,25 @@
+---
+import Base from '../../../layouts/Base.astro';
+import { groups } from '../../../data/groups';
+import { allGuides, urlOf } from '../../../lib/guides';
+import { scene } from '../../../lib/scenes';
+export async function getStaticPaths() { return groups.map((g) => ({ params: { group: g.slug }, props: { group: g } })); }
+const { group } = Astro.props;
+const guides = (await allGuides()).filter((g) => g.data.group === group.slug);
+const base = import.meta.env.BASE_URL;
+---
+<Base title={`${group.title} · Learn OSP`}>
+  <div class="wrap">
+    <div class="crumbs"><a href={`${base}osp/`}>Learn OSP</a> / {group.title}</div>
+    <h1>{group.title}</h1>
+    <p class="lede">{group.blurb}</p>
+    <div class="quick">
+      {guides.map((g) => (
+        <a class="qcard" href={urlOf(g)}>
+          <img src={scene(g.data.scene).poster} alt="" loading="lazy" width="1600" height="1000" />
+          <div><h3>{g.data.title}</h3><p>{g.data.purpose}</p></div>
+        </a>
+      ))}
+    </div>
+  </div>
+</Base>

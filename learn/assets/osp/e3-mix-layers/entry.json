@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.e3-mix-layers",
+  "title": "Balance, mute and solo layers",
+  "scenarioDigest": "sha256:c354cd28a4692fb979c062964b864f6c03cc0f0a54a3879317ae97d2c1fc3531",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.play.mix"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.layers"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "osp.source.B.level",
+    "osp.source.B.solo",
+    "osp.source.A.mute"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    },
+    {
+      "id": "tutorial:voice",
+      "file": "Tutorial Voice A3.wav",
+      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
+      "bytes": 1440104
+    }
+  ],
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 284,
+    "crop": [
+      0,
+      177,
+      2896,
+      1381
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 664,
+    "fps": 30,
+    "frames": 284,
+    "duration": 9.467,
+    "files": {
+      "webm": {
+        "path": "e3-mix-layers/e3-mix-layers.webm",
+        "codec": "vp9",
+        "bytes": 438973,
+        "sha256": "ed1f042bf7f95df6ced18f15b960a39ccca55d3ccb0bde50a3d80b67dc08c6ea"
+      },
+      "mp4": {
+        "path": "e3-mix-layers/e3-mix-layers.mp4",
+        "codec": "h264",
+        "bytes": 592831,
+        "sha256": "265a61daf1b2facbafbc25233b5e6d5173c74a06e54e4023ce7c0ebabe9ca6fb"
+      }
+    }
+  },
+  "marks": {
+    "level-b": 0.0,
+    "solo-b": 2.9,
+    "unsolo-b": 5.367,
+    "mute-a": 6.9
+  },
+  "steps": {
+    "level-b": "e3-mix-layers/steps/level-b.webp",
+    "solo-b": "e3-mix-layers/steps/solo-b.webp",
+    "unsolo-b": "e3-mix-layers/steps/unsolo-b.webp",
+    "mute-a": "e3-mix-layers/steps/mute-a.webp"
+  },
+  "poster": {
+    "path": "e3-mix-layers/poster.webp",
+    "frame": 271,
+    "sha256": "655a8b3d840338f7d52c6b8050b8b635500470b7a7ed195f6caf4080a12cc531",
+    "master": "learn/capture/out/e3-mix-layers/poster.png"
+  },
+  "run": {
+    "wallSeconds": 72.686,
+    "meanFrameMs": 235.9,
+    "slowdown": 7.08,
+    "notesPlayed": 1
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "4/4",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "4 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "284 / 284"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 0.03 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "284"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x664"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "284"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x664"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "9.47 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

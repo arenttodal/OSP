@@ -1,0 +1,22 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.play.midi-learn
+product: osp
+group: play-and-layer
+order: 50
+title: "Control a knob from a MIDI controller"
+purpose: "Assign a hardware knob to a control with MIDI Learn."
+tags: ["midi learn", "controller"]
+synonyms: ["midi learn", "midi cc", "controller", "hardware knob", "map controller"]
+learn: { lessons: [], info: [] }
+related: ["osp.guide.play.vibrato"]
+preconditions: []
+scene: osp.scene.j2-midi-learn
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: right-click, instruction: "Right-click a knob, such as FILTER.", result: "Its menu opens." }
+  - { id: learn, instruction: "Choose Learn MIDI CC.", result: "OSP waits for a controller." }
+  - { id: move-controller, instruction: "Move a knob on your MIDI controller.", result: "The control follows it." }
+---

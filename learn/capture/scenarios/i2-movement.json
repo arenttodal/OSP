@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.i2-movement",
+  "product": "osp",
+  "title": "Add MOVEMENT",
+  "guides": [
+    "osp.guide.shape.movement"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.sound"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (voice), a note held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "voice"
+        ]
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          57
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-movement",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "macrolabel:movement",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "state": "osp.popup.movement.open"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ]
+    },
+    {
+      "mark": "choose-mode",
+      "do": [
+        {
+          "do": "click",
+          "target": "learn:osp.movement.mode",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:Chorus"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "click",
+          "target": "menu:Chorus"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "movement.mode",
+          "equals": "Chorus"
+        }
+      ]
+    },
+    {
+      "mark": "amount",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "macroknob:movement"
+        },
+        {
+          "do": "drag",
+          "target": "macroknob:movement",
+          "dy": -90,
+          "seconds": 1.2
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.6
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.macros",
+      "popover:open",
+      "menuOpen:"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.macro.movement",
+      "osp.movement.mode"
+    ],
+    "parameters": [
+      "movement.mode",
+      "motion"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/MacroPopups.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}

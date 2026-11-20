@@ -1,0 +1,22 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.shape.modulation
+product: osp
+group: shape-and-finish
+order: 30
+title: "Make a control move with an LFO"
+purpose: "Connect LFO 1 to FILTER and set how far it moves."
+tags: ["modulation", "lfo"]
+synonyms: ["modulation", "lfo", "modulate", "route", "ring", "automation"]
+learn: { lessons: ["osp.modulation"], info: ["osp.mod.halo"] }
+related: ["osp.guide.shape.user-macro"]
+preconditions: []
+scene: osp.scene.i4-modulation
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: lfo-tab, instruction: "Click LFO 1 in the modulation panel.", result: "LFO 1's settings show." }
+  - { id: connect, instruction: "Drag LFO 1's tab onto the FILTER knob.", result: "A ring appears around FILTER." }
+  - { id: depth, instruction: "Drag the ring.", result: "The ring shows how far LFO 1 moves FILTER." }
+---

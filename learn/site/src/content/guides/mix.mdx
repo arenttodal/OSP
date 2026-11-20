@@ -1,0 +1,23 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.play.mix
+product: osp
+group: play-and-layer
+order: 25
+title: "Balance, mute and solo layers"
+purpose: "Set how much of each layer you hear."
+tags: ["mix", "mute", "solo"]
+synonyms: ["level", "volume", "mute", "solo", "balance", "mix"]
+learn: { lessons: ["osp.layers"], info: [] }
+related: ["osp.guide.play.layers"]
+preconditions: []
+scene: osp.scene.e3-mix-layers
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: level-b, instruction: "Turn layer B's LEVEL.", result: "B gets quieter against A." }
+  - { id: solo-b, instruction: "Click S on layer B.", result: "Only B is heard; A shows NOT SOLOED." }
+  - { id: unsolo-b, instruction: "Click S again.", result: "Both layers are heard." }
+  - { id: mute-a, instruction: "Click M on layer A.", result: "A is silent and shows MUTED." }
+---

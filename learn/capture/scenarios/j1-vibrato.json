@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.j1-vibrato",
+  "product": "osp",
+  "title": "Add vibrato with the mod wheel",
+  "guides": [
+    "osp.guide.play.vibrato"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.vibrato"
+    ],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed)",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-mod",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.5
+        },
+        {
+          "do": "click",
+          "target": "learn:osp.wheel.mod",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "state": "osp.popup.mod.open"
+        }
+      ]
+    },
+    {
+      "mark": "vibrato-on",
+      "do": [
+        {
+          "do": "click",
+          "target": "learn:osp.vibrato.enable",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ],
+      "expect": [
+        {
+          "param": "vibrato.enabled",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "mark": "play-raise",
+      "do": [
+        {
+          "do": "midi",
+          "keys": [
+            57
+          ],
+          "state": "on",
+          "velocity": 90
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        },
+        {
+          "do": "cc",
+          "controller": 1,
+          "from": 0,
+          "to": 110,
+          "seconds": 1.5
+        },
+        {
+          "do": "hold",
+          "seconds": 1.6
+        },
+        {
+          "do": "cc",
+          "controller": 1,
+          "from": 110,
+          "to": 0,
+          "seconds": 0.8
+        },
+        {
+          "do": "midi",
+          "keys": [
+            57
+          ],
+          "state": "off"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "learn:osp.keyboard",
+      "popover:open",
+      "card:A.card"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.wheel.mod",
+      "osp.vibrato.enable"
+    ],
+    "parameters": [
+      "vibrato.enabled"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/WheelPopups.cpp"
+    ]
+  },
+  "disclosures": [
+    "The held note and the mod wheel (MIDI CC 1) are sent as MIDI by the runner, as a keyboard would; the on-screen wheel moves as it does for a hardware wheel."
+  ]
+}

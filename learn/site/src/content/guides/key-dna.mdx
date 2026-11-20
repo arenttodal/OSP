@@ -1,0 +1,25 @@
+---
+schemaVersion: 1
+kind: andor.learn.guide
+id: osp.guide.granular.key-dna
+product: osp
+group: granular-key-dna
+order: 20
+title: "Vary the sound from key to key"
+purpose: "Give each key its own granular settings with KEY DNA."
+tags: ["key dna", "granular"]
+synonyms: ["key dna", "per key", "each key", "keyboard variation", "grain variation"]
+learn: { lessons: ["osp.keydna"], info: [] }
+reference: osp.ref.key-dna
+related: ["osp.guide.granular.grains"]
+preconditions: ["Granular playback."]
+scene: osp.scene.h3-key-dna
+quick: false
+verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
+steps:
+  - { id: open, instruction: "In Granular, click KEY DNA at the end of the granular controls.", result: "The KEY DNA editor opens." }
+  - { id: power, instruction: "Click OFF to switch it on.", result: "KEY DNA is on for this layer." }
+  - { id: draw-keys, instruction: "Draw across the graph.", result: "Each key gets its own value for POS." }
+  - { id: depth, instruction: "Raise DEPTH.", result: "The keys' values reach further." }
+  - { id: play-keys, instruction: "Play keys across the keyboard.", result: "Each key takes its grains from a different place." }
+---

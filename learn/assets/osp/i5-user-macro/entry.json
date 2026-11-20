@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.i5-user-macro",
+  "title": "Assign a USER macro",
+  "scenarioDigest": "sha256:4eb8fc9b69b8c391f90fd59912bbf9b1b75e09106bb1325ec581de2dced7984f",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.shape.user-macro"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.usermacros"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "macros.bank",
+    "osp.source.level",
+    "usermacro.0"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:pluck",
+      "file": "Tutorial Pluck A3.wav",
+      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+      "bytes": 230504
+    }
+  ],
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ],
+  "source": {
+    "width": 3416,
+    "height": 2100,
+    "fps": 30,
+    "frames": 336,
+    "crop": [
+      0,
+      67,
+      2923,
+      2100
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1112,
+    "fps": 30,
+    "frames": 336,
+    "duration": 11.2,
+    "files": {
+      "webm": {
+        "path": "i5-user-macro/i5-user-macro.webm",
+        "codec": "vp9",
+        "bytes": 417698,
+        "sha256": "84d4b7a396d1f248b5635c2980d96ec5c2fc90108adf73c4a1d63500858e28ed"
+      },
+      "mp4": {
+        "path": "i5-user-macro/i5-user-macro.mp4",
+        "codec": "h264",
+        "bytes": 423603,
+        "sha256": "434f95cc2c5a26235ae6b39f5662fb1f4f507c3e8c191cfd9d4a6629b3920229"
+      }
+    }
+  },
+  "marks": {
+    "user-bank": 0.0,
+    "right-click": 2.567,
+    "assign": 4.533,
+    "turn": 7.067
+  },
+  "steps": {
+    "user-bank": "i5-user-macro/steps/user-bank.webp",
+    "right-click": "i5-user-macro/steps/right-click.webp",
+    "assign": "i5-user-macro/steps/assign.webp",
+    "turn": "i5-user-macro/steps/turn.webp"
+  },
+  "poster": {
+    "path": "i5-user-macro/poster.webp",
+    "frame": 306,
+    "sha256": "e78dd9ccf1f25978d8325f9a3f6f88743d6332f503fe61a35ac7b8e7732ea432",
+    "master": "learn/capture/out/i5-user-macro/poster.png"
+  },
+  "run": {
+    "wallSeconds": 74.155,
+    "meanFrameMs": 200.8,
+    "slowdown": 6.02,
+    "notesPlayed": 1
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "4/4",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "4 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "336 / 336"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 1.23 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "336"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1112"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "336"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1112"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "11.20 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

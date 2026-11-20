@@ -1,0 +1,49 @@
+---
+// Search over every step, guide and reference article (Pagefind's static index: no server).
+// A hit on a step opens that step's own URL.
+interface Props { autofocus?: boolean; chips?: string[]; }
+const { autofocus = false, chips = [] } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+<div class="search" data-search data-base={base}>
+  <label class="sr-only" for="learn-search">Search the guides</label>
+  <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 13l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  <input id="learn-search" type="search" autocomplete="off" placeholder="Search guides, controls and steps" autofocus={autofocus} />
+</div>
+{chips.length > 0 && (
+  <div class="chips" aria-label="Frequent searches">
+    {chips.map((c) => <a class="chip" href={`${base}osp/search/?q=${encodeURIComponent(c)}`} data-chip={c}>{c}</a>)}
+  </div>
+)}
+<ul class="results" data-results aria-live="polite"></ul>
+<script>
+  type Result = { url: string; meta: { title?: string; where?: string }; excerpt: string };
+  const box = document.querySelector<HTMLElement>('[data-search]');
+  const input = document.getElementById('learn-search') as HTMLInputElement | null;
+  const list = document.querySelector<HTMLUListElement>('[data-results]');
+  if (box && input && list) {
+    const base = box.dataset.base ?? '/';
+    let pagefind: any = null;
+    const load = async () => {
+      if (!pagefind) {
+        pagefind = await import(/* @vite-ignore */ `${base}pagefind/pagefind.js`);
+        await pagefind.options({ baseUrl: base, excerptLength: 18 });
+      }
+      return pagefind;
+    };
+    const run = async (q: string) => {
+      const term = q.trim();
+      if (!term) { list.innerHTML = ''; return; }
+      const pf = await load();
+      const search = await pf.debouncedSearch(term, {}, 120);
+      if (!search) return;
+      const data: Result[] = await Promise.all(search.results.slice(0, 8).map((r: any) => r.data()));
+      list.innerHTML = data.length === 0
+        ? `<li class="r-text">No guide matches “${term.replace(/[<>&]/g, '')}”.</li>`
+        : data.map((d) => `<li><a href="${d.url}"><span class="r-where">${d.meta.where ?? ''}</span><span class="r-title">${d.meta.title ?? ''}</span><div class="r-text">${d.excerpt}</div></a></li>`).join('');
+    };
+    input.addEventListener('input', () => run(input.value));
+    const q = new URLSearchParams(location.search).get('q');
+    if (q) { input.value = q; run(q); }
+  }
+</script>

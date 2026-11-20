@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.i3-shaper",
+  "title": "Use a SHAPER pattern",
+  "scenarioDigest": "sha256:437df472060a52e4725b3f510eca3f2ea7da2686615dac17144e9d1c866601f8",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.shape.shaper"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "targets": [],
+  "fixtures": [
+    {
+      "id": "tutorial:voice",
+      "file": "Tutorial Voice A3.wav",
+      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
+      "bytes": 1440104
+    }
+  ],
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 311,
+    "crop": [
+      72,
+      860,
+      1900,
+      2082
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1070,
+    "fps": 30,
+    "frames": 311,
+    "duration": 10.367,
+    "files": {
+      "webm": {
+        "path": "i3-shaper/i3-shaper.webm",
+        "codec": "vp9",
+        "bytes": 350717,
+        "sha256": "c10662e449e95edadce0ce17443bba86ea9ffb7111e23745fa1e2d6d6d22cd7b"
+      },
+      "mp4": {
+        "path": "i3-shaper/i3-shaper.mp4",
+        "codec": "h264",
+        "bytes": 419654,
+        "sha256": "c70f45875490a0f42cc67d7b834c88917ca7752a404ec8d7a356aa0b02a841b2"
+      }
+    }
+  },
+  "marks": {
+    "open-movement": 0.0,
+    "shaper": 2.067,
+    "pattern": 4.367,
+    "depth": 6.667
+  },
+  "steps": {
+    "open-movement": "i3-shaper/steps/open-movement.webp",
+    "shaper": "i3-shaper/steps/shaper.webp",
+    "pattern": "i3-shaper/steps/pattern.webp",
+    "depth": "i3-shaper/steps/depth.webp"
+  },
+  "poster": {
+    "path": "i3-shaper/poster.webp",
+    "frame": 289,
+    "sha256": "738167476f5d08b7eee759a802cbb5131c7fe1e40405dccf7e4aa4f2831c5cf0",
+    "master": "learn/capture/out/i3-shaper/poster.png"
+  },
+  "run": {
+    "wallSeconds": 86.246,
+    "meanFrameMs": 244.0,
+    "slowdown": 7.32,
+    "notesPlayed": 1
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "5/5",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "5 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "311 / 311"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 0.07 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "311"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1070"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "311"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1070"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "10.37 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

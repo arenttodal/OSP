@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.h1-oneshot-granular",
+  "product": "osp",
+  "title": "Switch between One Shot and Granular",
+  "guides": [
+    "osp.guide.play.oneshot-granular"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.playback"
+    ],
+    "steps": [
+      "osp.playback/selector",
+      "osp.playback/granular",
+      "osp.playback/compare"
+    ]
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic",
+    "marginRight": 260
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed), One Shot",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "oneshot-play",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.6
+        },
+        {
+          "do": "key",
+          "note": 60,
+          "seconds": 1.2
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "layerA.sourceMode",
+          "equals": "One Shot"
+        }
+      ]
+    },
+    {
+      "mark": "open-mode",
+      "do": [
+        {
+          "do": "click",
+          "target": "learn:osp.source.mode",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "waitFor",
+          "until": {
+            "target": "menu:Granular"
+          },
+          "timeout": 3
+        },
+        {
+          "do": "hold",
+          "seconds": 0.6
+        }
+      ]
+    },
+    {
+      "mark": "choose-granular",
+      "do": [
+        {
+          "do": "click",
+          "target": "menu:Granular"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "layerA.sourceMode",
+          "equals": "Granular"
+        }
+      ]
+    },
+    {
+      "mark": "granular-play",
+      "do": [
+        {
+          "do": "key",
+          "note": 60,
+          "seconds": 1.6
+        },
+        {
+          "do": "hold",
+          "seconds": 1.2
+        }
+      ],
+      "expect": [
+        {
+          "notesPlayed": 2
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:A.card",
+      "learn:osp.keyboard",
+      "menuOpen:"
+    ],
+    "context": 0.03,
+    "aspect": "16:10"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [
+      "osp.source.mode",
+      "osp.keyboard"
+    ],
+    "parameters": [
+      "layerA.sourceMode"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/EngineCard.cpp",
+      "apps/plugin/Source/PluginEditor.cpp"
+    ]
+  },
+  "disclosures": []
+}

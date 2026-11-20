@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.assets.entry",
+  "scenario": "osp.scene.e2-add-layers",
+  "title": "Add a second and third sound",
+  "scenarioDigest": "sha256:5da299b073bc604db65e87bb686a689296f39e9a3cd0af5108d0719a62a5d1a2",
+  "product": "osp",
+  "productCommit": "6ef3376",
+  "environment": {
+    "os": "linux",
+    "display": "Xvfb + openbox",
+    "render": "JUCE software renderer, ceramic look, 2x",
+    "timing": "frame clock: 1600 samples of audio and one message-loop pass per frame; wall-clock UI timings run faster than the video (see run.slowdown)"
+  },
+  "guides": [
+    "osp.guide.play.layers"
+  ],
+  "learn": {
+    "lessons": [
+      "osp.layers"
+    ],
+    "steps": []
+  },
+  "targets": [
+    "osp.keyboard"
+  ],
+  "fixtures": [
+    {
+      "id": "tutorial:bowed",
+      "file": "Tutorial Bowed Note C3.wav",
+      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
+      "bytes": 648104
+    },
+    {
+      "id": "tutorial:voice",
+      "file": "Tutorial Voice A3.wav",
+      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
+      "bytes": 1440104
+    },
+    {
+      "id": "tutorial:pluck",
+      "file": "Tutorial Pluck A3.wav",
+      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
+      "bytes": 230504
+    }
+  ],
+  "disclosures": [
+    "The file arrives through the editor's own drop handlers (fileDragEnter, fileDragMove, filesDropped); the travelling file badge is drawn in post-production. It is not a recording of an operating-system drag-and-drop."
+  ],
+  "source": {
+    "width": 2896,
+    "height": 2100,
+    "fps": 30,
+    "frames": 269,
+    "crop": [
+      0,
+      0,
+      2896,
+      2100
+    ]
+  },
+  "video": {
+    "width": 1600,
+    "height": 1160,
+    "fps": 30,
+    "frames": 269,
+    "duration": 8.967,
+    "files": {
+      "webm": {
+        "path": "e2-add-layers/e2-add-layers.webm",
+        "codec": "vp9",
+        "bytes": 576912,
+        "sha256": "65fba19500e711bfd3244e8c927d10aa1d247908304380b85edec106d68bd268"
+      },
+      "mp4": {
+        "path": "e2-add-layers/e2-add-layers.mp4",
+        "codec": "h264",
+        "bytes": 672148,
+        "sha256": "44e0cf9536a770d56c43251c4623e605dbb68ead34eda829cfc35f1d5b870595"
+      }
+    }
+  },
+  "marks": {
+    "add-b": 0.0,
+    "add-c": 3.267,
+    "play-all": 5.933
+  },
+  "steps": {
+    "add-b": "e2-add-layers/steps/add-b.webp",
+    "add-c": "e2-add-layers/steps/add-c.webp",
+    "play-all": "e2-add-layers/steps/play-all.webp"
+  },
+  "poster": {
+    "path": "e2-add-layers/poster.webp",
+    "frame": 256,
+    "sha256": "124a953443ea15e771c510e6b0407dd9c201f6fdcb92fb3a4f2b6a195bbe2eb1",
+    "master": "learn/capture/out/e2-add-layers/poster.png"
+  },
+  "run": {
+    "wallSeconds": 50.805,
+    "meanFrameMs": 169.6,
+    "slowdown": 5.09,
+    "notesPlayed": 1
+  },
+  "validation": {
+    "status": "passed",
+    "expectations": "5/5",
+    "blankFrames": 0,
+    "approvedPosterDiff": null,
+    "checks": [
+      {
+        "check": "runner status",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "expectations",
+        "passed": true,
+        "detail": "5 passed"
+      },
+      {
+        "check": "master frame count = frames.json",
+        "passed": true,
+        "detail": "269 / 269"
+      },
+      {
+        "check": "every editor size fits the canvas",
+        "passed": true,
+        "detail": "[(1448, 986), (1448, 1050)]"
+      },
+      {
+        "check": "encoder exit (libvpx-vp9)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no blank frames",
+        "passed": true,
+        "detail": "0 blank"
+      },
+      {
+        "check": "no frozen run longer than the longest declared hold + 1 s",
+        "passed": true,
+        "detail": "longest unchanged run 1.60 s"
+      },
+      {
+        "check": "webm frames = master",
+        "passed": true,
+        "detail": "269"
+      },
+      {
+        "check": "webm size",
+        "passed": true,
+        "detail": "1600x1160"
+      },
+      {
+        "check": "mp4 frames = master",
+        "passed": true,
+        "detail": "269"
+      },
+      {
+        "check": "mp4 size",
+        "passed": true,
+        "detail": "1600x1160"
+      },
+      {
+        "check": "duration 6-15 s (one clip) or declared",
+        "passed": true,
+        "detail": "8.97 s"
+      },
+      {
+        "check": "poster not blank",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "approved baseline",
+        "passed": true,
+        "detail": "none yet: first capture (to be approved)"
+      }
+    ]
+  },
+  "approved": false
+}

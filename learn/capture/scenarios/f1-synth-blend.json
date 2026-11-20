@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.learn.scenario",
+  "id": "osp.scene.f1-synth-blend",
+  "product": "osp",
+  "title": "Blend in SYNTH",
+  "guides": [
+    "osp.guide.synth.blend"
+  ],
+  "learn": {
+    "lessons": [],
+    "steps": []
+  },
+  "editor": {
+    "width": 1448,
+    "scale": 2,
+    "look": "ceramic"
+  },
+  "fps": 30,
+  "maxSeconds": 15.0,
+  "start": {
+    "state": "one layer (bowed), a note held",
+    "input": false,
+    "setup": [
+      {
+        "do": "addLayers",
+        "sounds": [
+          "bowed"
+        ]
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          48
+        ],
+        "velocity": 90
+      },
+      {
+        "do": "settle",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "steps": [
+    {
+      "mark": "open-synth",
+      "do": [
+        {
+          "do": "hold",
+          "seconds": 0.6
+        },
+        {
+          "do": "click",
+          "target": "synth:A.label",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "target": "synthpage:A.page"
+        }
+      ]
+    },
+    {
+      "mark": "amount",
+      "do": [
+        {
+          "do": "highlight",
+          "target": "param:layerA.synthesize"
+        },
+        {
+          "do": "drag",
+          "target": "param:layerA.synthesize",
+          "dy": -110,
+          "seconds": 1.0
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "param": "layerA.synthesize",
+          "min": 30
+        }
+      ]
+    },
+    {
+      "mark": "wave",
+      "do": [
+        {
+          "do": "click",
+          "target": "synthpage:A.wave#2/4",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "layerA.synth.wave",
+          "equals": "Triangle"
+        }
+      ]
+    },
+    {
+      "mark": "octave",
+      "do": [
+        {
+          "do": "click",
+          "target": "synthpage:A.octave#1/4",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 0.8
+        }
+      ],
+      "expect": [
+        {
+          "param": "layerA.synth.octave",
+          "equals": -1
+        }
+      ]
+    },
+    {
+      "mark": "shape",
+      "do": [
+        {
+          "do": "click",
+          "target": "synthpage:A.shape#0/2",
+          "highlight": true
+        },
+        {
+          "do": "highlight",
+          "target": ""
+        },
+        {
+          "do": "hold",
+          "seconds": 1.2
+        }
+      ],
+      "expect": [
+        {
+          "paramText": "layerA.synth.shape",
+          "equals": "Held"
+        }
+      ]
+    }
+  ],
+  "frame": {
+    "focus": [
+      "card:A.card"
+    ],
+    "context": 0.03,
+    "aspect": "auto"
+  },
+  "outputs": [
+    "webm",
+    "mp4",
+    "poster"
+  ],
+  "dependsOn": {
+    "targets": [],
+    "parameters": [
+      "layerA.synthesize",
+      "layerA.synth.wave",
+      "layerA.synth.octave",
+      "layerA.synth.shape"
+    ],
+    "sources": [
+      "shared/andor-ui/Source/EqEditor.cpp",
+      "shared/andor-ui/Source/EngineCard.cpp"
+    ]
+  },
+  "disclosures": [
+    "Held notes are sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+  ]
+}
