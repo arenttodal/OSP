@@ -15,6 +15,12 @@
 >   where no handler is set (it did nothing in shell products).
 > - **Confirmations:** removing a layer or the generator's recording asks once more (a sub-menu,
 >   as OSP's source menus). **Shortcuts** are shown on Undo / Redo.
+> - **The main menu right-aligns to its key**, as OSP's (it opened rightwards, off the plugin),
+>   at every interface scale (the key stays the menu's target, so JUCE scales it).
+> - **Tests under a bare X server:** the shell test main creates the window-manager atoms JUCE
+>   looks up only if they exist, on a connection kept open (Xvfb would reset them otherwise), so a
+>   product's real-window tests (ANALOG's menu geometry at 100 / 150 / 200 %) run after any other.
+>   OSP's own `[menu-visual]` test still needs `xvfb-run -s -noreset` when run after other tests.
 > - **USER MACROS:** turning a control the chosen macro moves keeps its ranges shown (OSP's
 >   `UserMacroController` did; the shell's own glue cleared them).
 > - Products without factory presets or USER MACROS see no change. ANDOR OSP's editor is not
