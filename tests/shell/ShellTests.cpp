@@ -292,6 +292,12 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
             CHECK (ranged->getVersionHint() == andor::shell::productInfo().strumParameterHint);
             line = line.replace (" v" + juce::String (ranged->getVersionHint()) + " ", " v" + juce::String (andor::shell::ProductInfo {}.strumParameterHint) + " ");
         }
+        if (id == "arp.custom")
+        {
+            // CUSTOM's too (ProductInfo::customPatternParameterHint; ANDOR ANALOG's 41).
+            CHECK (ranged->getVersionHint() == andor::shell::productInfo().customPatternParameterHint);
+            line = line.replace (" v" + juce::String (ranged->getVersionHint()) + " ", " v" + juce::String (andor::shell::ProductInfo {}.customPatternParameterHint) + " ");
+        }
         const bool isOwn = line.startsWith (prefix);
         // ANDOR OSP's parameters added after products shipped (the MOD WHEEL's vibrato.*, then
         // STRUM: arp.strum.* and a per-card product's <slug>.arp.cardB|C.strum.*, then CUSTOM:
