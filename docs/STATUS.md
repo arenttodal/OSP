@@ -25,6 +25,51 @@
 >   `docs/OSP_PARITY_AUDIT.md`, section 5). Custom ARP reaches ANALOG with its pin once the
 >   Custom Pattern work is approved (R2).
 
+> **19 Nov 2026, Custom ARP CP3 + CP4 (branch `claude/custom-arp`; `docs/research/custom-arp/04-cp3-cp4.md`):**
+> make, edit and keep custom patterns, in ANDOR OSP and every ANDOR shell product (ANALOG).
+> - **Make:** RECORD from the keys or the host. The capture is taken before the arpeggiator,
+>   which steps aside while armed, so there is no feedback, and comes back on stop. Or IMPORT
+>   MIDI: tracks, channels, tempo and PPQ are kept, the file is parsed off the audio thread,
+>   and you pick a part. Or start from one of nine factory patterns.
+> - **Edit:** the compact Custom Pattern editor keeps the take (RECORDED) separate from the
+>   pattern (PATTERN: relative ranks on the step grid).
+>   - SPLIT / MERGE / EXTEND / REST / DELETE keep the length; + / - STEP and LENGTH change it.
+>   - REVERSE / MIRROR / ROTATE, plus drag to change a note's rank.
+>   - STEPS or a 1/2, 1/4, 1/8 grid; CONTOUR or DEGREES.
+>   - Every action is one undo step.
+>   - PREVIEW plays it on the card; CANCEL restores the card exactly; USE PATTERN keeps it.
+> - **ARP list:** ends with `Custom: <name>`, `Create Pattern...` and `Custom Patterns...`. The
+>   card is A when linked, else the card being edited.
+> - **Keep:** each card's whole document is embedded in the session, presets and portable
+>   instruments (`<CustomPatterns>`). A missing library file never breaks a session; a state
+>   without patterns clears them.
+> - **Library:** `~/Documents/ANDOR/Patterns/*.andorpattern` (schema 1, shared by the
+>   products), with Save / Rename / Duplicate / Delete / Load. Factory patterns are protected.
+> - **NEXT:**
+>   - pattern packs (library patterns shipped on their own; pack presets already carry theirs);
+>   - drawing and editing per-event velocity (CP6);
+>   - host tests in real DAWs and listening with real takes;
+>   - running the shell `[arp-custom]` test in ANDOR ANALOG. ANALOG's own
+>     `AnalogProductTests.cpp` must first follow the Shared FX move (it still names
+>     `andor::analog::FxRoutingView`, `fxRackShown` and `fxpresets`), and its OSP pin must follow
+>     this branch. Every shared source and the shell test already compile for ANALOG here.
+
+> **19 Nov 2026, Custom ARP CP2 (branch `claude/custom-arp`; `docs/research/custom-arp/03-cp2.md`):**
+> recorded patterns play inside the one arpeggiator, in ANDOR OSP and the ANDOR shell (ANALOG).
+> - **Mapping:** the approved hybrid as **CONTOUR**; degree-cycle as **DEGREES**. The engine
+>   picks exactly the lab's notes.
+> - **Rhythm:** variable-duration events in exact ticks (960 per step), including rests, splits
+>   and merges. Subdivisions keep their place in the swung step, and GATE is a share of each
+>   event's duration. The engine plays the lab's rhythmSequence to the sample.
+> - **Parameters:** CUSTOM per card (`arp.custom`, `arp.cardB|C.custom`, hint 36), off by
+>   default. CUSTOM on without a pattern plays the selected style unchanged.
+> - **Hand-over:** each card's pattern reaches the audio thread lock-free
+>   (`CustomPatternExchange`, `InstrumentHost::setCustomArpPattern`).
+> - **Renderer:** custom patterns render headlessly (`research/configs/custom-*.json`).
+> - The 18-style golden is unchanged; STRUM does not apply to custom patterns.
+> - **NEXT:** CP3 (the CUSTOM row, Create Pattern, recording, import, the editor) and CP4
+>   (patterns saved in sessions and presets, the library).
+
 > **18 Nov 2026, ARP STRUM (branch `claude/arp-strum`; `docs/research/arp-strum/`):** a CHORD
 > step's notes one after another, inside the one arpeggiator.
 > - **Engine:** a bounded pending note-on queue; UP / DOWN / RANDOM / ALTERNATE; FREE ms or

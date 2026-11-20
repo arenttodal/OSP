@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "description": "Sixteenths and thirty-seconds at ARP RATE 1/8 (a step is an eighth: halves are sixteenths, quarters thirty-seconds). Render with --fixture chords; compare with custom-off-reference (UP, the same rate) and baselines A/B with the same arp block.",
+  "arp": {
+    "enabled": true,
+    "transport": true,
+    "pattern": "up",
+    "rate": "1/8",
+    "gate": 0.75,
+    "octaves": 2,
+    "bpm": 108,
+    "swing": 0.0,
+    "custom": {
+      "mapping": "contour",
+      "events": [
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.25
+        ],
+        [
+          2,
+          0.25
+        ],
+        [
+          3,
+          0.5
+        ],
+        [
+          2,
+          0.5
+        ],
+        [
+          1,
+          0.25
+        ],
+        [
+          0,
+          0.25
+        ],
+        [
+          1,
+          0.5
+        ]
+      ]
+    }
+  }
+}

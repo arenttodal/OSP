@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "description": "The reference for the custom-* configs: UP at 1/16 over 2 octaves, 108 BPM. Render with --fixture chords.",
+  "arp": {
+    "enabled": true,
+    "transport": true,
+    "pattern": "up",
+    "rate": "1/16",
+    "gate": 0.75,
+    "octaves": 2,
+    "bpm": 108
+  }
+}

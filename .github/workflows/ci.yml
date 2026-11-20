@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
   workflow_dispatch:   # on-demand test builds after [skip ci] pushes
+    inputs:
+      macos_runner:
+        description: "macOS runner (the build is universal on either; Intel when Apple-silicon runners are short)"
+        type: choice
+        options: [macos-15, macos-15-intel]
+        default: macos-15
 
 jobs:
   build-test:
@@ -13,7 +19,10 @@ jobs:
         # macOS only (the target platform; Linux and Windows runs were dropped to save CI
         # time). The Linux steps below stay for a local or on-demand Linux job.
         include:
-          - os: macos-15          # Apple Silicon: primary target (macos-14 is retired on 2 Nov 2026)
+          # Apple Silicon: primary target (macos-14 is retired on 2 Nov 2026). A manual run can
+          # choose the Intel image when GitHub cannot acquire an Apple-silicon runner ("The job
+          # was not acquired by Runner of type hosted"); the build is universal either way.
+          - os: ${{ inputs.macos_runner || 'macos-15' }}
             plugin: ON
     runs-on: ${{ matrix.os }}
     steps:

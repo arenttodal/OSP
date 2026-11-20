@@ -24,6 +24,7 @@
 #include "research/PhraseFixtures.h"
 #include "research/RenderMetrics.h"
 #include "research/PedalLoopLab.h"
+#include "research/ArpPatternLab.h"
 #include "research/PedalReimaginedLab.h"
 #include "research/RenderSession.h"
 #include "research/SourceAnalysis.h"
@@ -143,6 +144,12 @@ BENCHMARK
         Pedal Loop 1.0: renders and measures the matrix (stand-ins, then the recordings) into <dir>.
   --pedal-reimagined-lab <dir> [--recordings <a.wav,b.wav>] [--no-audio] [--bench yes] [--only-recordings yes]
         PEDAL LOOP x REIMAGINED: A/B/C/D per REIMAGINED mode, Forward and Ping-Pong, into <dir>.
+
+CUSTOM ARP PATTERNS (CP1; docs/research/custom-arp)
+  --arp-lab <dir> [--no-audio]
+        The reference gestures (fixtures/*.mid), each over 1 to 6 held notes and 1 to 4 octaves for
+        every mapping (report.md), the listening progression per mapping (midi/), and renders
+        through baseline A with a synthetic pluck (audio/).
 
   --help, --version
 
@@ -1551,6 +1558,15 @@ int commandPhraseFixtures (const Args& args)
     return exitOk;
 }
 
+int commandArpLab (const Args& args)
+{
+    const fs::path out = args.get ("--arp-lab");
+    const auto result = research::arplab::runArpPatternLab (out, ! args.has ("--no-audio"));
+    std::ofstream (out / "report.md") << result.markdown;
+    std::cout << "arp lab: " << result.midiFiles << " MIDI files, " << result.audioFiles << " renders -> " << out.string() << "\n";
+    return result.midiFiles > 0 ? exitOk : exitProcessing;
+}
+
 int commandPedalLoopLab (const Args& args)
 {
     // Pedal Loop 1.0 (docs/research/pedal-loop): the stand-ins, then any recordings given.
@@ -1696,6 +1712,8 @@ int main (int argc, char** argv)
             return commandBenchmark (args);
         if (args.has ("--pedal-loop-lab"))
             return commandPedalLoopLab (args);
+        if (args.has ("--arp-lab"))
+            return commandArpLab (args);
         if (args.has ("--pedal-reimagined-lab"))
             return commandPedalReimaginedLab (args);
         if (args.has ("--unified"))

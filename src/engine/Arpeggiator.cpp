@@ -173,7 +173,7 @@ void Arpeggiator::beginBlock (const Settings& s, const HostTiming& timing, int n
         pendingOctaves = next.octaves;
         next.octaves = settings.octaves;
     }
-    if (next.pattern != settings.pattern || next.octaves != settings.octaves)
+    if (next.pattern != settings.pattern || next.octaves != settings.octaves || next.custom != settings.custom)
         sequenceDirty = true;
     const bool wantEnabled = next.enabled;
     next.enabled = enabled;
@@ -225,8 +225,11 @@ void Arpeggiator::beginBlock (const Settings& s, const HostTiming& timing, int n
     else if (! modulated && modClock)
         leaveModulatedClock();
 
-    // STRUM off, or a pattern without chords: nothing strummed is left waiting.
-    if (! strumApplies())
+    // STRUM off, or a pattern without chords (and no custom pattern, whose subdivisions also
+    // wait there): nothing is left waiting.
+    if (! running)
+        applyPendingCustom();
+    if (! strumApplies() && ! customActive())
         clearPending();
 
     if (wantEnabled != enabled)
@@ -440,6 +443,18 @@ void Arpeggiator::ensureSequence() const noexcept
             if (note <= 127)
                 base[static_cast<std::size_t> (n++)] = { static_cast<std::uint8_t> (note), h.velocity, h.channel };
         }
+
+    if (settings.custom && customLoaded)
+    {
+        // The custom pattern's pool: the held notes ascending (whatever the selected style).
+        std::array<arp::PoolNote, maxHeld> ascending;
+        for (int i = 0; i < sortedCount; ++i)
+        {
+            const auto& h = heldNotes[static_cast<std::size_t> (sortedIndex[static_cast<std::size_t> (i)])];
+            ascending[static_cast<std::size_t> (i)] = { h.note, h.velocity, h.channel };
+        }
+        arp::planCustomPool (ascending.data(), sortedCount, settings.octaves, customCurrent.maxRank, customPool);
+    }
 
     sequenceLength = 0;
     auto push = [this] (const Step& s) {
@@ -664,6 +679,15 @@ void Arpeggiator::leaveModulatedClock() noexcept
 
 bool Arpeggiator::atCycleStart() const noexcept
 {
+    if (customActive())
+    {
+        // A loop boundary of the pattern falls inside this step.
+        const auto length = static_cast<std::int64_t> (customCurrent.lengthTicks());
+        if (length <= 0)
+            return true;
+        const std::int64_t r = (patternStep (stepCount) * arp::ticksPerStep) % length;
+        return r == 0 || r + arp::ticksPerStep > length;
+    }
     ensureSequence();
     if (sequenceLength == 0)
         return true;
@@ -812,6 +836,8 @@ void Arpeggiator::fireStep (std::int64_t time) noexcept
         modPhase = (static_cast<double> (time) - lastStepExact) / stepSamples();
         modPhaseTime = static_cast<double> (time);
     }
+    // A new custom pattern takes over here (the phase kept).
+    applyPendingCustom();
     // OCTAVES by modulation: at the start of a cycle, and the new cycle from the beginning.
     if (pendingOctaves > 0 && atCycleStart())
     {
@@ -819,6 +845,12 @@ void Arpeggiator::fireStep (std::int64_t time) noexcept
         pendingOctaves = 0;
         sequenceDirty = true;
         cycleOrigin = stepCount;
+    }
+
+    if (customActive())
+    {
+        fireCustomStep (time);
+        return;
     }
 
     std::array<Step, maxHeld> notes;
@@ -897,6 +929,125 @@ void Arpeggiator::fireStep (std::int64_t time) noexcept
     history[static_cast<std::size_t> (stepCount % displaySteps)] = count > 0 ? std::array<std::int8_t, 2> { static_cast<std::int8_t> (low), static_cast<std::int8_t> (high) }
                                                                               : std::array<std::int8_t, 2> { -1, -1 };
     previousIndex = index;
+    ++stepCount;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The custom pattern
+
+void Arpeggiator::setCustomPattern (const arp::CustomPattern& pattern) noexcept
+{
+    customNext = pattern;
+    customNextValid = pattern.valid();
+    customPending = true;
+    if (! running)
+        applyPendingCustom();
+}
+
+void Arpeggiator::clearCustomPattern() noexcept
+{
+    customNextValid = false;
+    customPending = true;
+    if (! running)
+        applyPendingCustom();
+}
+
+void Arpeggiator::applyPendingCustom() noexcept
+{
+    if (! customPending)
+        return;
+    customPending = false;
+    customLoaded = customNextValid;
+    if (customLoaded)
+        customCurrent = customNext;
+    sequenceDirty = true;
+}
+
+int Arpeggiator::customStepNotes (std::int64_t step, std::array<CustomNote, maxHeld>& out) const noexcept
+{
+    ensureSequence();
+    const auto length = static_cast<std::int64_t> (customCurrent.lengthTicks());
+    if (length <= 0 || sortedCount == 0 || step < 0)
+        return 0;
+    const std::int64_t windowStart = step * arp::ticksPerStep;
+    const std::int64_t windowEnd = windowStart + arp::ticksPerStep;
+    int n = 0;
+    // The cycles overlapping the step (several when the pattern is shorter than a step).
+    for (std::int64_t cycle = windowStart / length; cycle * length < windowEnd && n < maxHeld; ++cycle)
+    {
+        std::int64_t t = cycle * length;
+        for (int i = 0; i < customCurrent.count && n < maxHeld; ++i)
+        {
+            const auto& e = customCurrent.events[static_cast<std::size_t> (i)];
+            const std::int64_t onset = t;
+            t += e.duration;
+            if (onset < windowStart)
+                continue;
+            if (onset >= windowEnd)
+                break;
+            if (e.rest)
+                continue;   // a rest advances time and plays nothing (no repeat of the last note)
+            const auto p = arp::customNote (customPool, customCurrent.mapping, e.rank, customCurrent.maxRank, cycle);
+            if (p.note > 127)
+                continue;
+            // The held key it comes from (an octave copy of it): released, its waiting notes go.
+            int source = p.note;
+            for (int k = 0; k < sortedCount; ++k)
+            {
+                const int h = heldNotes[static_cast<std::size_t> (sortedIndex[static_cast<std::size_t> (k)])].note;
+                if (h <= p.note && (p.note - h) % 12 == 0)
+                    source = h;   // ascending: the highest one at or below wins
+            }
+            auto& c = out[static_cast<std::size_t> (n++)];
+            c.step = { p.note, e.velocity > 0 ? e.velocity : p.velocity, p.channel };
+            c.offset = static_cast<int> (onset - windowStart);
+            c.duration = e.duration;
+            c.source = static_cast<std::uint8_t> (source);
+        }
+    }
+    return n;
+}
+
+void Arpeggiator::fireCustomStep (std::int64_t time) noexcept
+{
+    std::array<CustomNote, maxHeld> notes;
+    const int count = customStepNotes (patternStep (stepCount), notes);
+    clearPending();   // (none should be left; a step never inherits the last one's)
+
+    // A subdivision keeps its place inside its step as played: the step's length at the
+    // current speed, stretched or shortened by SWING's change to the next step (so splitting an
+    // event never swings it on its own). The gate is a share of the event's own duration.
+    const std::int64_t k = synced && ! modClock ? gridIndex : stepCount;
+    const double step = stepSamples() / rateMultiplier;
+    const double room = step * (1.0 + swingSteps (k + 1) - swingSteps (k));
+    int low = 128, high = -1;
+    for (int i = 0; i < count; ++i)
+    {
+        const auto& c = notes[static_cast<std::size_t> (i)];
+        auto s = c.step;
+        const int velocity = settings.velocityScale == 1.0 ? static_cast<int> (s.velocity)
+                                                           : static_cast<int> (std::lround (settings.velocityScale * s.velocity));
+        s.velocity = static_cast<std::uint8_t> (std::clamp (velocity, 1, 127));
+        const auto gateSamples = std::max<std::int64_t> (1, std::llround (settings.gate * step * c.duration / arp::ticksPerStep));
+        low = std::min (low, static_cast<int> (s.note));
+        high = std::max (high, static_cast<int> (s.note));
+        const auto at = time + std::llround (room * c.offset / arp::ticksPerStep);
+        if (c.offset == 0 || at <= time)
+        {
+            playNote (time, s, gateSamples);
+            continue;
+        }
+        auto& p = pending[static_cast<std::size_t> (pendingCount++)];
+        p.time = at;
+        p.gate = gateSamples;
+        p.note = s.note;
+        p.velocity = s.velocity;
+        p.channel = s.channel;
+        p.source = c.source;
+    }
+    history[static_cast<std::size_t> (stepCount % displaySteps)] = count > 0 ? std::array<std::int8_t, 2> { static_cast<std::int8_t> (low), static_cast<std::int8_t> (high) }
+                                                                              : std::array<std::int8_t, 2> { -1, -1 };
+    previousIndex = -1;
     ++stepCount;
 }
 
@@ -1034,6 +1185,23 @@ void Arpeggiator::display (Display& out) const noexcept
             const auto& h = history[static_cast<std::size_t> (s % displaySteps)];
             out.low[static_cast<std::size_t> (j)] = h[0];
             out.high[static_cast<std::size_t> (j)] = h[1];
+            continue;
+        }
+        if (customActive())
+        {
+            std::array<CustomNote, maxHeld> custom;
+            const int n = customStepNotes (patternStep (s), custom);
+            int low = 127, high = 0;
+            for (int i = 0; i < n; ++i)
+            {
+                low = std::min (low, static_cast<int> (custom[static_cast<std::size_t> (i)].step.note));
+                high = std::max (high, static_cast<int> (custom[static_cast<std::size_t> (i)].step.note));
+            }
+            if (n > 0)
+            {
+                out.low[static_cast<std::size_t> (j)] = static_cast<std::int8_t> (low);
+                out.high[static_cast<std::size_t> (j)] = static_cast<std::int8_t> (high);
+            }
             continue;
         }
         int index = -1;

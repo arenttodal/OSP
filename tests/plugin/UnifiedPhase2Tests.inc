@@ -199,9 +199,11 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
         expected.add (id);
     for (int m = 1; m <= 6; ++m)   // (version 34: USER MACROS)
         expected.add ("userMacro." + juce::String (m));
-    for (const char* card : { "arp.strum.", "arp.cardB.strum.", "arp.cardC.strum." })   // (version 35, last: STRUM)
+    for (const char* card : { "arp.strum.", "arp.cardB.strum.", "arp.cardC.strum." })   // (version 35: STRUM)
         for (const char* field : { "on", "direction", "sync", "ms", "division" })
             expected.add (juce::String (card) + field);
+    for (const char* id : { "arp.custom", "arp.cardB.custom", "arp.cardC.custom" })   // (version 36, last: CUSTOM)
+        expected.add (id);
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)
     {

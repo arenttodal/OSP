@@ -8,6 +8,7 @@
 #include "engine/InstrumentEngine.h"
 #include "engine/KeyDna.h"
 #include "engine/Modulation.h"
+#include "engine/PatternCapture.h"
 #include "engine/RhythmicShaper.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -583,9 +584,15 @@ public:
     static void addStrumParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns, int hint, int cards = 3);
     static const juce::StringArray& strumDirectionNames();
     static const juce::StringArray& strumDivisionNames();
-    /** Reads one card's STRUM parameters on the audio thread (attach on the message thread). */
+    /** CUSTOM per card (arp.custom, and B's and C's with `cards` 3), appended with `hint`
+        (ANDOR OSP 36; a shell product after STRUM). Off by default: every session as it was.
+        Which pattern each card plays is not a parameter (setCustomArpPattern). */
+    static void addCustomPatternParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns, int hint, int cards = 3);
+    /** Reads one card's STRUM and CUSTOM parameters on the audio thread (attach on the message
+        thread). */
     struct StrumReader
     {
+        std::atomic<float>* custom = nullptr;
         std::atomic<float>* on = nullptr;
         std::atomic<float>* direction = nullptr;
         std::atomic<float>* sync = nullptr;
@@ -597,6 +604,26 @@ public:
     };
     /** The card (shown, 0 A .. 2 C) whose lane arpView() shows (the one the panel edits). */
     virtual void setArpViewCard (int shown) noexcept { juce::ignoreUnused (shown); }
+    /** The custom pattern card 0 A .. 2 C plays while its CUSTOM is on (message thread; nullptr
+        clears it). It reaches the audio thread lock-free and takes over at the lane's next step. */
+    virtual void setCustomArpPattern (int card, const arp::CustomPattern* pattern) { juce::ignoreUnused (card, pattern); }
+    /** The pattern last set for the card (message thread; nullptr: none). */
+    virtual const arp::CustomPattern* customArpPattern (int card) const { juce::ignoreUnused (card); return nullptr; }
+    /** Recording a Custom ARP pattern (null: the product cannot): the message thread starts, polls
+        and stops it; the processor feeds it the notes played before the arpeggiator. While it is
+        armed the arpeggiator steps aside (the keys sound as played, every lane), and takes over
+        again when the take stops or is cancelled. */
+    virtual PatternCapture* patternCapture() noexcept { return nullptr; }
+    /** The pattern document card 0 A .. 2 C plays (message thread): kept with the session and
+        presets (customPatternsToXml), compiled and handed to the audio thread (setCustomArpPattern).
+        nullptr clears it. The same in every product. */
+    void setCustomArpDocument (int card, const arppattern::Document* document);
+    const arppattern::Document* customArpDocument (int card) const;
+    /** The cards' documents in a session's state (<CustomPatterns>; null when no card has one). */
+    std::unique_ptr<juce::XmlElement> customPatternsToXml() const;
+    /** From a session's state: absent (an older session), every card has none. An unreadable
+        document is skipped (its card has none) and reported in the return value. */
+    juce::StringArray customPatternsFromXml (const juce::XmlElement* element);
 
     // -- Live capture (a product opts in: ANDOR OSP) -----------------------------------------
     /** What the CAPTURE page shows (message thread). */
@@ -749,6 +776,9 @@ protected:
     /** rackPresetMemory's (a host that saves it with the session reads and writes these). */
     mutable juce::CriticalSection rackMemoryLock;
     juce::StringPairArray rackMemory;
+
+private:
+    std::array<std::optional<arppattern::Document>, 3> customDocuments;   ///< message thread
 };
 
 } // namespace osp::plugin

@@ -1,4 +1,8 @@
 #include "ArpSection.h"
+
+#include "CustomPatternEditor.h"
+#include "io/ArpPatternJson.h"
+#include "model/ArpFactoryPatterns.h"
 #include "ShapingPopups.h"
 #include "AndorParameters.h"
 #include "Binding.h"
@@ -634,9 +638,20 @@ void ArpInlinePanel::updatePreview()
 void ArpInlinePanel::updateField()
 {
     // The picture: the style itself on four notes over one octave, so every shape reads.
-    const int want = hoverRow >= 0 ? listOrder()[static_cast<std::size_t> (hoverRow)] : pattern;
+    // (-2: the card's custom pattern, hovered or chosen; the action rows keep the current picture)
+    int want = customOn ? -2 : pattern;
+    if (hoverRow >= 0 && hoverRow < arp::patternCount)
+        want = listOrder()[static_cast<std::size_t> (hoverRow)];
+    else if (hoverRow == arp::patternCount)
+        want = -2;
     if (want == fieldShown)
         return;
+    if (want == -2)
+    {
+        fieldShown = want;
+        repaint (field.getSmallestIntegerContainer().expanded (2));
+        return;
+    }
     fieldShown = want;
     Arpeggiator demo;
     demo.prepare (48000.0);
@@ -654,6 +669,21 @@ void ArpInlinePanel::updateField()
 
 void ArpInlinePanel::refresh()
 {
+    {
+        // The card's CUSTOM and its pattern's name (no attachment: one card's at a time).
+        const bool on = ospProcessor.parameterValue (ids::arpCustom (ospProcessor.cardArpNamespace(), customCard())) >= 0.5f;
+        const auto* d = ospProcessor.customArpDocument (customCard());
+        const juce::String nameNow = d != nullptr ? juce::String (d->name) : juce::String();
+        if (on != customOn || nameNow != customName)
+        {
+            customOn = on;
+            customName = nameNow;
+            fieldShown = -1;
+            updateField();
+            revealSelected();
+            repaint (list.getUnion (field).getSmallestIntegerContainer().expanded (3));
+        }
+    }
     if (satellite != nullptr)
         satellite->refresh();
     if (strum != nullptr)
@@ -739,12 +769,97 @@ int ArpInlinePanel::rowAt (juce::Point<float> p) const
     if (! list.contains (p) || p.x > list.getRight() - 8.0f)
         return -1;
     const int row = firstRow + static_cast<int> ((p.y - list.getY()) / listRowHeight);
-    return row >= 0 && row < arp::patternCount ? row : -1;
+    return row >= 0 && row < listRows ? row : -1;
+}
+
+juce::Rectangle<float> ArpInlinePanel::customRowArea (int which) const
+{
+    const int row = arp::patternCount + juce::jlimit (0, customRows - 1, which) - firstRow;
+    if (row < 0 || row >= visibleRows)
+        return {};
+    return { list.getX(), list.getY() + listRowHeight * static_cast<float> (row), list.getWidth() - 8.0f, listRowHeight };
+}
+
+void ArpInlinePanel::setCustom (bool on)
+{
+    if (auto* p = ospProcessor.apvts().getParameter (ids::arpCustom (ospProcessor.cardArpNamespace(), customCard())); p != nullptr && (p->getValue() >= 0.5f) != on)
+    {
+        ospProcessor.undo().beginNewTransaction ("Custom pattern");
+        p->beginChangeGesture();
+        p->setValueNotifyingHost (on ? 1.0f : 0.0f);
+        p->endChangeGesture();
+    }
+    refresh();
+}
+
+void ArpInlinePanel::chooseCustom()
+{
+    if (ospProcessor.customArpDocument (customCard()) == nullptr)
+    {
+        openCustomEditor (true);
+        return;
+    }
+    setCustom (true);
+}
+
+void ArpInlinePanel::openCustomEditor (bool fresh)
+{
+    auto* owner = findParentComponentOfClass<AnchoredPopoverHost>();
+    if (owner == nullptr)
+        return;
+    owner->openAnchoredPopover (std::make_unique<CustomPatternEditor> (ospProcessor, customCard(), fresh), *this);
+}
+
+void ArpInlinePanel::openLibraryMenu()
+{
+    // Loads a pattern straight onto the card (CUSTOM on); the editor offers the same list.
+    juce::PopupMenu menu, factory, yours;
+    std::vector<arppattern::Document> entries;
+    for (const auto& d : arppattern::factoryPatterns())
+    {
+        entries.push_back (d);
+        factory.addItem (static_cast<int> (entries.size()), juce::String (d.name));
+    }
+    auto files = CustomPatternEditor::libraryFolder().findChildFiles (juce::File::findFiles, false, juce::String ("*") + arpPatternExtension);
+    files.sort();
+    for (const auto& f : files)
+    {
+        std::string error;
+        if (auto d = readArpPattern (f.getFullPathName().toStdString(), error))
+        {
+            entries.push_back (*d);
+            yours.addItem (static_cast<int> (entries.size()), f.getFileNameWithoutExtension());
+        }
+    }
+    menu.addSectionHeader ("CARD " + InstrumentHost::shownLayerName (customCard()));
+    menu.addSubMenu ("Factory patterns", factory);
+    menu.addSubMenu ("Your patterns", yours, yours.getNumItems() > 0);
+    menu.addSeparator();
+    constexpr int editId = 9001, createId = 9002;
+    menu.addItem (editId, "Edit Pattern...", ospProcessor.customArpDocument (customCard()) != nullptr);
+    menu.addItem (createId, "Create Pattern...");
+    juce::Component::SafePointer<ArpInlinePanel> safe (this);
+    const int card = customCard();
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (list.getSmallestIntegerContainer())),
+                        [safe, entries, card] (int result) {
+                            if (safe == nullptr || result <= 0)
+                                return;
+                            if (result == editId || result == createId)
+                            {
+                                safe->openCustomEditor (result == createId);
+                                return;
+                            }
+                            if (result <= static_cast<int> (entries.size()))
+                            {
+                                safe->ospProcessor.setCustomArpDocument (card, &entries[static_cast<std::size_t> (result - 1)]);
+                                safe->setCustom (true);
+                            }
+                        });
 }
 
 void ArpInlinePanel::scrollTo (int first)
 {
-    const int next = juce::jlimit (0, arp::patternCount - visibleRows, first);
+    const int next = juce::jlimit (0, listRows - visibleRows, first);
     if (next != firstRow)
     {
         firstRow = next;
@@ -756,7 +871,7 @@ void ArpInlinePanel::revealSelected()
 {
     // The chosen style stays in view (it may change from automation or a preset).
     const auto& order = listOrder();
-    const int row = static_cast<int> (std::distance (order.begin(), std::find (order.begin(), order.end(), pattern)));
+    const int row = customOn ? arp::patternCount : static_cast<int> (std::distance (order.begin(), std::find (order.begin(), order.end(), pattern)));
     if (row < firstRow)
         scrollTo (row);
     else if (row >= firstRow + visibleRows)
@@ -765,6 +880,9 @@ void ArpInlinePanel::revealSelected()
 
 void ArpInlinePanel::choosePattern (int which)
 {
+    // A style chosen plays that style: the card's CUSTOM goes off (its pattern is kept).
+    if (customOn)
+        setCustom (false);
     const auto v = static_cast<float> (juce::jlimit (0, arp::patternCount - 1, which));
     if (editCard == 0)
         patternAttachment.setValueAsCompleteGesture (v);
@@ -924,6 +1042,11 @@ void ArpInlinePanel::paintField (juce::Graphics& g)
     for (int n : notes)
         g.fillRect (juce::Rectangle<float> (inner.getX() - 4.0f, yOf (n) - 0.5f, inner.getWidth() + 8.0f, 1.0f));
 
+    if (fieldShown == -2)
+    {
+        paintCustomField (g, inner, dim);
+        return;
+    }
     const auto ink = (fieldShown == pattern ? colour::accent : stepTan).withMultipliedAlpha (dim);
     const bool chord = fieldShown == static_cast<int> (ArpPattern::chord);
     juce::Path line;
@@ -968,11 +1091,37 @@ void ArpInlinePanel::paintList (juce::Graphics& g)
     const float dim = enabled ? 1.0f : 0.55f;
     const auto& order = listOrder();
     g.setFont (type::popupLabel (13.0f));
-    for (int row = firstRow; row < firstRow + visibleRows && row < arp::patternCount; ++row)
+    for (int row = firstRow; row < firstRow + visibleRows && row < listRows; ++row)
     {
+        if (row >= arp::patternCount)
+        {
+            // CUSTOM (the card's own pattern), then the two actions, under a hairline.
+            const int k = row - arp::patternCount;
+            const auto area = customRowArea (k);
+            if (k == 0)
+            {
+                g.setColour (colour::hairline);
+                g.fillRect (juce::Rectangle<float> (area.getX() + 6.0f, area.getY(), area.getWidth() - 12.0f, 1.0f));
+            }
+            const bool chosen = k == 0 && customOn;
+            if (chosen)
+            {
+                g.setColour (colour::accent.withAlpha (0.16f + 0.06f * dim));
+                g.fillRoundedRectangle (area.reduced (0.0f, 1.0f), 5.0f);
+            }
+            else if (row == hoverRow)
+            {
+                g.setColour (colour::text.withAlpha (0.06f));
+                g.fillRoundedRectangle (area.reduced (0.0f, 1.0f), 5.0f);
+            }
+            juce::String label = k == 0 ? (customName.isNotEmpty() ? "Custom: " + customName : juce::String ("Custom")) : (k == 1 ? "Create Pattern..." : "Custom Patterns...");
+            g.setColour ((k == 0 ? colour::text : colour::textSecondary).withAlpha ((chosen ? 0.95f : (row == hoverRow ? 0.85f : 0.66f)) * dim));
+            g.drawText (label, area.withTrimmedLeft (10.0f), juce::Justification::centredLeft, true);
+            continue;
+        }
         const int which = order[static_cast<std::size_t> (row)];
         const auto area = patternRowArea (which);
-        const bool chosen = which == pattern;
+        const bool chosen = which == pattern && ! customOn;
         if (chosen)
         {
             g.setColour (colour::accent.withAlpha (0.16f + 0.06f * dim));
@@ -990,8 +1139,8 @@ void ArpInlinePanel::paintList (juce::Graphics& g)
     const auto track = juce::Rectangle<float> (list.getRight() - 4.0f, list.getY() + 2.0f, 3.0f, list.getHeight() - 4.0f);
     g.setColour (colour::hairline.withAlpha (0.8f));
     g.fillRoundedRectangle (track, 1.5f);
-    const float share = static_cast<float> (visibleRows) / static_cast<float> (arp::patternCount);
-    const float top = static_cast<float> (firstRow) / static_cast<float> (arp::patternCount);
+    const float share = static_cast<float> (visibleRows) / static_cast<float> (listRows);
+    const float top = static_cast<float> (firstRow) / static_cast<float> (listRows);
     g.setColour (colour::textSecondary.withAlpha (0.55f * dim));
     g.fillRoundedRectangle (track.withY (track.getY() + top * track.getHeight()).withHeight (share * track.getHeight()), 1.5f);
 }
@@ -1146,6 +1295,18 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
             onOctavesMenu();
         return;
     }
+    if (const int row = rowAt (e.position); row >= arp::patternCount)
+    {
+        const int k = row - arp::patternCount;
+        if (k == 0)
+            chooseCustom();
+        else if (k == 1)
+            openCustomEditor (true);
+        else
+            openLibraryMenu();
+        report ("arp.custom.changed", ids::arpCustom (ospProcessor.cardArpNamespace(), customCard()));
+        return;
+    }
     if (const int row = rowAt (e.position); row >= 0)
     {
         choosePattern (listOrder()[static_cast<std::size_t> (row)]);
@@ -1185,6 +1346,59 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
     }
     if (collapse.contains (e.position) && onCollapse != nullptr)
         onCollapse();
+}
+
+void ArpInlinePanel::mouseDoubleClick (const juce::MouseEvent& e)
+{
+    // CUSTOM twice: its editor (the card's pattern).
+    if (rowAt (e.position) == arp::patternCount)
+        openCustomEditor (ospProcessor.customArpDocument (customCard()) == nullptr);
+}
+
+void ArpInlinePanel::paintCustomField (juce::Graphics& g, juce::Rectangle<float> inner, float dim)
+{
+    // The card's custom pattern as it is: its whole length (never stretched to 16 steps), each
+    // note on its rank, rests as gaps; its length in steps in the corner.
+    using namespace design;
+    const auto* d = ospProcessor.customArpDocument (customCard());
+    g.setFont (type::popupLabel (10.0f));
+    if (d == nullptr || d->pattern.events.empty())
+    {
+        g.setColour (colour::text.withAlpha (0.45f * dim));
+        g.drawText ("No pattern yet", inner, juce::Justification::centred, false);
+        return;
+    }
+    const auto& p = d->pattern;
+    const int length = std::max (1, p.lengthTicks());
+    const int ranks = std::max (p.maxRank, p.highestRank()) + 1;
+    auto yOf = [&] (int rank) { return inner.getBottom() - inner.getHeight() * (ranks <= 1 ? 0.5f : static_cast<float> (rank) / static_cast<float> (ranks - 1)); };
+    const auto ink = (customOn ? colour::accent : stepTan).withMultipliedAlpha (dim);
+    juce::Path line;
+    bool started = false;
+    for (int i = 0; i < static_cast<int> (p.events.size()); ++i)
+    {
+        const auto& e = p.events[static_cast<std::size_t> (i)];
+        if (e.rest)
+            continue;
+        const float x0 = inner.getX() + inner.getWidth() * static_cast<float> (p.onsetOf (i)) / static_cast<float> (length);
+        const float x1 = inner.getX() + inner.getWidth() * static_cast<float> (p.onsetOf (i) + e.duration) / static_cast<float> (length);
+        const juce::Point<float> at (x0, yOf (e.rank));
+        if (! started)
+            line.startNewSubPath (at);
+        else
+            line.lineTo (at);
+        started = true;
+        g.setColour (ink.withAlpha (0.35f * dim));
+        g.fillRoundedRectangle (juce::Rectangle<float> (x0, at.y - 1.5f, std::max (3.0f, x1 - x0 - 1.0f), 3.0f), 1.5f);
+    }
+    g.setColour (ink.withAlpha (0.5f * dim));
+    g.strokePath (line, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (ink);
+    for (int i = 0; i < static_cast<int> (p.events.size()); ++i)
+        if (const auto& e = p.events[static_cast<std::size_t> (i)]; ! e.rest)
+            g.fillEllipse (juce::Rectangle<float> (5.5f, 5.5f).withCentre ({ inner.getX() + inner.getWidth() * static_cast<float> (p.onsetOf (i)) / static_cast<float> (length), yOf (e.rank) }));
+    g.setColour (colour::text.withAlpha (0.5f * dim));
+    g.drawText (juce::String ((length + arp::ticksPerStep - 1) / arp::ticksPerStep) + " STEPS", field.reduced (6.0f, 3.0f), juce::Justification::topRight, false);
 }
 
 void ArpInlinePanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)

@@ -90,6 +90,8 @@ add_library(osp_dsp STATIC
     src/engine/EchoDelay.cpp
     src/engine/DriveProcessor.cpp
     src/engine/Arpeggiator.cpp
+    src/engine/ArpCustomPattern.cpp
+    src/engine/PatternCapture.cpp
     src/engine/Modulation.cpp
     src/engine/LayerEq.cpp
     src/engine/Dampen.cpp
@@ -102,6 +104,8 @@ add_library(osp_dsp STATIC
     src/model/RootChoice.cpp
     src/model/PlaybackPreparation.cpp
     src/model/NoteAtlas.cpp
+    src/model/ArpPatternModel.cpp
+    src/model/ArpFactoryPatterns.cpp
 )
 target_include_directories(osp_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # Linked into plugin shared objects (VST3/AU bundles).
@@ -151,6 +155,7 @@ set(OSP_IO_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/AnalysisJson.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/JsonUtil.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/NoteAtlasJson.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/io/ArpPatternJson.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/PhraseAnalysisCache.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/midi/MidiFileIO.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/library/SoundImport.cpp
@@ -204,6 +209,7 @@ add_library(osp_research STATIC
     src/research/AtlasFixtures.cpp
     src/research/PhraseFixtures.cpp
     src/research/PedalLoopLab.cpp
+    src/research/ArpPatternLab.cpp
     src/research/PedalReimaginedLab.cpp
 )
 target_include_directories(osp_research PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)

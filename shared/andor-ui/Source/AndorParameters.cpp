@@ -241,6 +241,15 @@ void InstrumentHost::addStrumParameters (juce::AudioProcessorValueTreeState::Par
     }
 }
 
+void InstrumentHost::addCustomPatternParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns, int hint, int cards)
+{
+    for (int c = 0; c < std::clamp (cards, 1, 3); ++c)
+    {
+        const auto name = c == 0 ? juce::String ("Arp Custom") : "Arp Card " + juce::String::charToString (static_cast<juce::juce_wchar> ('A' + c)) + " Custom";
+        layout.add (parameters::make<juce::AudioParameterBool> (juce::ParameterID { ids::arpCustom (ns, c), hint }, name, false));
+    }
+}
+
 void InstrumentHost::addCardArpParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& ns)
 {
     auto id = [] (const juce::String& s) { return juce::ParameterID { s, 27 }; };

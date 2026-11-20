@@ -530,6 +530,28 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
                         arpSettings.strumQuarters = arp::strumDivisionQuarters (i);
             }
         }
+        // A custom pattern: "custom": { "mapping": "contour" | "degrees", "maxRank": 2,
+        // "events": [ [rank, steps], ... ] } (rank -1: a rest; steps may be fractional, in
+        // 1/32-step units: 0.5, 0.25, 1.5 ...). Invalid: the selected pattern plays.
+        if (json::has (a, "custom"))
+        {
+            const auto& cu = a["custom"];
+            auto& p = config.arp.customPattern;
+            p = {};
+            p.mapping = juce::String (json::getString (cu, "mapping", "contour")).toLowerCase() == "degrees" ? arp::CustomMapping::degrees
+                                                                                                          : arp::CustomMapping::contour;
+            if (const auto* events = cu["events"].getArray())
+                for (const auto& e : *events)
+                    if (const auto* pair = e.getArray(); pair != nullptr && pair->size() >= 2 && p.count < arp::maxPatternEvents)
+                    {
+                        const int rank = static_cast<int> ((*pair)[0]);
+                        const auto ticks = static_cast<int> (std::llround (static_cast<double> ((*pair)[1]) * arp::ticksPerStep));
+                        p.events[static_cast<std::size_t> (p.count++)] = { static_cast<std::int16_t> (std::max (0, rank)), rank < 0, 0, ticks };
+                        p.maxRank = std::max (p.maxRank, rank);
+                    }
+            p.maxRank = std::max (p.maxRank, json::getInt (cu, "maxRank", p.maxRank));
+            arpSettings.custom = json::getBool (cu, "enabled", true) && p.valid();
+        }
     }
 
     return config;

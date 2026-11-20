@@ -13,6 +13,7 @@
 
 #include "audio/utility/TestSignals.h"
 #include "core/PitchMath.h"
+#include "io/ArpPatternJson.h"
 #include "io/AudioFileIO.h"
 
 #define CATCH_CONFIG_RUNNER
@@ -293,9 +294,10 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
         }
         const bool isOwn = line.startsWith (prefix);
         // ANDOR OSP's parameters added after products shipped (the MOD WHEEL's vibrato.*, then
-        // STRUM: arp.strum.* and a per-card product's <slug>.arp.cardB|C.strum.*) come after the
-        // product's own, so none of a product's moves; the rest of ANDOR OSP's before.
-        const bool appendedAfterProducts = id.startsWith ("vibrato.") || id.contains ("strum.");
+        // STRUM: arp.strum.* and a per-card product's <slug>.arp.cardB|C.strum.*, then CUSTOM:
+        // arp.custom and <slug>.arp.cardB|C.custom) come after the product's own, so none of a
+        // product's moves; the rest of ANDOR OSP's before.
+        const bool appendedAfterProducts = id.startsWith ("vibrato.") || id.contains ("strum.") || id == "arp.custom" || (id.contains ("arp.card") && id.endsWith (".custom"));
         orderKept = orderKept && (isOwn || ! ownStarted || appendedAfterProducts);
         if (appendedAfterProducts)
             vibratoSeen = true;
@@ -1370,4 +1372,53 @@ TEST_CASE ("shell: PITCH BEND, MOD WHEEL and ADVANCED as every product shows the
             ui.closePopup();
         }
     }
+}
+
+TEST_CASE ("shell: custom ARP patterns are saved with the state and presets; a state without them clears them", "[shell][arp-custom]")
+{
+    // The same contract as ANDOR OSP's (tests/plugin/CustomPatternStateTests.inc): each card's
+    // whole document is embedded, so the session never needs the pattern library.
+    osp::arppattern::Document d;
+    d.id = osp::newArpPatternId();
+    d.name = "Shell pattern";
+    d.capture = { { 0.0, 0.2, 60, 100 }, { 0.25, 0.2, 64, 90 }, { 0.5, 0.2, 67, 80 } };
+    d.captureBpm = 101.0;
+    d.pattern.events = { { 1, false, 960, 100 }, { 3, false, 480, 90 }, { -1, true, 480, 0 }, { 2, false, 960, 80 } };
+    d.pattern.maxRank = 3;
+    REQUIRE (d.pattern.valid());
+
+    juce::MemoryBlock saved;
+    {
+        ShellProcessor p;
+        p.setCustomArpDocument (2, &d);
+        p.getStateInformation (saved);
+        // Recording is offered exactly where the product runs the arpeggiator.
+        CHECK ((p.patternCapture() != nullptr) == p.runsArpeggiator());
+    }
+    ShellProcessor q;
+    q.setStateInformation (saved.getData(), static_cast<int> (saved.getSize()));
+    REQUIRE (q.customArpDocument (2) != nullptr);
+    CHECK (*q.customArpDocument (2) == d);
+    REQUIRE (q.customArpPattern (2) != nullptr);
+    CHECK (*q.customArpPattern (2) == osp::arppattern::compile (d.pattern));
+    CHECK (q.customArpDocument (0) == nullptr);
+
+    // A preset carries it too.
+    TempDir tmp;
+    const auto preset = tmp.dir.getChildFile ("custom");
+    REQUIRE (q.savePreset (preset));
+    ShellProcessor r;
+    REQUIRE (r.loadPreset (preset.withFileExtension (andor::shell::productInfo().presetExtension)));
+    REQUIRE (r.customArpDocument (2) != nullptr);
+    CHECK (*r.customArpDocument (2) == d);
+
+    // An older state (none written when no card has one) clears every card's.
+    juce::MemoryBlock older;
+    {
+        ShellProcessor fresh;
+        fresh.getStateInformation (older);
+    }
+    r.setStateInformation (older.getData(), static_cast<int> (older.getSize()));
+    CHECK (r.customArpDocument (2) == nullptr);
+    CHECK (r.customArpPattern (2) == nullptr);
 }

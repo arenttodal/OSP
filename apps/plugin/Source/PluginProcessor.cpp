@@ -165,6 +165,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     // STRUM (version hint 35; after USER MACROS): each card's own, off by default and in every
     // session from before, so the arpeggiator plays exactly as it did.
     addStrumParameters (layout, {}, 35);
+    // CUSTOM per card (version 36, after STRUM: nothing moves). Off: every session as it was.
+    addCustomPatternParameters (layout, {}, 36);
     return layout;
 }
 
@@ -317,6 +319,7 @@ OspAudioProcessor::OspAudioProcessor()
     userMacroOffsets.assign (static_cast<std::size_t> (liveOffsets.size()), 0.0);
     userMacroTouched.assign (static_cast<std::size_t> (liveOffsets.size()), 0);
     lanes = std::make_unique<CardArpLanes>();
+    customPatterns = std::make_unique<arp::CustomPatternExchange>();
     laneHost = std::make_unique<LaneHost> (*this);
     fxReader.attach (parameters, fxParameterPrefix(), &liveOffsets);
     attackParam = liveParameter (ids::attack);
@@ -1683,6 +1686,19 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             hostWasPlaying = transportRunning;
         }
     engine.setHostTiming (timing);
+    // New custom patterns (lock-free from the message thread): A's is the arpeggiator's own
+    // (and every linked lane's), B's and C's their lanes'. Each takes over at its next step.
+    customPatterns->collect ([this] (int card, const arp::CustomPattern* pattern) {
+        if (card == 0)
+        {
+            if (pattern != nullptr)
+                arpeggiator.setCustomPattern (*pattern);
+            else
+                arpeggiator.clearCustomPattern();
+        }
+        else
+            lanes->setCustomPattern (card, pattern);
+    });
     {
         // The on-screen wheels act like the controller's.
         const float pitch = screenPitch.load(), mod = screenMod.load();
@@ -1700,6 +1716,13 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
     }
     applyUserMacros (numSamples);   // USER MACROS: before anything reads a parameter (they move its base)
     applyParameters (false);
+    // Recording a Custom ARP pattern: the notes as played (the on-screen keyboard merged),
+    // before any arpeggiator, so its own output is never captured.
+    if (capture->armed())
+        for (const auto metadata : midi)
+            if (const auto m = metadata.getMessage(); m.isNoteOnOrOff())
+                capture->push (metadata.samplePosition, m.getNoteNumber(), m.isNoteOn() ? m.getVelocity() : 0, timing.valid ? timing.bpm : 120.0);
+    capture->advance (numSamples);
     const auto& notes = runCardArpeggiators (midi, numSamples, timing);
 
     const int outChannels = std::min (buffer.getNumChannels(), 2);
@@ -1758,7 +1781,7 @@ const juce::MidiBuffer& OspAudioProcessor::runCardArpeggiators (const juce::Midi
     // MPE (each member channel is a note) or MONO (one held-key stack) the channels cannot name
     // cards: LINK with every card, the one arpeggiator (a switch ends the lanes' notes cleanly).
     plugin::CardArpLanes::Controls c;
-    c.enabled = arpEnabledParam->load() >= 0.5f;
+    c.enabled = arpEnabledParam->load() >= 0.5f && ! capture->armed();
     c.seed = static_cast<std::uint64_t> (std::max (1.0f, seedParam->load()));
     if (! engine.isMpe() && ! engineSettings.mono)
     {
@@ -1791,7 +1814,8 @@ const juce::MidiBuffer& OspAudioProcessor::runCardArpeggiators (const juce::Midi
 Arpeggiator::Settings OspAudioProcessor::arpSettings() noexcept
 {
     Arpeggiator::Settings settings;
-    settings.enabled = arpEnabledParam->load() >= 0.5f && ! lanes->forceArpOff();
+    // (recording a Custom ARP pattern: the keys as played, the arpeggiator steps aside)
+    settings.enabled = arpEnabledParam->load() >= 0.5f && ! lanes->forceArpOff() && ! capture->armed();
     settings.pattern = static_cast<ArpPattern> (std::clamp (juce::roundToInt (arpPatternParam->load()), 0, arp::patternCount - 1));
     settings.rate = static_cast<ArpRate> (std::clamp (juce::roundToInt (arpRateParam->load()), 0, arp::rateCount - 1));
     settings.gate = arpGateParam->load() / 100.0;
@@ -3651,6 +3675,11 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
     // USER MACROS: names and assignments, only when there are some (absent: none, as before).
     if (! userMacroState.isDefault())
         stateTree.appendChild (juce::ValueTree::fromXml (*userMacroState.toXml()), nullptr);
+    // Custom ARP patterns: each card's whole document, embedded, so the session and every preset
+    // play without the pattern library (absent: no card has one, as before).
+    stateTree.removeChild (stateTree.getChildWithName ("CustomPatterns"), nullptr);
+    if (const auto patterns = customPatternsToXml())
+        stateTree.appendChild (juce::ValueTree::fromXml (*patterns), nullptr);
     return stateTree.createXml();
 }
 
@@ -3763,6 +3792,14 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
         stateTree.removeChild (userMacroTree, nullptr);
         const auto userMacroXml = userMacroTree.isValid() ? userMacroTree.createXml() : nullptr;
         setUserMacroAssignments (UserMacroState::fromXml (userMacroXml.get()));
+    }
+    // Custom ARP patterns: the saved ones, or none (a state without them clears the last's).
+    {
+        const auto patternTree = stateTree.getChildWithName ("CustomPatterns");
+        stateTree.removeChild (patternTree, nullptr);
+        const auto patternXml = patternTree.isValid() ? patternTree.createXml() : nullptr;
+        for (const auto& problem : customPatternsFromXml (patternXml.get()))
+            DBG ("State: " << problem);   // (that card has none; the rest of the state loads)
     }
     const int savedVersion = static_cast<int> (stateTree.getProperty ("stateVersion", 1));
     // LOOP's fallback for short notes: the session's, per layer. Saved before it existed: off

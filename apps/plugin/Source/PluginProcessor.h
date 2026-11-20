@@ -257,6 +257,9 @@ public:
     bool cardArpeggiator() const noexcept override { return true; }
     juce::String cardArpNamespace() const override { return {}; }
     void setArpViewCard (int shown) noexcept override { arpViewCard.store (std::clamp (shown, 0, 2), std::memory_order_relaxed); }
+    void setCustomArpPattern (int card, const arp::CustomPattern* pattern) override { customPatterns->publish (card, pattern); }
+    const arp::CustomPattern* customArpPattern (int card) const override { return customPatterns->current (card); }
+    PatternCapture* patternCapture() noexcept override { return capture.get(); }
 
     // A/B source layers (numLayers, layerName, layerParameterId: InstrumentHost). Everything
     // below that takes a `layer` acts on the layer being edited when it is -1 (the A/B tabs choose it).
@@ -808,6 +811,8 @@ private:
     bool keepTake (std::int64_t from, std::int64_t to, int layer, bool snapshot);
     void startAnalysis (AnalyseRequest request, int layer);
     std::unique_ptr<plugin::CardArpLanes> lanes;
+    std::unique_ptr<arp::CustomPatternExchange> customPatterns;   ///< (on the heap: about 25 KB)
+    std::unique_ptr<PatternCapture> capture = std::make_unique<PatternCapture>();   ///< recording a Custom ARP pattern (on the heap: 64 KB)
     std::unique_ptr<LaneHost> laneHost;
     std::atomic<int> arpViewCard { 0 };   ///< the card whose lane the ARP display shows
     std::array<std::atomic<int>, Arpeggiator::displaySteps> arpDisplayLow {}, arpDisplayHigh {};

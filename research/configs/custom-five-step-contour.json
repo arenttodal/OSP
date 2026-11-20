@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "description": "Custom ARP CP2: a five-step rising contour (ranks 0-4), CONTOUR over 2 octaves: the gesture keeps its shape and climbs an octave per cycle where there is room. Render with --fixture chords; compare with custom-off-reference (UP, the same rate) and baselines A/B with the same arp block.",
+  "arp": {
+    "enabled": true,
+    "transport": true,
+    "pattern": "up",
+    "rate": "1/16",
+    "gate": 0.75,
+    "octaves": 2,
+    "bpm": 108,
+    "swing": 0.0,
+    "custom": {
+      "mapping": "contour",
+      "events": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          4,
+          1
+        ]
+      ]
+    }
+  }
+}

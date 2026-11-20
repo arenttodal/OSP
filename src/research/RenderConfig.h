@@ -64,6 +64,7 @@ struct RenderConfig
     struct Arp
     {
         Arpeggiator::Settings settings {};
+        arp::CustomPattern customPattern {};   ///< played while settings.custom (valid: see "custom")
         double bpm = 120.0;
         bool transport = true;   ///< a host playing from bar 1 (a bounce); false: no host, free running
     } arp;

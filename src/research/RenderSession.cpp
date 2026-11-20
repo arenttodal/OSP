@@ -106,6 +106,8 @@ MidiSequence arpeggiate (const MidiSequence& sequence, const RenderConfig& confi
     Arpeggiator arp;
     arp.setSeed (config.engineSettings.seed);
     arp.prepare (outputRate);
+    if (config.arp.settings.custom)
+        arp.setCustomPattern (config.arp.customPattern);
     HostTiming timing;
     timing.valid = timing.playing = config.arp.transport;
     timing.bpm = config.arp.bpm;

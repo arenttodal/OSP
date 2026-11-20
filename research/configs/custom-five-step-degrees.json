@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "engine": "C",
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "seed": 1,
+  "description": "The same five-step contour through DEGREES (rank r plays the r-th held note, wrapping). Render with --fixture chords; compare with custom-off-reference (UP, the same rate) and baselines A/B with the same arp block.",
+  "arp": {
+    "enabled": true,
+    "transport": true,
+    "pattern": "up",
+    "rate": "1/16",
+    "gate": 0.75,
+    "octaves": 2,
+    "bpm": 108,
+    "swing": 0.0,
+    "custom": {
+      "mapping": "degrees",
+      "events": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          4,
+          1
+        ]
+      ]
+    }
+  }
+}

@@ -37,6 +37,7 @@ set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/EqSpectrum.cpp
     ${ANDOR_UI_DIR}/Source/SatellitePanel.cpp
     ${ANDOR_UI_DIR}/Source/StrumPanel.cpp
+    ${ANDOR_UI_DIR}/Source/CustomPatternEditor.cpp
     ${ANDOR_UI_DIR}/Source/AndorSubPanel.cpp
     ${ANDOR_UI_DIR}/Source/UserMacroAssignments.cpp
     ${ANDOR_UI_DIR}/Source/UserMacroEditor.cpp
