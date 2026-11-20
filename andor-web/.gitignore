@@ -4,7 +4,8 @@ assets/source/
 tests/visual/out/
 framer-upload/
 product-renders/blender/textures/
-product-renders/blender/textures_current/
+# textures_current (17 Nov, 08ebd01, archived) and textures_0.9.0-beta.1 (the release interface) are committed:
+# they are the fixed interfaces of the launch photography (documentation/interface_release_check.md).
 *.blend
 *.blend1
 product-renders/renders/**/*_16bit.png

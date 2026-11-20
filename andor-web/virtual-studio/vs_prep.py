@@ -22,7 +22,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ap = argparse.ArgumentParser()
 ap.add_argument("project")
 ap.add_argument("--fps", type=int, default=24)
-ap.add_argument("--master", default=os.path.join(HERE, "..", "product-renders", "blender", "textures_current"))
+ap.add_argument("--master", default=os.path.join(HERE, "..", "product-renders", "blender", "textures_0.9.0-beta.1"))
 a = ap.parse_args()
 
 cap = os.path.join(a.project, "captures", f"{a.fps}fps")

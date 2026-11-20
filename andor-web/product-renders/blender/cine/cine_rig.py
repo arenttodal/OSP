@@ -57,6 +57,7 @@ ap.add_argument("--still", type=float, default=None, help="render one frame at t
 ap.add_argument("--still-width", type=int, default=1920)
 ap.add_argument("--still-samples", type=int, default=128)
 ap.add_argument("--still-noise", type=float, default=0.01)
+ap.add_argument("--textures", default=None, help="the interface texture directory (default: andor_scene.py's, the release interface)")
 ap.add_argument("--depth", default="auto", choices=["auto", "8", "16"], help="PNG bit depth; auto: 8 for draft sizes (< 1920 px), else 16")
 args = ap.parse_args(argv)
 spec = json.load(open(args.spec))
@@ -72,7 +73,7 @@ samples = args.still_samples if args.still is not None else (4 if args.pass_ == 
 noise = args.still_noise if args.still is not None else args.noise
 
 sys.argv = ["andor_scene.py", "--", "--setup", spec["setup"], "--shot", spec["base_shot"], "--res", str(res[0]), str(res[1]),
-            "--samples", str(samples), "--noise", str(noise)]
+            "--samples", str(samples), "--noise", str(noise)] + (["--textures", args.textures] if args.textures else [])
 g = runpy.run_path(os.path.join(SCRIPTS, "andor_scene.py"), run_name="__main__")
 bpy, Vector, Euler = g["bpy"], g["Vector"], g["Euler"]
 from mathutils import Matrix, Quaternion  # noqa: E402
@@ -464,7 +465,7 @@ else:
             bpy.ops.render.render(write_still=True)
             rec["render_s"] = round(time.time() - t0, 1)
         log.append(rec)
-json.dump({"spec": spec, "pass": args.pass_, "res": res, "samples": samples, "noise": noise, "fps": FPS,
+json.dump({"interface_textures": os.path.basename(os.path.normpath(g["TEX"])), "spec": spec, "pass": args.pass_, "res": res, "samples": samples, "noise": noise, "fps": FPS,
            "frames_total": N, "handles_s": HANDLE, "blender": bpy.app.version_string, "frames": log},
           open(os.path.join(args.out, f"{spec['id']}_{'keyframes' if args.keyframes else (args.pass_ if args.still is None else 'still')}_meta.json"), "w"), indent=1)
 print("done", spec["id"], args.pass_ if args.still is None else "still")

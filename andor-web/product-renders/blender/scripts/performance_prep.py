@@ -14,7 +14,7 @@ from PIL import Image
 
 perf, out = sys.argv[1:3]
 here = os.path.dirname(os.path.abspath(__file__))
-master = Image.open(os.path.join(here, "..", "textures_current", "osp_face.png"))
+master = Image.open(os.path.join(here, "..", "textures_0.9.0-beta.1", "osp_face.png"))
 seq = os.path.join(out, "face_seq")
 os.makedirs(seq, exist_ok=True)
 files = sorted(glob.glob(os.path.join(perf, "face", "*.png")))

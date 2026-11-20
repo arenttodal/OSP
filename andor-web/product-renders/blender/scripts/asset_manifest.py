@@ -86,7 +86,7 @@ USAGE = {
     "M04": "Detail: keyboard", "M05": "Detail: front-left corner (timber, ceramic)", "M06": "Detail: PITCH / MOD touch strips",
 }
 
-texdir = os.path.join(BLENDER, "textures_current")
+texdir = os.path.join(BLENDER, "textures_0.9.0-beta.1")   # the release interface (0.9.0-beta.1, 32e0bee); textures_current = 17 Nov
 textures = {f: sha(os.path.join(texdir, f)) for f in sorted(os.listdir(texdir))} if os.path.isdir(texdir) else {}
 sources = {
     "scene": ("scripts/andor_scene.py", last_commit("scripts/andor_scene.py")),
@@ -142,7 +142,7 @@ json.dump(doc, open(os.path.join(out, "asset_manifest.json"), "w"), indent=1)
 L = ["# ANDOR commercial stills · final asset manifest", "",
      f"Repository `{doc['repository']}`, branch `{doc['branch']}`. Blender {doc['blender']}.", "",
      "**Sources:** " + ", ".join(f"`{v['file']}` @ `{v['commit']}`" for v in doc["sources"].values()) + ".",
-     "**Scene textures** (`blender/textures_current/`, git-ignored, archived with Package A): " +
+     f"**Scene textures** (`blender/{os.path.basename(texdir)}/`, git-ignored, regenerated from `assets/source/captures` by `prep_textures.py`): " +
      ", ".join(f"`{k}` sha256 `{v[:12]}…`" for k, v in textures.items()) + ".", "",
      "Every master is a 16-bit PNG in sRGB (AgX view, 'AgX - Punchy' look, baked). The derivatives are 8-bit sRGB AVIF and WebP. "
      "The full camera, light overrides, command line and SHA-256 hash of each master are in `asset_manifest.json`.", "",

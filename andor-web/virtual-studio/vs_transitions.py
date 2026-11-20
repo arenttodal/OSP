@@ -35,7 +35,7 @@ ap.add_argument("project")
 ap.add_argument("--fps", type=int, default=24)
 ap.add_argument("--cut", type=float, default=7.0, help="T1: the note onset (seconds) the cut lands on")
 ap.add_argument("--master-geometry", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "product-renders",
-                                                          "blender", "textures_current", "geometry.json"))
+                                                          "blender", "textures_0.9.0-beta.1", "geometry.json"))
 a = ap.parse_args()
 P, F = a.project, a.fps
 R = lambda name: os.path.join(P, "renders", name, f"{F}fps")

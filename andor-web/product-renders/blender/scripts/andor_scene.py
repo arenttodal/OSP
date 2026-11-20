@@ -56,8 +56,9 @@ p.add_argument("--dist-scale", type=float, default=1.0, help="multiply the shot'
 p.add_argument("--scale", type=float, default=1.0)
 p.add_argument("--samples", type=int, default=128)
 p.add_argument("--out")
-p.add_argument("--textures", default="product-renders/blender/textures_current",
-               help="the master is the current editor (C2.5 sync); product-renders/blender/textures rebuilds C2 and earlier")
+p.add_argument("--textures", default="product-renders/blender/textures_0.9.0-beta.1",
+               help="the master shows the release interface, ANDOR OSP 0.9.0-beta.1 (32e0bee, approved 20 Nov); "
+                    "textures_current is the 17 Nov editor (08ebd01) and textures rebuilds C2 and earlier")
 p.add_argument("--save-blend")
 p.add_argument("--view", default="AgX")
 p.add_argument("--look", default="AgX - Punchy")

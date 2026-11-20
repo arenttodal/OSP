@@ -14,7 +14,7 @@
 |---|---|
 | `product-renders/blender/scripts/andor_scene.py`, `motion_preview.py` | The scene builder (geometry, materials, light) and the shot driver |
 | `product-renders/blender/config/campaign_setups.json` | Setups, shots, lights |
-| `product-renders/blender/textures_current/` | The face texture, geometry and teak strip |
+| `product-renders/blender/textures_0.9.0-beta.1/` | The face texture, geometry and teak strip (the release interface; regenerate with `prep_textures.py` from `assets/source/captures/osp-0.9.0-beta.1/`) |
 | `tools/blender-assets/config/macro-knob.json` | The approved macro knob definition |
 | `reference/` | CPU reference frames and timings from the build machine |
 
