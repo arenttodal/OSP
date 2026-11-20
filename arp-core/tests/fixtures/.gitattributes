@@ -1,0 +1,2 @@
+# Pattern fixtures are byte-exact copies of what ANDOR OSP writes (CRLF line ends included).
+*.andorpattern -text

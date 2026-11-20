@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.arp-pattern",
+  "id": "corpus.edge-1",
+  "name": "Edge \"quoted\" \\ é – ✓ 🎹",
+  "description": "line one\nline two\ttabbed",
+  "factory": false,
+  "pattern": {
+    "mapping": "degrees",
+    "maxRank": 7,
+    "events": [
+      [0, 960],
+      [-1, 480],
+      [3, 30, 127],
+      [2, 930, 1],
+      [-1, 2880],
+      [5, 1960, 80]
+    ]
+  },
+  "interpretation": {
+    "timing": "steps",
+    "quantumTicks": 120,
+    "stepQuarters": 0.333333,
+    "lengthQuarters": 3.0,
+    "chord": "lowest",
+    "mapping": "degrees"
+  },
+  "capture": {
+    "bpm": 97.25,
+    "notes": [
+      [0.0, 0.25, 60, 100],
+      [0.333333, 0.166667, 64, 90],
+      [0.5, 0.125, 67, 1],
+      [1.0, 1.5, 72, 127],
+      [2.75, 0.03125, 59, 64]
+    ]
+  }
+}

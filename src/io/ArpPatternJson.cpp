@@ -1,10 +1,12 @@
 #include "io/ArpPatternJson.h"
 
 #include "io/JsonUtil.h"
+#include "model/ArpPatternCodec.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 
 namespace osp
@@ -12,122 +14,77 @@ namespace osp
 
 namespace
 {
-    constexpr const char* kind = "andor.arp-pattern";
+    // The document's meaning lives in model/ArpPatternCodec (pure C++, shared with ANDOR ARP's Max
+    // external and plugin). Here juce::var is only translated, so OSP's text stays JUCE's.
+    juce::var toVar (const arppattern::JsonValue& v)
+    {
+        using T = arppattern::JsonValue::Type;
+        switch (v.type)
+        {
+            case T::null:    return {};
+            case T::boolean: return v.boolean;
+            case T::number:
+                if (v.integer && std::abs (v.number) <= 2147483647.0)
+                    return static_cast<int> (v.number);
+                if (v.integer && std::abs (v.number) < 9.0e18)
+                    return static_cast<juce::int64> (v.number);
+                return v.number;
+            case T::string:  return juce::String::fromUTF8 (v.text.c_str());
+            case T::array:
+            {
+                juce::Array<juce::var> items;
+                for (const auto& i : v.items)
+                    items.add (toVar (i));
+                return items;
+            }
+            case T::object:
+            {
+                auto object = json::object();
+                for (const auto& [key, value] : v.members)
+                    object.getDynamicObject()->setProperty (juce::Identifier (juce::String::fromUTF8 (key.c_str())), toVar (value));
+                return object;
+            }
+        }
+        return {};
+    }
 
-    const char* mappingId (arp::CustomMapping m) { return m == arp::CustomMapping::degrees ? "degrees" : "contour"; }
-    arp::CustomMapping mappingFrom (const std::string& s) { return s == "degrees" ? arp::CustomMapping::degrees : arp::CustomMapping::contour; }
-
-    juce::var number (double v) { return json::number (v, 6); }
+    arppattern::JsonValue fromVar (const juce::var& v)
+    {
+        using J = arppattern::JsonValue;
+        if (v.isBool())
+            return J::makeBool (static_cast<bool> (v));
+        if (v.isInt() || v.isInt64())
+            return J::makeInt (static_cast<juce::int64> (v));
+        if (v.isDouble())
+            return J::makeDouble (static_cast<double> (v));
+        if (v.isString())
+            return J::makeString (v.toString().toStdString());
+        if (const auto* items = v.getArray())
+        {
+            auto out = J::makeArray();
+            for (const auto& i : *items)
+                out.append (fromVar (i));
+            return out;
+        }
+        if (auto* object = v.getDynamicObject())
+        {
+            auto out = J::makeObject();
+            for (const auto& p : object->getProperties())
+                out.members.emplace_back (p.name.toString().toStdString(), fromVar (p.value));
+            return out;
+        }
+        return {};
+    }
 }
 
 juce::var arpPatternToJson (const arppattern::Document& d)
 {
-    auto root = json::object();
-    json::set (root, "schemaVersion", arppattern::Document::schemaVersion);
-    json::set (root, "kind", kind);
-    json::set (root, "id", json::str (d.id));
-    json::set (root, "name", json::str (d.name));
-    json::set (root, "description", json::str (d.description));
-    json::set (root, "factory", d.factory);
-
-    auto pattern = json::object();
-    json::set (pattern, "mapping", mappingId (d.pattern.mapping));
-    json::set (pattern, "maxRank", d.pattern.maxRank);
-    auto events = json::array();
-    for (const auto& e : d.pattern.events)
-    {
-        juce::Array<juce::var> item { e.rest ? -1 : e.rank, e.duration };
-        if (e.velocity > 0)
-            item.add (e.velocity);
-        events.append (juce::var (item));
-    }
-    json::set (pattern, "events", events);
-    json::set (root, "pattern", pattern);
-
-    const auto& in = d.interpretation;
-    auto how = json::object();
-    json::set (how, "timing", in.timing == arppattern::Interpretation::Timing::steps ? "steps" : "rhythm");
-    json::set (how, "quantumTicks", in.quantumTicks);
-    json::set (how, "stepQuarters", number (in.stepQuarters));
-    json::set (how, "lengthQuarters", number (in.lengthQuarters));
-    json::set (how, "chord", in.chord == arppattern::ChordPolicy::lowest ? "lowest" : "highest");
-    json::set (how, "mapping", mappingId (in.mapping));
-    json::set (root, "interpretation", how);
-
-    auto capture = json::object();
-    json::set (capture, "bpm", number (d.captureBpm));
-    auto notes = json::array();
-    for (const auto& n : d.capture)
-        notes.append (juce::var (juce::Array<juce::var> { number (n.onset), number (n.duration), n.pitch, n.velocity }));
-    json::set (capture, "notes", notes);
-    json::set (root, "capture", capture);
-    return root;
+    return toVar (arppattern::documentToJson (d));
 }
 
 std::optional<arppattern::Document> arpPatternFromJson (const juce::var& root, std::string& error)
 {
-    if (! root.isObject())
-    {
-        error = "not a pattern (no JSON object)";
-        return std::nullopt;
-    }
-    const int version = json::getInt (root, "schemaVersion", 0);
-    if (version < 1 || version > arppattern::Document::schemaVersion)
-    {
-        error = version > arppattern::Document::schemaVersion ? "made by a newer version (pattern schema " + std::to_string (version) + ")"
-                                                              : "not a pattern (no schemaVersion)";
-        return std::nullopt;
-    }
-    if (json::getString (root, "kind") != kind)
-    {
-        error = "not an ANDOR ARP pattern";
-        return std::nullopt;
-    }
-    arppattern::Document d;
-    d.id = json::getString (root, "id");
-    d.name = json::getString (root, "name");
-    d.description = json::getString (root, "description");
-    d.factory = json::getBool (root, "factory", false);
-
-    const auto& pattern = root["pattern"];
-    d.pattern.mapping = mappingFrom (json::getString (pattern, "mapping", "contour"));
-    d.pattern.maxRank = std::clamp (json::getInt (pattern, "maxRank", 0), 0, arppattern::maxRankLimit);
-    if (const auto* events = pattern["events"].getArray())
-        for (const auto& e : *events)
-        {
-            const auto* item = e.getArray();
-            if (item == nullptr || item->size() < 2)
-            {
-                error = "a pattern event is not [rank, ticks]";
-                return std::nullopt;
-            }
-            const int rank = static_cast<int> ((*item)[0]);
-            arppattern::Event ev { std::max (0, rank), rank < 0, static_cast<int> ((*item)[1]), item->size() > 2 ? static_cast<int> ((*item)[2]) : 0 };
-            d.pattern.events.push_back (ev);
-        }
-    if (! d.pattern.valid())
-    {
-        error = "the pattern is outside the limits (1-256 events, 1-128 steps, each at least 1/32 step, one note at least)";
-        return std::nullopt;
-    }
-
-    const auto& how = root["interpretation"];
-    auto& in = d.interpretation;
-    in.timing = json::getString (how, "timing", "rhythm") == "steps" ? arppattern::Interpretation::Timing::steps : arppattern::Interpretation::Timing::rhythm;
-    in.quantumTicks = std::clamp (json::getInt (how, "quantumTicks", in.quantumTicks), arp::minEventTicks, arp::ticksPerStep);
-    in.stepQuarters = std::clamp (json::getDouble (how, "stepQuarters", in.stepQuarters), 1.0 / 64.0, 4.0);
-    in.lengthQuarters = std::clamp (json::getDouble (how, "lengthQuarters", 0.0), 0.0, 4.0 * arp::maxPatternSteps);
-    in.chord = json::getString (how, "chord", "highest") == "lowest" ? arppattern::ChordPolicy::lowest : arppattern::ChordPolicy::highest;
-    in.mapping = mappingFrom (json::getString (how, "mapping", mappingId (d.pattern.mapping)));
-
-    const auto& capture = root["capture"];
-    d.captureBpm = std::clamp (json::getDouble (capture, "bpm", 120.0), 5.0, 1000.0);
-    if (const auto* notes = capture["notes"].getArray())
-        for (const auto& n : *notes)
-            if (const auto* item = n.getArray(); item != nullptr && item->size() >= 4 && static_cast<int> (d.capture.size()) < arppattern::maxCaptureNotes)
-                d.capture.push_back ({ static_cast<double> ((*item)[0]), static_cast<double> ((*item)[1]), std::clamp (static_cast<int> ((*item)[2]), 0, 127),
-                                       std::clamp (static_cast<int> ((*item)[3]), 1, 127) });
-    return d;
+    return arppattern::documentFromJson (fromVar (root), error);
 }
 
 std::string arpPatternToString (const arppattern::Document& d) { return json::toString (arpPatternToJson (d)); }

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.arp-pattern",
+  "id": "factory.arch",
+  "name": "Arch",
+  "description": "Up and back down, odd length",
+  "factory": true,
+  "pattern": {
+    "mapping": "contour",
+    "maxRank": 4,
+    "events": [
+      [0, 960],
+      [1, 960],
+      [2, 960],
+      [3, 960],
+      [4, 960],
+      [3, 960],
+      [2, 960],
+      [1, 960],
+      [0, 960]
+    ]
+  },
+  "interpretation": {
+    "timing": "rhythm",
+    "quantumTicks": 240,
+    "stepQuarters": 0.25,
+    "lengthQuarters": 0.0,
+    "chord": "highest",
+    "mapping": "contour"
+  },
+  "capture": {
+    "bpm": 120.0,
+    "notes": []
+  }
+}

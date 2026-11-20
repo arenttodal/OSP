@@ -32,6 +32,15 @@ include(OspDependencies)
 include(OspWarnings)
 
 # ---------------------------------------------------------------------------
+# andor_arp_core (arp-core/): the arpeggiator, its custom patterns, capture and the `.andorpattern`
+# codec, pure C++20. ANDOR ARP builds the same target from a pinned OSP; osp_dsp links it, so the
+# ARP sources are compiled once and every product (OSP, the shell, ANALOG) plays the same code.
+# ---------------------------------------------------------------------------
+# Its own tests (standalone checks: no JUCE on the include path, the codec fixtures) run in ctest too.
+set(ANDOR_ARP_CORE_BUILD_TESTS ${OSP_BUILD_TESTS})
+add_subdirectory(arp-core)
+
+# ---------------------------------------------------------------------------
 # osp_dsp: pure C++20 DSP + analysis. No JUCE, no I/O, no global state.
 # Everything here must be usable from the audio thread *or* from offline tools.
 # ---------------------------------------------------------------------------
@@ -89,9 +98,6 @@ add_library(osp_dsp STATIC
     src/engine/VintageReverb.cpp
     src/engine/EchoDelay.cpp
     src/engine/DriveProcessor.cpp
-    src/engine/Arpeggiator.cpp
-    src/engine/ArpCustomPattern.cpp
-    src/engine/PatternCapture.cpp
     src/engine/Modulation.cpp
     src/engine/LayerEq.cpp
     src/engine/Dampen.cpp
@@ -104,14 +110,12 @@ add_library(osp_dsp STATIC
     src/model/RootChoice.cpp
     src/model/PlaybackPreparation.cpp
     src/model/NoteAtlas.cpp
-    src/model/ArpPatternModel.cpp
-    src/model/ArpFactoryPatterns.cpp
 )
 target_include_directories(osp_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # Linked into plugin shared objects (VST3/AU bundles).
 set_target_properties(osp_dsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
 find_package(Threads REQUIRED)
-target_link_libraries(osp_dsp PRIVATE signalsmith-stretch PUBLIC Threads::Threads)
+target_link_libraries(osp_dsp PRIVATE signalsmith-stretch PUBLIC andor_arp_core Threads::Threads)
 osp_set_warnings(osp_dsp)
 
 # ---------------------------------------------------------------------------

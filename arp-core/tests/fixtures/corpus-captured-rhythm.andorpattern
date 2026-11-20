@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.arp-pattern",
+  "id": "corpus.captured-rhythm",
+  "name": "Captured",
+  "description": "",
+  "factory": false,
+  "pattern": {
+    "mapping": "contour",
+    "maxRank": 4,
+    "events": [
+      [0, 960],
+      [2, 960],
+      [1, 1920],
+      [4, 480],
+      [3, 480],
+      [-1, 1920],
+      [0, 960]
+    ]
+  },
+  "interpretation": {
+    "timing": "rhythm",
+    "quantumTicks": 240,
+    "stepQuarters": 0.25,
+    "lengthQuarters": 0.0,
+    "chord": "highest",
+    "mapping": "contour"
+  },
+  "capture": {
+    "bpm": 123.0,
+    "notes": [
+      [0.0, 0.2, 48, 110],
+      [0.25, 0.2, 55, 70],
+      [0.5, 0.45, 52, 90],
+      [1.0, 0.1, 60, 100],
+      [1.125, 0.1, 59, 100],
+      [1.75, 0.2, 48, 120]
+    ]
+  }
+}

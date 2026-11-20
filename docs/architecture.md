@@ -488,6 +488,26 @@ view setting (`arpExpanded` on the state tree), never a parameter. Headless:
 `research::arpeggiate` and the `"arp"` block of render configs. Report:
 `docs/reports/arpeggiator.md`.
 
+### `andor_arp_core` (arp-core/; ANDOR ARP spinoff, 20 Nov 2026)
+
+The arpeggiator and everything a host needs to play it are their own static library, so ANDOR
+ARP (a separate product repository, `arenttodal/andor-arp`, which pins OSP as a submodule) builds
+the same code without JUCE or the rest of OSP: `Arpeggiator`, `ArpCustomPattern`, `HostTiming`,
+`PatternCapture`, `ArpPatternModel`, `ArpFactoryPatterns`, `core/Prng.h` and the `.andorpattern`
+codec `model/ArpPatternCodec` (pure C++). The sources stay where they were; `arp-core/CMakeLists.txt`
+owns them and `osp_dsp` links the target, so nothing is compiled twice into one binary and every
+namespace, parameter, plugin ID and stored format is unchanged. Why: a second copy of the
+arpeggiator in another product would drift; one target keeps the 18-style golden, the custom
+pattern tests and the codec fixtures binding for every product. `cmake -S arp-core` builds and
+tests it alone (no JUCE is fetched); its include check (`arp-core-includes`) fails if a core file
+includes anything outside the core and the standard library.
+
+The pattern document's meaning lives once, in `ArpPatternCodec` (`JsonValue`, `documentToJson`,
+`documentFromJson`). `io/ArpPatternJson` is now a thin adapter that only translates `juce::var`;
+its text output is unchanged (JUCE's formatting, CRLF line ends), so sessions, presets and library
+files are byte-identical. `arp-core/tests/fixtures` are the corpus as ANDOR OSP writes it
+(`[arp-codec-compat]` keeps them current); the core's standalone tests read them without JUCE.
+
 ## MODULATION (parameters v17)
 
 `engine/Modulation` (pure C++) is a control layer next to the DSP, not inside it: two LFOs

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.arp-pattern",
+  "id": "factory.thumb-leaps",
+  "name": "Thumb Leaps",
+  "description": "The lowest note under irregular leaps",
+  "factory": true,
+  "pattern": {
+    "mapping": "contour",
+    "maxRank": 5,
+    "events": [
+      [0, 960],
+      [3, 960],
+      [0, 480],
+      [0, 480],
+      [4, 960],
+      [2, 960],
+      [0, 960],
+      [5, 960]
+    ]
+  },
+  "interpretation": {
+    "timing": "rhythm",
+    "quantumTicks": 240,
+    "stepQuarters": 0.25,
+    "lengthQuarters": 0.0,
+    "chord": "highest",
+    "mapping": "contour"
+  },
+  "capture": {
+    "bpm": 120.0,
+    "notes": []
+  }
+}

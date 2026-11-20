@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "kind": "andor.arp-pattern",
+  "id": "factory.long-short",
+  "name": "Long Short",
+  "description": "A held note and quick answers, seven steps",
+  "factory": true,
+  "pattern": {
+    "mapping": "contour",
+    "maxRank": 3,
+    "events": [
+      [0, 1920],
+      [2, 480],
+      [1, 480],
+      [3, 1920],
+      [1, 960],
+      [0, 960]
+    ]
+  },
+  "interpretation": {
+    "timing": "rhythm",
+    "quantumTicks": 240,
+    "stepQuarters": 0.25,
+    "lengthQuarters": 0.0,
+    "chord": "highest",
+    "mapping": "contour"
+  },
+  "capture": {
+    "bpm": 120.0,
+    "notes": []
+  }
+}

@@ -1269,6 +1269,25 @@ the shared rack (done) and OSP's routing view and mixer (not started).
     items. The chosen macro's rings replace `MacroAssignOverlay`'s show mode.
   - ANDOR OSP sets none of it: 0 px, its tests unchanged.
 
+## ANDOR ARP spinoff: the shared ARP core (20 Nov 2026; branch claude/andor-arp-spec-xy4umx)
+
+Built on `claude/custom-arp` (e39b0bb; its ARP sources are identical in 0.9.0-beta.1, 32e0bee,
+which is not touched). Spec: "ANDOR ARP — product spinoff specification R0.1". The product itself
+lives in `arenttodal/andor-arp`.
+
+- **`andor_arp_core`** (`arp-core/`): the arpeggiator, custom patterns, capture, factory patterns
+  and the pattern codec as one pure C++20 static library; `osp_dsp` links it (no source compiled
+  twice; no namespace, parameter, plugin ID or stored format changed). Version 1.0.0
+  (`model/ArpCoreVersion.h`).
+- **`model/ArpPatternCodec`**: the `.andorpattern` codec without JUCE. `io/ArpPatternJson` adapts
+  it to `juce::var`; OSP's text is byte-identical (JUCE formatting, CRLF).
+- **Tests:** `[arp-codec-compat]` (each codec reads the other's text as the same document; OSP's
+  bytes equal the fixtures `arp-core/tests/fixtures`), and the standalone core suite
+  (`cmake -S arp-core`: STRUM tests, the 18-style golden, codec, fixtures, an include check).
+- **Results:** ctest green (unit, integration, regression, performance-smoke, bootstrap, and the
+  three arp-core tests); the 18-style golden unchanged; no golden updated. ANDOR ANALOG
+  (`analog_dsp_tests` and the arp-core tests) built and passed against this branch.
+
 ## IN PROGRESS
 
 - Lab round 3 (Reimagined 3, violin).
@@ -1276,6 +1295,13 @@ the shared rack (done) and OSP's routing view and mixer (not started).
   standalone app's microphone input).
 
 ## NEXT
+
+- **ANDOR ARP (spinoff).** The shared core is extracted here; the product (three-lane coordinator,
+  Max for Live external, Master/Receiver link) is in `arenttodal/andor-arp`, pinned to this
+  branch. Not yet run: the ANDOR shell's `[shell][arp-custom]` test in ANDOR ANALOG (blocked by
+  ANALOG's own test drift, see the CP3/CP4 notes), the plugin build's state tests on this branch
+  (they use the unchanged JUCE text path). Merging this branch into the release line is the
+  owner's decision.
 
 - **AUX strip (shell, opt-in; ANDOR ANALOG's D / AUX, analog `docs/aux/AUX_REPORT.md`).**
   `ProductInfo::auxStrip` adds an optional strip under the source cards:
