@@ -229,6 +229,8 @@ void CustomPatternBrowser::choose (const ap::Document& document)
         p->endChangeGesture();
     }
     noteUsed (document);
+    if (onUserChoice != nullptr)
+        onUserChoice();
     if (onClose != nullptr)
         onClose();
 }

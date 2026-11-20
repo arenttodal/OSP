@@ -280,14 +280,16 @@ less than a full chord.
 
 ## ARPEGGIATOR
 
-To the right of the keyboard: the ARP card (a light, ARP, an arrow, and the pattern and rate
-below) and Advanced under it.
+To the right of the keyboard: the ARP key and Advanced under it. The key has two rows, each a
+light, a name and an arrow: **ARP** above and **SUB** (a sub-bass under the keys you hold)
+below. It no longer shows the pattern and rate; they are in the settings panel.
 
-- **The light** switches the arpeggiator on and off (orange when on).
-- **Anywhere else on the card** shows or hides its settings, which open between the macros and
+- **ARP's light** switches the arpeggiator on and off (orange when on).
+- **Anywhere else on ARP's row** shows or hides its settings, which open between the macros and
   the keyboard; the round button at the panel's top right hides them too. The window grows by
   that much and shrinks back when you hide them. Showing the settings does not switch it on,
   and switching it on does not show them.
+- **SUB's row** works the same way for SUB: its light switches it, the rest opens its settings.
 
 Hold a chord: it plays as a stepped pattern, each note with the velocity you played it with,
 through every layer and effect exactly as if you were playing the notes yourself. The display
@@ -312,6 +314,21 @@ Pitch bend, the mod wheel and pressure work as usual. The settings are automatab
 with the project. Projects from before the arpeggiator open with it off and sound exactly as
 they did. **Advanced** is the card under ARP (the whole width: the MOD button there is gone,
 the modulation tabs are always in the envelope panel).
+
+### PLAYS, LINK and EDIT: an arpeggio per layer
+
+The panel's title row holds, after ARPEGGIATOR:
+
+- **PLAYS A B C**: which layers play the arpeggio. A layer that is off holds the keys you play
+  as you play them while the others arpeggiate (a held pad under an arpeggio, for example).
+- **LINK**: on (the default), every layer plays A's PATTERN, RATE and OCTAVES. Off, each layer
+  has its own.
+- **EDIT A | B | C** (shown while LINK is off): whose PATTERN, RATE and OCTAVES the panel shows
+  and sets. Choosing a layer here changes only what the panel shows. GATE, SWING and VELOCITY
+  are shared by every layer.
+
+All of them are saved with the project. Projects from before the per-layer arpeggiator open
+with LINK on and every layer playing, and sound as they did.
 
 ### SATELLITE: each layer moves in the stereo field
 

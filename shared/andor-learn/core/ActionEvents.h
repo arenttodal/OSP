@@ -20,6 +20,11 @@ namespace andor::learn::actions
     inline constexpr const char* arpCardToggled = "arp.card.toggled";
     inline constexpr const char* arpLinkChanged = "arp.link.changed";
     inline constexpr const char* arpEditSelected = "arp.edit.selected";
+    /** Custom Patterns (R2): the row's click opened the browser; a pattern chosen in it; the
+        editor opened (the pencil, or the browser's Edit / + New Pattern). */
+    inline constexpr const char* arpCustomOpened = "arp.custom.opened";
+    inline constexpr const char* arpCustomChosen = "arp.custom.chosen";
+    inline constexpr const char* arpCustomEditorOpened = "arp.custom.editor.opened";
     // The shell.
     inline constexpr const char* sourceViewToggled = "sourceView.toggled";
     inline constexpr const char* rackToggled = "rack.toggled";

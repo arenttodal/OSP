@@ -2154,7 +2154,7 @@ InstrumentHost::CaptureView OspAudioProcessor::captureView()
         }
     }
     else
-        view.hint = wrapperType == wrapperType_Standalone ? "Choose an audio input in Settings (the menu: Audio / MIDI settings)"
+        view.hint = wrapperType == wrapperType_Standalone ? "Choose an audio input: Options > Audio/MIDI Settings..."
                                                           : "Route a track to OSP's sidechain input in your DAW";
     return view;
 }

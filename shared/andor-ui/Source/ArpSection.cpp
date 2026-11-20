@@ -822,13 +822,21 @@ void ArpInlinePanel::openCustomBrowser()
     if (owner == nullptr)
         return;
     juce::Component::SafePointer<ArpInlinePanel> safe (this);
-    owner->openAnchoredPopover (std::make_unique<CustomPatternBrowser> (ospProcessor, customCard(), [safe] (bool fresh) {
-                                    juce::MessageManager::callAsync ([safe, fresh] {
-                                        if (safe != nullptr)
-                                            safe->openCustomEditor (fresh);
-                                    });
-                                }),
-                                browserAnchor);
+    auto browser = std::make_unique<CustomPatternBrowser> (ospProcessor, customCard(), [safe] (bool fresh) {
+        juce::MessageManager::callAsync ([safe, fresh] {
+            if (safe == nullptr)
+                return;
+            safe->openCustomEditor (fresh);
+            // (Edit or + New Pattern: a click in the browser.)
+            if (safe != nullptr && safe->onLearnAction != nullptr)
+                safe->onLearnAction ("arp.custom.editor.opened", {});
+        });
+    });
+    browser->onUserChoice = [safe] {
+        if (safe != nullptr && safe->onLearnAction != nullptr)
+            safe->onLearnAction ("arp.custom.chosen", ids::arpCustom (safe->ospProcessor.cardArpNamespace(), safe->customCard()));
+    };
+    owner->openAnchoredPopover (std::move (browser), browserAnchor);
 }
 
 juce::Rectangle<float> ArpInlinePanel::pencilArea() const
@@ -1290,6 +1298,7 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
     if (pencilArea().contains (e.position))
     {
         openCustomEditor (false);   // the card's pattern, straight into the editor
+        report ("arp.custom.editor.opened", {});
         return;
     }
     if (const int row = rowAt (e.position); row >= arp::patternCount)
@@ -1300,8 +1309,11 @@ void ArpInlinePanel::mouseDown (const juce::MouseEvent& e)
         // alone changes nothing.
         juce::Component::SafePointer<ArpInlinePanel> safe (this);
         juce::MessageManager::callAsync ([safe] {
-            if (safe != nullptr)
-                safe->openCustomBrowser();
+            if (safe == nullptr)
+                return;
+            safe->openCustomBrowser();
+            if (safe != nullptr && safe->onLearnAction != nullptr)
+                safe->onLearnAction ("arp.custom.opened", {});   // (once it is open: the click's)
         });
         return;
     }

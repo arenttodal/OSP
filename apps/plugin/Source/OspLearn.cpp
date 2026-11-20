@@ -7,7 +7,13 @@
 
 #include "PluginEditor.h"
 
+#include "AndorParameters.h"
 #include "Binding.h"
+#include "CustomPatternBrowser.h"
+#include "CustomPatternEditor.h"
+#include "EqEditor.h"
+#include "SatellitePanel.h"
+#include "StrumPanel.h"
 #include "TutorialSounds.h"
 
 #include "engine/KeyDna.h"
@@ -180,6 +186,131 @@ namespace
             out.add (param (InstrumentHost::modRouteId (r, "depth")));
         return out;
     }
+
+    /** An ARP lane setting edited on any card (A "arp.<name>", B "arp.cardB.<name>" ...; ANDOR
+        OSP's card arpeggiator has no namespace). */
+    juce::StringArray laneActions (const juce::String& name)
+    {
+        juce::StringArray out;
+        for (int card = 0; card < 3; ++card)
+            out.add (param (ids::arpCardSetting ({}, card, name)));
+        return out;
+    }
+
+    /** A layer's SATELLITE field edited, on any layer (the panel shows one card at a time). */
+    juce::StringArray satelliteActions (std::initializer_list<const char*> fields)
+    {
+        juce::StringArray out;
+        for (int layer = 0; layer < 3; ++layer)
+            for (const auto* field : fields)
+                out.add (param (InstrumentHost::satelliteFieldId (layer, field)));
+        return out;
+    }
+
+    /** The first visible component strictly inside `root` tagged with `id` (a page that carries
+        its own controls' tags, as the SYNTH page does, is not its own control). */
+    juce::Component* findTaggedChild (juce::Component* root, const juce::String& id)
+    {
+        if (root == nullptr)
+            return nullptr;
+        for (auto* child : root->getChildren())
+            if (child->isVisible())
+                if (auto* found = findTagged (child, id))
+                    return found;
+        return nullptr;
+    }
+
+    /** CAPTURE needs an input: the standalone app's, or the plugin's sidechain in a DAW. */
+    Requirement captureInput()
+    {
+        Requirement r;
+        r.id = "osp.capture.input";
+        r.holds = Condition::state ("osp.capture.connected");
+        r.title = "No input is connected";
+        r.body = juce::String::fromUTF8 ("CAPTURE records what arrives at OSP's audio input. In the standalone app, choose an input under Options > Audio/MIDI Settings\xe2\x80\xa6. "
+                                         "In a DAW, OSP's input is its sidechain: route a track to it (each DAW does this its own way).");
+        r.targetId = "osp.capture.page";
+        r.offerExample = false;
+        return r;
+    }
+
+    /** A kept take's notes on the keys (the analysis takes a moment). */
+    Requirement takeMapped()
+    {
+        Requirement r;
+        r.id = "osp.capture.mapped";
+        r.holds = Condition::state ("osp.source.mapped");
+        r.title = "The take's notes are not on the keys yet";
+        r.body = "OSP maps a kept take's notes as soon as it has analysed it, which takes a moment. If no take was kept, record one first.";
+        r.targetId = "osp.source.rec";
+        r.offerExample = false;
+        return r;
+    }
+
+    Requirement unlinked()
+    {
+        Requirement r;
+        r.id = "osp.arp.unlinked";
+        r.holds = Condition::state ("osp.arp.unlinked");
+        r.title = "LINK is on";
+        r.body = "Click LINK on the ARP panel's title row to turn it off: each layer can then have its own arpeggio.";
+        r.targetId = "osp.arp.link";
+        r.offerExample = false;
+        return r;
+    }
+
+    Requirement chordPattern()
+    {
+        Requirement r;
+        r.id = "osp.arp.chord";
+        r.holds = Condition::state ("osp.arp.strum.chord");
+        r.title = "STRUM plays only with Chord";
+        r.body = "Choose Chord in PATTERN's list: STRUM spreads the notes of each chord, so the pattern must play chords.";
+        r.targetId = "osp.arp.pattern";
+        r.offerExample = false;
+        return r;
+    }
+
+    Requirement customChosen()
+    {
+        Requirement r;
+        r.id = "osp.arp.custom";
+        r.holds = Condition::state ("osp.arp.custom.on");
+        r.title = "No custom pattern is playing";
+        r.body = juce::String::fromUTF8 ("Click Custom Patterns \xe2\x80\xba at the end of PATTERN's list and choose a pattern.");
+        r.targetId = "osp.arp.custom.row";
+        r.offerExample = false;
+        return r;
+    }
+
+    Requirement imprintMode()
+    {
+        Requirement r;
+        r.id = "osp.synth.imprint";
+        r.holds = Condition::state ("osp.synth.imprint");
+        r.title = "IMPRINT is not chosen";
+        r.body = "Choose IMPRINT at the top of the SYNTH page (beside ANALOG).";
+        r.targetId = "osp.synth.mode";
+        r.offerExample = false;
+        return r;
+    }
+
+    /** ARP's panel opened from its key (the ARP lessons' first task). */
+    Step openArpStep()
+    {
+        auto open = step ("open", "osp.arp.control", "Open ARP", "Click ARP beside the keyboard to open the arpeggiator.",
+                          Completion::action ({ andor::learn::actions::arpPanelOpened }, Condition::state ("osp.arp.panel.open"))
+                              .withAlreadyDone (Condition::state ("osp.arp.panel.open"), "Already open"));
+        open.revealOnEnter = false;
+        return open;
+    }
+
+    Step arpOnStep (const juce::String& body)
+    {
+        return step ("on", "osp.arp.enable", "Switch it on", body,
+                     Completion::action ({ andor::learn::actions::arpEnabledChanged, param ("arp.enabled") }, Condition::equals ("arp.enabled", 1.0f))
+                         .withAlreadyDone (Condition::equals ("arp.enabled", 1.0f), "Already on"));
+    }
 } // namespace
 
 //==============================================================================
@@ -266,6 +397,52 @@ static Catalog ospCatalog()
         c.lessons.push_back (l);
     }
     {
+        // CAPTURE (live capture): an input recorded, or what was just played grabbed, into the
+        // edited layer; the take's notes mapped onto the keys as a dropped phrase's are.
+        Lesson l;
+        l.id = "osp.capture";
+        l.title = "Record or grab from an input";
+        l.description = "Turn what you play or sing into an input into this layer's notes.";
+        l.minutes = 4;
+        l.exampleId = "bowed";
+        auto open = step ("open", "osp.source.rec", "Open CAPTURE",
+                          "Click REC on the card, beside EQ. The CAPTURE page opens over the waveform; what arrives at OSP's input scrolls by as a level picture.",
+                          Completion::action ({ "capture.opened" }, Condition::state ("osp.capture.open"))
+                              .withAlreadyDone (Condition::state ("osp.capture.open"), "CAPTURE is already open."));
+        open.revealOnEnter = false;
+        l.steps.push_back (open);
+        const juce::String closed = "CAPTURE is closed. Show me opens it again.";
+        auto input = step ("input", "osp.capture.meter", "The input",
+                           juce::String::fromUTF8 ("The picture shows the level at OSP's input. Without one the page says how to connect it: in the standalone app, Options > Audio/MIDI Settings\xe2\x80\xa6; "
+                                                   "in a DAW, the plugin's sidechain input. The input is kept for recording only; you never hear it through OSP."));
+        input.unavailableBody = closed;
+        l.steps.push_back (input);
+        auto grab = step ("grab", "osp.capture.grab", "GRAB LAST",
+                          "While an input is connected OSP keeps the last minute of it. GRAB LAST 10, 20, 30 or 60 s keeps what you have just played, so a good moment is never lost.");
+        grab.unavailableBody = closed;
+        l.steps.push_back (grab);
+        auto take = step ("take", "osp.capture.record", "Keep a take",
+                          "Click RECORD, play or sing a few separate notes into the input, then click STOP. Or click a GRAB LAST length to keep what you just played. "
+                          "The take becomes this layer's sound, and OSP maps its notes onto the keys.",
+                          Completion::action ({ "capture.kept" }, Condition::always()));
+        take.unavailableBody = closed;
+        take.doneText = "OSP is mapping the take's notes.";
+        take.requirements = { captureInput() };
+        l.steps.push_back (take);
+        auto play = step ("play", "osp.keyboard", "Play the take's notes",
+                          "Play the keys. Each key plays the recorded note nearest to it. NOTES on the card shows what OSP found, as for a dropped phrase.",
+                          Completion::action ({ "note.played" }, Condition::state ("osp.source.mapped")));
+        play.requirements = { takeMapped() };
+        l.steps.push_back (play);
+        l.completionText = "CAPTURE turns an input into a layer of its own notes. A take lives in OSP's sample store with the sound; record again whenever you like.";
+        // (Only the steps before the take need the card's sound: a kept take reloads the layer.)
+        l.steps.insert (l.steps.begin(),
+                        prepare ({ soundReady() }, "CAPTURE records into the layer you are editing, from its card's REC key. A kept take replaces that layer's sound. "
+                                                   "Use your current card, or load the example to record over."));
+        requireOn (l, { "open", "input", "grab" }, soundReady());
+        c.lessons.push_back (l);
+    }
+    {
         Lesson l;
         l.id = "osp.playback";
         l.title = "One Shot & Granular";
@@ -333,6 +510,55 @@ static Catalog ospCatalog()
                                  "Keep the mode you like and set how much of it you hear with REIMAGINED. Each layer has its own mode and amount.", edited (reimaginedToken)));
         l.completionText = "REIMAGINED offers five ways to transform the same recording. Changing the mode never reloads or alters the recording itself.";
         setUp (l, { soundReady() }, "This lesson transforms a tonal recording: use your current sound, or the bowed example.");
+        c.lessons.push_back (l);
+    }
+    {
+        // SYNTHESIZE (S1 / S2): the layer's own oscillator, and the recording's imprint on it.
+        Lesson l;
+        l.id = "osp.synth";
+        l.title = "Blend in SYNTH and IMPRINT";
+        l.description = "Add an oscillator that takes on the recording's colour.";
+        l.minutes = 4;
+        l.exampleId = "bowed";
+        auto open = step ("open", "osp.source.synth", "Open SYNTH",
+                          "Click SYNTH in the waveform's top-right corner. Its page opens over the waveform and draws the oscillator's wave as it sounds.",
+                          Completion::action ({ "synth.opened" }, Condition::state ("osp.synth.open"))
+                              .withAlreadyDone (Condition::state ("osp.synth.open"), "The SYNTH page is already open."));
+        open.revealOnEnter = false;
+        l.steps.push_back (open);
+        const juce::String closed = "The SYNTH page is closed. Show me opens it again.";
+        auto amount = step ("amount", "osp.synth.amount", "Set the AMOUNT",
+                            "AMOUNT blends this layer's own oscillator into its voices, from none to all of it. Raise it while you play; the chip on the card shows the same amount.",
+                            edited (editedLayerToken + ".synthesize"));
+        amount.unavailableBody = closed;
+        l.steps.push_back (amount);
+        auto wave = step ("wave", "osp.synth.wave", "Choose a WAVE", "WAVE chooses the oscillator: saw, square, triangle or sine. The drawing above changes with it.",
+                          edited (editedLayerToken + ".synth.wave"));
+        wave.unavailableBody = closed;
+        l.steps.push_back (wave);
+        auto shape = step ("shape", "osp.synth.shape", "Held or Follow",
+                           "SHAPE: Held plays the oscillator for the whole note, shaped only by AMP. Follow gives it the recording's own contour, so it ends when the sound ends.",
+                           edited (editedLayerToken + ".synth.shape"));
+        shape.unavailableBody = closed;
+        l.steps.push_back (shape);
+        auto imprint = step ("imprint", "osp.synth.mode", "Choose IMPRINT",
+                             "Choose IMPRINT beside ANALOG. The recording's own spectral envelope, its body, formants, bow or breath, now colours the oscillator.",
+                             setTo (editedLayerToken + ".synth.mode", 1.0f, "IMPRINT is already chosen."));
+        imprint.unavailableBody = closed;
+        l.steps.push_back (imprint);
+        auto much = step ("much", "osp.synth.imprint", "How much IMPRINT", "IMPRINT sets how much of the recording's colour the oscillator takes. Change it while you play.",
+                          edited (editedLayerToken + ".synth.imprint"));
+        much.unavailableBody = closed;
+        much.requirements = { imprintMode() };
+        l.steps.push_back (much);
+        auto motion = step ("motion", "osp.synth.motion", "MOTION",
+                            "MOTION at 0 holds the recording's average colour; higher, the colour moves as the recording's did through the note.",
+                            edited (editedLayerToken + ".synth.motion"));
+        motion.unavailableBody = closed;
+        motion.requirements = { imprintMode() };
+        l.steps.push_back (motion);
+        l.completionText = "SYNTH adds an oscillator to the layer; IMPRINT gives it the recording's colour. The recording itself is not changed, and AMOUNT at 0 leaves the layer as it was.";
+        setUp (l, { soundReady() }, "SYNTH blends an oscillator into a recording: use your current sound, or the bowed example.");
         c.lessons.push_back (l);
     }
     {
@@ -509,6 +735,166 @@ static Catalog ospCatalog()
                                  edited ("arp.gate")));
         l.completionText = "The arpeggiator turns the notes you hold into a repeating sequence. The recording itself is not changed.";
         setUp (l, { soundReady() }, "The arpeggiator plays the notes you hold: use your current sound, or the plucked example.");
+        c.lessons.push_back (l);
+    }
+    {
+        // The per-card arpeggiator: PLAYS, LINK and EDIT A | B | C.
+        Lesson l;
+        l.id = "osp.arp.layers";
+        l.title = "Each layer its own arpeggio";
+        l.description = "Let layers play different patterns, or hold their keys.";
+        l.minutes = 4;
+        l.exampleId = "layered";
+        l.steps.push_back (openArpStep());
+        l.steps.push_back (arpOnStep ("Click ARP's light to switch it on, then hold a few notes: both layers play the arpeggio."));
+        l.steps.push_back (step ("plays", "osp.arp.cards", "Choose who plays it",
+                                 "PLAYS A B C chooses which layers play the arpeggio. Click B: it now holds the keys you play while A arpeggiates. Click it again to bring it back.",
+                                 Completion::action ({ andor::learn::actions::arpCardToggled }, Condition::always())));
+        l.steps.push_back (step ("link", "osp.arp.link", "Turn LINK off",
+                                 "With LINK on, every layer plays A's PATTERN, RATE and OCTAVES. Click LINK to turn it off: EDIT A | B | C appears.",
+                                 Completion::action ({ andor::learn::actions::arpLinkChanged }, Condition::state ("osp.arp.unlinked"))
+                                     .withAlreadyDone (Condition::state ("osp.arp.unlinked"), "LINK is already off.")));
+        auto edit = step ("edit", "osp.arp.edit.B", "Edit layer B",
+                          "Click EDIT B. PATTERN, RATE and OCTAVES now show and set layer B's arpeggio; GATE, SWING and VELOCITY stay shared.",
+                          Completion::action ({ andor::learn::actions::arpEditSelected }, Condition::state ("osp.arp.edit.B"))
+                              .withAlreadyDone (Condition::state ("osp.arp.edit.B"), "Layer B is already being edited."));
+        edit.requirements = { unlinked() };
+        l.steps.push_back (edit);
+        auto pattern = step ("pattern", "osp.arp.lane.pattern", "A pattern for B", "Choose another pattern for B, then hold a chord: A and B now play their own patterns together.",
+                             Completion::action ({ andor::learn::actions::arpPatternChanged }, Condition::changed ("arp.cardB.pattern")));
+        Requirement editingB;
+        editingB.id = "osp.arp.editB";
+        editingB.holds = Condition::state ("osp.arp.edit.B");
+        editingB.title = "Layer B is not being edited";
+        editingB.body = "Click EDIT B on the ARP panel's title row.";
+        editingB.targetId = "osp.arp.edit.B";
+        editingB.offerExample = false;
+        pattern.requirements = { unlinked(), editingB };
+        l.steps.push_back (pattern);
+        l.steps.push_back (step ("relink", "osp.arp.link", "LINK again",
+                                 "Turn LINK back on whenever you want every layer to play A's arpeggio again. PLAYS works either way."));
+        l.completionText = "Each layer can play its own pattern, rate and octaves, or hold its keys while the others arpeggiate.";
+        setUp (l, { twoLayers() }, "This lesson needs two layers to hear them play different arpeggios: use your current sound, or the layered example.");
+        c.lessons.push_back (l);
+    }
+    {
+        // Custom ARP patterns (R2): the row, the browser, a factory pattern, the editor.
+        Lesson l;
+        l.id = "osp.arp.custom";
+        l.title = "Use a custom pattern";
+        l.description = "Play a pattern of your own, or one of the factory patterns.";
+        l.minutes = 3;
+        l.exampleId = "pluck";
+        l.steps.push_back (openArpStep());
+        l.steps.push_back (arpOnStep ("Click ARP's light to switch it on, then hold a few notes."));
+        auto row = step ("row", "osp.arp.custom.row", "Open Custom Patterns",
+                         juce::String::fromUTF8 ("At the end of PATTERN's list, after the 18 styles, click Custom Patterns \xe2\x80\xba (scroll the list if it is out of view). "
+                                                 "Its browser lists the layer's own pattern, recent ones, your library and the factory patterns."),
+                         Completion::action ({ andor::learn::actions::arpCustomOpened }, Condition::state ("osp.arp.custom.browser.open"))
+                             .withAlreadyDone (Condition::state ("osp.arp.custom.browser.open"), "The browser is already open."));
+        row.revealOnEnter = false;
+        l.steps.push_back (row);
+        auto choose = step ("choose", "osp.arp.custom.browser", "Choose a factory pattern",
+                            "Open FACTORY PATTERNS and click one. The layer now plays it: hold a chord to hear it. The PATTERN field shows its name.",
+                            Completion::action ({ andor::learn::actions::arpCustomChosen }, Condition::state ("osp.arp.custom.on")));
+        choose.unavailableBody = "The browser is closed. Show me opens it again.";
+        l.steps.push_back (choose);
+        auto pencil = step ("pencil", "osp.arp.custom.pencil", "Open the editor", "Click the pencil beside the pattern's name to open it in the editor.",
+                            Completion::action ({ andor::learn::actions::arpCustomEditorOpened }, Condition::state ("osp.arp.custom.editor.open"))
+                                .viaMenu()
+                                .withAlreadyDone (Condition::state ("osp.arp.custom.editor.open"), "The editor is already open."));
+        pencil.requirements = { customChosen() };
+        pencil.revealOnEnter = false;
+        l.steps.push_back (pencil);
+        auto editor = step ("editor", "osp.arp.custom.editor", "The editor",
+                            "The grid is the pattern: each note on its rank (1 is the lowest note you hold), rests as gaps. Drag a note up or down, or its edge for its length. "
+                            "APPLY PATTERN keeps your changes on the layer; CANCEL puts it back as it was.");
+        editor.unavailableBody = "The editor is closed. Click the pencil beside the pattern's name to open it again.";
+        l.steps.push_back (editor);
+        l.completionText = "A custom pattern plays on the layer like a style. Choose a style from the list again to leave it; the pattern is kept with the sound.";
+        setUp (l, { soundReady() }, "A custom pattern plays the notes you hold: use your current sound, or the plucked example.");
+        c.lessons.push_back (l);
+    }
+    {
+        // STRUM (docs/research/arp-strum): the Chord pattern's notes one after another.
+        Lesson l;
+        l.id = "osp.arp.strum";
+        l.title = "Strum a chord";
+        l.description = "Spread each chord's notes like a strummed guitar.";
+        l.minutes = 3;
+        l.exampleId = "pluck";
+        l.steps.push_back (openArpStep());
+        l.steps.push_back (arpOnStep ("Click ARP's light to switch it on, then hold a chord."));
+        l.steps.push_back (step ("chord", "osp.arp.pattern", "Choose Chord",
+                                 "Choose Chord in PATTERN's list: each step plays every note you hold at once. STRUM plays only with Chord.",
+                                 Completion::action ({ andor::learn::actions::arpPatternChanged }, Condition::state ("osp.arp.strum.chord"))
+                                     .withAlreadyDone (Condition::state ("osp.arp.strum.chord"), "Chord is already chosen.")));
+        auto on = step ("strum", "osp.arp.strum.light", "Switch STRUM on",
+                        "Click the light on STRUM's key, on the ARP panel's title row. Each chord's notes now start one after another.",
+                        Completion::action (laneActions ("strum.on"), Condition::state ("osp.arp.strum.on"))
+                            .withAlreadyDone (Condition::state ("osp.arp.strum.on"), "STRUM is already on."));
+        on.requirements = { chordPattern() };
+        l.steps.push_back (on);
+        auto open = step ("panel", "osp.arp.strum", "Open STRUM", "Click the word STRUM to open its panel. The display draws the sweep: the chord's notes along the spread, in the order they start.",
+                          Completion::action ({ andor::learn::actions::touched ("osp.arp.strum") }, Condition::state ("osp.arp.strum.open"))
+                              .viaMenu()
+                              .withAlreadyDone (Condition::state ("osp.arp.strum.open"), "STRUM's panel is already open."));
+        open.revealOnEnter = false;
+        l.steps.push_back (open);
+        const juce::String closed = "STRUM's panel is closed. Show me opens it again.";
+        auto direction = step ("direction", "osp.strum.direction", "Choose the direction",
+                               "UP plays from the lowest note to the highest, DOWN the other way, RANDOM a new order each chord, ALT up then down.",
+                               Completion::action (laneActions ("strum.direction"), Condition::always()));
+        direction.unavailableBody = closed;
+        l.steps.push_back (direction);
+        auto spreadActions = laneActions ("strum.ms");
+        spreadActions.addArray (laneActions ("strum.division"));
+        auto spread = step ("spread", "osp.strum.spread", "Set the SPREAD",
+                            "SPREAD is the time from the first note to the last: in milliseconds (FREE), or a note value at the tempo (SYNC). A strum never reaches into the next step.",
+                            Completion::action (spreadActions, Condition::always()));
+        spread.unavailableBody = closed;
+        l.steps.push_back (spread);
+        l.completionText = "STRUM spreads each chord the Chord pattern plays. With LINK off, each layer has its own STRUM.";
+        setUp (l, { soundReady() }, "STRUM spreads the chords you hold: use your current sound, or the plucked example.");
+        requireOn (l, { "direction", "spread" }, chordPattern());
+        c.lessons.push_back (l);
+    }
+    {
+        // SATELLITE: each layer's own movement in the stereo field.
+        Lesson l;
+        l.id = "osp.satellite";
+        l.title = "Move each layer in the stereo field";
+        l.description = "Let a layer pan, orbit or bounce on its own.";
+        l.minutes = 3;
+        l.exampleId = "layered";
+        l.steps.push_back (openArpStep());
+        auto open = step ("panel", "osp.arp.satellite", "Open SATELLITE",
+                          "SATELLITE sits on the ARP panel's title row. Click the word SATELLITE to open its panel; it works with the arpeggiator on or off.",
+                          Completion::action ({ andor::learn::actions::touched ("osp.arp.satellite") }, Condition::state ("osp.arp.satellite.open"))
+                              .viaMenu()
+                              .withAlreadyDone (Condition::state ("osp.arp.satellite.open"), "SATELLITE's panel is already open."));
+        open.revealOnEnter = false;
+        l.steps.push_back (open);
+        l.steps.push_back (step ("on", "osp.arp.satellite.light", "Switch it on",
+                                 "Click the light on SATELLITE's key (or the panel's own light) and play: the layer starts to move.",
+                                 Completion::action (satelliteActions ({ "enabled" }), Condition::state ("osp.satellite.on"))
+                                     .withAlreadyDone (Condition::state ("osp.satellite.on"), "SATELLITE is already on.")));
+        const juce::String closed = "SATELLITE's panel is closed. Show me opens it again.";
+        auto mode = step ("mode", "osp.satellite.mode", "Choose the movement",
+                          "PAN moves the layer from side to side. ORBIT takes it round you, quieter and darker behind. BOUNCE jumps it from one side to the other.",
+                          Completion::action (satelliteActions ({ "mode" }), Condition::always()));
+        mode.unavailableBody = closed;
+        l.steps.push_back (mode);
+        auto rate = step ("rate", "osp.satellite.rate", "Set the RATE", "RATE sets how fast it moves: in cycles a second (FREE), or one cycle per note value at the tempo (SYNC).",
+                          Completion::action (satelliteActions ({ "rate", "division" }), Condition::always()));
+        rate.unavailableBody = closed;
+        l.steps.push_back (rate);
+        auto layers = step ("layers", "osp.arp.satellite.panel", "One per layer",
+                            "A, B and C at the top of the panel choose whose movement it shows; choosing never switches one on. Give each layer its own path and they spread around you.");
+        layers.unavailableBody = closed;
+        l.steps.push_back (layers);
+        l.completionText = "SATELLITE moves each layer on its own, PAN, ORBIT or BOUNCE, in time or free. The recording itself is not changed.";
+        setUp (l, { soundReady() }, "SATELLITE moves the layers you play: use your current sound, or the layered example.");
         c.lessons.push_back (l);
     }
     {
@@ -754,6 +1140,38 @@ static Catalog ospCatalog()
           "CORE holds the six main sound controls. USER holds six macros you assign yourself: right-click a knob and choose Assign to Macro, or drag the light under a USER knob onto it.",
           "osp.usermacros");
     help ("osp.arp.control", "ARP", "Plays the notes you hold as a repeating pattern. The light switches it on; the rest of the key opens its settings.", "osp.arp");
+    help ("osp.arp.cards", "PLAYS", "Which layers play the arpeggio. A layer that is off holds the keys you play instead, while the others arpeggiate.", "osp.arp.layers");
+    help ("osp.arp.link", "LINK", "On: every layer plays A's PATTERN, RATE and OCTAVES. Off: each layer has its own, chosen with EDIT A | B | C.", "osp.arp.layers");
+    help ("osp.arp.edit", "EDIT A | B | C", "With LINK off: whose PATTERN, RATE and OCTAVES the panel shows and sets. GATE, SWING and VELOCITY are shared by every layer.",
+          "osp.arp.layers");
+    help ("osp.arp.custom.row", "Custom Patterns",
+          "The last row of PATTERN's list: opens the browser of custom patterns (the layer's own, recent ones, your library, the factory patterns). Lit while the layer plays one.",
+          "osp.arp.custom");
+    help ("osp.arp.custom.pencil", "Edit the pattern", "Opens the layer's custom pattern in the editor.", "osp.arp.custom");
+    help ("osp.arp.custom.browser", "Custom Patterns browser", "Click a pattern to play it on the layer; Edit opens the current one in the editor; + New Pattern starts an empty one.",
+          "osp.arp.custom");
+    help ("osp.arp.custom.editor", "Custom pattern editor",
+          "The pattern as a grid of steps, each note on its rank (1: the lowest note held). APPLY PATTERN keeps it on the layer; CANCEL leaves it as it was. Save to Library is in its menu.",
+          "osp.arp.custom");
+    help ("osp.arp.strum", "STRUM",
+          "Plays each chord's notes one after another, like a strum. It plays only with the Chord pattern: on with another pattern, its light is dimmed. The light switches it; the name opens its panel.",
+          "osp.arp.strum");
+    help ("osp.arp.strum.panel", "STRUM panel", "DIRECTION (UP, DOWN, RANDOM, ALT) and SPREAD, the time from the first note to the last (FREE in ms, or SYNC to the tempo). A, B, C choose whose settings it shows.",
+          "osp.arp.strum");
+    help ("osp.arp.satellite", "SATELLITE", "Moves each layer in the stereo field on its own. The light switches it; the name opens its panel.", "osp.satellite");
+    help ("osp.arp.satellite.panel", "SATELLITE panel",
+          "PAN, ORBIT or BOUNCE; RATE free or in time; DEPTH, WIDTH, PHASE and OFFSET. A, B, C choose whose movement it shows (choosing never switches one on).", "osp.satellite");
+    help ("osp.source.rec", "REC", "Opens this layer's CAPTURE page: record from OSP's audio input, or grab what was just played. Its dot turns red while a take is recording.",
+          "osp.capture");
+    help ("osp.capture.page", "CAPTURE",
+          "The input's level as a scrolling picture. RECORD starts a take and STOP keeps it (a minute at most); GRAB LAST keeps the last 10, 20, 30 or 60 s. A kept take becomes this layer's sound, its notes mapped.",
+          "osp.capture");
+    help ("osp.capture.record", "RECORD / STOP", "RECORD starts a take for this layer; STOP keeps it. DISCARD, shown while recording, throws the take away.", "osp.capture");
+    help ("osp.capture.grab", "GRAB LAST", "Keeps what arrived at the input in the last 10, 20, 30 or 60 seconds, without having pressed RECORD.", "osp.capture");
+    help ("osp.source.synth", "SYNTH", "This layer's own oscillator, blended into its voices. Drag the amount; click SYNTH to open its page.", "osp.synth");
+    help ("osp.synth.page", "SYNTH page",
+          "ANALOG or IMPRINT, AMOUNT, WAVE, OCTAVE, DETUNE, TONE, SHAPE (Held or Follow) and PITCH. IMPRINT lays the recording's own spectral envelope on the oscillator; MOTION lets it move as the recording did.",
+          "osp.synth");
     help ("osp.sub.row", "SUB", "A sub-bass one or two octaves below the keys you hold, added after the effects. The light switches it on; the row opens WAVE, GRIT, LEVEL and its key range.",
           "osp.sub");
     help ("osp.mod.panel", "AMP, ENV, LFO", "AMP shapes each note's volume (A D S R). ENV and LFO 1 / 2 are movements you connect to controls by dragging their tab onto a knob.",
@@ -988,6 +1406,164 @@ struct OspLearnTargets
                  [&e, expandArp] { const bool shown = expandArp(); e.arpPanel.setEditCard (0); return shown; }, ownCard });
         t.add ({ "osp.arp.gate", [&e] { return findTagged (&e.arpPanel, "arp.gate"); }, {}, expandArp });
 
+        // The per-card arpeggiator on the panel's title row (painted: the panel's own geometry).
+        auto cardsShown = [&e] { return e.arpPanel.showsCards(); };
+        auto unlinkedNow = [&e] { return e.arpPanel.showsCards() && ! e.arpPanel.isLinked(); };
+        t.add ({ "osp.arp.cards", panel, [&e] (juce::Component&) {
+                     auto r = e.arpPanel.cardChipArea (0);
+                     for (int c = 1; c < 3; ++c)
+                         r = r.getUnion (e.arpPanel.cardChipArea (c));
+                     return r.getSmallestIntegerContainer();
+                 },
+                 expandArp, cardsShown, true });
+        t.add ({ "osp.arp.link", panel, [&e] (juce::Component&) { return e.arpPanel.linkArea().getSmallestIntegerContainer(); }, expandArp, cardsShown, true });
+        t.add ({ "osp.arp.edit", panel, [&e] (juce::Component&) {
+                     auto r = e.arpPanel.editTabArea (0);
+                     for (int c = 1; c < 3; ++c)
+                         r = r.getUnion (e.arpPanel.editTabArea (c));
+                     return r.getSmallestIntegerContainer();
+                 },
+                 expandArp, unlinkedNow, true });
+        for (int c = 0; c < 3; ++c)
+            t.add ({ "osp.arp.edit." + InstrumentHost::layerName (c), panel, [&e, c] (juce::Component&) { return e.arpPanel.editTabArea (c).getSmallestIntegerContainer(); }, expandArp,
+                     unlinkedNow });
+        // PATTERN of the card being edited (never switching the card: the lesson chose it).
+        t.add ({ "osp.arp.lane.pattern", panel,
+                 [&e] (juce::Component&) { return e.arpPanel.patternFieldArea().getUnion (e.arpPanel.patternListArea()).getSmallestIntegerContainer(); }, expandArp });
+
+        // Custom Patterns: the list's last row (the list itself while the row is scrolled out of
+        // view), the pencil, the browser and the editor (anchored popovers).
+        t.add ({ "osp.arp.custom.row", panel, [&e] (juce::Component&) {
+                     const auto row = e.arpPanel.customRowArea();
+                     return (row.isEmpty() ? e.arpPanel.patternListArea() : row).getSmallestIntegerContainer();
+                 },
+                 expandArp, {}, true });
+        t.add ({ "osp.arp.custom.pencil", panel, [&e] (juce::Component&) { return e.arpPanel.pencilArea().getSmallestIntegerContainer(); }, expandArp,
+                 [&e] { return ! e.arpPanel.pencilArea().isEmpty(); }, true });
+        auto anchored = [&e] { return e.popupIndex == OspAudioProcessorEditor::anchoredPopup ? e.popup.get() : nullptr; };
+        auto browser = [anchored] { return dynamic_cast<CustomPatternBrowser*> (anchored()); };
+        auto customEditor = [anchored] { return dynamic_cast<CustomPatternEditor*> (anchored()); };
+        t.add ({ "osp.arp.custom.browser", [browser] { return static_cast<juce::Component*> (browser()); }, {},
+                 [&e, expandArp, browser] {
+                     if (! expandArp())
+                         return false;
+                     if (browser() == nullptr)
+                         e.arpPanel.openCustomBrowser();   // (opening alone changes nothing)
+                     return browser() != nullptr;
+                 },
+                 {}, true });
+        // (No reveal for the editor: its own CANCEL puts the card back, and a lesson never opens it.)
+        t.add ({ "osp.arp.custom.editor", [customEditor] { return static_cast<juce::Component*> (customEditor()); }, {}, {}, {}, true });
+
+        // STRUM and SATELLITE: keys of one design on the title row (the light switches, the name
+        // opens the panel; their touches are reported), and their panels.
+        auto strumKey = [&e] { return e.arpPanel.strumKey(); };
+        auto satelliteKey = [&e] { return e.arpPanel.satelliteKey(); };
+        auto lightOf = [] (juce::Component& c) { return static_cast<SatelliteKey&> (c).lightArea(); };
+        auto openKey = [expandArp] (std::function<SatelliteKey*()> key, std::function<bool()> open) {
+            return std::function<bool()> ([expandArp, key, open] {
+                if (! expandArp() || key() == nullptr)
+                    return false;
+                if (! open())
+                    key()->openPanel();
+                return open();
+            });
+        };
+        auto strumPanel = [anchored] { return dynamic_cast<StrumPanel*> (anchored()); };
+        auto satellitePanel = [anchored] { return dynamic_cast<SatellitePanel*> (anchored()); };
+        auto strumOpen = [strumKey, strumPanel] { return strumKey() != nullptr && strumKey()->isOpen() && strumPanel() != nullptr; };
+        auto satelliteOpen = [satelliteKey, satellitePanel] { return satelliteKey() != nullptr && satelliteKey()->isOpen() && satellitePanel() != nullptr; };
+        const auto openStrum = openKey (strumKey, strumOpen), openSatellite = openKey (satelliteKey, satelliteOpen);
+        t.add ({ "osp.arp.strum", [strumKey] { return static_cast<juce::Component*> (strumKey()); }, {}, expandArp, {}, true, true });
+        t.add ({ "osp.arp.strum.light", [strumKey] { return static_cast<juce::Component*> (strumKey()); }, lightOf, expandArp });
+        t.add ({ "osp.arp.strum.panel", [strumPanel] { return static_cast<juce::Component*> (strumPanel()); }, {}, openStrum, {}, true });
+        t.add ({ "osp.strum.direction", [strumPanel] { auto* s = strumPanel(); return s != nullptr ? static_cast<juce::Component*> (&s->directionControl()) : nullptr; }, {},
+                 openStrum });
+        t.add ({ "osp.strum.spread", [strumPanel]() -> juce::Component* {
+                     auto* s = strumPanel();
+                     if (s == nullptr)
+                         return nullptr;
+                     return s->spreadKnob().isVisible() ? static_cast<juce::Component*> (&s->spreadKnob()) : &s->divisionKnob();
+                 },
+                 {}, openStrum });
+        t.add ({ "osp.arp.satellite", [satelliteKey] { return static_cast<juce::Component*> (satelliteKey()); }, {}, expandArp, {}, true, true });
+        t.add ({ "osp.arp.satellite.light", [satelliteKey] { return static_cast<juce::Component*> (satelliteKey()); }, lightOf, expandArp });
+        t.add ({ "osp.arp.satellite.panel", [satellitePanel] { return static_cast<juce::Component*> (satellitePanel()); }, {}, openSatellite, {}, true });
+        t.add ({ "osp.satellite.mode", [satellitePanel] { auto* s = satellitePanel(); return s != nullptr ? static_cast<juce::Component*> (&s->modeControl()) : nullptr; }, {},
+                 openSatellite });
+        t.add ({ "osp.satellite.rate", [satellitePanel]() -> juce::Component* {
+                     auto* s = satellitePanel();
+                     if (s == nullptr)
+                         return nullptr;
+                     return s->rateKnob().isVisible() ? static_cast<juce::Component*> (&s->rateKnob()) : &s->divisionKnob();
+                 },
+                 {}, openSatellite });
+        t.addState ("osp.arp.unlinked", unlinkedNow);
+        for (int c = 0; c < 3; ++c)
+            t.addState ("osp.arp.edit." + InstrumentHost::layerName (c), [&e, unlinkedNow, c] { return unlinkedNow() && e.arpPanel.editedCard() == c; });
+        t.addState ("osp.arp.custom.browser.open", [browser] { return browser() != nullptr; });
+        t.addState ("osp.arp.custom.editor.open", [customEditor] { return customEditor() != nullptr; });
+        t.addState ("osp.arp.custom.on", [&e, &p] {
+            const int card = e.arpPanel.customCard();
+            return p.customArpDocument (card) != nullptr && p.parameterValue (ids::arpCustom (p.cardArpNamespace(), card)) >= 0.5f;
+        });
+        t.addState ("osp.arp.strum.on", [strumKey] { return strumKey() != nullptr && strumKey()->anyOn(); });
+        t.addState ("osp.arp.strum.chord", [strumKey] { return strumKey() != nullptr && strumKey()->isAvailable(); });
+        t.addState ("osp.arp.strum.open", strumOpen);
+        t.addState ("osp.arp.satellite.open", satelliteOpen);
+        t.addState ("osp.satellite.on", [satelliteKey] { return satelliteKey() != nullptr && satelliteKey()->anyOn(); });
+
+        // Live capture: the edited card's REC key and its CAPTURE page (in the card's well).
+        auto capturePage = [edited]() -> CaptureEditor* { auto* c = edited(); return c != nullptr ? c->captureEditorComponent() : nullptr; };
+        auto openCapture = [edited] {
+            auto* c = edited();
+            if (c == nullptr || c->recToggle() == nullptr)
+                return false;
+            c->setCaptureOpen (true);
+            return c->isCaptureOpen();
+        };
+        auto capturePart = [capturePage] { return Target::Locator ([capturePage] { return static_cast<juce::Component*> (capturePage()); }); };
+        t.add ({ "osp.source.rec", [edited] { auto* c = edited(); return c != nullptr ? static_cast<juce::Component*> (c->recToggle()) : nullptr; }, {}, {}, {}, true });
+        t.add ({ "osp.capture.page", capturePart(), {}, openCapture, {}, true });
+        t.add ({ "osp.capture.record", capturePart(), [] (juce::Component& c) { return static_cast<CaptureEditor&> (c).recordArea().getSmallestIntegerContainer(); }, openCapture, {},
+                 true });
+        t.add ({ "osp.capture.grab", capturePart(), [] (juce::Component& c) {
+                     auto& page = static_cast<CaptureEditor&> (c);
+                     auto r = page.grabArea (0);
+                     for (int i = 1; i < static_cast<int> (CaptureEditor::grabChoices.size()); ++i)
+                         r = r.getUnion (page.grabArea (i));
+                     return r.getSmallestIntegerContainer();
+                 },
+                 openCapture, {}, true });
+        t.add ({ "osp.capture.meter", capturePart(), [] (juce::Component& c) { return static_cast<CaptureEditor&> (c).pictureArea().getSmallestIntegerContainer(); }, openCapture });
+        t.addState ("osp.capture.open", [edited] { auto* c = edited(); return c != nullptr && c->isCaptureOpen(); });
+        t.addState ("osp.capture.recording", [&p] { return p.recordingLayer() >= 0; });
+        t.addState ("osp.capture.connected", [&p] { return p.captureInputConnected(); });
+
+        // SYNTHESIZE: the chip in the well's corner and its SYNTH page.
+        auto synthPage = [edited]() -> SynthEditor* { auto* c = edited(); return c != nullptr ? c->synthEditorComponent() : nullptr; };
+        auto openSynth = [edited] {
+            auto* c = edited();
+            if (c == nullptr || c->synthesizeControl() == nullptr)
+                return false;
+            c->setSynthOpen (true);
+            return c->isSynthOpen();
+        };
+        auto synthPart = [synthPage] { return Target::Locator ([synthPage] { return static_cast<juce::Component*> (synthPage()); }); };
+        auto choice = [] (const char* name) {
+            return Target::Area ([name] (juce::Component& c) { return static_cast<SynthEditor&> (c).choiceArea (name).getSmallestIntegerContainer(); });
+        };
+        t.add ({ "osp.source.synth", [edited] { auto* c = edited(); return c != nullptr ? static_cast<juce::Component*> (c->synthesizeControl()) : nullptr; }, {}, {}, {}, true });
+        t.add ({ "osp.synth.page", synthPart(), {}, openSynth, {}, true });
+        t.add ({ "osp.synth.amount", [synthPage, &p] { return findTaggedChild (synthPage(), InstrumentHost::synthesizeId (p.editLayer())); }, {}, openSynth });
+        t.add ({ "osp.synth.mode", synthPart(), choice ("mode"), openSynth });
+        t.add ({ "osp.synth.wave", synthPart(), choice ("wave"), openSynth });
+        t.add ({ "osp.synth.shape", synthPart(), choice ("shape"), openSynth });
+        t.add ({ "osp.synth.imprint", synthPart(), [] (juce::Component& c) { return static_cast<SynthEditor&> (c).imprintFieldArea().getSmallestIntegerContainer(); }, openSynth });
+        t.add ({ "osp.synth.motion", synthPart(), [] (juce::Component& c) { return static_cast<SynthEditor&> (c).motionFieldArea().getSmallestIntegerContainer(); }, openSynth });
+        t.addState ("osp.synth.open", [edited] { auto* c = edited(); return c != nullptr && c->isSynthOpen(); });
+        t.addState ("osp.synth.imprint", [&p] { return p.parameterValue (InstrumentHost::synthParameterId (p.editLayer(), "mode")) >= 0.5f; });
+
         // Modulation: the panel, LFO 1's tab (a click selects it; a drag connects it) and page.
         auto lfoPage = [&e, &p] { e.modPanel.showTab (2); p.setModPanelTab (2); return e.modPanel.tab() == 2; };
         t.add ({ "osp.mod.panel", comp (e.modPanel), {}, {}, {}, true });
@@ -1213,6 +1789,31 @@ void OspAudioProcessorEditor::createLearn()
             if (popupIndex == reimaginedPopup + l)
                 learnAction ("reimagined.opened", "osp.source.reimagined.label");
         };
+        // REC opens the CAPTURE page; the SYNTH chip's label opens the SYNTH page (their own
+        // handlers: a reveal opens them without reporting).
+        if (auto* rec = card.recToggle())
+        {
+            auto click = rec->onClick;
+            rec->onClick = [this, click, &card] {
+                if (click != nullptr)
+                    click();
+                if (card.isCaptureOpen())
+                {
+                    hookCapturePage (card.captureEditorComponent());
+                    learnAction ("capture.opened", "osp.source.rec");
+                }
+            };
+        }
+        if (auto* chip = card.synthesizeControl())
+        {
+            auto open = chip->onOpenPage;
+            chip->onOpenPage = [this, open, &card] {
+                if (open != nullptr)
+                    open();
+                if (card.isSynthOpen())
+                    learnAction ("synth.opened", "osp.source.synth");
+            };
+        }
     }
     for (int i = 0; i < frame::macroCount; ++i)
         if (auto* label = macros[static_cast<std::size_t> (i)].label.get())
@@ -1289,6 +1890,12 @@ void OspAudioProcessorEditor::learnAction (const juce::String& actionId, const j
         learn->userAction (actionId, targetId, parameterId, andor::learn::Origin::userPointer);
 }
 
+void OspAudioProcessorEditor::hookCapturePage (CaptureEditor* page)
+{
+    if (page != nullptr && page->onUserAction == nullptr)
+        page->onUserAction = [this] (const juce::String& action) { learnAction (action, "osp.capture.page"); };
+}
+
 void OspAudioProcessorEditor::tickLearn()
 {
     if (learn == nullptr)
@@ -1301,6 +1908,11 @@ void OspAudioProcessorEditor::tickLearn()
     // KEY DNA's own edits (its window is made when it opens).
     if (keyDnaPanel != nullptr && keyDnaPanel->onUserEdit == nullptr)
         keyDnaPanel->onUserEdit = [this] (const juce::String& what) { learnAction ("keydna." + what, "osp.keydna.graph"); };
+    // The CAPTURE pages' own clicks (each page is made when it opens: a card's, or the empty
+    // instrument's).
+    for (int layer = 0; layer < OspAudioProcessor::numLayers; ++layer)
+        hookCapturePage (cards[static_cast<std::size_t> (layer)]->captureEditorComponent());
+    hookCapturePage (newLayerCapture.get());
     // A step on a granular control keeps the strip showing (it otherwise follows the pointer).
     if (learn->noteKind() == andor::learn::LearnController::NoteKind::lesson)
         if (const auto* s = learn->runner().step(); s != nullptr && (s->targetId.startsWith ("osp.granular.") || s->targetId == "osp.source.keyDna"))

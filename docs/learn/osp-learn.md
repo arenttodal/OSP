@@ -1,6 +1,8 @@
 # ANDOR Learn in ANDOR OSP
 
-_15 Nov 2026. Branch `claude/osp-learn-2` (supersedes `claude/osp-learn`, which built on V1)._
+_15 Nov 2026. Branch `claude/osp-learn-2` (supersedes `claude/osp-learn`, which built on V1).
+Updated 20 Nov 2026 on `feature/learn-beta-in-plugin` (from the beta line `claude/macos-release`
+at `9ff2120`): six lessons and 17 Info topics for the beta features (see "Beta readiness" below)._
 
 ANDOR OSP's own plugin (`OspAudioProcessorEditor`) now uses **ANDOR Learn 2.0**, the shared
 framework in `shared/andor-learn` that ANDOR ANALOG uses. OSP has no copy or parallel version of
@@ -63,10 +65,20 @@ gesture, so they report nothing. The adapter also reports the edited layer's `la
   - `MacroPanel::mode` selectors (REIMAGINED, MOVEMENT, DRIVE, FILTER…)
   - LIFE's CHARACTER, TAKES and ORDER
   - the LFO's SHAPE
+- Beta readiness (20 Nov 2026), all opt-in callbacks that are null unless a product sets them:
+  - `ArpInlinePanel::onLearnAction` also reports `arp.custom.opened` (the Custom Patterns row,
+    once its browser is open), `arp.custom.chosen` (a pattern chosen in the browser) and
+    `arp.custom.editor.opened` (the pencil, or the browser's Edit / + New Pattern). ANDOR ANALOG's
+    shell forwards every report to its own Learn, which has no step that accepts these IDs.
+  - `CustomPatternBrowser::onUserChoice`: a row's choice, before the browser closes.
+  - `CaptureEditor::onUserAction`: `capture.record.started`, `capture.kept`, `capture.discarded`,
+    from the page's own click handler.
+  - `andor::learn::actions` gained the three Custom Patterns IDs (constants only).
+  - Nothing painted changed, so no visual reference moves.
 
 ## OSP-specific code
 
-- `apps/plugin/Source/OspLearn.cpp` holds the catalog (11 lessons, 32 Info topics), the targets,
+- `apps/plugin/Source/OspLearn.cpp` holds the catalog (21 lessons, 57 Info topics), the targets,
   the states, `createLearn` / `tickLearn` / `learnAction` and the click hooks.
 - **Click hooks.** The adapter wraps the existing callbacks: card KEY DNA and REIMAGINED, the
   macro labels, ARP's toggle, the mod tab, a mod drop, the preset bar's Library and the drop
@@ -75,7 +87,7 @@ gesture, so they report nothing. The adapter also reports the edited layer's `la
 - **Notes played.** A note played is the processor's note counter, polled on the editor's timer.
 - **Edited-layer tokens.** `layer{L}.…` in a lesson is the edited layer's parameter, and
   `layer{L}.reimagined` is `reimagined` for layer A.
-- **Tutorial sounds.** `apps/plugin/Source/TutorialSounds.*` writes five examples from fixed
+- **Tutorial sounds.** `apps/plugin/Source/TutorialSounds.*` writes six examples from fixed
   seeds, so they are ours to ship and identical everywhere. They go once to
   `<user application data>/ANDOR/OSP/Tutorial Sounds` (`OSP_TUTORIAL_DIR` overrides it) and load
   through the normal sample path, so a session recalls them like any recording.
@@ -85,6 +97,7 @@ gesture, so they report nothing. The adapter also reports the edited layer's `la
   - **voice:** A3 (formant vowel).
   - **layered:** bowed plus voice.
   - **pluckSet:** G3, C4, G4 and D5, two takes each, as one multi-sample layer.
+  - **phrase:** a sung phrase of seven notes, for MAP NOTES.
 
   They are synthetic; the lessons call them "the bowed note" and so on, never recordings of real
   instruments.
@@ -103,16 +116,25 @@ to presets or sessions (progress is a per-user file), and no DSP file changed.
 | Group | Lesson (id) | Steps (after the set-up step) | Example | Required |
 |---|---|---|---|---|
 | Start here | Quick Start (`osp.quickstart`) | load (its set-up: waits for the analysis), play, START, LEVEL, REIMAGINED, back to 0 % | bowed | a playable sound |
+| | From a phrase to an instrument (`osp.phrase`) | MAP NOTES, play, NOTES, any phrase | phrase | a phrase; its notes mapped |
+| | Record or grab from an input (`osp.capture`, beta) | REC (opens CAPTURE), the input, GRAB LAST, keep a take (RECORD / STOP or GRAB LAST), play its notes | bowed | a card before the take; an input for the take; the take's notes mapped |
 | Working with recordings | One Shot & Granular (`osp.playback`) | the playback key, One Shot, Granular, POS, SIZE, DENS, SPREAD, compare | bowed | a sound; Granular for POS…SPREAD |
 | | REIMAGINED (`osp.reimagined`) | find, open (label), KALEIDOSCOPE, TAPE FRAME, TOYBOX, MOSAIC, MIRAGE, amount | bowed | a sound |
+| | Blend in SYNTH and IMPRINT (`osp.synth`, beta) | the SYNTH chip (opens the page), AMOUNT, WAVE, SHAPE, IMPRINT, how much IMPRINT, MOTION | bowed | a sound; IMPRINT chosen for its two controls |
 | | Layering sounds (`osp.layers`) | add (waits), play, B's LEVEL, S on, S off, B's TUNE, different modes, a third layer | layered | a sound; two layers after "add" |
 | | Multi-sample instruments (`osp.multisample`) | one sound from many files, play across, open Samples, root, takes and roles, velocity layers | pluck set | a multi-sample layer |
 | Playing and shaping | LIFE: natural variation (`osp.life`) | LIFE 0 %, LIFE up, open, PITCH, TONE, ATTACK, TAKES | pluck | a sound |
 | | KEY DNA (`osp.keydna`) | Granular, open, what it does, on, POS depth, SIZE or DENS, AMOUNT | bowed | a sound; Granular after its step |
 | | Arpeggiator (`osp.arp`) | open, on, PATTERN, RATE, OCTAVES, GATE | pluck | a sound |
+| | Each layer its own arpeggio (`osp.arp.layers`, beta) | open, on, PLAYS, LINK off, EDIT B, B's pattern, LINK again | layered | two layers; LINK off and B edited for B's pattern |
+| | Use a custom pattern (`osp.arp.custom`, beta) | open, on, Custom Patterns ›, a factory pattern, the pencil, the editor | pluck | a sound; a custom pattern for the pencil |
+| | Strum a chord (`osp.arp.strum`, beta) | open, on, Chord, STRUM's light, its panel, DIRECTION, SPREAD | pluck | a sound; Chord for STRUM |
+| | Move each layer in the stereo field (`osp.satellite`, beta) | open ARP, SATELLITE's panel, its light, PAN / ORBIT / BOUNCE, RATE, one per layer | layered | a sound |
 | | SUB (`osp.sub`, added with SUB: docs/sub/osp-sub.md) | open (the housing's SUB row), on (its light), hold a chord, LEVEL, range | bowed | none (SUB plays without a recording) |
+| | Add vibrato to a recording (`osp.vibrato`) | MOD, VIBRATO on, the wheel controls it, DEPTH, RATE, the wheel up, DELAY / RISE, SOURCES | bowed | a sound |
 | | Modulation (`osp.modulation`) | LFO 1 tab, SHAPE (SINE), RATE, connect (drag), depth (ring), listen | bowed | a sound |
 | | Shape the sound (`osp.sound`) | FILTER, DRIVE, MOVEMENT (open), a movement, ECHO, SPACE, compare | bowed | a sound |
+| | Create a macro (`osp.usermacros`) | USER, a right-click on LEVEL, Macro 1, its range, turn it, review | pluck | a sound |
 | Managing sounds | Presets and instruments (`osp.presets`) | Library, what a preset keeps, Save…, Export instrument…, Open instrument file… | bowed | a sound |
 
 **Set-up and requirements.** Every lesson but Quick Start opens with a set-up step: **Use
@@ -133,9 +155,11 @@ playback key.
   - Export and Open instrument (writing a file only to finish a lesson is not asked).
 
 **Not taught, on purpose:**
-- Analog's per-card PLAYS / LINK. They exist in OSP's arpeggiator, but the specification keeps
-  them out.
 - SHAPER DNA.
+- MIDI Learn (after the beta).
+
+(PLAYS / LINK / EDIT were left out of the first OSP curriculum; the beta readiness work teaches
+them in `osp.arp.layers`.)
 
 ## Control-target inventory
 
@@ -166,13 +190,28 @@ against current component bounds.
 | `osp.samples[.role/.root/.layer]` | the Samples inspector (its first file's lists) | a multi-sample layer, inspector open | shows the inspector |
 | `osp.library[.save]` | the Library window / its Save… key | Library open | opens the Library |
 | `osp.keyboard`, `osp.advanced` | keyboard / Advanced card | always | Advanced opens its popover |
+| `osp.arp.{cards,link,edit}`, `osp.arp.edit.{A,B,C}` | the panel's painted parts: `cardChipArea` (A, B, C together), `linkArea`, `editTabArea` | the per-card row; EDIT with LINK off | expands the panel |
+| `osp.arp.lane.pattern` | the pattern field + list of the card being edited (never switching it) | panel open | expands the panel |
+| `osp.arp.custom.row` / `.pencil` | `customRowArea` (the list while the row is scrolled out of view) / `pencilArea` | panel open / a custom pattern on | expands the panel |
+| `osp.arp.custom.browser` / `.editor` | the anchored Custom Patterns browser / editor | open | opens the browser / none (the editor's CANCEL owns the card) |
+| `osp.arp.strum[.light]`, `osp.arp.satellite[.light]` | the title-row keys (`strumKey`, `satelliteKey`; `.light`: their light part). Touches are watched (`<id>.touched`) | panel open | expands the panel |
+| `osp.arp.strum.panel`, `osp.strum.{direction,spread}` | the STRUM popover, DIRECTION, the shown SPREAD knob (ms or division) | STRUM's panel open | opens it from its key |
+| `osp.arp.satellite.panel`, `osp.satellite.{mode,rate}` | the SATELLITE popover, PAN / ORBIT / BOUNCE, the shown RATE knob | SATELLITE's panel open | opens it from its key |
+| `osp.source.rec` | the edited card's REC key | a layer | — (opening is the task) |
+| `osp.capture.{page,record,grab,meter}` | the card's CAPTURE page; `recordArea`, the four `grabArea`s, `pictureArea` | CAPTURE open | opens the page |
+| `osp.source.synth` | the edited card's SYNTH chip | a layer, nothing covering the well | — (opening is the task) |
+| `osp.synth.{page,amount,mode,wave,shape,imprint,motion}` | the SYNTH page; its AMOUNT field (by parameter), `choiceArea` of mode / wave / shape, `imprintFieldArea`, `motionFieldArea` | SYNTH open (IMPRINT / MOTION: in IMPRINT) | opens the page |
 
 **States checked:**
 - `osp.source.ready` (the edited layer is loaded and playable), `osp.source.empty`,
   `osp.layers.two`, `osp.layers.fewerThanTwo`, `osp.source.set`, `osp.source.granular`;
 - `osp.popup.{reimagined,life,movement}.open`, `osp.keydna.open`, `osp.keydna.enabled`,
   `osp.arp.panel.open`, `osp.mod.tab.lfo1`, `osp.mod.lfo1.routed`, `osp.samples.open`,
-  `osp.library.open`.
+  `osp.library.open`;
+- the beta features: `osp.arp.unlinked`, `osp.arp.edit.{A,B,C}`, `osp.arp.custom.{browser.open,
+  editor.open,on}`, `osp.arp.strum.{on,chord,open}`, `osp.arp.satellite.open`, `osp.satellite.on`,
+  `osp.capture.{open,recording,connected}` (`connected` reads `captureInputConnected()`, not the
+  meter, so Learn never takes the page's peak), `osp.synth.open`, `osp.synth.imprint`.
 
 ## Editorial verification
 
@@ -217,11 +256,12 @@ line). The main checks:
 
 ## Tests
 
-`osp_plugin_tests "[learn]"`: 8 cases, 438 assertions, all passing.
+`osp_plugin_tests "[learn]"`: 24 cases, 1862 assertions, all passing (Linux, headless, 20 Nov
+2026).
 
 - **Catalog.**
   - It is valid against the editor's targets.
-  - It has 11 lessons and at least 30 Info topics, with the groups in order.
+  - It has 21 lessons and 57 Info topics, with the groups in order.
   - The menu has Learn 2.0's labels.
   - Learn is idle (no component) until asked.
 - **Quick Start, end to end.**
@@ -249,7 +289,30 @@ line). The main checks:
 - **Reset Tutorials** asks, then resets only OSP's file (ANDOR ANALOG's file is untouched).
   Escape closes the note before the editor's popover.
 - **Info** shows no card regions on an empty instrument. FILTER's help reads "FILTER" / "INFO".
-- **Tutorial sounds** are written once and are byte-identical when regenerated (same seed).
+- **Tutorial sounds** are written once and are byte-identical when regenerated (same seed): all
+  six examples, the phrase included.
+- **Beta features** (the beta readiness work):
+  - Each new lesson exists, starts with its set-up, has at least three user-action tasks and
+    points only at registered targets; the 17 new Info topics exist, each on a registered target
+    with its lesson; the public guides' target and state IDs are registered.
+  - User-origin completion, lesson by lesson. A programmatic open (as Show me does), automation
+    or the processor's own call never completes a step; the musician's click or gesture does:
+    REC's handler, RECORD then STOP on the page, GRAB LAST on the page (and not
+    `grabLast()` called directly), a played note on the take's mapped notes; PLAYS, LINK, EDIT B
+    and B's pattern clicked on the panel (A keeps its own); the Custom Patterns row clicked
+    (after `openCustomBrowser()` alone did not count), a factory row chosen, the pencil;
+    Chord clicked in the list, STRUM's light, its name (Learn's touch watcher), DIRECTION and
+    SPREAD; SATELLITE's name and light, ORBIT, RATE; the SYNTH chip's label, AMOUNT, WAVE, SHAPE,
+    IMPRINT, its amount and MOTION.
+  - Without an input the take step is blocked, and its note gives the standalone app's
+    **Options > Audio/MIDI Settings…** and, for a DAW, only "OSP's sidechain input" (no
+    routing in any DAW is claimed: none has been tested on a Mac).
+  - Geometry at 869, 1086 and 1448 px for REC, GRAB LAST, RECORD, the SYNTH chip, WAVE, SHAPE,
+    PLAYS, LINK, EDIT B, Custom Patterns ›, STRUM's light, DIRECTION, SPREAD, SATELLITE, its
+    mode and RATE: the outline equals the control's bounds, inside the window, and the note does
+    not cover it.
+  - Navigation (Show me, Back, Continue, X) in every lesson, the six new ones included, leaves
+    every parameter as it was.
 
 `[learn-shots]` (hidden; `OSP_LEARN_SHOTS=<dir>`) renders every step of every lesson at 1086 and
 869 px, plus the browser, Info, the reset confirmation, a set-up step, a blocked step and a
@@ -264,4 +327,10 @@ loaded example (182 images).
     editor's own entry points (`dropModulation`, parameter gestures), not through an OS pointer.
   - Keyboard focus and Tab order inside notes were not tried with a screen reader.
 - **The tutorial sounds** are synthetic stand-ins. Nobody has listened to them on monitors yet.
-- **ANDOR ANALOG** has not been rebuilt against the shared changes (see above).
+- **ANDOR ANALOG** has not been rebuilt against the shared changes (see above). In this
+  repository the shell's Learn tests and the shell products' visual regression ran unchanged.
+- **The beta lessons** ran only in headless tests on Linux. The Custom Patterns test needs the
+  message loop pumped; on macOS it stops after the first click, as the other popover tests do.
+- **CAPTURE A's tab label.** In the headless Linux render the "CAPTURE A" label in the page's
+  top-left looks overdrawn by the card's tool icons. It has not been checked in the standalone
+  app on macOS, so it is not classified as a defect and nothing was changed.

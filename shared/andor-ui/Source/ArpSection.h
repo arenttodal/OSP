@@ -183,9 +183,11 @@ public:
     /** A right-click on OCTAVES (ARP OCTAVES as a modulation destination). */
     std::function<void()> onOctavesMenu;
     /** ANDOR Learn (opt-in, null by default): a musician's committed gesture in the panel (a
-        pattern, an octave key, a card, LINK, an EDIT tab, a RATE knob turned), reported from the
-        handler that made it, after its attachment wrote the parameter. The programmatic calls
-        (choosePattern, toggleCard ...) and parameter callbacks never report. */
+        pattern, an octave key, a card, LINK, an EDIT tab, a RATE knob turned; Custom Patterns'
+        row once its browser is open, a pattern chosen there, the editor opened from the pencil
+        or the browser), reported from the handler that made it, after its attachment wrote the
+        parameter. The programmatic calls (choosePattern, toggleCard, openCustomBrowser ...)
+        and parameter callbacks never report. */
     std::function<void (const juce::String& actionId, const juce::String& parameterId)> onLearnAction;
 
     /** Pulls the scheduler's step display and the parameters (editor timer, ~30 Hz). */

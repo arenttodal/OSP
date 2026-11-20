@@ -1,5 +1,44 @@
 # Status
 
+> **20 Nov 2026, in-plugin Learn for the beta (branch `feature/learn-beta-in-plugin`, from the
+> beta line `claude/macos-release` at `9ff2120`; spec: `docs/learn-studio/beta-readiness-in-
+> plugin-learn.md` on `feature/learn-capture-studio`; details: `docs/learn/osp-learn.md`):**
+> - **Six Learn 2.0 lessons** in `apps/plugin/Source/OspLearn.cpp` (21 lessons now):
+>   `osp.capture` (REC → CAPTURE → RECORD / STOP or GRAB LAST → the take's notes),
+>   `osp.arp.layers` (PLAYS, LINK off, EDIT B, B's own pattern), `osp.arp.custom` (Custom
+>   Patterns › → browser → a factory pattern → the pencil → the editor), `osp.arp.strum` (Chord,
+>   STRUM's light and panel, DIRECTION, SPREAD), `osp.satellite` (panel, light, PAN / ORBIT /
+>   BOUNCE, RATE, one per layer), `osp.synth` (the SYNTH chip, AMOUNT, WAVE, SHAPE Held / Follow,
+>   IMPRINT, MOTION). Each task completes only on the musician's click or gesture.
+> - **17 Info topics** (57 now) and the semantic targets and states for those controls, with the
+>   public guides' IDs. The ARP panel's painted parts use its public geometry (`cardChipArea`,
+>   `linkArea`, `editTabArea`, `customRowArea`, `pencilArea`, the STRUM / SATELLITE keys).
+> - **Shared (opt-in, null by default; nothing painted changed):** `ArpInlinePanel` reports
+>   `arp.custom.opened / .chosen / .editor.opened`; `CustomPatternBrowser::onUserChoice`;
+>   `CaptureEditor::onUserAction`; three constants in `andor::learn::actions`.
+> - **OSP only:** `OspAudioProcessor::captureInputConnected()` (Learn reads the input without
+>   taking the meter's peak). The no-input hint now names JUCE's standalone labels:
+>   "Choose an audio input: Options > Audio/MIDI Settings...". The DAW hint is unchanged and no
+>   lesson claims a DAW's sidechain routing works (none has been tested on a Mac).
+> - **Tests:** `osp_plugin_tests "[learn]"` 24 cases, 1862 assertions (catalog, user-origin
+>   completion lesson by lesson, geometry at 869 / 1086 / 1448 px, navigation never changes the
+>   sound, every tutorial example byte-identical when regenerated, the phrase included).
+>   Full `ctest` on Linux (plugin build, run as CI runs it, without a display): 10 / 10 pass.
+>   Under xvfb, `plugin` stops at "popover macros: the editor closed while a control's menu is
+>   pending" with an X `BadAtom` (PopoverRig takes real windows when a display exists); CI runs
+>   `ctest` without one.
+> - **Docs:** `docs/learn/osp-learn.md` (counts, curriculum, targets, tests), `docs/user-guide.md`
+>   (the ARP key is ARP over SUB, no pattern / rate inset; PLAYS, LINK and EDIT documented).
+> - **CAPTURE A's tab label (to verify on macOS; not changed):** reproduced in the headless Linux
+>   render (`[capture-shots]`, `capture-1-recording.png`): the card's LINK, REVERSE, LOOP and
+>   FOLLOW keys draw over "CAPTURE A". Likely cause: `EngineCard::updateModifiers` does not count
+>   `captureEditor` as taking the well (EQ, NOTE MAP, SYNTH and the well editor do;
+>   `updateWellOverlay` already counts it). Still to check in the standalone app on macOS before
+>   it is called a defect.
+> - **ANDOR ANALOG:** it pins OSP `e7a3834` (`claude/analog-release`), which has neither Custom
+>   Patterns R2 nor CAPTURE, so nothing here reaches it until its pin moves. In this repository
+>   the shell's Learn tests and the shell products' visual regression pass unchanged.
+>
 > **20 Nov 2026, Custom Pattern UX redesign R2 (owner's spec; shared, so ANDOR OSP and every
 > shell product; `docs/research/custom-arp/05-r2.md`):**
 > - **ARP list:** the three custom rows became one, **Custom Patterns ›**, which opens a

@@ -31,6 +31,10 @@ public:
     CustomPatternBrowser (InstrumentHost& host, int card, std::function<void (bool fresh)> openEditor);
 
     static constexpr int width = 300;
+    /** ANDOR Learn (opt-in, null by default): a pattern was chosen by a click on its row (or
+        activate(), which is what the click does), after the card took it and before the browser
+        asks to close. */
+    std::function<void()> onUserChoice;
     juce::Point<int> cardSize() const override;
     bool compact() const override { return true; }
     void paint (juce::Graphics&) override;

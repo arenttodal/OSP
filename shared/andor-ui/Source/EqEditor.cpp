@@ -2008,19 +2008,24 @@ void CaptureEditor::mouseDown (const juce::MouseEvent& e)
         return close();
     if (! view.connected)
         return;
-    bool kept = false;
+    bool kept = false, started = false, discarded = false;
     if (part == "record")
     {
         if (view.recording)
             kept = host.stopTake();
         else
-            host.startTake (layer);
+            started = host.startTake (layer);
     }
     else if (part == "discard")
+    {
+        discarded = view.recording;
         host.cancelTake();
+    }
     else if (part.startsWith ("grab"))
         kept = host.grabLast (grabChoices[static_cast<std::size_t> (part.getTrailingIntValue())], layer);
     refresh();
+    if (onUserAction != nullptr && (kept || started || discarded))
+        onUserAction (kept ? "capture.kept" : started ? "capture.record.started" : "capture.discarded");
     if (kept)
         close();   // the layer shows its new notes
 }

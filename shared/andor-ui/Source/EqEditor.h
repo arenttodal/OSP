@@ -205,6 +205,10 @@ public:
 
     /** The page closes (its close cross, or a take was kept). */
     std::function<void()> onClose;
+    /** ANDOR Learn (opt-in, null by default): what a click on the page did, reported from its
+        own handler after the host acted: "capture.record.started", "capture.kept" (STOP or GRAB
+        LAST kept a take), "capture.discarded". Nothing else reports. */
+    std::function<void (const juce::String& actionId)> onUserAction;
     static constexpr std::array<int, 4> grabChoices { 10, 20, 30, 60 };
 
     /** Where each part sits (tests and the screenshots). */

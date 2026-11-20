@@ -248,6 +248,9 @@ public:
     bool liveCapture() const noexcept override { return true; }
     CaptureView captureView() override;
     int recordingLayer() const noexcept override { return takeStart >= 0 ? takeLayer : -1; }
+    /** An input is connected and kept (captureView().connected without reading the meter, which
+        takes the input's peak: ANDOR Learn asks every tick). */
+    bool captureInputConnected() const noexcept { return captureLive.load (std::memory_order_acquire) && captureRing.isPrepared(); }
     bool startTake (int layer) override;
     bool stopTake() override;
     void cancelTake() override;

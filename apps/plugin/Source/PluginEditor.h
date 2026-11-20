@@ -400,6 +400,8 @@ private:
     int learnNotesSeen = -1;   ///< the processor's played-note count Learn has seen
     void createLearn();
     void tickLearn();
+    /** A CAPTURE page's clicks reported to Learn (once per page: pages are made when they open). */
+    void hookCapturePage (CaptureEditor* page);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessorEditor)
 };
