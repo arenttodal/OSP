@@ -588,7 +588,8 @@ TEST_CASE ("shell: SAVE updates only the musician's own preset; factory presets 
         REQUIRE (ui != nullptr);
         auto& bar = dynamic_cast<osp::plugin::PresetBar&> (ui->presetBarComponent());
         juce::StringArray headers, texts;
-        for (juce::PopupMenu::MenuItemIterator it (bar.presetMenu()); it.next();)
+        const auto presets = bar.presetMenu();   // (kept: the iterator holds a reference)
+        for (juce::PopupMenu::MenuItemIterator it (presets); it.next();)
             (it.getItem().isSectionHeader ? headers : texts).add (it.getItem().text);
         CHECK (headers.indexOf ("Factory") >= 0);
         CHECK (headers.indexOf ("Factory") < headers.indexOf ("Your presets"));
