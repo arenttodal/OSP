@@ -1,0 +1,282 @@
+<title>ANDOR Learn Gate 0</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column for the report; wireframes sit in wide framed panels that scroll inside themselves on phones.
+   Tokens: ANDOR web design system v1 (andor-web/shared/tokens/tokens.css), so the review looks like the site it plans. */
+:root {
+  --bg: #f7f6f2; --bg-2: #edebe5; --bg-elev: #fcfbf8;
+  --text: #242723; --text-2: #5c635a; --muted: #656c63;
+  --accent: #bd653d; --accent-strong: #a4532e;
+  --border: #d8d9d1; --border-strong: #858c82;
+  --display: #1d2321; --display-text: #e9e4da;
+  --ok: #3f7a52; --warn: #a06a12; --no: #a4532e;
+  --sans: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1f2521; --bg-2: #272e29; --bg-elev: #2b332d;
+  --text: #f4f1e9; --text-2: #c4cec1; --muted: #9aa597;
+  --accent: #d08a63; --accent-strong: #d08a63;
+  --border: #3c463e; --border-strong: #7f897f;
+  --display: #151a18; --display-text: #e9e4da;
+  --ok: #7fbf8f; --warn: #d9a54a; --no: #e09a74; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #1f2521; --bg-2: #272e29; --bg-elev: #2b332d;
+  --text: #f4f1e9; --text-2: #c4cec1; --muted: #9aa597;
+  --accent: #d08a63; --accent-strong: #d08a63;
+  --border: #3c463e; --border-strong: #7f897f;
+  --display: #151a18; --display-text: #e9e4da;
+  --ok: #7fbf8f; --warn: #d9a54a; --no: #e09a74; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font: 400 16px/1.55 var(--sans); margin: 0; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.label { font: 500 12px/1.3 var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+h1 { font-weight: 500; font-size: clamp(34px, 5vw, 56px); line-height: 1.04; letter-spacing: -.03em; margin: 8px 0 16px; text-wrap: balance; }
+h2 { font-weight: 500; font-size: clamp(24px, 3vw, 32px); letter-spacing: -.02em; margin: 64px 0 12px; text-wrap: balance; }
+h3 { font-weight: 600; font-size: 17px; margin: 28px 0 8px; }
+p { max-width: 68ch; margin: 0 0 12px; }
+.lede { font-size: 19px; color: var(--text-2); }
+code { font: 13px var(--mono); background: var(--bg-2); padding: 1px 5px; border-radius: 4px; }
+.table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elev); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); background: var(--bg-2); }
+tr:last-child td { border-bottom: 0; }
+td.id { font: 500 13px var(--mono); white-space: nowrap; }
+.yes { color: var(--ok); font-weight: 600; } .part { color: var(--warn); font-weight: 600; } .no { color: var(--no); font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 24px 0 0; }
+.fact { border-top: 2px solid var(--text); padding: 12px 0 0; }
+.fact b { display: block; font-weight: 600; margin-bottom: 4px; }
+.fact span { color: var(--text-2); font-size: 15px; }
+
+/* Wireframe frames */
+.wf { margin: 20px 0 8px; border: 1px solid var(--border-strong); border-radius: 12px; overflow: hidden; background: var(--bg-elev); }
+.wf-bar { display: flex; gap: 8px; align-items: center; padding: 8px 12px; background: var(--bg-2); border-bottom: 1px solid var(--border); font: 12px var(--mono); color: var(--muted); }
+.wf-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--border-strong); opacity: .5; display: inline-block; }
+.wf-bar .url { margin-left: 8px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 2px 10px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wf-scroll { overflow-x: auto; }
+.page { min-width: 760px; padding: 0 28px 28px; background: var(--bg); }
+.nav { display: flex; align-items: center; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-2); }
+.nav .brand { font-weight: 600; color: var(--text); letter-spacing: .02em; }
+.nav .brand em { font-style: normal; font-weight: 400; color: var(--muted); }
+.nav .here { color: var(--text); border-bottom: 2px solid var(--accent); padding-bottom: 2px; }
+.nav .sp { flex: 1; }
+.search { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border-strong); border-radius: 10px; padding: 12px 14px; background: var(--bg-elev); color: var(--muted); font-size: 16px; }
+.search kbd { margin-left: auto; font: 12px var(--mono); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chip { font: 13px var(--mono); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; color: var(--text-2); background: var(--bg-elev); }
+.home-top { display: grid; grid-template-columns: 1.1fr .9fr; gap: 28px; padding: 32px 0 24px; align-items: end; }
+.home-top h4 { font-size: 40px; font-weight: 500; letter-spacing: -.03em; margin: 0 0 8px; }
+.qs { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elev); display: grid; grid-template-columns: 160px 1fr; overflow: hidden; }
+.qs .thumb { background: var(--display); min-height: 104px; }
+.qs div:last-child { padding: 12px 14px; font-size: 14px; }
+.groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--border); }
+.group { padding: 18px 18px 18px 0; border-bottom: 1px solid var(--border); }
+.group:not(:nth-child(3n)) { border-right: 1px solid var(--border); }
+.group:not(:nth-child(3n+1)) { padding-left: 18px; }
+.group b { display: block; font-weight: 600; margin-bottom: 6px; }
+.group ul { list-style: none; margin: 0; padding: 0; font-size: 14px; color: var(--text-2); line-height: 1.75; }
+.foot { display: flex; gap: 24px; padding-top: 20px; font: 12px var(--mono); color: var(--muted); }
+
+.crumbs { font: 12px var(--mono); color: var(--muted); padding: 18px 0 6px; }
+.guide-head h4 { font-size: 34px; font-weight: 500; letter-spacing: -.025em; margin: 0 0 6px; }
+.guide-head p { color: var(--text-2); }
+.guide { display: grid; grid-template-columns: 1.55fr 1fr; gap: 24px; margin-top: 16px; }
+.stage { background: var(--display); border-radius: 10px; padding: 18px; position: relative; }
+.frame { position: relative; border-radius: 6px; overflow: hidden; }
+.frame img { display: block; width: 100%; height: auto; }
+.hl { position: absolute; left: 83.7%; top: 89.5%; width: 4.2%; height: 7.5%; border: 2px solid var(--accent); border-radius: 4px; box-shadow: 0 0 0 3px rgba(189,101,61,.18); }
+.ptr { position: absolute; left: 86.4%; top: 93.2%; width: 18px; height: 22px; }
+.stage-meta { display: flex; justify-content: space-between; margin-top: 12px; font: 12px var(--mono); color: #a9b2a6; }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+.steps li { counter-increment: s; padding: 12px 0 12px 40px; border-bottom: 1px solid var(--border); position: relative; font-size: 14px; color: var(--text-2); }
+.steps li::before { content: counter(s); position: absolute; left: 0; top: 11px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border-strong); font: 500 13px/24px var(--mono); text-align: center; color: var(--text); }
+.steps li b { display: block; color: var(--text); font-weight: 600; font-size: 15px; }
+.steps li.on::before { background: var(--text); color: var(--bg); border-color: var(--text); }
+.steps li.on { color: var(--text); }
+.flag { display: inline-block; margin-top: 4px; font: 11px var(--mono); color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 0 5px; }
+.pn { display: flex; justify-content: space-between; margin-top: 16px; font-size: 14px; }
+.pn a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border-strong); }
+.related { margin-top: 20px; font-size: 14px; color: var(--text-2); }
+
+.ref { display: grid; grid-template-columns: 200px 1fr; gap: 32px; padding-top: 8px; }
+.toc { font-size: 14px; color: var(--text-2); border-right: 1px solid var(--border); padding: 20px 20px 0 0; line-height: 2; }
+.toc b { color: var(--text); }
+.ref-body h4 { font-size: 34px; font-weight: 500; letter-spacing: -.025em; margin: 20px 0 6px; }
+.ref-body h5 { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 20px 0 6px; }
+.ref-body p { font-size: 15px; }
+.ref-body table { font-size: 13px; }
+
+.note { font-size: 14px; color: var(--text-2); margin: 8px 0 0; max-width: 80ch; }
+.note b { color: var(--text); }
+ol.plain, ul.plain { padding-left: 20px; max-width: 72ch; }
+ol.plain li, ul.plain li { margin-bottom: 6px; }
+a { color: var(--accent-strong); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 640px) { .lede { font-size: 17px; } h2 { margin-top: 48px; } }
+</style>
+
+<div class="wrap">
+  <div class="label">ANDOR Learn · Public Visual Guides &amp; Capture Studio · Gate 0</div>
+  <h1>Discovery, architecture and wireframes for review</h1>
+  <p class="lede">Gate 0 read the current code on the release line (<code>6ef3376</code>, 0.9.0-beta.1 plus Custom Pattern UX R2) and ran its Learn, capture and real-window tests. No product, test or website code was written. Five decisions are needed before Gate 1.</p>
+
+  <div class="facts">
+    <div class="fact"><b>Reuse, don't rebuild</b><span>Learn 2.0 targets and states, real-window mouse events, menu compositing, the tutorial sounds and the live-input test path cover most of the capture runner.</span></div>
+    <div class="fact"><b>Shipping plugin unchanged</b><span>The runner is a separate test-only build target. Nothing is added to the plugin for Gates 1–2.</span></div>
+    <div class="fact"><b>Seven features have no Learn coverage</b><span>Live capture, GRAB LAST, per-source ARP, Custom Patterns, STRUM, SATELLITE and SYNTH/IMPRINT have no lesson, target or Info topic.</span></div>
+    <div class="fact"><b>One honest gap</b><span>Routing a DAW track into OSP's Sidechain input has never been tested on a Mac. That guide step stays flagged until it is.</span></div>
+  </div>
+
+  <h2>Decisions needed</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>ID</th><th>Decision</th><th>Recommendation</th></tr></thead>
+    <tbody>
+      <tr><td class="id">D1</td><td>Which product commit the guides document. The default branch (<code>6d07440</code>) is the last PR-merged integration; the beta line (<code>32e0bee</code> → <code>6ef3376</code>) has no PR yet and is the only one with Custom Patterns and the beta version.</td><td><b><code>6ef3376</code></b>, re-pinned at beta freeze. Say whether knob-skin PRs #26 and #28 will land first: they change every frame.</td></tr>
+      <tr><td class="id">D2</td><td>How <code>/learn</code> is hosted next to the Framer site.</td><td>A small static Astro site with Pagefind search and the ANDOR tokens. Path routing by an edge rule if the domain is on Cloudflare; otherwise a <code>learn.</code> subdomain.</td></tr>
+      <tr><td class="id">D3</td><td>How "load a file" is shown. An OS drag cannot be synthesised headlessly; Browse… opens a native dialog.</td><td>Use the editor's real drop handler with a drawn file badge, and say so in the scene's manifest.</td></tr>
+      <tr><td class="id">D4</td><td>Sounds shown in the guides.</td><td>The shipped synthetic tutorial sounds for Gate 1; your own recordings later if you want them.</td></tr>
+      <tr><td class="id">D5</td><td>Frame rate and size.</td><td>30 fps; 1448 px editor captured at 2×; WebM primary, MP4 fallback, no audio.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Coverage of the features you named</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Feature</th><th>In-plugin lesson</th><th>INFO topic</th><th>Capturable through the real UI</th></tr></thead>
+    <tbody>
+      <tr><td>Phrase → MAP NOTES / NOTES</td><td class="yes">From a phrase to an instrument</td><td class="yes">NOTE MAP</td><td class="yes">yes (file drop: see D3)</td></tr>
+      <tr><td>Record from an input</td><td class="no">none</td><td class="no">none</td><td class="part">yes, with a deterministic input fixture; host routing pending</td></tr>
+      <tr><td>GRAB LAST</td><td class="no">none</td><td class="no">none</td><td class="part">yes, same fixture; host routing pending</td></tr>
+      <tr><td>Per-source arpeggiators (PLAYS, LINK, EDIT A|B|C)</td><td class="no">none</td><td class="part">ARP only</td><td class="yes">yes</td></tr>
+      <tr><td>Custom Patterns</td><td class="no">none</td><td class="no">none</td><td class="part">browser and editor yes; MIDI import is a native dialog</td></tr>
+      <tr><td>STRUM (plays only with the Chord pattern)</td><td class="no">none</td><td class="no">none</td><td class="yes">yes</td></tr>
+      <tr><td>SATELLITE (per-layer stereo motion)</td><td class="no">none</td><td class="no">none</td><td class="yes">yes</td></tr>
+      <tr><td>SUB</td><td class="yes">SUB</td><td class="yes">SUB</td><td class="yes">yes</td></tr>
+      <tr><td>SYNTH / IMPRINT</td><td class="no">none</td><td class="no">none</td><td class="yes">yes</td></tr>
+      <tr><td>USER macros</td><td class="yes">Create a macro</td><td class="yes">CORE and USER</td><td class="yes">yes</td></tr>
+      <tr><td>Pitch, mod wheel, vibrato</td><td class="yes">Add vibrato</td><td class="yes">three topics</td><td class="yes">yes</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">The in-plugin catalog has 15 lessons and 40 Info topics; its 15 Nov document still describes 11 and 32. The full matrix of 40 scenes is in <code>docs/learn-studio/curriculum-coverage.md</code>.</p>
+
+  <h2>Wireframe A — Learn OSP home</h2>
+  <p>Find the task immediately. Search first, one Quick Start, six groups, direct links to the features people search for. No dashboard, progress or accounts.</p>
+  <div class="wf" role="img" aria-label="Wireframe of the Learn OSP home page">
+    <div class="wf-bar"><i></i><i></i><i></i><span class="url">andor…/learn/osp/</span></div>
+    <div class="wf-scroll"><div class="page">
+      <div class="nav"><span class="brand">ANDOR<em>/OSP</em></span><span>Instrument</span><span>Sounds</span><span class="here">Learn</span><span>Support</span><span class="sp"></span><span>Download beta</span></div>
+      <div class="home-top">
+        <div>
+          <h4>Learn OSP</h4>
+          <p style="color:var(--text-2);margin:0 0 16px">Short, silent demonstrations of each task, recorded from the real instrument. Version 0.9.0-beta.1.</p>
+          <div class="search">⌕ Search guides, controls and steps <kbd>/</kbd></div>
+          <div class="chips"><span class="chip">grab last</span><span class="chip">map notes</span><span class="chip">strum</span><span class="chip">satellite</span><span class="chip">imprint</span><span class="chip">key dna</span><span class="chip">record</span></div>
+        </div>
+        <div class="qs"><div class="thumb"></div><div><span class="label">Quick start</span><br><b>Load a sound and play it</b><br><span style="color:var(--text-2)">3 steps · 10 s loop</span></div></div>
+      </div>
+      <div class="groups">
+        <div class="group"><b>Make an instrument</b><ul><li>Load a sound and play it</li><li>Turn a phrase into an instrument</li><li>Record from an audio input</li><li>Grab what you just played</li></ul></div>
+        <div class="group"><b>Play and layer</b><ul><li>One Shot and Granular</li><li>Layer two or three sounds</li><li>Load a preset</li></ul></div>
+        <div class="group"><b>SYNTH &amp; IMPRINT</b><ul><li>Blend in SYNTH</li><li>Colour it with IMPRINT</li></ul></div>
+        <div class="group"><b>Arpeggiator</b><ul><li>Arpeggiate held notes</li><li>Each layer its own arpeggio</li><li>Strum a chord</li><li>SATELLITE · SUB · Custom patterns</li></ul></div>
+        <div class="group"><b>Granular &amp; KEY DNA</b><ul><li>Shape the grains</li><li>Vary the sound key to key</li></ul></div>
+        <div class="group"><b>Shape and finish</b><ul><li>REIMAGINED · MOVEMENT</li><li>Modulation · USER macros</li><li>FILTER, ECHO and SPACE</li></ul></div>
+      </div>
+      <div class="foot"><span>Reference</span><span>Support</span><span>Release notes</span><span style="margin-left:auto">Guides match OSP 0.9.0-beta.1</span></div>
+    </div></div>
+  </div>
+  <p class="note"><b>Search</b> indexes titles, every step's instruction, control names as drawn (GRAB LAST, MAP NOTES), synonyms (live input → Record; phrase transformer → MAP NOTES) and tags. A hit on a step opens that step, not the guide's start.</p>
+
+  <h2>Wireframe B — Visual walkthrough</h2>
+  <p>One task, one silent loop, numbered steps. Each step has its own URL; choosing a step plays only its part of the loop. Shown with a real frame from the CAPTURE page, rendered from the current code with the deterministic input fixture.</p>
+  <div class="wf" role="img" aria-label="Wireframe of a guide page: Grab what you just played">
+    <div class="wf-bar"><i></i><i></i><i></i><span class="url">andor…/learn/osp/make-an-instrument/grab-last/#grab-last</span></div>
+    <div class="wf-scroll"><div class="page">
+      <div class="nav"><span class="brand">ANDOR<em>/OSP</em></span><span class="here">Learn</span><span class="sp"></span><span class="search" style="padding:6px 10px;font-size:13px">⌕ Search</span></div>
+      <div class="crumbs">Learn OSP / Make an instrument / Grab what you just played</div>
+      <div class="guide-head"><h4>Grab what you just played</h4><p>OSP keeps the last minute of its audio input. GRAB LAST turns what you just played into this layer's notes, without pressing record first.</p></div>
+      <div class="guide">
+        <div>
+          <div class="stage">
+            <div class="frame">
+              <img alt="The CAPTURE page on layer A: INPUT meter, level picture, STOP, DISCARD and GRAB LAST 10 s, 20 s, 30 s, 60 s" src="data:image/webp;base64,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">
+              <div class="hl"></div>
+              <svg class="ptr" viewBox="0 0 18 22" aria-hidden="true"><path d="M1 1 L1 17 L5.5 13 L8.5 20 L11 19 L8 12 L14 12 Z" fill="#f4f1e9" stroke="#1d2321" stroke-width="1.2" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="stage-meta"><span>Step 3 of 4 · silent loop</span><span>❚❚ Pause</span></div>
+          </div>
+          <div class="pn"><a href="#">← Record from an audio input</a><a href="#">Turn a phrase into an instrument →</a></div>
+        </div>
+        <div>
+          <ol class="steps">
+            <li><b>Send audio to OSP</b>In the standalone app, choose your input. In a DAW, route a track to OSP's Sidechain input.<br><span class="flag">host routing not yet verified</span></li>
+            <li><b>Open CAPTURE</b>Click REC on the layer's card. The INPUT meter shows what arrives.</li>
+            <li class="on"><b>Grab the last seconds</b>Play, then click a length under GRAB LAST, such as 10 s.</li>
+            <li><b>Play the notes</b>OSP maps the notes it heard onto the keys. Play them from the keyboard.</li>
+          </ol>
+          <div class="related"><span class="label">Related</span><br>Record from an audio input · NOTES: see and move mapped notes · Reference: the CAPTURE page</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+  <p class="note"><b>Treatment:</b> real frames only; a small pointer drawn from the exact coordinates the runner clicked; one thin terracotta outline on the active control; 0.8 s hold before and 1.2 s after each action; the loop crossfades back to its first frame. Reduced motion: posters replace the loop and steps advance on click.</p>
+
+  <h2>Wireframe C — Reference article</h2>
+  <p>Exact facts about one feature, for people who already know where they are. No video required.</p>
+  <div class="wf" role="img" aria-label="Wireframe of the SATELLITE reference article">
+    <div class="wf-bar"><i></i><i></i><i></i><span class="url">andor…/learn/osp/reference/satellite/</span></div>
+    <div class="wf-scroll"><div class="page">
+      <div class="nav"><span class="brand">ANDOR<em>/OSP</em></span><span class="here">Learn</span><span class="sp"></span><span class="search" style="padding:6px 10px;font-size:13px">⌕ Search</span></div>
+      <div class="ref">
+        <div class="toc"><b>Reference</b><br>Arpeggiator<br>STRUM<br><b style="color:var(--accent-strong)">SATELLITE</b><br>SUB<br>CAPTURE page<br>NOTES<br>SYNTH &amp; IMPRINT<br>KEY DNA</div>
+        <div class="ref-body">
+          <div class="crumbs" style="padding-top:20px">Learn OSP / Reference</div>
+          <h4>SATELLITE</h4>
+          <h5>Function</h5>
+          <p>Moves each layer in the stereo field on its own path, at a tempo-synced or free rate. It works with or without the arpeggiator.</p>
+          <h5>Location</h5>
+          <p>The ARP panel's title row. The light switches the moving layers on or off; the name opens the panel. The chips A B C show a layer's settings.</p>
+          <h5>Parameters</h5>
+          <div class="table-scroll"><table>
+            <thead><tr><th>Control</th><th>Values</th><th>Does</th></tr></thead>
+            <tbody>
+              <tr><td>Mode</td><td>PAN · ORBIT · BOUNCE</td><td>Side to side; round, quieter and darker behind; from side to side</td></tr>
+              <tr><td>Timing</td><td>SYNC · FREE</td><td>RATE as a note value (4 BARS … 1/32) or in Hz</td></tr>
+              <tr><td>DEPTH · WIDTH</td><td>%</td><td>How far it moves; how wide the path is</td></tr>
+              <tr><td>PHASE · OFFSET</td><td>degrees · position</td><td>Where each layer starts on its path</td></tr>
+            </tbody>
+          </table></div>
+          <h5>Guides</h5>
+          <p><a href="#">Move each layer in the stereo field</a> · <a href="#">Give each layer its own arpeggio</a></p>
+        </div>
+      </div>
+    </div></div>
+  </div>
+  <p class="note">Every value in a reference table is read from the parameter schema at the pinned commit, and the build lists any article whose parameters changed since it was checked.</p>
+
+  <h2>Gate 1 pilot captures</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Scene</th><th>What is filmed</th><th>Guides it serves</th></tr></thead>
+    <tbody>
+      <tr><td class="id">A</td><td>Drop the bowed example on the empty instrument, wait for it to be ready, play three keys.</td><td>Load a sound and play it</td></tr>
+      <tr><td class="id">B</td><td>Drop the sung phrase, answer MAP NOTES, play the mapped keys, open NOTES.</td><td>Turn a phrase into an instrument</td></tr>
+      <tr><td class="id">C</td><td>Feed the input fixture. C1: REC, RECORD, STOP, play. C2: input history first, then REC and GRAB LAST 10 s.</td><td>Record from an audio input · Grab what you just played</td></tr>
+      <tr><td class="id">D</td><td>Three layers. LINK off, B and C on their own patterns, A unlit under PLAYS. Chord + STRUM. SATELLITE ORBIT on B.</td><td>Each layer its own arpeggio · Strum a chord · SATELLITE</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Each pilot delivers a WebM, MP4, poster, scenario file, validation report and the command that regenerates it. A scene that fails any expectation produces no video.</p>
+
+  <h2>What ran during Gate 0</h2>
+  <ul class="plain">
+    <li><code>[learn]</code> passed, 15 cases, 654 assertions. <code>[capture]</code> passed, 8 cases.</li>
+    <li><code>[learn-shots]</code> rendered 238 images in 2 min 10 s. <code>[capture-shots]</code> rendered 7.</li>
+    <li><code>[menu-visual]</code> (real menu windows) passed with Xvfb <code>-noreset</code>, failed without it.</li>
+    <li><code>[popover]</code> (real window, real mouse events) failed on a bare Xvfb; with a window manager it passed 5/6, then 6/6. The runner will use Xvfb with a window manager.</li>
+    <li>To verify, not changed: the CAPTURE page's tab label looks overdrawn by the card's tool icons in the headless render.</li>
+  </ul>
+  <p class="note">Full report: <code>docs/learn-studio/gate-0-report.md</code>. Schemas: <code>content-and-scenario-model.md</code>. Matrix: <code>curriculum-coverage.md</code>.</p>
+</div>

@@ -1,5 +1,19 @@
 # Status
 
+> **20 Nov 2026, ANDOR Learn: public visual guides and capture studio, Gate 0 (branch
+> `feature/learn-capture-studio`, from `6ef3376`; `docs/learn-studio/`):**
+> - **Discovery only:** no product, test or website code changed. Report, coverage matrix
+>   (40 scenes), content and capture-scenario schemas, and wireframes for owner review.
+> - **Findings:** OSP's Learn has 15 lessons and 40 Info topics (its 15 Nov document says 11 and
+>   32); no lesson, target or Info topic for live capture / GRAB LAST, per-source ARP, Custom
+>   Patterns, STRUM, SATELLITE or SYNTH / IMPRINT. Real-window tests need Xvfb `-noreset` and a
+>   window manager on Linux.
+> - **Ran:** `[learn]` 15 cases, `[capture]` 8, `[menu-visual]` 2 (with `-noreset`), `[popover]`
+>   6 (with a window manager; one intermittent failure in two runs), `[learn-shots]` 238 images,
+>   `[capture-shots]` 7 images.
+> - **NEXT:** owner decisions D1–D5 (`docs/learn-studio/gate-0-report.md`), then Gate 1: the
+>   test-only capture runner and four pilot captures.
+>
 > **20 Nov 2026, Custom Pattern UX redesign R2 (owner's spec; shared, so ANDOR OSP and every
 > shell product; `docs/research/custom-arp/05-r2.md`):**
 > - **ARP list:** the three custom rows became one, **Custom Patterns ›**, which opens a
