@@ -1,0 +1,212 @@
+{
+ "id": "D2_TRACK",
+ "family": "Editorial motion",
+ "variant": "D2 Macro row: lateral track",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 12.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 85,
+  "fstop": 16,
+  "position": [
+   [
+    0.0,
+    [
+     0.1376,
+     -0.2924,
+     0.1
+    ],
+    [
+     0.3,
+     0.0,
+     0.7,
+     1.0
+    ]
+   ],
+   [
+    12.0,
+    [
+     0.1624,
+     -0.2676,
+     0.1
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     -0.0874,
+     -0.0674,
+     0.0
+    ],
+    [
+     0.3,
+     0.0,
+     0.7,
+     1.0
+    ]
+   ],
+   [
+    12.0,
+    [
+     -0.0626,
+     -0.0426,
+     0.0
+    ]
+   ]
+  ],
+  "focus": [
+   [
+    0.0,
+    [
+     -0.0924,
+     -0.0774,
+     0.018
+    ],
+    [
+     0.3,
+     0.0,
+     0.7,
+     1.0
+    ]
+   ],
+   [
+    12.0,
+    [
+     -0.0676,
+     -0.0526,
+     0.018
+    ]
+   ]
+  ]
+ },
+ "stage": {
+  "hide_floor": true,
+  "cyc": {
+   "rgb": [
+    0.6,
+    0.565,
+    0.52
+   ],
+   "roughness": 0.9,
+   "radius": 1.4,
+   "wall": 2.2,
+   "height": 5.0,
+   "width": 14.0
+  },
+  "remove_lights": [
+   "Key softbox",
+   "Edge strip",
+   "Overhead",
+   "Fill",
+   "Front kicker",
+   "Low rake"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Rake",
+    "position": [
+     -0.9,
+     0.55,
+     0.13
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     0.9,
+     0.15
+    ],
+    "power": 60,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 180,
+    "link": "product",
+    "glossy_only": false
+   },
+   {
+    "name": "Sky",
+    "position": [
+     0.6,
+     -0.6,
+     0.5
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.2,
+     1.2
+    ],
+    "power": 2,
+    "rgb": [
+     0.93,
+     0.96,
+     1.0
+    ],
+    "spread": 180,
+    "link": "product",
+    "glossy_only": false
+   },
+   {
+    "name": "Hero kicker",
+    "position": [
+     0.1,
+     0.25,
+     0.1
+    ],
+    "target": [
+     -0.047,
+     -0.065,
+     0.015
+    ],
+    "size": [
+     0.1,
+     0.04
+    ],
+    "power": 0.6,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 40,
+    "link": "product",
+    "glossy_only": false
+   }
+  ]
+ },
+ "world": 0.06,
+ "exposure": -0.2,
+ "narrative": "The macro row, tracking: the camera moves 3.5 cm sideways over twelve seconds, centred on the approved still at the midpoint. Focus travels with the camera (the same distance throughout), so the focal plane never hunts: the fluted knobs pass through it one after another, the keys soft in the foreground.",
+ "from_still": "SF_D2"
+}

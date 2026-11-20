@@ -101,7 +101,7 @@ for shot in sorted(os.listdir(a.renders)):
             occ = []
             for f in frames:
                 t = (f - frames[0]) / 24.0
-                v = min(1.0, max(0.0, (t - f0) / (f1 - f0)))
+                v = 1.0 if f1 <= f0 else min(1.0, max(0.0, (t - f0) / (f1 - f0)))   # no fade: the type is there from the cut
                 v = v * v * (3 - 2 * v)
                 L = dict(L0, alpha=L0.get("alpha", 1.0) * v, blur=ty.get("blur_from", 12.0) * (1 - v) + L0.get("blur", 0) * v)
                 comp, meta = compose(Image.open(os.path.join(bdir, f"{f:04d}.png")).convert("RGB"),
@@ -118,6 +118,25 @@ for shot in sorted(os.listdir(a.renders)):
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "24", "-start_number", str(frames[0]), "-i",
                         os.path.join(mdir, "%04d.png"), "-vf", "alphaextract,format=yuv420p", "-c:v", "libx264", "-crf", "17", "-an", mp], check=True)
         rec["matte"] = os.path.relpath(mp, a.out)
+    elif "hero_layout" in ty and os.path.isdir(mdir) and len(os.listdir(mdir)) >= len(frames):
+        # H01: the front-facing hero's wordmark (h01_layouts.json), registered behind the instrument on every frame
+        sys.path.insert(0, os.path.join(HERE, "..", "..", "..", "launch-kit", "typography"))
+        from compose_style_type import compose
+        from compose_h01 import LAYOUTS as HL, centred
+        tdir = os.path.join(a.renders, shot, "type_hero")
+        os.makedirs(tdir, exist_ok=True)
+        occ = []
+        for f in frames:
+            b = Image.open(os.path.join(bdir, f"{f:04d}.png")).convert("RGB")
+            comp, meta = compose(b, Image.open(os.path.join(mdir, f"{f:04d}.png")), centred(HL[ty["hero_layout"]]["wordmark"], *b.size))
+            comp.save(os.path.join(tdir, f"{f:04d}.png"))
+            occ.append(meta["occlusion"])
+        tmp4 = os.path.join(d, name(shot, "type", w, "mp4"))
+        encode(tdir, tmp4, frames[0])
+        sheet([os.path.join(tdir, f"{f:04d}.png") for f in picks], os.path.join(d, name(shot, "type-keyframes", w, "jpg", fps=False)),
+              ["opening", "quarter", "mid", "three-quarter", "closing"])
+        rec["typography_passes"] = {"hero": {"file": os.path.relpath(tmp4, a.out), "layout": ty["hero_layout"],
+                                             "occlusion_at_keyframes": [occ[round(u * (len(occ) - 1))] for u in (0, 0.25, 0.5, 0.75, 1.0)]}}
     elif shot.startswith("R01") and os.path.isdir(mdir) and len(os.listdir(mdir)) >= len(frames):
         tdir = os.path.join(a.renders, shot, "typo")
         layout = "desktop" if shot.endswith("desktop") else "centre"

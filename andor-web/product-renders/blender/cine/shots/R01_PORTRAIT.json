@@ -1,0 +1,137 @@
+{
+ "id": "R01_PORTRAIT",
+ "family": "R01 Monument (cut)",
+ "variant": "Shot 2: the A2 portrait with the wordmark",
+ "setup": "ANDOR_FLOATING",
+ "base_shot": "B1_R4",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 6.5,
+ "handles": 1.0,
+ "camera": {
+  "lens": 65,
+  "fstop": 9,
+  "position": [
+   [
+    0.0,
+    [
+     0.5277,
+     -0.6757,
+     0.4884
+    ],
+    [
+     0.25,
+     0.0,
+     0.35,
+     1.0
+    ]
+   ],
+   [
+    6.5,
+    [
+     0.5359,
+     -0.686,
+     0.4972
+    ]
+   ]
+  ],
+  "target": [
+   -0.01,
+   0.0,
+   -0.09
+  ]
+ },
+ "stage": {
+  "remove_lights": [
+   "Fill",
+   "Front kicker",
+   "Floor overhead"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Monument sweep",
+    "position": [
+     0.75,
+     0.35,
+     0.7
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.4,
+     0.3
+    ],
+    "power": 22,
+    "rgb": [
+     1.0,
+     0.975,
+     0.95
+    ],
+    "spread": 180,
+    "link": "product",
+    "glossy_only": false
+   }
+  ]
+ },
+ "product": {
+  "translate": [
+   0.0,
+   0.0,
+   -0.098
+  ]
+ },
+ "lights": {
+  "Floor rake": {
+   "energy": 0.45
+  },
+  "Top line": {
+   "energy": 0.35
+  }
+ },
+ "exposure": 0.0,
+ "emission": 0.9,
+ "narrative": "Cut out to the portrait: the complete instrument at A2's three-quarter, the ANDOR wordmark standing in the dark behind it, the far corner crossing the foot of the letters. The camera eases back by 1.5 % and settles; the instrument and the type stay registered.",
+ "from_still": "SF_A2",
+ "typography": {
+  "style_layouts": {
+   "T1": [
+    "SF_A2",
+    "T1"
+   ],
+   "T2": [
+    "SF_A2",
+    "T2"
+   ],
+   "T3": [
+    "SF_A2",
+    "T3"
+   ]
+  },
+  "fade": [
+   0.0,
+   0.0
+  ],
+  "blur_from": 0.0
+ }
+}

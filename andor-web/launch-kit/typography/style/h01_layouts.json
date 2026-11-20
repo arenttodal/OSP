@@ -1,0 +1,76 @@
+{
+ "H01_A": {
+  "wordmark": {
+   "cap_height": 0.285,
+   "y": 0.285,
+   "ink": [
+    104,
+    95,
+    86
+   ],
+   "alpha": 0.9,
+   "blur": 0,
+   "falloff": {
+    "centre": [
+     0.5,
+     0.42
+    ],
+    "radius": 0.55,
+    "floor": 0.45
+   }
+  }
+ },
+ "H01_B": {
+  "wordmark": {
+   "cap_height": 0.285,
+   "y": 0.285,
+   "mode": "multiply",
+   "darken": 0.78,
+   "alpha": 1.0,
+   "blur": 0,
+   "falloff": {
+    "centre": [
+     0.5,
+     0.42
+    ],
+    "radius": 0.6,
+    "floor": 0.55
+   }
+  }
+ },
+ "H01_C": {
+  "wordmark": {
+   "cap_height": 0.2,
+   "y": 0.47,
+   "mode": "multiply",
+   "darken": 0.86,
+   "alpha": 1.0,
+   "blur": 0,
+   "falloff": {
+    "centre": [
+     0.5,
+     0.58
+    ],
+    "radius": 0.5,
+    "floor": 0.55
+   }
+  },
+  "web": {
+   "headline": [
+    "One sound.",
+    "An entire instrument."
+   ],
+   "headline_px": 0.058,
+   "headline_y": 0.085,
+   "cta": "Join the beta",
+   "cta_px": 0.024,
+   "cta_gap": 0.035,
+   "ink": [
+    40,
+    36,
+    32
+   ]
+  }
+ },
+ "_note": "multiply mode: the letters keep `darken` of the background's brightness (compose_style_type: ink = 1 - v * (1 - darken))"
+}

@@ -1,0 +1,144 @@
+{
+ "id": "R01_CLOSE",
+ "family": "R01 Monument (cut)",
+ "variant": "Shot 1: close, drifting",
+ "setup": "ANDOR_FLOATING",
+ "base_shot": "B1_R4",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 5.5,
+ "handles": 1.0,
+ "camera": {
+  "lens": 65,
+  "fstop": 6.3,
+  "position": [
+   [
+    0.0,
+    [
+     0.238,
+     -0.378,
+     0.2036
+    ],
+    "linear"
+   ],
+   [
+    5.5,
+    [
+     0.2615,
+     -0.3593,
+     0.2036
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     -0.035,
+     -0.035,
+     -0.09
+    ],
+    "linear"
+   ],
+   [
+    5.5,
+    [
+     -0.0115,
+     -0.0163,
+     -0.09
+    ]
+   ]
+  ],
+  "focus": [
+   [
+    0.0,
+    [
+     -0.06,
+     -0.06,
+     -0.086
+    ],
+    "linear"
+   ],
+   [
+    5.5,
+    [
+     -0.0365,
+     -0.0413,
+     -0.086
+    ]
+   ]
+  ]
+ },
+ "stage": {
+  "remove_lights": [
+   "Fill",
+   "Front kicker",
+   "Floor overhead"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Monument sweep",
+    "position": [
+     0.75,
+     0.35,
+     0.7
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.4,
+     0.3
+    ],
+    "power": 22,
+    "rgb": [
+     1.0,
+     0.975,
+     0.95
+    ],
+    "spread": 180,
+    "link": "product",
+    "glossy_only": false
+   }
+  ]
+ },
+ "product": {
+  "translate": [
+   0.0,
+   0.0,
+   -0.098
+  ]
+ },
+ "lights": {
+  "Floor rake": {
+   "energy": 0.45
+  },
+  "Top line": {
+   "energy": 0.35
+  }
+ },
+ "exposure": 0.0,
+ "emission": 0.9,
+ "narrative": "Close on the instrument from A2's direction, at half the distance: the displays, the macros and the keys run diagonally through the frame in the theatre's warm dark, focus on the macro row. The camera drifts sideways by three centimetres; nothing else moves.",
+ "from_still": "SF_A2"
+}

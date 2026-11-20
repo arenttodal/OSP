@@ -1,0 +1,183 @@
+{
+ "id": "R03_GLIDE",
+ "family": "R03 Above the Sound",
+ "variant": "Immersive flyover: constant glide",
+ "narrative": "R03's lateral track over the three engines at one constant, slow speed (2.5 cm/s): no acceleration, no settling, no change of direction, so any stretch can be cut out and used alone. Sections: A 0-6.5 s, B 5.5-11.5 s, C 10.5-17 s (a second of overlap between each).",
+ "setup": "ANDOR_GALLERY",
+ "base_shot": "A2",
+ "aspect": [
+  16,
+  9
+ ],
+ "seconds": 17.0,
+ "handles": 1.0,
+ "camera": {
+  "lens": 50,
+  "fstop": 8,
+  "position": [
+   [
+    0.0,
+    [
+     -0.275,
+     -0.17,
+     0.0943
+    ],
+    "linear"
+   ],
+   [
+    17.0,
+    [
+     0.145,
+     -0.17,
+     0.1057
+    ]
+   ]
+  ],
+  "target": [
+   [
+    0.0,
+    [
+     -0.195,
+     0.06,
+     -0.0007
+    ],
+    "linear"
+   ],
+   [
+    17.0,
+    [
+     0.225,
+     0.06,
+     0.0007
+    ]
+   ]
+  ],
+  "focus": [
+   [
+    0.0,
+    [
+     -0.175,
+     0.06,
+     0.0093
+    ],
+    "linear"
+   ],
+   [
+    17.0,
+    [
+     0.175,
+     0.06,
+     0.0107
+    ]
+   ]
+  ]
+ },
+ "stage": {
+  "hide_floor": true,
+  "cyc": {
+   "rgb": [
+    0.6,
+    0.565,
+    0.52
+   ],
+   "roughness": 0.9,
+   "radius": 1.4,
+   "wall": 2.2,
+   "height": 5.0,
+   "width": 14.0
+  },
+  "remove_lights": [
+   "Key softbox",
+   "Edge strip",
+   "Overhead",
+   "Fill",
+   "Front kicker",
+   "Low rake"
+  ],
+  "flags": [
+   {
+    "name": "Display flag",
+    "mirror": true,
+    "aim": [
+     0.0,
+     0.065,
+     0.012
+    ],
+    "size": [
+     0.9,
+     0.6
+    ],
+    "distance": 1.0
+   }
+  ],
+  "add_lights": [
+   {
+    "name": "Rake",
+    "position": [
+     -0.9,
+     0.55,
+     0.13
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     0.9,
+     0.15
+    ],
+    "power": 60,
+    "rgb": [
+     1.0,
+     0.95,
+     0.88
+    ],
+    "spread": 180,
+    "link": null
+   },
+   {
+    "name": "Sky",
+    "position": [
+     0.6,
+     -0.6,
+     0.5
+    ],
+    "target": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "size": [
+     1.2,
+     1.2
+    ],
+    "power": 3,
+    "rgb": [
+     0.93,
+     0.96,
+     1.0
+    ],
+    "spread": 180,
+    "link": "product"
+   }
+  ]
+ },
+ "world": 0.1,
+ "exposure": -0.3,
+ "notes": "Light = style frame SF_D1; f/8 (D1: f/5.6) so more of the functional surface stays readable. The display flag follows the camera every frame. Static displays here; the performance version uses Virtual Studio frames.",
+ "sections": {
+  "A": [
+   0.0,
+   6.5
+  ],
+  "B": [
+   5.5,
+   11.5
+  ],
+  "C": [
+   10.5,
+   17.0
+  ]
+ }
+}
