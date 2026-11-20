@@ -1,5 +1,14 @@
 # Status
 
+> **20 Nov 2026, R2 on the ANDOR ANALOG parity line (branch `claude/analog-parity-r1-custom-arp`):**
+> R2 (6ef33767) cherry-picked alone (8d3b3729); the beta's release work, MIDI Learn and the POS
+> line fix are not part of it.
+> - **Card letter:** the Custom Pattern editor and browser named the card by its *shown* layer
+>   (`shownLayerName`). Their card index is already the arpeggiator's (EDIT A / B / C, as shown),
+>   so ANALOG (layers shown A, C, B) labelled card B's editor "CARD C". They now use
+>   `layerName`. ANDOR OSP shows its layers in order, so nothing changes there (its R2 tests,
+>   visual reference and the example product's visual test pass).
+>
 > **20 Nov 2026, Custom Pattern UX redesign R2 (owner's spec; shared, so ANDOR OSP and every
 > shell product; `docs/research/custom-arp/05-r2.md`):**
 > - **ARP list:** the three custom rows became one, **Custom Patterns ›**, which opens a

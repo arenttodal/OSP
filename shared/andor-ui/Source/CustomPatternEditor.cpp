@@ -99,8 +99,11 @@ namespace
 }
 
 //==============================================================================
+// "CARD X" is the card's own letter: the card index is the arpeggiator's (EDIT A / B / C, as
+// shown), never a storage layer, so a product that shows its layers in another order (ANDOR
+// ANALOG: A, C, B) is not relabelled.
 CustomPatternEditor::CustomPatternEditor (InstrumentHost& h, int card, bool fresh)
-    : MiniPanel ("CUSTOM PATTERN", "CARD " + InstrumentHost::shownLayerName (juce::jlimit (0, 2, card))), host (h), cardIndex (juce::jlimit (0, 2, card))
+    : MiniPanel ("CUSTOM PATTERN", "CARD " + InstrumentHost::layerName (juce::jlimit (0, 2, card))), host (h), cardIndex (juce::jlimit (0, 2, card))
 {
     setWantsKeyboardFocus (true);
     if (const auto* d = host.customArpDocument (cardIndex))
@@ -332,7 +335,7 @@ void CustomPatternEditor::perform (Action a)
                 publishPreview();
             else
                 restoreCard();
-            status = previewOn ? "Preview: hold a chord to hear the pattern on card " + InstrumentHost::shownLayerName (cardIndex) : "Preview off (the card as it was)";
+            status = previewOn ? "Preview: hold a chord to hear the pattern on card " + InstrumentHost::layerName (cardIndex) : "Preview off (the card as it was)";
             break;
         case Action::timingSteps: chooseTiming (ap::Interpretation::Timing::steps, doc.interpretation.quantumTicks); return;
         case Action::timingHalf: chooseTiming (ap::Interpretation::Timing::rhythm, arp::ticksPerStep / 2); return;
@@ -1727,7 +1730,7 @@ juce::String CustomPatternEditor::getTooltip()
     const auto at = getMouseXYRelative();
     if (dialog != nullptr)
         return {};
-    const auto card = "card " + InstrumentHost::shownLayerName (cardIndex);
+    const auto card = "card " + InstrumentHost::layerName (cardIndex);
     for (const auto& k : keys)
     {
         if (! keyShown (k.action) || ! k.area.contains (at))
@@ -1949,7 +1952,7 @@ void CustomPatternEditor::paint (juce::Graphics& g)
         const auto c = card().toFloat();
         g.setFont (type::popupLabel (10.0f));
         g.setColour (colour::textMicro);
-        g.drawText ("CARD " + InstrumentHost::shownLayerName (cardIndex), juce::Rectangle<float> (c.getX() + 13.0f + titleW + 10.0f, c.getY() + 7.0f, 80.0f, 20.0f),
+        g.drawText ("CARD " + InstrumentHost::layerName (cardIndex), juce::Rectangle<float> (c.getX() + 13.0f + titleW + 10.0f, c.getY() + 7.0f, 80.0f, 20.0f),
                     juce::Justification::centredLeft, false);
     }
 

@@ -61,7 +61,7 @@ void CustomPatternBrowser::clearRecentForTests()
 }
 
 CustomPatternBrowser::CustomPatternBrowser (InstrumentHost& h, int card, std::function<void (bool)> editor)
-    : MiniPanel ("CUSTOM PATTERNS", "CARD " + InstrumentHost::shownLayerName (juce::jlimit (0, 2, card))), host (h), cardIndex (juce::jlimit (0, 2, card)),
+    : MiniPanel ("CUSTOM PATTERNS", "CARD " + InstrumentHost::layerName (juce::jlimit (0, 2, card))), host (h), cardIndex (juce::jlimit (0, 2, card)),
       openEditor (std::move (editor))
 {
     rebuild();
@@ -81,7 +81,7 @@ void CustomPatternBrowser::rebuild()
 
     // The card's own pattern.
     const auto* current = host.customArpDocument (cardIndex);
-    add (Kind::heading, "ON CARD " + InstrumentHost::shownLayerName (cardIndex));
+    add (Kind::heading, "ON CARD " + InstrumentHost::layerName (cardIndex));
     if (current != nullptr)
         add (Kind::current, juce::String (current->name).isEmpty() ? juce::String ("Custom pattern") : juce::String (current->name), stepsText (*current), keep (*current));
     else
@@ -113,7 +113,7 @@ void CustomPatternBrowser::rebuild()
     std::vector<std::pair<ap::Document, juce::String>> recent;
     for (int c = 0; c < 3; ++c)
         if (const auto* d = c != cardIndex ? host.customArpDocument (c) : nullptr; d != nullptr && listed.insert (d->id).second)
-            recent.emplace_back (*d, "card " + InstrumentHost::shownLayerName (c));
+            recent.emplace_back (*d, "card " + InstrumentHost::layerName (c));
     for (const auto& d : recentList())
         if (listed.insert (d.id).second)
             recent.emplace_back (d, stepsText (d));
