@@ -1,0 +1,19 @@
+{
+ "what": "R02 loop at final quality (1920 px, 96 samples, noise 0.01, fixed seed): body frame 25 (t=0 s) against body frame 289 (t=11 s, the closing frame, dropped from the 264-frame loop)",
+ "results": {
+  "R02_DIM": {
+   "bit_depth": 16,
+   "pixels_differing": 19135,
+   "share_differing": 0.009228,
+   "mean_abs_diff_levels_of_255": 1e-05,
+   "max_levels_of_255": 0.0078
+  },
+  "R02_DIM_R4": {
+   "bit_depth": 16,
+   "pixels_differing": 61444,
+   "share_differing": 0.029632,
+   "mean_abs_diff_levels_of_255": 4e-05,
+   "max_levels_of_255": 0.6848
+  }
+ }
+}

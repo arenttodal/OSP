@@ -122,6 +122,17 @@ The renderer writes a shot's closing frame at exactly t = duration, so every R3 
 | R04 | 16 s | 385 | 384 at final |
 | H01 dolly | 10 s | 241 | 240 at final |
 
-## Loop verification
+## Loop verification (final quality)
 
-(To be completed when the final-quality loop frames finish.)
+**The test:** frames 25 (t = 0 s) and 289 (t = 11 s) of R02, rendered at final quality on the frozen interface, for both versions. Settings: 1920 × 1080, 16-bit, 96 samples, noise 0.01, a fixed seed. The two frames were compared at full 16-bit precision (`loopcheck.json` in the metadata ZIP).
+
+| Version | Largest difference (levels of 255) | Mean difference | Pixels that differ at all |
+|---|---|---|---|
+| R3 (current peak) | 0.008 | 0.00001 | 0.9 % |
+| R4 (peak −0.3 EV) | 0.68 | 0.00004 | 3.0 % |
+
+**Result: the loop is seamless at final quality.** In both versions the first and last frames differ by less than one level anywhere: rounding in the renderer, invisible and below 8-bit output.
+
+**The loop file** is the 264 frames from 0 s to just before 11 s. The closing frame (289) equals the first, so it is dropped and the loop never shows the same frame twice.
+
+**The draft's noise step,** where a light reached exactly zero (R3 doc), is not visible at final quality: the 16-bit comparison above includes those frames' light state.
