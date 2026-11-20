@@ -438,7 +438,7 @@
   <PARAM id="grainBudget" value="3.0"/>
   <PARAM id="layerA.dampen.amount" value="100.0"/>
   <PARAM id="layerA.dampen.cutoff" value="2000.000244140625"/>
-  <PARAM id="layerA.dampen.enabled" value="0.0"/>
+  <PARAM id="layerA.dampen.enabled" value="1.0"/>
   <PARAM id="layerA.dampen.frequency" value="3000.0"/>
   <PARAM id="layerA.dampen.mode" value="0.0"/>
   <PARAM id="layerA.eq.bell.enabled" value="0.0"/>
@@ -518,7 +518,7 @@
   <PARAM id="layerA.tune" value="0.0"/>
   <PARAM id="layerB.dampen.amount" value="100.0"/>
   <PARAM id="layerB.dampen.cutoff" value="2000.000244140625"/>
-  <PARAM id="layerB.dampen.enabled" value="0.0"/>
+  <PARAM id="layerB.dampen.enabled" value="1.0"/>
   <PARAM id="layerB.dampen.frequency" value="3000.0"/>
   <PARAM id="layerB.dampen.mode" value="0.0"/>
   <PARAM id="layerB.eq.bell.enabled" value="0.0"/>
@@ -599,7 +599,7 @@
   <PARAM id="layerB.tune" value="0.0"/>
   <PARAM id="layerC.dampen.amount" value="100.0"/>
   <PARAM id="layerC.dampen.cutoff" value="2000.000244140625"/>
-  <PARAM id="layerC.dampen.enabled" value="0.0"/>
+  <PARAM id="layerC.dampen.enabled" value="1.0"/>
   <PARAM id="layerC.dampen.frequency" value="3000.0"/>
   <PARAM id="layerC.dampen.mode" value="0.0"/>
   <PARAM id="layerC.eq.bell.enabled" value="0.0"/>

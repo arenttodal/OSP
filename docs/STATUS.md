@@ -1,5 +1,14 @@
 # Status
 
+> **20 Nov 2026, DAMPEN on by default (owner's choice; ANDOR OSP only):**
+> - Every layer of the seven built-in Starting States has DAMPEN on, so a new instance (which
+>   opens on Starting State 1) starts with it on.
+> - The parameter's own default stays off. That is deliberate:
+>   - Sessions and presets recall exactly what they stored, older ones included.
+>   - The shared schema, ANDOR ANALOG and the plugin-equals-engine references are unchanged.
+>   - Double-clicking the switch to its default turns it off.
+> - **Tests:** `[plugin][dampen-default]`.
+>
 > **20 Nov 2026, Custom Pattern UX redesign R2 (owner's spec; shared, so ANDOR OSP and every
 > shell product; `docs/research/custom-arp/05-r2.md`):**
 > - **ARP list:** the three custom rows became one, **Custom Patterns ›**, which opens a
