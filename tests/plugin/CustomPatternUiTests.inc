@@ -164,19 +164,26 @@ TEST_CASE ("custom arp ui: a take becomes an editable pattern; every action is o
     CHECK (editor.document().pattern == original);
     editor.perform (Action::redo);
     CHECK (editor.document().pattern.events.size() == original.events.size() + 1);
-    // Another quantisation re-reads the take (STEPS: one step per note).
+    // Another quantisation re-reads the take (STEPS: one step per note); the pattern has manual
+    // edits, so the editor asks first (R2) and rebuilds on Rebuild.
     editor.perform (Action::timingSteps);
+    REQUIRE (editor.dialogShown());
+    CHECK (editor.dialogTitle() == "Rebuild pattern from original take?");
+    editor.answerDialog (true);
     CHECK (editor.document().pattern.events.size() == 5);
     CHECK (editor.document().pattern.lengthTicks() == 5 * osp::arp::ticksPerStep);
-    // Places: every key on the card, none overlapping.
-    for (const auto a : { Action::record, Action::import, Action::split, Action::merge, Action::extend, Action::rest, Action::remove, Action::undo,
-                          Action::redo, Action::preview, Action::contour, Action::degrees, Action::clear, Action::cancel, Action::use, Action::save, Action::library })
+    // Places (R2): every key on the card, none overlapping.
+    const Action placed[] { Action::help, Action::close, Action::record, Action::import, Action::overflow, Action::timingMenu, Action::mappingMenu,
+                            Action::shorter, Action::longer, Action::split, Action::rest, Action::insertStep, Action::transform, Action::merge,
+                            Action::extend, Action::undo, Action::redo, Action::preview, Action::cancel, Action::use };
+    for (const auto a : placed)
     {
         INFO (static_cast<int> (a));
         CHECK (editor.card().contains (editor.keyArea (a)));
+        for (const auto b : placed)
+            if (a != b)
+                CHECK_FALSE (editor.keyArea (a).intersects (editor.keyArea (b)));
     }
-    CHECK_FALSE (editor.keyArea (Action::undo).intersects (editor.keyArea (Action::redo)));
-    CHECK_FALSE (editor.keyArea (Action::rotate).intersects (editor.keyArea (Action::undo)));
 }
 
 TEST_CASE ("custom arp ui: PREVIEW plays on the card; closing without USE PATTERN puts the card back; USE keeps it", "[plugin][arp-custom][arp-custom-ui]")
@@ -245,14 +252,21 @@ TEST_CASE ("custom arp ui: MIDI import with several parts picks one; the library
     editor.perform (Action::save);   // the same pattern again: the same file
     CHECK (folder.dir.findChildFiles (juce::File::findFiles, false, "*.andorpattern").size() == 1);
     editor.nameField().setText ("Climb Higher", true);
-    editor.perform (Action::rename);
+    editor.perform (Action::rename);   // (R2: Rename... asks for the name, the field's as offered)
+    REQUIRE (editor.dialogField() != nullptr);
+    CHECK (editor.dialogField()->getText() == "Climb Higher");
+    editor.answerDialog (true);
     CHECK (folder.dir.getChildFile ("Climb Higher.andorpattern").existsAsFile());
     CHECK_FALSE (folder.dir.getChildFile ("Climb.andorpattern").exists());
     const auto firstId = editor.document().id;
     editor.perform (Action::duplicate);
+    REQUIRE (editor.dialogShown());
+    editor.answerDialog (true);
     CHECK (editor.document().id != firstId);
     CHECK (folder.dir.getChildFile ("Climb Higher copy.andorpattern").existsAsFile());
     editor.perform (Action::deleteFromLibrary);
+    REQUIRE (editor.dialogShown());   // (destructive: asked)
+    editor.answerDialog (true);
     CHECK_FALSE (folder.dir.getChildFile ("Climb Higher copy.andorpattern").exists());
     CHECK (folder.dir.getChildFile ("Climb Higher.andorpattern").existsAsFile());
 
@@ -269,7 +283,7 @@ TEST_CASE ("custom arp ui: MIDI import with several parts picks one; the library
     CHECK (folder.dir.getChildFile ("My Climb.andorpattern").existsAsFile());
 }
 
-TEST_CASE ("custom arp ui: the ARP list ends with CUSTOM, Create Pattern... and Custom Patterns...; a style turns CUSTOM off", "[plugin][arp-custom][arp-custom-ui]")
+TEST_CASE ("custom arp ui: the ARP list ends with one Custom Patterns row; CUSTOM chosen shows the pattern; a style turns CUSTOM off", "[plugin][arp-custom][arp-custom-ui]")
 {
     using Editor = osp::plugin::OspAudioProcessorEditor;
     OspAudioProcessor p;
@@ -278,8 +292,8 @@ TEST_CASE ("custom arp ui: the ARP list ends with CUSTOM, Create Pattern... and 
     REQUIRE (ui != nullptr);
     ui->arpControl().onToggleEditor();
     auto& arp = ui->arpInlinePanel();
-    CHECK (osp::plugin::ArpInlinePanel::listRows == osp::arp::patternCount + 3);
-    // At the top, the custom rows are scrolled out of view.
+    CHECK (osp::plugin::ArpInlinePanel::listRows == osp::arp::patternCount + 1);
+    // At the top, the custom row is scrolled out of view.
     CHECK (arp.customRowArea (0).isEmpty());
     // A pattern for card A, chosen: CUSTOM on; a style chosen: CUSTOM off, the pattern kept.
     const auto& factory = osp::arppattern::factoryPatterns()[1];
@@ -289,7 +303,9 @@ TEST_CASE ("custom arp ui: the ARP list ends with CUSTOM, Create Pattern... and 
     arp.refresh();
     CHECK (arp.customChosen());
     CHECK (arp.fieldPattern() == -2);   // the picture: the custom pattern
-    // The list scrolls to show CUSTOM (chosen), below the last style, with the two actions.
+    CHECK (arp.customPatternName() == juce::String (factory.name));
+    CHECK_FALSE (arp.pencilArea().isEmpty());
+    // The list scrolls to show the row (lit), below the last style.
     CHECK_FALSE (arp.customRowArea (0).isEmpty());
     CHECK (arp.customRowArea (0).getY() > arp.patternListArea().getY());
     arp.choosePattern (static_cast<int> (osp::ArpPattern::down));
@@ -297,6 +313,8 @@ TEST_CASE ("custom arp ui: the ARP list ends with CUSTOM, Create Pattern... and 
     CHECK (p.customArpDocument (0) != nullptr);
     arp.refresh();
     CHECK_FALSE (arp.customChosen());
+    CHECK (arp.customPatternName().isEmpty());
+    CHECK (arp.pencilArea().isEmpty());
     CHECK (arp.fieldPattern() == static_cast<int> (osp::ArpPattern::down));
 }
 
@@ -312,44 +330,4 @@ TEST_CASE ("custom arp ui: the factory patterns are valid, marked factory and di
         CHECK (ids.insert (d.id).second);
     }
     CHECK (ids.size() >= 8);
-}
-
-TEST_CASE ("custom arp ui: screenshots (on demand: OSP_CUSTOM_ARP_SHOTS=<dir>)", "[.][custom-arp-shots]")
-{
-    using namespace customui;
-    const auto dir = juce::SystemStats::getEnvironmentVariable ("OSP_CUSTOM_ARP_SHOTS", {});
-    if (dir.isEmpty())
-        return;
-    juce::File out (dir);
-    out.createDirectory();
-    OspAudioProcessor p;
-    auto shoot = [&out] (juce::Component& c, const juce::String& name) {
-        const auto image = c.createComponentSnapshot (c.getLocalBounds(), true, 2.0f);
-        juce::FileOutputStream stream (out.getChildFile (name));
-        stream.setPosition (0);
-        stream.truncate();
-        juce::PNGImageFormat().writeImageToStream (image, stream);
-    };
-    {
-        Editor editor (p, 0, true);
-        editor.setBounds (0, 0, Editor::width + 2 * Editor::shadowMargin, Editor::height + 2 * Editor::shadowMargin);
-        shoot (editor, "custom-1-editor-empty.png");
-        std::vector<osp::arppattern::CapturedNote> take { { 0.0, 0.2, 60, 100 }, { 0.25, 0.2, 64, 100 }, { 0.5, 0.1, 67, 100 }, { 0.625, 0.1, 67, 100 },
-                                                          { 0.75, 0.45, 72, 100 }, { 1.5, 0.2, 64, 100 }, { 1.75, 0.2, 62, 100 } };
-        editor.useTake (take, 112.0);
-        editor.nameField().setText ("Rise and fall", false);
-        editor.select (3);
-        shoot (editor, "custom-2-editor-take.png");
-        editor.perform (Action::split);
-        editor.perform (Action::preview);
-        shoot (editor, "custom-3-editor-split-preview.png");
-        editor.perform (Action::use);
-    }
-    std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
-    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (e.get());
-    REQUIRE (ui != nullptr);
-    ui->arpControl().onToggleEditor();
-    auto& arp = ui->arpInlinePanel();
-    arp.refresh();
-    shoot (arp, "custom-4-arp-panel-custom.png");
 }

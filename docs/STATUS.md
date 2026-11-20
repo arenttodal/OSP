@@ -1,5 +1,34 @@
 # Status
 
+> **20 Nov 2026, Custom Pattern UX redesign R2 (owner's spec; shared, so ANDOR OSP and every
+> shell product; `docs/research/custom-arp/05-r2.md`):**
+> - **ARP list:** the three custom rows became one, **Custom Patterns ›**, which opens a
+>   browser: the card's pattern with Edit, recent ones, your library, the nine factory patterns
+>   (a collapsible group), + New Pattern. A click chooses (CUSTOM on, one undo step) and closes;
+>   opening and closing it changes nothing. The pattern field shows the pattern's name and a
+>   pencil that opens the editor.
+> - **Editor (700 × 424):**
+>   - one dominant grid; the original take folds into a strip;
+>   - TIMING / GRID / MAPPING selectors and LENGTH − +;
+>   - a contextual toolbar (Split, Make Rest, Add Step, Transform ▾; Merge and Extend when they
+>     apply; Undo, Redo);
+>   - Preview, Cancel, Apply Pattern (the one accent);
+>   - the library in the ··· menu; help and close icons.
+> - **Direct manipulation:** double-click a rest for a note, drag a note's edge for its length
+>   (the pattern's length kept), and a right-click menu that keeps "make a rest" apart from
+>   "remove its time". Delete makes a rest, Shift-Delete removes the time. Long patterns scroll.
+> - **Safety:**
+>   - A rebuild from the take asks only when manual edits would be lost; so do Record and Import.
+>   - Undo restores whole documents (TIMING with its pattern).
+>   - Changes neither applied nor saved ask "Discard changes to this pattern?" through the
+>     hosts' new dismissal hook (`MiniPanel::dismissRequested`), never from a destructor.
+> - **Model:** `edit::resizeEnd`, `resizeStart` and `placeNote`, plus
+>   `SnapshotHistory<Document>`, all pure and tested.
+> - **Unchanged:** the engine, the file format, the state, the parameter IDs and the factory
+>   patterns.
+> - **Tests:** `[arp-custom-r2]` (17 cases), `[arp-pattern-r2]` (3), the shell's R2 case, and
+>   the updated `[arp-custom-ui]`. Screenshots: `[custom-arp-shots]`.
+>
 > **20 Nov 2026, granular POS line flicker (owner's report, ANDOR OSP and the shell):**
 > - **Symptom:** on older granular patches the POS line (with its flare) jumped between where
 >   it should be and another place, often the left edge of the sample.

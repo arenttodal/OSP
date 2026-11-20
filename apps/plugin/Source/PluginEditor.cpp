@@ -724,6 +724,13 @@ void OspAudioProcessorEditor::closePopup()
         userMacroController->popupClosed();   // (a USER macro's panel: its name no longer open)
 }
 
+void OspAudioProcessorEditor::requestClosePopup()
+{
+    if (popup != nullptr && ! popup->dismissRequested())
+        return;
+    closePopup();
+}
+
 void OspAudioProcessorEditor::openAnchoredPopover (std::unique_ptr<MiniPanel> panel, juce::Component& anchor)
 {
     closePopup();
@@ -733,7 +740,7 @@ void OspAudioProcessorEditor::openAnchoredPopover (std::unique_ptr<MiniPanel> pa
     popupAnchor = &anchor;
     // The backdrop: the click that closes the panel goes nowhere else.
     juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
-    popupBackdrop.onPress = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closePopup(); }); };
+    popupBackdrop.onPress = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->requestClosePopup(); }); };
     popupBackdrop.setBounds (content.getLocalBounds());
     content.addAndMakeVisible (popupBackdrop);
     presentPopup (anchoredPopup);
@@ -747,7 +754,7 @@ bool OspAudioProcessorEditor::anchoredPopoverOpenFrom (const juce::Component& an
 void OspAudioProcessorEditor::closeAnchoredPopover()
 {
     if (popupIndex == anchoredPopup)
-        closePopup();
+        requestClosePopup();   // (its anchor again: as the musician asked)
 }
 
 void OspAudioProcessorEditor::positionPopup()
@@ -1644,7 +1651,7 @@ bool OspAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
     {
         // Closed asynchronously: the key may have come through one of the popup's children.
         juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
-        juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closePopup(); });
+        juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->requestClosePopup(); });
         return true;
     }
     const bool command = key.getModifiers().isCommandDown();

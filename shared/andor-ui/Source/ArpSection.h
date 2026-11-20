@@ -263,20 +263,29 @@ public:
     int litColumn() const noexcept { return shown.current; }
 
     static constexpr int visibleRows = 6;
-    /** Custom ARP patterns (docs/research/custom-arp): after the 18 styles, CUSTOM (the card's
-        own pattern), Create Pattern... and Custom Patterns... (the library). */
-    static constexpr int customRows = 3;
+    /** Custom ARP patterns (docs/research/custom-arp, R2): after the 18 styles, one row,
+        "Custom Patterns ›", lit while the card plays its custom pattern; it opens the browser
+        (CustomPatternBrowser: the card's pattern and Edit, recent, your library, the factory
+        patterns, + New Pattern). */
+    static constexpr int customRows = 1;
     static constexpr int listRows = arp::patternCount + customRows;
-    /** A custom row (0 CUSTOM, 1 Create Pattern..., 2 Custom Patterns...), or empty while scrolled out. */
-    juce::Rectangle<float> customRowArea (int which) const;
-    /** The card whose custom pattern the rows show and set: linked, A; else the edited one. */
+    /** The Custom Patterns row (`which` 0), or empty while scrolled out. */
+    juce::Rectangle<float> customRowArea (int which = 0) const;
+    /** The card whose custom pattern the row shows and sets: linked, A; else the edited one. */
     int customCard() const noexcept { return linked ? 0 : editCard; }
     bool customChosen() const noexcept { return customOn; }
+    /** The name the pattern field shows while CUSTOM is on ("" otherwise). */
+    juce::String customPatternName() const { return customOn ? customName : juce::String(); }
     /** CUSTOM chosen for the card (its pattern plays); without a pattern, the editor opens. */
     void chooseCustom();
-    /** The custom pattern editor for the card (`fresh`: an empty one, Create Pattern...). */
+    /** The custom pattern editor for the card (`fresh`: an empty one, + New Pattern). */
     void openCustomEditor (bool fresh);
-    void mouseDoubleClick (const juce::MouseEvent&) override;
+    /** The Custom Patterns browser for the card (the row's click). */
+    void openCustomBrowser();
+    /** The pencil in the pattern field (while CUSTOM is on): opens the editor. Empty otherwise. */
+    juce::Rectangle<float> pencilArea() const;
+    /** What the browser is anchored to (the style list). */
+    juce::Component& customBrowserAnchor() noexcept { return browserAnchor; }
 
 private:
     void paintSteps (juce::Graphics&);
@@ -318,10 +327,10 @@ private:
     bool customOn = false;          ///< the card's CUSTOM (arp.custom / arp.cardB|C.custom)
     juce::String customName;        ///< its pattern's name ("" without one)
     void setCustom (bool on);
-    void openLibraryMenu();
+    juce::Component browserAnchor;   ///< (invisible, over the list: the browser unfolds from it)
     void paintCustomField (juce::Graphics&, juce::Rectangle<float> inner, float dim);
     float wheelPending = 0.0f;
-    int hover = 0;   ///< 3 collapse, 10 + n octave key n
+    int hover = 0;   ///< 3 collapse, 10 + n octave key n, 30 the pencil
 };
 
 } // namespace osp::plugin

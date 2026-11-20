@@ -24,8 +24,15 @@ The first signed and notarized beta of ANDOR OSP, for invited testers (November 
 - Effects: SPACE, ECHO and MOVEMENT racks, the FX ROUTING view and its mixer.
 - Arpeggiator: eighteen styles, per-card lanes, STRUM for CHORD steps, and **custom
   patterns**: record a pattern from the keys, import one from a MIDI file, or start from a
-  factory pattern; edit it (split, merge, rests, length, reverse, mirror, rotate, undo); keep
-  it in the session, in presets and in your pattern library.
+  factory pattern; keep it in the session, in presets and in your pattern library.
+  - Choose one from **Custom Patterns ›** at the end of the style list. The pencil beside the
+    pattern's name edits it.
+  - Shape it right on the grid: drag a note up or down, drag its edge, double-click a rest for
+    a note, right-click for more.
+  - Change how the take is read (TIMING, MAPPING); the editor asks before replacing your edits,
+    and everything can be undone.
+  - Preview it, then Apply Pattern. Closing with changes you have not applied or saved asks
+    first.
 - PEDAL LOOP with forward and ping-pong loops; Note Atlas multi-sample sets; live capture
   (RECORD and GRAB from your audio input).
 - A phrase you drop, RECORD or GRAB becomes a NOTES instrument whose FILL reaches ±24

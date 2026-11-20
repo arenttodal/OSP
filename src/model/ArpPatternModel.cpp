@@ -363,6 +363,131 @@ namespace edit
     }
 
     void setMapping (Pattern& p, arp::CustomMapping mapping) { p.mapping = mapping; }
+
+    namespace
+    {
+        /** A rest of `ticks` may stand: none, or at least the shortest event. */
+        bool restFits (int ticks) { return ticks == 0 || ticks >= arp::minEventTicks; }
+    }
+
+    bool resizeEnd (Pattern& p, int i, int duration)
+    {
+        if (! inRange (p, i) || duration < arp::minEventTicks)
+            return false;
+        auto& e = p.events[static_cast<std::size_t> (i)];
+        const int change = duration - e.duration;
+        if (change == 0)
+            return false;
+        const bool last = i + 1 >= static_cast<int> (p.events.size());
+        if (change > 0)
+        {
+            // Longer: only into the rests after it (never over a note, never past the end).
+            int available = 0, j = i + 1;
+            while (j < static_cast<int> (p.events.size()) && p.events[static_cast<std::size_t> (j)].rest && available < change)
+                available += p.events[static_cast<std::size_t> (j++)].duration;
+            if (available < change || ! restFits (available - change))
+                return false;
+            e.duration = duration;
+            int take = change;
+            while (take > 0)
+            {
+                auto& next = p.events[static_cast<std::size_t> (i + 1)];
+                const int used = std::min (take, next.duration);
+                next.duration -= used;
+                take -= used;
+                if (next.duration == 0)
+                    p.events.erase (p.events.begin() + i + 1);
+            }
+            return true;
+        }
+        // Shorter: the time freed becomes rest after it (the rest there grows, or a new one).
+        const int freed = -change;
+        if (freed < arp::minEventTicks)
+            return false;
+        if (! last && p.events[static_cast<std::size_t> (i + 1)].rest)
+        {
+            e.duration = duration;
+            p.events[static_cast<std::size_t> (i + 1)].duration += freed;
+            return true;
+        }
+        if (! roomForOneMore (p))
+            return false;
+        e.duration = duration;
+        p.events.insert (p.events.begin() + i + 1, Event { 0, true, freed, 0 });
+        return true;
+    }
+
+    bool resizeStart (Pattern& p, int i, int duration)
+    {
+        if (! inRange (p, i) || i == 0 || duration < arp::minEventTicks)
+            return false;
+        auto& e = p.events[static_cast<std::size_t> (i)];
+        const int change = duration - e.duration;
+        if (change == 0)
+            return false;
+        auto& prev = p.events[static_cast<std::size_t> (i - 1)];
+        if (change > 0)
+        {
+            // Earlier start: only into the rests before it.
+            int available = 0, j = i - 1;
+            while (j >= 0 && p.events[static_cast<std::size_t> (j)].rest && available < change)
+                available += p.events[static_cast<std::size_t> (j--)].duration;
+            if (available < change || ! restFits (available - change))
+                return false;
+            e.duration = duration;
+            int take = change, at = i;
+            while (take > 0)
+            {
+                auto& before = p.events[static_cast<std::size_t> (at - 1)];
+                const int used = std::min (take, before.duration);
+                before.duration -= used;
+                take -= used;
+                if (before.duration == 0)
+                    p.events.erase (p.events.begin() + at - 1);
+                --at;
+            }
+            return true;
+        }
+        const int freed = -change;
+        if (freed < arp::minEventTicks)
+            return false;
+        if (prev.rest)
+        {
+            prev.duration += freed;
+            e.duration = duration;
+            return true;
+        }
+        if (! roomForOneMore (p))
+            return false;
+        e.duration = duration;
+        p.events.insert (p.events.begin() + i, Event { 0, true, freed, 0 });
+        return true;
+    }
+
+    bool placeNote (Pattern& p, int i, int offset, int duration, int rank)
+    {
+        if (! inRange (p, i) || rank < 0 || rank > maxRankLimit || duration < arp::minEventTicks || offset < 0)
+            return false;
+        const auto rest = p.events[static_cast<std::size_t> (i)];
+        if (! rest.rest || offset + duration > rest.duration)
+            return false;
+        const int before = offset, after = rest.duration - offset - duration;
+        if (! restFits (before) || ! restFits (after))
+            return false;
+        const int added = (before > 0 ? 1 : 0) + (after > 0 ? 1 : 0);
+        if (static_cast<int> (p.events.size()) + added > arp::maxPatternEvents)
+            return false;
+        std::vector<Event> parts;
+        if (before > 0)
+            parts.push_back ({ 0, true, before, rest.velocity });
+        parts.push_back ({ rank, false, duration, 0 });   // (0: the held key's velocity)
+        if (after > 0)
+            parts.push_back ({ 0, true, after, rest.velocity });
+        p.events.erase (p.events.begin() + i);
+        p.events.insert (p.events.begin() + i, parts.begin(), parts.end());
+        p.maxRank = std::max (p.maxRank, rank);
+        return true;
+    }
 }
 
 void History::reset (const Pattern& now)

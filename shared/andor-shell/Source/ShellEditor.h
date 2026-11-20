@@ -175,6 +175,9 @@ public:
     void closeAnchoredPopover() override;
     void openPopup (int which, int source = 0);
     void closePopup();
+    /** Closes the popup as the musician asked (Escape, a click outside, its anchor again): the
+        panel may keep itself open to ask first (MiniPanel::dismissRequested). */
+    void requestClosePopup();
     static constexpr bool isReimaginedPopup (int which) noexcept { return which >= reimaginedPopup && which < reimaginedPopup + osp::plugin::InstrumentHost::numLayers; }
     int openPopupIndex() const noexcept { return popupIndex; }
     /** The keyboard row's wheels (tests: their captions open PITCH BEND and MOD WHEEL). */

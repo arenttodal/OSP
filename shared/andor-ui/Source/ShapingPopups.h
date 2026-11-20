@@ -272,6 +272,12 @@ public:
     /** Brings what it draws up to date at once, without its own timer (tests, snapshots). */
     virtual void settleNow() {}
 
+    /** A dismissal the musician asked for (Escape, a click outside, the anchor again): true closes
+        it now; false keeps it open (it asks first, e.g. "Discard changes?", and closes itself
+        through onClose once answered). A host closing it for its own reasons (another popover
+        opening, the window going) does not ask: the panel's destructor must leave things safe. */
+    virtual bool dismissRequested() { return true; }
+
     /** Called when the card's preferred size changes (e.g. another MOVEMENT mode). */
     std::function<void()> onSizeChanged;
     /** The close button (the owner closes the popup, asynchronously). */
