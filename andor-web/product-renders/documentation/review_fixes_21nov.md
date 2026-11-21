@@ -25,7 +25,7 @@
 | A2 gallery, and the transparent set (same camera) | 0.04 % | footer key, macro arcs | keep |
 | B1-R4, B2 (dark, floating) | under 0.01 % | footer key | keep |
 | M02, M03, M04, M05 (details) | 0 % | none: these crops don't include the macro row or footer | keep |
-| **M01 macro knobs** | 0.18 % | **the arcs around FILTER and MOVEMENT: green and teal before, ochre and umber now**, in a close-up whose subject is these controls | **re-render** |
+| **M01 macro knobs** | 0.18 % | **the arcs around FILTER and MOVEMENT: green and blue before, teal and ochre now**, in a close-up whose subject is these controls | **re-render** |
 | **M06 touch strips** | 0.13 % | **a macro arc at the top edge: orange before, sage now**, soft but clearly coloured | **re-render** |
 
 **Re-render on the frozen interface (running on the CPU at the time of writing; this note is updated when it finishes):**
