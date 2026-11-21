@@ -17,6 +17,7 @@ const guides = defineCollection({
     order: z.number(),
     title: z.string(),
     purpose: z.string(),
+    about: z.string().optional(),   // 1-2 sentences: what the clip shows and the key facts around it
     tags: z.array(z.string()),
     synonyms: z.array(z.string()),
     controls: z.array(z.string()).default([]),

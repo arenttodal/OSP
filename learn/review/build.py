@@ -33,11 +33,13 @@ for f in sorted((root / "site/src/content/guides").glob("*.mdx")):
     fm = f.read_text().split("---")[1]
     get = lambda k: (re.search(rf"^{k}: (.*)$", fm, re.M) or [None, ""])[1]
     steps = {m.group(1): json.loads(m.group(2)) for m in re.finditer(r'^  - \{ id: ([a-z0-9-]+), instruction: ("(?:[^"\\]|\\.)*")', fm, re.M)}
-    guides.append({"group": get("group"), "order": int(get("order") or 0), "scene": get("scene"), "title": json.loads(get("title") or '""'), "steps": steps})
+    guides.append({"group": get("group"), "order": int(get("order") or 0), "scene": get("scene"), "title": json.loads(get("title") or '""'), "steps": steps,
+                   "about": json.loads(get("about") or '""')})
 STEP_TEXT = {}
 for g in guides:
     for k, v in g["steps"].items():
         STEP_TEXT[(g["scene"], k)] = v
+ABOUT = {g["scene"]: g["about"] for g in guides}
 GROUPS = []
 for i, (slug, title) in enumerate(GROUP_TITLES):
     ids = [g["scene"] for g in sorted(guides, key=lambda g: g["order"]) if g["group"] == slug]
@@ -85,6 +87,7 @@ def card(e):
         <p class="small">Scenario <code>{esc(e["scenario"])}</code> · product commit <code>{esc(e["productCommit"])}</code> ·
         <a href="{esc(P + files["mp4"]["path"])}">MP4</a> · <a href="{esc(P + files["webm"]["path"])}">WebM</a> · <a href="{esc(P + e["poster"]["path"])}">poster</a></p>
       </details>
+      {f'<p class="about"><span class="label">What this shows</span>{esc(ABOUT[e["scenario"]])}</p>' if ABOUT.get(e["scenario"]) else ""}
     </article>'''
 
 

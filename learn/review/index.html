@@ -66,6 +66,8 @@ code { font: 12px var(--mono); background: var(--bg-2); padding: 1px 4px; border
 .sha { font: 11px var(--mono); color: var(--muted); }
 .small { font-size: 12px; color: var(--muted); }
 a { color: var(--accent-strong); }
+.about { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--border); font-size: 14px; line-height: 1.55; color: var(--text); }
+.about .label { display: block; margin-bottom: 4px; }
 .missing { display: grid; place-items: center; color: var(--muted); min-height: 120px; }
 </style>
 
@@ -102,6 +104,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.a-load-and-play</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/a-load-and-play/a-load-and-play.mp4">MP4</a> · <a href="../assets/osp/a-load-and-play/a-load-and-play.webm">WebM</a> · <a href="../assets/osp/a-load-and-play/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>Drop one tonal recording (WAV, AIFF or FLAC) on the empty instrument and it becomes playable across the whole keyboard; OSP detects the note it was recorded at (shown on the card, here C3) and pitches it to every key. Browse… and Load example on the empty screen do the same without dragging.</p>
     </article>
     <article class="scene" id="b-phrase-map-notes">
       <header><h3>Turn a phrase into an instrument</h3><span class="pill passed">passed</span></header>
@@ -125,6 +128,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.b-phrase-map-notes</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/b-phrase-map-notes/b-phrase-map-notes.mp4">MP4</a> · <a href="../assets/osp/b-phrase-map-notes/b-phrase-map-notes.webm">WebM</a> · <a href="../assets/osp/b-phrase-map-notes/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>A recording of several separate notes (a melody sung, hummed or played) is analysed into its notes, and MAP NOTES puts each one on its own key so every key plays a real recorded note. NOTES shows the map, where a note can be moved or left out; notes the phrase repeats take turns, and DETECTION (FEWER, NORMAL, MORE) sets how many notes OSP looks for.</p>
     </article>
     <article class="scene" id="c1-record-input">
       <header><h3>Record from an audio input</h3><span class="pill passed">passed</span></header>
@@ -148,6 +152,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.c1-record-input</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/c1-record-input/c1-record-input.mp4">MP4</a> · <a href="../assets/osp/c1-record-input/c1-record-input.webm">WebM</a> · <a href="../assets/osp/c1-record-input/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>CAPTURE records from OSP&#x27;s audio input: the input chosen in the standalone app, or a track sent to OSP&#x27;s Sidechain input in a DAW (DAW routing not yet verified). A take runs up to one minute; on STOP, OSP trims the silence and maps the notes it heard, so the take plays as an instrument straight away.</p>
     </article>
     <article class="scene" id="c2-grab-last">
       <header><h3>Grab what you just played</h3><span class="pill passed">passed</span></header>
@@ -171,6 +176,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.c2-grab-last</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/c2-grab-last/c2-grab-last.mp4">MP4</a> · <a href="../assets/osp/c2-grab-last/c2-grab-last.webm">WebM</a> · <a href="../assets/osp/c2-grab-last/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>While an input is connected, OSP keeps about the last minute of what arrived, so you can play first and decide afterwards. GRAB LAST takes the last 10, 20, 30 or 60 seconds and maps its notes onto the layer, replacing its sound in one undo step.</p>
     </article>
     <article class="scene" id="e1-save-preset">
       <header><h3>Save the sound as a preset</h3><span class="pill passed">passed</span></header>
@@ -194,6 +200,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.e1-save-preset</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/e1-save-preset/e1-save-preset.mp4">MP4</a> · <a href="../assets/osp/e1-save-preset/e1-save-preset.webm">WebM</a> · <a href="../assets/osp/e1-save-preset/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>A preset keeps every setting and which recordings it uses, in the Library on this computer; the recordings themselves stay in OSP&#x27;s sample store, so a preset alone does not carry the audio. The Save sheet adds a category, tags and a description, and can also write a portable copy with the audio.</p>
     </article>
     <article class="scene" id="e5-export-instrument">
       <header><h3>Export a portable instrument</h3><span class="pill passed">passed</span></header>
@@ -217,6 +224,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.e5-export-instrument</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/e5-export-instrument/e5-export-instrument.mp4">MP4</a> · <a href="../assets/osp/e5-export-instrument/e5-export-instrument.webm">WebM</a> · <a href="../assets/osp/e5-export-instrument/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>Export portable instrument… writes one .ospinstrument file with the settings and copies of the recordings, for another computer or a collaborator; Open instrument… in the same menu brings it back, recordings included. Save as… in the same menu writes a preset, without the audio.</p>
     </article></div></section><section class="demo" id="demo-2"><h2><span class="letter">2</span>Play and layer</h2><div class="grid">
     <article class="scene" id="h1-oneshot-granular">
       <header><h3>Switch between One Shot and Granular</h3><span class="pill passed">passed</span></header>
@@ -240,6 +248,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.h1-oneshot-granular</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/h1-oneshot-granular/h1-oneshot-granular.mp4">MP4</a> · <a href="../assets/osp/h1-oneshot-granular/h1-oneshot-granular.webm">WebM</a> · <a href="../assets/osp/h1-oneshot-granular/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>Each layer has two playback modes on its playback key: One Shot plays the recording from START at the note&#x27;s pitch, and Granular rebuilds each note from many short, overlapping grains of the recording. The same menu holds PEDAL LOOP, which applies to One Shot only.</p>
     </article>
     <article class="scene" id="p1-pedal-loop-pingpong">
       <header><h3>Hold a note with the sustain pedal (Pedal Loop)</h3><span class="pill passed">passed</span></header>
@@ -263,6 +272,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.p1-pedal-loop-pingpong</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/p1-pedal-loop-pingpong/p1-pedal-loop-pingpong.mp4">MP4</a> · <a href="../assets/osp/p1-pedal-loop-pingpong/p1-pedal-loop-pingpong.webm">WebM</a> · <a href="../assets/osp/p1-pedal-loop-pingpong/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>PEDAL LOOP sets what the sustain pedal does to One Shot notes on each layer: Normal (a standard sustain pedal), Forward (a forward loop) or Ping-Pong (a forward and reverse loop), chosen in the playback key&#x27;s menu. Turn the card&#x27;s LOOP off first, so the note decays on its own and only the pedal holds it; with LOOP on the note already sustains, and Forward then changes nothing.</p>
     </article>
     <article class="scene" id="e2-add-layers">
       <header><h3>Add a second and third sound</h3><span class="pill passed">passed</span></header>
@@ -286,6 +296,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.e2-add-layers</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/e2-add-layers/e2-add-layers.mp4">MP4</a> · <a href="../assets/osp/e2-add-layers/e2-add-layers.webm">WebM</a> · <a href="../assets/osp/e2-add-layers/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>OSP layers up to three recordings, A, B and C, each with its own playback mode, knobs and arpeggiator settings. Drag a file beside the cards onto ADD LAYER, or use Add source… in the ••• menu; a folder dropped on a layer becomes one multi-sample sound.</p>
     </article>
     <article class="scene" id="e3-mix-layers">
       <header><h3>Balance, mute and solo layers</h3><span class="pill passed">passed</span></header>
@@ -309,6 +320,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.e3-mix-layers</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/e3-mix-layers/e3-mix-layers.mp4">MP4</a> · <a href="../assets/osp/e3-mix-layers/e3-mix-layers.webm">WebM</a> · <a href="../assets/osp/e3-mix-layers/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>Each card has its own LEVEL (up to +6 dB), TUNE, PAN, M (mute) and S (solo); while any layer is soloed, only soloed layers play and the others show NOT SOLOED. With two layers, MIX in the header balances A and B.</p>
     </article>
     <article class="scene" id="e4-starting-state">
       <header><h3>Load a starting state</h3><span class="pill passed">passed</span></header>
@@ -332,6 +344,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.e4-starting-state</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/e4-starting-state/e4-starting-state.mp4">MP4</a> · <a href="../assets/osp/e4-starting-state/e4-starting-state.webm">WebM</a> · <a href="../assets/osp/e4-starting-state/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>Starting states are sets of settings without audio (Natural, Alive, Floating, Broken, Frozen, Dream, Wide), applied to the sounds already loaded. They are in the Library: the LIBRARY key beside the keyboard, or the preset name&#x27;s menu.</p>
     </article>
     <article class="scene" id="j1-vibrato">
       <header><h3>Add vibrato with the mod wheel</h3><span class="pill passed">passed</span></header>
@@ -355,6 +368,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.j1-vibrato</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/j1-vibrato/j1-vibrato.mp4">MP4</a> · <a href="../assets/osp/j1-vibrato/j1-vibrato.webm">WebM</a> · <a href="../assets/osp/j1-vibrato/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>MOD beneath the mod wheel opens VIBRATO: DEPTH in cents, RATE in Hz, DELAY and RISE for how it enters, and CONTROL (MOD WHEEL, ALWAYS ON or ASSIGNED). With MOD WHEEL, the wheel sets how much vibrato plays and can still drive anything else routed to it.</p>
     </article>
     <article class="scene" id="j2-midi-learn">
       <header><h3>Control a knob from a MIDI controller</h3><span class="pill passed">passed</span></header>
@@ -378,6 +392,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.j2-midi-learn</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/j2-midi-learn/j2-midi-learn.mp4">MP4</a> · <a href="../assets/osp/j2-midi-learn/j2-midi-learn.webm">WebM</a> · <a href="../assets/osp/j2-midi-learn/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>Right-click a knob and choose Learn MIDI CC, then move a knob or fader on your controller: the control follows it from then on. The same menu shows which CC is assigned and Forget MIDI CC removes it.</p>
     </article></div></section><section class="demo" id="demo-3"><h2><span class="letter">3</span>SYNTH &amp; IMPRINT</h2><div class="grid">
     <article class="scene" id="f1-synth-blend">
       <header><h3>Blend in SYNTH</h3><span class="pill passed">passed</span></header>
@@ -401,6 +416,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.f1-synth-blend</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/f1-synth-blend/f1-synth-blend.mp4">MP4</a> · <a href="../assets/osp/f1-synth-blend/f1-synth-blend.webm">WebM</a> · <a href="../assets/osp/f1-synth-blend/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>Each layer can blend an oscillator under its recording: AMOUNT, WAVE (saw, square, triangle, sine), OCTAVE (−2 to +1), DETUNE and TONE. SHAPE Follow makes the oscillator follow the recording&#x27;s own loudness and Held keeps it full for the whole note; PITCH follows the keys or the recording&#x27;s own tuning.</p>
     </article>
     <article class="scene" id="f2-synth-imprint">
       <header><h3>Colour SYNTH with IMPRINT</h3><span class="pill passed">passed</span></header>
@@ -424,6 +440,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.f2-synth-imprint</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/f2-synth-imprint/f2-synth-imprint.mp4">MP4</a> · <a href="../assets/osp/f2-synth-imprint/f2-synth-imprint.webm">WebM</a> · <a href="../assets/osp/f2-synth-imprint/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>IMPRINT colours the oscillator with the recording&#x27;s spectral shape (its body, formants, bow or breath), so the synth sounds as if it belongs to the recording. MOTION sets how far that colour follows the recording through the note; switching IMPRINT on takes a moment to prepare.</p>
     </article></div></section><section class="demo" id="demo-4"><h2><span class="letter">4</span>Arpeggiator</h2><div class="grid">
     <article class="scene" id="g1-arp-basics">
       <header><h3>Arpeggiate held notes</h3><span class="pill passed">passed</span></header>
@@ -447,6 +464,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.g1-arp-basics</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/g1-arp-basics/g1-arp-basics.mp4">MP4</a> · <a href="../assets/osp/g1-arp-basics/g1-arp-basics.webm">WebM</a> · <a href="../assets/osp/g1-arp-basics/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>The arpeggiator plays held notes as a repeating pattern: 18 built-in patterns plus custom ones, RATE from 1/4D to 1/32, OCTAVES 1 to 4, and GATE, SWING and VELOCITY. ARP&#x27;s light switches it on and its name opens the panel, which makes the window taller.</p>
     </article>
     <article class="scene" id="d1-arp-per-source">
       <header><h3>Give each layer its own arpeggio</h3><span class="pill passed">passed</span></header>
@@ -470,6 +488,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.d1-arp-per-source</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/d1-arp-per-source/d1-arp-per-source.mp4">MP4</a> · <a href="../assets/osp/d1-arp-per-source/d1-arp-per-source.webm">WebM</a> · <a href="../assets/osp/d1-arp-per-source/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>With LINK on, every layer plays layer A&#x27;s arpeggio; with LINK off, EDIT A | B | C sets each layer&#x27;s own PATTERN, RATE, OCTAVES, custom pattern and STRUM, while GATE, SWING and VELOCITY stay shared. A layer unlit under PLAYS holds the keys as played, for example a sustained pad under two arpeggios.</p>
     </article>
     <article class="scene" id="d2-arp-strum">
       <header><h3>Strum a chord</h3><span class="pill passed">passed</span></header>
@@ -493,6 +512,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.d2-arp-strum</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/d2-arp-strum/d2-arp-strum.mp4">MP4</a> · <a href="../assets/osp/d2-arp-strum/d2-arp-strum.webm">WebM</a> · <a href="../assets/osp/d2-arp-strum/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>STRUM spreads each Chord step&#x27;s notes over time, like a strummed guitar: UP, DOWN, RANDOM or ALT, with SPREAD in milliseconds (FREE) or as a note value (SYNC). It plays only with the Chord pattern (the key shows a ring otherwise) and is set per layer when LINK is off.</p>
     </article>
     <article class="scene" id="d3-satellite">
       <header><h3>Move each layer in the stereo field</h3><span class="pill passed">passed</span></header>
@@ -516,6 +536,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.d3-satellite</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/d3-satellite/d3-satellite.mp4">MP4</a> · <a href="../assets/osp/d3-satellite/d3-satellite.webm">WebM</a> · <a href="../assets/osp/d3-satellite/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>SATELLITE moves each layer in the stereo field: PAN (side to side), ORBIT (a round path, quieter and darker behind) or BOUNCE, synced to tempo or free, with DEPTH, WIDTH, PHASE and OFFSET. It is spatial rather than rhythmic, and works with the arpeggiator on or off.</p>
     </article>
     <article class="scene" id="g2-arp-custom">
       <header><h3>Use a custom pattern</h3><span class="pill passed">passed</span></header>
@@ -539,6 +560,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.g2-arp-custom</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/g2-arp-custom/g2-arp-custom.mp4">MP4</a> · <a href="../assets/osp/g2-arp-custom/g2-arp-custom.webm">WebM</a> · <a href="../assets/osp/g2-arp-custom/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>Custom patterns are arpeggiator rhythms of your own: one of nine factory patterns or yours, chosen from Custom Patterns › at the end of the PATTERN list. The pencil opens the grid editor, where steps can be split, made rests or lengthened; patterns can also be recorded from the keys or imported from a MIDI file.</p>
     </article>
     <article class="scene" id="g3-sub">
       <header><h3>Add SUB under your keys</h3><span class="pill passed">passed</span></header>
@@ -562,6 +584,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.g3-sub</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/g3-sub/g3-sub.mp4">MP4</a> · <a href="../assets/osp/g3-sub/g3-sub.webm">WebM</a> · <a href="../assets/osp/g3-sub/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>SUB adds a sub-bass one or two octaves below the keys you hold, after the effects: WAVE (SINE, TRI, SQUARE, SAW), GRIT, LEVEL and a key range, with TAPER to make higher keys quieter. It plays even without a recording and follows the keys while the arpeggiator runs.</p>
     </article></div></section><section class="demo" id="demo-5"><h2><span class="letter">5</span>Granular &amp; KEY DNA</h2><div class="grid">
     <article class="scene" id="h2-grains">
       <header><h3>Shape the grains</h3><span class="pill passed">passed</span></header>
@@ -585,6 +608,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.h2-grains</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/h2-grains/h2-grains.mp4">MP4</a> · <a href="../assets/osp/h2-grains/h2-grains.webm">WebM</a> · <a href="../assets/osp/h2-grains/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>In Granular, five knobs appear over the waveform when you point at it: POS (where in the recording grains are taken), SIZE (20 to 400 ms per grain), DENS (4 to 40 grains a second), TUNE (±12 semitones) and SPREAD (how far around POS grains are taken). KEY DNA sits at the end of the row.</p>
     </article>
     <article class="scene" id="h3-key-dna">
       <header><h3>Vary the sound from key to key (KEY DNA)</h3><span class="pill passed">passed</span></header>
@@ -608,6 +632,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.h3-key-dna</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/h3-key-dna/h3-key-dna.mp4">MP4</a> · <a href="../assets/osp/h3-key-dna/h3-key-dna.webm">WebM</a> · <a href="../assets/osp/h3-key-dna/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>KEY DNA gives every key its own offset of the granular settings (POS, SIZE, DENS, SPREAD, TUNE, SCATTER, PAN), fixed when each note starts: draw across the graph to set keys, then DEPTH, VARIATION and AMOUNT scale it. It affects Granular playback only.</p>
     </article></div></section><section class="demo" id="demo-6"><h2><span class="letter">6</span>Shape and finish</h2><div class="grid">
     <article class="scene" id="i1-reimagined">
       <header><h3>Reimagine a sound</h3><span class="pill passed">passed</span></header>
@@ -631,6 +656,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.i1-reimagined</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/i1-reimagined/i1-reimagined.mp4">MP4</a> · <a href="../assets/osp/i1-reimagined/i1-reimagined.webm">WebM</a> · <a href="../assets/osp/i1-reimagined/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>REIMAGINED transforms a layer&#x27;s recording in one of five modes (Kaleidoscope, Tape Frame, Toybox, Mosaic, Mirage), each with its own controls; the knob sets how much, and at 0 % the layer plays without it. Every layer has its own mode and amount.</p>
     </article>
     <article class="scene" id="i2-movement">
       <header><h3>Add MOVEMENT</h3><span class="pill passed">passed</span></header>
@@ -654,6 +680,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.i2-movement</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/i2-movement/i2-movement.mp4">MP4</a> · <a href="../assets/osp/i2-movement/i2-movement.webm">WebM</a> · <a href="../assets/osp/i2-movement/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>MOVEMENT makes the sound change over time in one of five modes (Drift, Tape, Chorus, Pulse, Shaper), each with its own settings in its popover. The MOVEMENT knob sets how much.</p>
     </article>
     <article class="scene" id="i3-shaper">
       <header><h3>Use a SHAPER pattern</h3><span class="pill passed">passed</span></header>
@@ -677,6 +704,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.i3-shaper</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/i3-shaper/i3-shaper.mp4">MP4</a> · <a href="../assets/osp/i3-shaper/i3-shaper.webm">WebM</a> · <a href="../assets/osp/i3-shaper/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>SHAPER, a MOVEMENT mode, shapes the sound with a rhythmic pattern: 12 built-in patterns (PULSE to MACHINE) or one drawn as CUSTOM, at RATE 1/4 to 1/32, on volume, filter or both (TARGET). DEPTH and SMOOTH set how deep and how soft the steps are.</p>
     </article>
     <article class="scene" id="i4-modulation">
       <header><h3>Make FILTER move with an LFO</h3><span class="pill passed">passed</span></header>
@@ -700,6 +728,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.i4-modulation</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/i4-modulation/i4-modulation.mp4">MP4</a> · <a href="../assets/osp/i4-modulation/i4-modulation.webm">WebM</a> · <a href="../assets/osp/i4-modulation/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>Drag a source tab (ENV, LFO 1, LFO 2, VEL or NOTE) onto a knob to connect it at 50 % depth; the coloured ring shows and sets how far it moves the knob, which keeps its own position. Right-click a knob for its routes and more sources.</p>
     </article>
     <article class="scene" id="i5-user-macro">
       <header><h3>Assign a USER macro</h3><span class="pill passed">passed</span></header>
@@ -723,6 +752,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.i5-user-macro</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/i5-user-macro/i5-user-macro.mp4">MP4</a> · <a href="../assets/osp/i5-user-macro/i5-user-macro.webm">WebM</a> · <a href="../assets/osp/i5-user-macro/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>The USER bank holds six knobs of your own: right-click a control and choose Assign to Macro to link it, with its range shown as an arc around the control. One macro can move up to eight settings, and macros are saved with the sound.</p>
     </article>
     <article class="scene" id="i6-echo-space">
       <header><h3>Add ECHO and SPACE</h3><span class="pill passed">passed</span></header>
@@ -746,6 +776,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.i6-echo-space</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/i6-echo-space/i6-echo-space.mp4">MP4</a> · <a href="../assets/osp/i6-echo-space/i6-echo-space.webm">WebM</a> · <a href="../assets/osp/i6-echo-space/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>ECHO adds repeats (TAPE, BBD or ASCEND; TIME, FEEDBACK, FREE or SYNC, MONO, PING-PONG or WIDE) and SPACE a reverb (Room, Hall, Plate, Spring, plus Abyss, Vintage and Bloom variants). Each knob sets how much, and the name above it opens its settings.</p>
     </article>
     <article class="scene" id="i7-filter">
       <header><h3>Shape the tone with FILTER</h3><span class="pill passed">passed</span></header>
@@ -769,6 +800,7 @@ a { color: var(--accent-strong); }
         <p class="small">Scenario <code>osp.scene.i7-filter</code> · product commit <code>6ef3376</code> ·
         <a href="../assets/osp/i7-filter/i7-filter.mp4">MP4</a> · <a href="../assets/osp/i7-filter/i7-filter.webm">WebM</a> · <a href="../assets/osp/i7-filter/poster.webp">poster</a></p>
       </details>
+      <p class="about"><span class="label">What this shows</span>FILTER sets the cutoff of the voices&#x27; filter between its MIN and MAX; its settings choose the type (LP24, LP12, HP12, BP12, Tilt), resonance and an envelope. A double-click on the name opens the full rack.</p>
     </article></div></section>
 </div>
 <script>
