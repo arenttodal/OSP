@@ -1,5 +1,14 @@
 # Status
 
+> **21 Nov 2026, the layer EQ editor and parameters for a product's own bus (branch
+> `claude/analog-unison`, for ANDOR ANALOG's D / AUX):**
+> - `EqTarget` (`EqEditor.h`): what an `EqEditor` edits - a layer's EQ (`EqTarget::ofLayer`, what
+>   `EqEditor (host, layer)` builds, exactly as before) or a product's bus EQ under its own IDs
+>   (its title letter, accent, no DAMPEN page, no modulation curve). `drawTabs` takes the accent.
+> - `InstrumentHost::addEqParameters`: one EQ's nineteen parameters by an ID function; the layers'
+>   version-hint-18 EQ is now built with it (same IDs, order, ranges, texts: schema unchanged).
+> - ANDOR OSP pixel-identical (`osp_visual_reference` passes); not a SPACE / ECHO / ARP feature.
+
 > **21 Nov 2026, AMP 2's opt-in hook on the AMP tab (branch `claude/analog-unison`, for ANDOR
 > ANALOG):**
 > - `ProductInfo::heldAttack` (switch and attack parameter IDs, the engine's count of notes begun

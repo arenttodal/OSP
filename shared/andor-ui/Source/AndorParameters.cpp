@@ -286,6 +286,48 @@ bool parameters::automatableNow (const juce::String& parameterId)
     return automatableFilter == nullptr || automatableFilter (parameterId);
 }
 
+void InstrumentHost::addEqParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint,
+                                      const std::function<juce::String (const juce::String& name)>& idOf, const juce::String& namePrefix)
+{
+    auto id = [versionHint, &idOf] (const juce::String& name) { return juce::ParameterID { idOf (name), versionHint }; };
+    auto logRange = [] (float lo, float hi) {
+        return juce::NormalisableRange<float> (
+            lo, hi, [] (float start, float end, float x) { return start * std::pow (end / start, x); },
+            [] (float start, float end, float v) { return std::log (v / start) / std::log (end / start); },
+            [] (float start, float end, float v) { return juce::jlimit (start, end, v); });
+    };
+    const auto frequency = juce::AudioParameterFloatAttributes().withLabel ("Hz").withStringFromValueFunction ([] (float v, int) {
+        return v >= 1000.0f ? juce::String (v / 1000.0f, v >= 10000.0f ? 1 : 2) + " kHz" : juce::String (juce::roundToInt (v)) + " Hz";
+    });
+    const auto gain = juce::AudioParameterFloatAttributes().withLabel ("dB").withStringFromValueFunction ([] (float v, int) {
+        return (v > 0.04f ? "+" : "") + juce::String (v, 1) + " dB";
+    });
+    const auto qText = juce::AudioParameterFloatAttributes().withStringFromValueFunction ([] (float v, int) { return juce::String (v, 2); });
+    const juce::StringArray slopes { "12 dB/oct", "24 dB/oct" };
+    const auto& n = namePrefix;
+    layout.add (parameters::make<juce::AudioParameterBool> (id ("enabled"), n + "On", false));
+    for (int b = 0; b < eq::bandCount; ++b)
+    {
+        const auto band = static_cast<eq::Band> (b);
+        const juce::String key = eqBandKey (band);
+        const auto range = eq::frequencyRange (band);
+        const auto bn = n + juce::String (eq::bandName (band)).toLowerCase() + " ";
+        layout.add (parameters::make<juce::AudioParameterBool> (id (key + ".enabled"), bn + "On", false));
+        layout.add (parameters::make<juce::AudioParameterFloat> (id (key + ".frequency"), bn + "Frequency",
+                                                                 logRange (static_cast<float> (range.minHz), static_cast<float> (range.maxHz)),
+                                                                 static_cast<float> (range.defaultHz), frequency));
+        if (eq::hasGain (band))
+        {
+            layout.add (parameters::make<juce::AudioParameterFloat> (id (key + ".gain"), bn + "Gain", juce::NormalisableRange<float> (-18.0f, 18.0f, 0.01f), 0.0f, gain));
+            const bool bell = band == eq::Band::bell;
+            auto qRange = logRange (static_cast<float> (bell ? eq::minBellQ : eq::minShelfQ), static_cast<float> (bell ? eq::maxBellQ : eq::maxShelfQ));
+            layout.add (parameters::make<juce::AudioParameterFloat> (id (key + ".q"), bn + "Q", qRange, bell ? 1.0f : 0.707f, qText));
+        }
+        else
+            layout.add (parameters::make<juce::AudioParameterChoice> (id (key + ".slope"), bn + "Slope", slopes, 0));
+    }
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParameterLayout()
 {
     using Range = juce::NormalisableRange<float>;
@@ -659,48 +701,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout InstrumentHost::createParame
     {
         // EQ (version hint 18): each layer's five bands. Every band and the EQ itself off by
         // default: sessions from before open with the layers untouched.
-        auto id18 = [] (const juce::String& id) { return juce::ParameterID { id, 18 }; };
-        auto logRange = [] (float lo, float hi) {
-            return juce::NormalisableRange<float> (
-                lo, hi, [] (float start, float end, float x) { return start * std::pow (end / start, x); },
-                [] (float start, float end, float v) { return std::log (v / start) / std::log (end / start); },
-                [] (float start, float end, float v) { return juce::jlimit (start, end, v); });
-        };
-        const auto frequency = juce::AudioParameterFloatAttributes().withLabel ("Hz").withStringFromValueFunction ([] (float v, int) {
-            return v >= 1000.0f ? juce::String (v / 1000.0f, v >= 10000.0f ? 1 : 2) + " kHz" : juce::String (juce::roundToInt (v)) + " Hz";
-        });
-        const auto gain = juce::AudioParameterFloatAttributes().withLabel ("dB").withStringFromValueFunction ([] (float v, int) {
-            return (v > 0.04f ? "+" : "") + juce::String (v, 1) + " dB";
-        });
-        const auto qText = juce::AudioParameterFloatAttributes().withStringFromValueFunction ([] (float v, int) { return juce::String (v, 2); });
-        const juce::StringArray slopes { "12 dB/oct", "24 dB/oct" };
         for (int layer = 0; layer < numLayers; ++layer)
-        {
-            const auto n = "Layer " + layerName (layer) + " EQ ";
-            auto id = [layer, &id18] (const char* name) { return id18 (eqParameterId (layer, name)); };
-            layout.add (parameters::make<juce::AudioParameterBool> (id ("enabled"), n + "On", false));
-            for (int b = 0; b < eq::bandCount; ++b)
-            {
-                const auto band = static_cast<eq::Band> (b);
-                const juce::String key = eqBandKey (band);
-                const auto range = eq::frequencyRange (band);
-                const auto bn = n + juce::String (eq::bandName (band)).toLowerCase() + " ";
-                layout.add (parameters::make<juce::AudioParameterBool> (id18 (eqParameterId (layer, key + ".enabled")), bn + "On", false));
-                layout.add (parameters::make<juce::AudioParameterFloat> (id18 (eqParameterId (layer, key + ".frequency")), bn + "Frequency",
-                                                                         logRange (static_cast<float> (range.minHz), static_cast<float> (range.maxHz)),
-                                                                         static_cast<float> (range.defaultHz), frequency));
-                if (eq::hasGain (band))
-                {
-                    layout.add (parameters::make<juce::AudioParameterFloat> (id18 (eqParameterId (layer, key + ".gain")), bn + "Gain",
-                                                                             juce::NormalisableRange<float> (-18.0f, 18.0f, 0.01f), 0.0f, gain));
-                    const bool bell = band == eq::Band::bell;
-                    auto qRange = logRange (static_cast<float> (bell ? eq::minBellQ : eq::minShelfQ), static_cast<float> (bell ? eq::maxBellQ : eq::maxShelfQ));
-                    layout.add (parameters::make<juce::AudioParameterFloat> (id18 (eqParameterId (layer, key + ".q")), bn + "Q", qRange, bell ? 1.0f : 0.707f, qText));
-                }
-                else
-                    layout.add (parameters::make<juce::AudioParameterChoice> (id18 (eqParameterId (layer, key + ".slope")), bn + "Slope", slopes, 0));
-            }
-        }
+            addEqParameters (layout, 18, [layer] (const juce::String& name) { return eqParameterId (layer, name); }, "Layer " + layerName (layer) + " EQ ");
     }
     {
         // Unified engine, Phase 2 (version hint 20), appended so nothing before moves. Each

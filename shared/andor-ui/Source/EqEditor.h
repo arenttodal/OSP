@@ -243,10 +243,24 @@ private:
     the inspector) sets its Q; a double-click resets its gain (HP / LP: its frequency). The
     top row: the EQ's own switch and the selected band's values, its switch and reset.
 */
+/** What an EqEditor edits: a layer's EQ (EqTarget::ofLayer, ANDOR OSP's three) or a product's
+    own bus EQ with the same nineteen parameters under other IDs (ANDOR ANALOG's D). */
+struct EqTarget
+{
+    int layer = 0;   ///< the spectrum's slot (stepLayerEqSpectrum / paintLayerEqSpectrum); 0..2 a layer
+    std::function<juce::String (const juce::String& name)> idOf;   ///< "enabled", "bell.gain", .. -> the parameter ID
+    juce::String name;                                            ///< after "EQ " in the title ("A", "D")
+    juce::Colour accent;                                          ///< the title's underline
+    bool dampen = true;       ///< a DAMPEN page (a layer's)
+    bool modulation = true;   ///< the curve follows the engine's modulation of the bands (a layer's)
+    static EqTarget ofLayer (int layer);
+};
+
 class EqEditor final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
     EqEditor (InstrumentHost& processor, int layer);
+    EqEditor (InstrumentHost& processor, EqTarget target);
 
     std::function<void()> onClose;
     /** Follows the parameters, the modulation and the layer's spectrum (editor timer); repaints
@@ -288,8 +302,11 @@ private:
     void rebuildInspector();
     double sampleRate() const;
 
+    eq::Settings settingsNow() const;   ///< the target's EQ as its parameters set it now
+
     InstrumentHost& ospProcessor;
     int layer;
+    EqTarget target;
     eq::Settings shown;
     int selected = -1, hover = -1, dragBand = -1;
     bool hotTab = false;

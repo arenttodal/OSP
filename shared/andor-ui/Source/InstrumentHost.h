@@ -137,6 +137,12 @@ public:
     /** DAMPEN's parameters in their order: enabled, mode, amount, frequency, cutoff. */
     static const juce::StringArray& dampenParameterNames();
     static const juce::StringArray& eqParameterNames();   ///< enabled, hp.enabled, hp.frequency, ... in order
+    /** One EQ's nineteen parameters (a layer's ranges, defaults and texts; every band and the EQ
+        off), each named by `idOf` from its eqParameterNames() name and titled after `namePrefix`
+        ("Layer A EQ "). The layers' EQ (version hint 18) is built with it; a product adds its own
+        bus EQ the same way (ANDOR ANALOG's D). */
+    static void addEqParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint,
+                                 const std::function<juce::String (const juce::String& name)>& idOf, const juce::String& namePrefix);
     static juce::String eqParameterId (int layer, const juce::String& name) { return layerParameterId (layer, "eq." + name); }
     static const char* eqBandKey (eq::Band band) noexcept;   ///< "hp", "lowShelf", "bell", "highShelf", "lp"
     /** The grain budget's choices (index -> grains at once; 0 = Unlimited, the original), never

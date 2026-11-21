@@ -71,14 +71,14 @@ namespace
     /** The open page's name, bright and underlined in the layer's colour ("Off" after it while
         it is off), the other page a quiet text tab; a hairline under the whole row. */
     void drawTabs (juce::Graphics& g, juce::Rectangle<float> title, const juce::String& name, bool on, juce::Rectangle<float> other,
-                   const juce::String& otherName, bool otherHot, int layer, float right, float rule = 38.0f)
+                   const juce::String& otherName, bool otherHot, juce::Colour accent, float right, float rule = 38.0f)
     {
         using namespace osp::plugin::design;
         g.setFont (type::popupLabel (12.0f));
         g.setColour (light.withAlpha (on ? 0.95f : 0.6f));
         g.drawText (name, title, juce::Justification::centredLeft, false);
         const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), name);
-        g.setColour (colour::identity (InstrumentHost::shownLayer (layer)).arc.withAlpha (on ? 1.0f : 0.5f));
+        g.setColour (accent.withAlpha (on ? 1.0f : 0.5f));
         g.fillRect (juce::Rectangle<float> (title.getX(), title.getBottom() - 2.0f, tw, 1.5f));
         if (! on)
         {
@@ -274,12 +274,26 @@ void EqValueField::commitTyping (const juce::String& text)
 }
 
 //==============================================================================
-EqEditor::EqEditor (InstrumentHost& p, int l) : ospProcessor (p), layer (l)
+EqTarget EqTarget::ofLayer (int layer)
 {
-    binding::tag (*this, InstrumentHost::eqParameterId (l, "*"));
-    setTitle ("EQ " + InstrumentHost::shownLayerName (layer));
-    shown = ospProcessor.layerEqSettings (layer);
+    EqTarget t;
+    t.layer = layer;
+    t.idOf = [layer] (const juce::String& name) { return InstrumentHost::eqParameterId (layer, name); };
+    t.name = InstrumentHost::shownLayerName (layer);
+    t.accent = osp::plugin::design::colour::identity (InstrumentHost::shownLayer (layer)).arc;
+    return t;
+}
+
+EqEditor::EqEditor (InstrumentHost& p, int l) : EqEditor (p, EqTarget::ofLayer (l)) {}
+
+EqEditor::EqEditor (InstrumentHost& p, EqTarget t) : ospProcessor (p), layer (t.layer), target (std::move (t))
+{
+    binding::tag (*this, target.idOf ("*"));
+    setTitle ("EQ " + target.name);
+    shown = settingsNow();
     setRepaintsOnMouseActivity (false);
+    if (! target.dampen)
+        return;
     dampenPage = std::make_unique<DampenEditor> (ospProcessor, layer);
     dampenPage->onShowEq = [this] { showDampen (false); };
     dampenPage->onClose = [this] {
@@ -289,8 +303,19 @@ EqEditor::EqEditor (InstrumentHost& p, int l) : ospProcessor (p), layer (l)
     addChildComponent (*dampenPage);
 }
 
+eq::Settings EqEditor::settingsNow() const
+{
+    std::array<float, 19> v {};
+    const auto& names = InstrumentHost::eqParameterNames();
+    for (int i = 0; i < names.size(); ++i)
+        v[static_cast<std::size_t> (i)] = ospProcessor.parameterValue (target.idOf (names[i]));
+    return InstrumentHost::eqFromValues (v);
+}
+
 void EqEditor::showDampen (bool show)
 {
+    if (dampenPage == nullptr)
+        return;
     dampenPage->setVisible (show);
     if (show)
     {
@@ -308,8 +333,7 @@ double EqEditor::sampleRate() const
 
 juce::RangedAudioParameter* EqEditor::bandParameter (int band, const char* name) const
 {
-    return ospProcessor.apvts().getParameter (
-        InstrumentHost::eqParameterId (layer, juce::String (InstrumentHost::eqBandKey (static_cast<eq::Band> (band))) + "." + name));
+    return ospProcessor.apvts().getParameter (target.idOf (juce::String (InstrumentHost::eqBandKey (static_cast<eq::Band> (band))) + "." + name));
 }
 
 void EqEditor::setValue (juce::RangedAudioParameter* p, float value)
@@ -332,10 +356,10 @@ void EqEditor::switchBand (int band, bool on)
         for (const auto& b : shown.bands)
             anyOn = anyOn || b.enabled;
         if (! anyOn)
-            setValue (ospProcessor.apvts().getParameter (InstrumentHost::eqParameterId (layer, "enabled")), 1.0f);
+            setValue (ospProcessor.apvts().getParameter (target.idOf ("enabled")), 1.0f);
     }
     setValue (bandParameter (band, "enabled"), on ? 1.0f : 0.0f);
-    shown = ospProcessor.layerEqSettings (layer);
+    shown = settingsNow();
     repaint();
 }
 
@@ -407,9 +431,11 @@ std::array<double, 4> EqEditor::modulationOffsets (const eq::Settings& base) con
     // envelopes, its clamps), as offsets from the stored bands. Nothing published - no route,
     // or an engine that does not move its EQ - nothing moves the curve.
     std::array<double, 4> o {};
+    if (! target.modulation)
+        return o;
     auto played = [this] (eq::Band band, const char* name, double& v) {
         InstrumentHost::EffectiveValue e;
-        if (! ospProcessor.effectiveValue (InstrumentHost::eqParameterId (layer, juce::String (InstrumentHost::eqBandKey (band)) + "." + name), e))
+        if (! ospProcessor.effectiveValue (target.idOf (juce::String (InstrumentHost::eqBandKey (band)) + "." + name), e))
             return false;
         v = e.value;
         return true;
@@ -455,7 +481,7 @@ void EqEditor::refresh()
     }
     else if (ospProcessor.stepLayerEqSpectrum (layer))
         repaint (graphArea().expanded (2.0f).getSmallestIntegerContainer());
-    const auto now = ospProcessor.layerEqSettings (layer);
+    const auto now = settingsNow();
     const auto offsets = modulationOffsets (now);
     bool moved = false;
     for (std::size_t i = 0; i < offsets.size(); ++i)
@@ -490,7 +516,7 @@ void EqEditor::rebuildInspector()
         const auto band = static_cast<eq::Band> (selected);
         const juce::String key = InstrumentHost::eqBandKey (band);
         auto make = [&] (const char* name) {
-            auto f = std::make_unique<EqValueField> (ospProcessor, InstrumentHost::eqParameterId (layer, key + "." + name));
+            auto f = std::make_unique<EqValueField> (ospProcessor, target.idOf (key + "." + name));
             f->setColour (equi::bandColour (band));
             addAndMakeVisible (*f);
             return f;
@@ -512,9 +538,9 @@ void EqEditor::resized()
     const float w = static_cast<float> (getWidth());
     // The open page's name, then the other page's tab one even gap after it (after "Off" while
     // the EQ is off), as NOTE MAP's tabs are spaced.
-    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "EQ " + InstrumentHost::shownLayerName (layer));
+    const float tw = juce::GlyphArrangement::getStringWidth (type::popupLabel (12.0f), "EQ " + target.name);
     titleArea = { 40.0f, 9.0f, tw + (shown.enabled ? 4.0f : 30.0f), 24.0f };
-    dampenTab = { titleArea.getRight() + 10.0f, 9.0f, 64.0f, 24.0f };
+    dampenTab = { titleArea.getRight() + 10.0f, 9.0f, target.dampen ? 64.0f : 0.0f, 24.0f };   // (no DAMPEN page: no tab)
     if (dampenPage != nullptr)
         dampenPage->setBounds (getLocalBounds());
     closeArea = { w - 32.0f, 10.0f, 22.0f, 22.0f };
@@ -733,7 +759,7 @@ void EqEditor::paint (juce::Graphics& g)
 
     // The top row: the EQ's switch, EQ | DAMPEN as text tabs, the selected band's values.
     drawPower (g, powerArea(), heard);
-    drawTabs (g, titleArea, "EQ " + InstrumentHost::shownLayerName (layer), heard, dampenTab, "DAMPEN", hotTab, layer, bounds.getRight(),
+    drawTabs (g, titleArea, "EQ " + target.name, heard, dampenTab, target.dampen ? "DAMPEN" : "", hotTab, target.accent, bounds.getRight(),
               twoRows ? 38.0f + rowDrop : 38.0f);
     if (selected >= 0)
     {
@@ -807,7 +833,7 @@ void EqEditor::mouseDown (const juce::MouseEvent& e)
     if (powerArea().expanded (4.0f).contains (p) || titleArea.contains (p))
     {
         ospProcessor.undo().beginNewTransaction (shown.enabled ? "EQ off" : "EQ on");
-        setValue (ospProcessor.apvts().getParameter (InstrumentHost::eqParameterId (layer, "enabled")), shown.enabled ? 0.0f : 1.0f);
+        setValue (ospProcessor.apvts().getParameter (target.idOf ("enabled")), shown.enabled ? 0.0f : 1.0f);
         refresh();
         return;
     }
@@ -1173,7 +1199,7 @@ void DampenEditor::paint (juce::Graphics& g)
     // The top row: DAMPEN's switch, DAMPEN | EQ as text tabs, the mode, AMOUNT, the value, the
     // curve's presets, close (the EQ page's vocabulary).
     drawPower (g, powerArea(), heard);
-    drawTabs (g, title, "DAMPEN " + InstrumentHost::shownLayerName (layer), heard, eqTab, "EQ", hotTab, layer, bounds.getRight(),
+    drawTabs (g, title, "DAMPEN " + InstrumentHost::shownLayerName (layer), heard, eqTab, "EQ", hotTab, osp::plugin::design::colour::identity (InstrumentHost::shownLayer (layer)).arc, bounds.getRight(),
               twoRows ? 38.0f + rowDrop : 38.0f);
     if (mode.getWidth() >= 110.0f)
         drawSegments (g, mode, { "Shelf", "Low-pass" }, lowPass() ? 1 : 0, false);
@@ -1704,7 +1730,7 @@ void SynthEditor::paint (juce::Graphics& g)
     }
 
     // The top row: the page's name, ANALOG | IMPRINT, AMOUNT, close.
-    drawTabs (g, title, "SYNTH " + InstrumentHost::layerName (layer), heard, {}, {}, false, layer, bounds.getRight());
+    drawTabs (g, title, "SYNTH " + InstrumentHost::layerName (layer), heard, {}, {}, false, osp::plugin::design::colour::identity (InstrumentHost::shownLayer (layer)).arc, bounds.getRight());
     drawSegments (g, modeChoice, { "ANALOG", "IMPRINT" }, imprintShown() ? 1 : 0, false);
     g.setFont (type::popupLabel (10.5f));
     g.setColour (colour::wellText.brighter (0.1f));
@@ -1881,7 +1907,7 @@ void CaptureEditor::paint (juce::Graphics& g)
     const bool mine = view.recording && view.layer == layer;
 
     // The top row: the page's name, the input meter, close.
-    drawTabs (g, title, "CAPTURE " + InstrumentHost::layerName (layer), view.connected, {}, {}, false, layer, bounds.getRight());
+    drawTabs (g, title, "CAPTURE " + InstrumentHost::layerName (layer), view.connected, {}, {}, false, osp::plugin::design::colour::identity (InstrumentHost::shownLayer (layer)).arc, bounds.getRight());
     g.setColour (light.withAlpha (0.08f));
     g.fillRoundedRectangle (meter, 2.0f);
     if (view.connected)
