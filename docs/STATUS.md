@@ -18,6 +18,10 @@
 >   message loop on macOS (`pumpMessages` returns false), so the click test failed there; it now
 >   returns early on such platforms, as OSP's other message-loop tests do (31aed041). Linux and
 >   Windows run it; on macOS the clicks are the owner's test in the hosts.
+> - **Windows (MSVC):** `ShellEditor.h` included `"FxRouting.h"` by name; MSVC looks first beside
+>   the file that included it, and ANDOR ANALOG has its own `FxRouting.h` there, so the shell
+>   saw ANALOG's header and not `RoutingKey`. It now includes OSP's by path (no other shared
+>   header has the problem: the rest find their own folder's file first).
 > - Not taken from the beta: the DAMPEN Starting States commit (3c260390, ANDOR OSP's own
 >   presets), as with its release work, MIDI Learn and the POS-line fix.
 >

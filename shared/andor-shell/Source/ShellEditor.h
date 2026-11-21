@@ -6,7 +6,7 @@
 #include "EngineCard.h"
 #include "InstrumentFrame.h"
 #include "EffectRack.h"
-#include "FxRouting.h"
+#include "../../andor-ui/Source/FxRouting.h"   // (by path: MSVC looks first beside the file that included this one, and a product may have its own FxRouting.h - ANDOR ANALOG does)
 #include "KeyDnaEditor.h"
 #include "LearnController.h"
 #include "MacroPopups.h"
