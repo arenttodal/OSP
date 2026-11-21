@@ -607,7 +607,7 @@ LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& st
             if (fileHash)
             {
                 std::string error;
-                if (! store.import (juce::File (juce::String (found->string())), *fileHash, error))
+                if (! store.import (juce::File (juce::String (osp::utf8Of (*found))), *fileHash, error))
                     result.warnings.push_back (error);
             }
             auto kept = std::find_if (resolvedAtlas->sources.begin(), resolvedAtlas->sources.end(), [&] (const auto& s) { return s.assetId == src.assetId; });

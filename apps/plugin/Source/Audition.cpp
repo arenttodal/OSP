@@ -136,7 +136,7 @@ Audition::Found Audition::find (library::Catalog& catalog, const std::filesystem
         return found;
     }
     found.ok = true;
-    found.file = juce::File (juce::String (where.file->string()));
+    found.file = juce::File (juce::String (osp::utf8Of (*where.file)));
     found.filename = found.name + found.file.getFileExtension();
     // Where it came from: the place the bytes were found, unless that is the managed copy;
     // then the first place it was seen that still exists (else the first one known).
@@ -186,7 +186,7 @@ void Audition::prepare (int slotIndex, const std::string& assetId, std::optional
             {
                 io::LoadOptions options;
                 options.maxSeconds = 60.0;   // a preview: the first minute of anything longer
-                auto decoded = io::loadAudioFile (found.file.getFullPathName().toStdString(), options);
+                auto decoded = io::loadAudioFile (osp::pathFromUtf8 (found.file.getFullPathName().toStdString()), options);
                 if (decoded.ok)
                     sound = library::makePreviewSound (std::move (decoded.audio), found.root, assetId, found.name.toStdString());
                 else
@@ -281,7 +281,7 @@ void Audition::decode (const std::string& assetId, const juce::File& file, Decod
             juce::String error = found.error;
             if (found.ok)
             {
-                auto decoded = io::loadAudioFile (found.file.getFullPathName().toStdString());
+                auto decoded = io::loadAudioFile (osp::pathFromUtf8 (found.file.getFullPathName().toStdString()));
                 if (decoded.ok)
                     audio = std::make_shared<const AudioData> (std::move (decoded.audio));
                 else
@@ -343,7 +343,7 @@ const std::vector<float>* Audition::overview (const std::string& assetId)
             {
                 io::LoadOptions options;
                 options.maxSeconds = 30.0;
-                const auto decoded = io::loadAudioFile (found.file.getFullPathName().toStdString(), options);
+                const auto decoded = io::loadAudioFile (osp::pathFromUtf8 (found.file.getFullPathName().toStdString()), options);
                 const auto frames = decoded.ok ? decoded.audio.numFrames() : 0;
                 for (int b = 0; b < overviewBins && frames > 0; ++b)
                 {

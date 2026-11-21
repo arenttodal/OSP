@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include "core/PathText.h"
 
 namespace osp::plugin
 {
@@ -575,7 +576,7 @@ void CustomPatternEditor::openImportChooser()
         // Parsed off the message thread, then back to the editor (if it is still open).
         juce::Thread::launch ([safe, path = file.getFullPathName().toStdString()] {
             std::string error;
-            auto phrases = readMidiPhrases (path, error);
+            auto phrases = readMidiPhrases (osp::pathFromUtf8 (path), error);
             juce::MessageManager::callAsync ([safe, phrases = std::move (phrases), error] {
                 if (safe == nullptr)
                     return;
@@ -889,7 +890,7 @@ void CustomPatternEditor::openBrowseMenu()
     for (const auto& f : files)
     {
         std::string error;
-        if (auto d = readArpPattern (f.getFullPathName().toStdString(), error))
+        if (auto d = readArpPattern (osp::pathFromUtf8 (f.getFullPathName().toStdString()), error))
         {
             entries.push_back (*d);
             yours.addItem (static_cast<int> (entries.size()), f.getFileNameWithoutExtension());
@@ -925,7 +926,7 @@ juce::File CustomPatternEditor::libraryFileOf (const ap::Document& d) const
     for (const auto& f : libraryFolder().findChildFiles (juce::File::findFiles, false, juce::String ("*") + arpPatternExtension))
     {
         std::string error;
-        if (const auto read = readArpPattern (f.getFullPathName().toStdString(), error); read && read->id == d.id)
+        if (const auto read = readArpPattern (osp::pathFromUtf8 (f.getFullPathName().toStdString()), error); read && read->id == d.id)
             return f;
     }
     return {};
@@ -965,7 +966,7 @@ void CustomPatternEditor::saveToLibrary()
     if (file == juce::File())
         file = freeLibraryFile (wanted);
     std::string error;
-    if (writeArpPattern (file.getFullPathName().toStdString(), doc, error))
+    if (writeArpPattern (osp::pathFromUtf8 (file.getFullPathName().toStdString()), doc, error))
     {
         saved = doc;
         status = "Saved in your library: " + file.getFileNameWithoutExtension() + " (Apply Pattern uses it here)";
@@ -984,7 +985,7 @@ void CustomPatternEditor::saveCopy (const juce::String& wanted, bool switchToCop
     copy.name = (wanted.isEmpty() ? juce::String (doc.name) + " copy" : wanted).toStdString();
     const auto file = freeLibraryFile (juce::String (copy.name));
     std::string error;
-    if (! writeArpPattern (file.getFullPathName().toStdString(), copy, error))
+    if (! writeArpPattern (osp::pathFromUtf8 (file.getFullPathName().toStdString()), copy, error))
     {
         status = "Could not save the copy: " + juce::String (error);
         repaint();
@@ -1026,7 +1027,7 @@ void CustomPatternEditor::renameInLibrary (const juce::String& wanted)
     name->setText (wanted, true);
     const auto target = file.getFileNameWithoutExtension() == juce::File::createLegalFileName (wanted) ? file : freeLibraryFile (wanted);
     std::string error;
-    const bool ok = writeArpPattern (target.getFullPathName().toStdString(), doc, error) && (target == file || file.deleteFile());
+    const bool ok = writeArpPattern (osp::pathFromUtf8 (target.getFullPathName().toStdString()), doc, error) && (target == file || file.deleteFile());
     if (ok)
         saved = doc;
     status = ok ? "Renamed: " + target.getFileNameWithoutExtension() : "Could not rename: " + juce::String (error);

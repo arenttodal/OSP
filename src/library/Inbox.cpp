@@ -84,8 +84,8 @@ InboxPass reconcileInbox (Catalog& catalog, const std::vector<std::filesystem::p
         auto consider = [&] (const std::filesystem::path& file) {
             if (const auto target = cloudPlaceholderTarget (file))
             {
-                if (io::isSupportedAudioExtension (*target) && present.count (target->string()) == 0)
-                    present[target->string()] = true;
+                if (io::isSupportedAudioExtension (*target) && present.count (osp::utf8Of (*target)) == 0)
+                    present[osp::utf8Of (*target)] = true;
                 return;
             }
             const auto name = osp::utf8Of (file.filename());
@@ -160,9 +160,9 @@ InboxPass reconcileInbox (Catalog& catalog, const std::vector<std::filesystem::p
             {
                 io::AudioFileInfo info;
                 std::string error;
-                if (io::readAudioFileInfo (path, info, error))
+                if (io::readAudioFileInfo (osp::pathFromUtf8 (path), info, error))
                 {
-                    if (const auto hex = io::sha256OfFile (path))
+                    if (const auto hex = io::sha256OfFile (osp::pathFromUtf8 (path)))
                     {
                         item.contentHash = io::contentId (*hex);
                         const auto records = catalog.soundsWithContent (item.contentHash);
@@ -247,7 +247,7 @@ ImportResult importInboxItem (Catalog& catalog, const std::filesystem::path& sto
     item->state = "importing";
     catalog.putInboxItem (*item);
     // The name's and the folders' evidence (and the analysis' when there is one), like a scan's.
-    auto request = requestWithEvidence (catalog, path, item->contentHash, item->folder);
+    auto request = requestWithEvidence (catalog, osp::pathFromUtf8 (path), item->contentHash, item->folder);
     request.origin = Origin::captured;
     request.name = name;
     request.collectionId = collectionId;

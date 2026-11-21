@@ -234,7 +234,7 @@ std::optional<PackManifest> parsePackManifest (const std::string& json, std::str
         const auto leaf = item.path.size() > std::string (folderOf (item.kind)).size() ? item.path.substr (std::string (folderOf (item.kind)).size()) : std::string();
         const auto ext = lowerExtension (leaf);
         const bool pathOk = safeRelativePath (item.path, 1, pathProblem) && item.path.rfind (folderOf (item.kind), 0) == 0 && ! leaf.empty()
-                            && (item.kind != PackItem::Kind::sound || (leaf == item.sha256 + ext && io::isSupportedAudioExtension (leaf)))
+                            && (item.kind != PackItem::Kind::sound || (leaf == item.sha256 + ext && io::isSupportedAudioExtension (osp::pathFromUtf8 (leaf))))
                             && (item.kind != PackItem::Kind::preset || ext == ".osppreset")
                             && (item.kind != PackItem::Kind::templateState || ext == ".ospstate");
         if (item.uid.empty() || ! uids.insert (item.uid).second || ! pathOk || ! paths.insert (item.path).second || ! isHex64 (item.sha256) || item.bytes < 0
@@ -381,7 +381,7 @@ PackResult installPack (Catalog& catalog, const std::filesystem::path& file, con
     for (const auto& item : m.items)
     {
         std::string why;
-        if (! archive.extract (item.path, staging / item.path, item.bytes, item.sha256, why))
+        if (! archive.extract (item.path, staging / osp::pathFromUtf8 (item.path), item.bytes, item.sha256, why))
         {
             result.error = "the pack is damaged, nothing was changed: " + why;
             return result;
@@ -391,7 +391,7 @@ PackResult installPack (Catalog& catalog, const std::filesystem::path& file, con
     for (const auto& item : m.items)
     {
         keys.insert (item.uid);
-        const auto staged = staging / item.path;
+        const auto staged = staging / osp::pathFromUtf8 (item.path);
         const auto existing = catalog.assetForPackKey (m.id, item.uid);
         if (item.kind == PackItem::Kind::sound)
         {
@@ -507,7 +507,7 @@ PackResult installPack (Catalog& catalog, const std::filesystem::path& file, con
         if (a->type != AssetType::sound)
         {
             if (const auto p = catalog.preset (id))
-                std::filesystem::remove (p->file, ec);
+                std::filesystem::remove (osp::pathFromUtf8 (p->file), ec);
             catalog.purge (id);
         }
         ++result.removedItems;
@@ -707,7 +707,7 @@ PackResult exportPack (Catalog& catalog, const std::filesystem::path& storeDir, 
         const auto p = catalog.preset (id);
         if (! a || ! p)
             continue;
-        const std::filesystem::path file (p->file);
+        const auto file = osp::pathFromUtf8 (p->file);
         const auto hex = io::sha256OfFile (file);
         if (! hex)
         {

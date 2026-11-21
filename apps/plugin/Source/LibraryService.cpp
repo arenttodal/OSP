@@ -12,7 +12,7 @@ LibraryService::LibraryService (juce::File sampleStoreDirectory) : store (std::m
     // A copy an interrupted import left behind (older than an hour: another instance may be
     // copying one right now) is cleared once per start.
     post ([dir = store] (library::Catalog&) {
-        library::clearInterruptedImports (dir.getFullPathName().toStdString(), std::chrono::hours (1));
+        library::clearInterruptedImports (osp::pathFromUtf8 (dir.getFullPathName().toStdString()), std::chrono::hours (1));
     });
 }
 
@@ -135,7 +135,7 @@ void LibraryService::soundLoaded (const LoadedInstrument& instrument, int layer,
             info.contentHash = f.hash;
             info.managed = true;
             info.provenance = "unknown";   // the user says otherwise (export asks)
-            if (const auto stored = library::findStored (dir.getFullPathName().toStdString(), library::hexOf (f.hash)))
+            if (const auto stored = library::findStored (osp::pathFromUtf8 (dir.getFullPathName().toStdString()), library::hexOf (f.hash)))
             {
                 io::AudioFileInfo header;
                 std::string error;

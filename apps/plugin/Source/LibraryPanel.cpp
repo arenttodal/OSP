@@ -2002,7 +2002,7 @@ void LibraryPanel::query()
                         {
                             io::AudioFileInfo info;
                             std::string unreadable;
-                            if (io::readAudioFileInfo (item.path, info, unreadable) && info.sampleRate > 0.0)
+                            if (io::readAudioFileInfo (osp::pathFromUtf8 (item.path), info, unreadable) && info.sampleRate > 0.0)
                                 r.seconds = static_cast<double> (info.frames) / info.sampleRate, r.sampleRate = info.sampleRate, r.channels = info.channels;
                         }
                         if (wanted (item.path, r.seconds))

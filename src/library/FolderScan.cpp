@@ -142,7 +142,7 @@ ScanSummary scanFolder (Catalog& catalog, const ScanRoot& root, const ScanSettin
     ScanSummary summary;
     progress.reset();
     progress.stage = 1;
-    const std::filesystem::path base (root.path);
+    const auto base = osp::pathFromUtf8 (root.path);
     std::error_code ec;
     if (! std::filesystem::is_directory (base, ec))
     {
@@ -284,7 +284,7 @@ ScanSummary scanFolder (Catalog& catalog, const ScanRoot& root, const ScanSettin
             ++summary.skipped;
             continue;
         }
-        const auto hex = io::sha256OfFile (f.path);
+        const auto hex = io::sha256OfFile (osp::pathFromUtf8 (f.path));
         if (! hex)
         {
             f.state = "failed";
@@ -373,7 +373,7 @@ bool analyseContent (Catalog& catalog, const std::string& path, const std::strin
         return true;
     io::LoadOptions options;
     options.maxSeconds = 120.0;
-    const auto decoded = io::loadAudioFile (path, options);
+    const auto decoded = io::loadAudioFile (osp::pathFromUtf8 (path), options);
     if (! decoded.ok)
     {
         error = decoded.error;
@@ -389,7 +389,7 @@ ImportRequest requestWithEvidence (const Catalog& catalog, const std::filesystem
     ImportRequest request;
     request.file = file;
     const auto name = evidenceFromName (osp::utf8Of (file.filename()));
-    const auto folders = rootPath.empty() ? NameEvidence {} : evidenceFromFolders (file, rootPath);
+    const auto folders = rootPath.empty() ? NameEvidence {} : evidenceFromFolders (file, osp::pathFromUtf8 (rootPath));
     for (const auto& t : name.tags)
         request.tags.push_back ({ t.tag, TagSource::filename, t.confidence });
     for (const auto& t : folders.tags)
@@ -419,7 +419,7 @@ ImportRequest requestWithEvidence (const Catalog& catalog, const std::filesystem
 ImportResult importCandidate (Catalog& catalog, const std::filesystem::path& storeDir, const ScanFile& candidate, const std::string& rootPath,
                               const std::string& collectionId, Origin origin)
 {
-    auto request = requestWithEvidence (catalog, candidate.path, candidate.contentHash, rootPath);
+    auto request = requestWithEvidence (catalog, osp::pathFromUtf8 (candidate.path), candidate.contentHash, rootPath);
     request.origin = origin;
     request.collectionId = collectionId;
     request.provenance = "unknown";   // found on a drive: whose it is, the user says when sharing

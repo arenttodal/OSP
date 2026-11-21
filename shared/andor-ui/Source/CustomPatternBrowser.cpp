@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <set>
+#include "core/PathText.h"
 
 namespace osp::plugin
 {
@@ -97,7 +98,7 @@ void CustomPatternBrowser::rebuild()
         {
             std::string error;
             // (an unreadable or newer file is left out of the list, never an error here)
-            if (auto d = readArpPattern (f.getFullPathName().toStdString(), error))
+            if (auto d = readArpPattern (osp::pathFromUtf8 (f.getFullPathName().toStdString()), error))
             {
                 listed.insert (d->id);
                 library.emplace_back (f.getFileNameWithoutExtension(), std::move (*d));

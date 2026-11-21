@@ -283,7 +283,7 @@ Resolution resolveSound (const Catalog& catalog, const std::filesystem::path& st
     std::error_code ec;
     for (const auto& path : catalog.locations (io::contentId (hex)))
     {
-        const std::filesystem::path p (path);
+        const auto p = osp::pathFromUtf8 (path);
         if (! std::filesystem::is_regular_file (p, ec))
         {
             r.missing.push_back (p);
@@ -370,7 +370,7 @@ TrashEmptied emptyTrash (Catalog& catalog, const std::filesystem::path& storeDir
         {
             // A trashed preset file sits in the Library's trash folder: moved away with its record.
             std::error_code ec;
-            const std::filesystem::path file (preset->file);
+            const auto file = osp::pathFromUtf8 (preset->file);
             if (std::filesystem::is_regular_file (file, ec))
             {
                 const auto size = static_cast<std::int64_t> (std::filesystem::file_size (file, ec));
@@ -403,7 +403,7 @@ TrashEmptied emptyTrash (Catalog& catalog, const std::filesystem::path& storeDir
         const auto size = static_cast<std::int64_t> (std::filesystem::file_size (*stored, ec));
         if (! moveAway (*stored))
         {
-            result.failed.push_back (stored->string());
+            result.failed.push_back (osp::utf8Of (*stored));
             continue;
         }
         ++result.files;

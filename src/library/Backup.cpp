@@ -297,7 +297,7 @@ BackupResult exportBackup (Catalog& catalog, const BackupPlaces& places, const s
             ++result.external;
         }
         else
-            result.notIncluded.push_back (name + (where.file ? " (outside the Library, at " + where.file->string() + ": choose \"include external files\")"
+            result.notIncluded.push_back (name + (where.file ? " (outside the Library, at " + osp::utf8Of (*where.file) + ": choose \"include external files\")"
                                                             : " (missing: not found anywhere)"));
     }
     if (options.includeUntracked)
@@ -408,7 +408,7 @@ BackupInfo inspectBackup (const std::filesystem::path& folder)
         return info;
     }
     for (const auto& f : m->files)
-        if (! plainFile (folder / f.path) || static_cast<std::int64_t> (std::filesystem::file_size (folder / f.path)) != f.bytes)
+        if (! plainFile (folder / osp::pathFromUtf8 (f.path)) || static_cast<std::int64_t> (std::filesystem::file_size (folder / osp::pathFromUtf8 (f.path))) != f.bytes)
         {
             info.error = "this backup is incomplete or damaged: " + f.path + " is missing, changed or a link";
             return info;
@@ -447,7 +447,7 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
         {
             std::error_code e;
             for (const char* suffix : { "", "-wal", "-shm" })
-                std::filesystem::remove (osp::utf8Of (file) + suffix, e);
+                std::filesystem::remove (osp::pathFromUtf8 (osp::utf8Of (file) + suffix), e);
         }
     } removeTemp { temp };
     std::filesystem::copy_file (folder / "catalog.db", temp, ec);
@@ -489,7 +489,7 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
             continue;
         }
         std::string problem;
-        if (storeContent (places.storeDir, folder / f.path, f.sha256, problem))
+        if (storeContent (places.storeDir, folder / osp::pathFromUtf8 (f.path), f.sha256, problem))
             ++report.soundsAdded;
         else
             report.notes.push_back (f.path + ": " + problem);
@@ -541,7 +541,7 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
         }
         if (! present)
         {
-            if (copyVerified (folder / f.path, target, sha, problem))
+            if (copyVerified (folder / osp::pathFromUtf8 (f.path), target, sha, problem))
                 ++report.filesAdded;
             else
                 report.notes.push_back (f.path + ": " + problem);
@@ -555,14 +555,14 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
         }
         if (! owner.empty() && updated.count (owner) > 0 && options.moveToTrash && options.moveToTrash (target))
         {
-            if (copyVerified (folder / f.path, target, sha, problem))
+            if (copyVerified (folder / osp::pathFromUtf8 (f.path), target, sha, problem))
                 ++report.filesReplaced;
             else
                 report.notes.push_back (f.path + ": " + problem);
             continue;
         }
         const auto beside = besideName (target);
-        if (! copyVerified (folder / f.path, beside, sha, problem))
+        if (! copyVerified (folder / osp::pathFromUtf8 (f.path), beside, sha, problem))
         {
             report.notes.push_back (f.path + ": " + problem);
             continue;
@@ -578,12 +578,12 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
         auto sha = f.sha256;
         std::string problem;
         if (f.path == "settings.json" && ! std::filesystem::exists (places.settingsFile, ec))
-            copyVerified (folder / f.path, places.settingsFile, sha, problem);
+            copyVerified (folder / osp::pathFromUtf8 (f.path), places.settingsFile, sha, problem);
         if (f.path == "favourites.txt")
         {
             auto here = juce::StringArray::fromLines (juce::File (juce::String (osp::utf8Of (places.favouritesFile))).loadFileAsString());
             here.removeEmptyStrings();
-            auto theirs = juce::StringArray::fromLines (juce::File (juce::String (osp::utf8Of ((folder / f.path)))).loadFileAsString());
+            auto theirs = juce::StringArray::fromLines (juce::File (juce::String (osp::utf8Of ((folder / osp::pathFromUtf8 (f.path))))).loadFileAsString());
             for (const auto& name : theirs)
                 if (name.isNotEmpty() && here.addIfNotAlreadyThere (juce::String (cleanText (name.toStdString(), 200))))
                     ++report.favourites;

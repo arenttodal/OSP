@@ -136,17 +136,17 @@ TEST_CASE ("library qa: Unicode and long names everywhere a name goes", "[unit][
     REQUIRE (longImport.ok);
     CHECK (p.catalog->asset (longImport.assetId)->name == longName);
     // Scans and the Inbox see the same files under the same names.
-    const auto root = *p.catalog->scanRoot (*p.catalog->addScanRoot (p.files.string()));
+    const auto root = *p.catalog->scanRoot (*p.catalog->addScanRoot (osp::utf8Of (p.files)));
     ScanControl control;
     ScanProgress progress;
     const auto summary = scanFolder (*p.catalog, root, {}, control, progress);
     CHECK (summary.found == 2);
     CHECK (summary.failed == 0);
-    CHECK (p.catalog->scanFile (file.string()).has_value());
+    CHECK (p.catalog->scanFile (osp::utf8Of (file)).has_value());
     reconcileInbox (*p.catalog, { p.files }, 1'000'000);
     reconcileInbox (*p.catalog, { p.files }, 1'010'000);
-    REQUIRE (p.catalog->inboxItem (file.string()));
-    CHECK (p.catalog->inboxItem (file.string())->state == "imported");   // its bytes are in the Library already
+    REQUIRE (p.catalog->inboxItem (osp::utf8Of (file)));
+    CHECK (p.catalog->inboxItem (osp::utf8Of (file))->state == "imported");   // its bytes are in the Library already
 }
 
 TEST_CASE ("library qa: thousands of tags stay quick to search and to list", "[unit][library][qa]")
