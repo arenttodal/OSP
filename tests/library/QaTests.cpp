@@ -122,8 +122,15 @@ TEST_CASE ("library qa: Unicode and long names everywhere a name goes", "[unit][
     SearchQuery q;
     q.text = "glocke";
     CHECK (p.catalog->count (q) == 1);
-    // A name as long as file systems allow (the extension included, 255 bytes).
+    // A name as long as file systems allow (the extension included, 255 bytes). Windows also
+    // caps the whole path at MAX_PATH (260) unless long paths are switched on: there the name
+    // is as long as the test folder leaves room for.
+   #if defined(_WIN32)
+    const auto room = static_cast<std::ptrdiff_t> (259) - static_cast<std::ptrdiff_t> (osp::utf8Of (p.files).size()) - 1 - 4;
+    const auto longName = std::string (static_cast<std::size_t> (std::clamp<std::ptrdiff_t> (room, 8, 251)), 'x');
+   #else
     const auto longName = std::string (251, 'x');
+   #endif
     const auto longFile = p.write (longName + ".wav", tone (220.0, 0.3, 2));
     const auto longImport = p.import (longFile);
     REQUIRE (longImport.ok);
