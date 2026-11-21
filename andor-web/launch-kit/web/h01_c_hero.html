@@ -36,10 +36,16 @@
          color: #f6f2ec; font-weight: 760; font-size: 15px; letter-spacing: 0.01em; text-decoration: none; }
   @media (max-aspect-ratio: 4/5) {
     .hero img { object-position: 50% 60%; }
-    .copy { padding-top: clamp(56px, 11vh, 120px); max-width: 30em; }
-    h1 { font-size: clamp(36px, 10.5vw, 56px); }
-    p { font-size: 16px; margin-top: 12px; }
-    .cta { margin-top: 22px; padding: 14px 28px; font-size: 16px; }
+    .copy { padding-top: clamp(44px, 10vh, 120px); max-width: 30em; }
+    h1 { font-size: clamp(30px, 9.4vw, 52px); }        /* two lines down to a 320 px wide phone */
+    p { font-size: clamp(14px, 3.9vw, 17px); margin-top: 12px; }
+    .cta { margin-top: 20px; padding: 13px 26px; font-size: 16px; }
+  }
+  /* shorter phones (iPhone SE and other 9:16 screens): the plate is cropped less at the bottom, so the
+     instrument sits lower and clear of the button */
+  @media (max-aspect-ratio: 4/5) and (min-aspect-ratio: 9/17) {
+    .hero img { object-position: 50% 8%; }
+    .copy { padding-top: clamp(32px, 7vh, 64px); }
   }
 </style>
 </head>
