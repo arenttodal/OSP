@@ -3,6 +3,7 @@
 #include "Audition.h"
 #include "InstrumentLoader.h"
 #include "PluginProcessor.h"
+#include "core/PathText.h"
 
 #include <cstdlib>
 
@@ -11,7 +12,7 @@ namespace osp::plugin
 
 namespace
 {
-    std::filesystem::path pathOf (const juce::File& f) { return std::filesystem::path (f.getFullPathName().toStdString()); }
+    std::filesystem::path pathOf (const juce::File& f) { return osp::pathFromUtf8 (f.getFullPathName().toStdString()); }
     std::filesystem::path libraryDir() { return library::Catalog::defaultFile().parent_path(); }
 }
 
@@ -44,7 +45,7 @@ juce::File factoryPackSource()
 
 bool moveToSystemTrash (const std::filesystem::path& path)
 {
-    return juce::File (juce::String (path.string())).moveToTrash();
+    return juce::File (juce::String (osp::utf8Of (path))).moveToTrash();
 }
 
 } // namespace osp::plugin

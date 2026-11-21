@@ -6,6 +6,7 @@
 #include "library/FolderScan.h"
 #include "library/Inbox.h"
 #include "library/Slicer.h"
+#include "core/PathText.h"
 
 namespace osp::plugin
 {
@@ -76,7 +77,7 @@ namespace
 
     std::filesystem::path storeDirectory()
     {
-        return std::filesystem::path (SampleStore::defaultDirectory().getFullPathName().toStdString());
+        return osp::pathFromUtf8 (SampleStore::defaultDirectory().getFullPathName().toStdString());
     }
 }
 

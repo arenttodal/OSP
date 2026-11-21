@@ -1,6 +1,7 @@
 #include "research/Fixtures.h"
 
 #include "midi/MidiFileIO.h"
+#include "core/PathText.h"
 
 #include <algorithm>
 #include <cmath>
@@ -16,7 +17,7 @@ bool writeFixtureFiles (const std::filesystem::path& directory, std::vector<std:
         const auto path = directory / (name + ".mid");
         if (! sequence || ! io::writeMidiFile (path, *sequence, error))
             return false;
-        written.push_back (path.string());
+        written.push_back (osp::utf8Of (path));
     }
     return true;
 }

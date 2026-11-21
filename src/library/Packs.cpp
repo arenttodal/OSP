@@ -4,6 +4,7 @@
 #include "io/ContentHash.h"
 #include "library/Archive.h"
 #include "library/SoundImport.h"
+#include "core/PathText.h"
 
 #include <juce_core/juce_core.h>
 
@@ -123,11 +124,11 @@ namespace
     PresetInfo presetInfoFor (const std::filesystem::path& file, const PackItem& item, const std::string& root)
     {
         PresetInfo info;
-        info.file = file.string();
+        info.file = osp::utf8Of (file);
         info.root = root;
         for (const auto& hex : item.sounds)
             info.soundHashes.push_back (io::contentId (hex));
-        if (const auto xml = juce::XmlDocument::parse (juce::File (juce::String (file.string()))))
+        if (const auto xml = juce::XmlDocument::parse (juce::File (juce::String (osp::utf8Of (file)))))
         {
             info.stateVersion = xml->getIntAttribute ("stateVersion", 0);
             info.layers = item.kind == PackItem::Kind::templateState ? xml->getIntAttribute ("keptSlots", 1) : static_cast<int> (item.sounds.size());
@@ -243,7 +244,7 @@ std::optional<PackManifest> parsePackManifest (const std::string& json, std::str
             return std::nullopt;
         }
         if (item.name.empty())
-            item.name = std::filesystem::path (leaf).stem().string();
+            item.name = osp::utf8Of (osp::pathFromUtf8 (leaf).stem());
         m.items.push_back (std::move (item));
     }
     return m;
@@ -453,12 +454,12 @@ PackResult installPack (Catalog& catalog, const std::filesystem::path& file, con
             continue;
         }
         // A preset or template: the pack's own folder, its record by its key.
-        const auto target = folder / (item.kind == PackItem::Kind::preset ? "Presets" : "Templates") / std::filesystem::path (item.path).filename();
+        const auto target = folder / (item.kind == PackItem::Kind::preset ? "Presets" : "Templates") / osp::pathFromUtf8 (item.path).filename();
         std::filesystem::create_directories (target.parent_path(), ec);
         std::filesystem::copy_file (staged, target, std::filesystem::copy_options::overwrite_existing, ec);
         if (ec)
         {
-            result.error = "cannot write " + target.filename().string() + " (disk full or no permission?)";
+            result.error = "cannot write " + osp::utf8Of (target.filename()) + " (disk full or no permission?)";
             return result;
         }
         const auto info = presetInfoFor (target, item, root);
@@ -575,7 +576,7 @@ std::vector<PackResult> installFactoryPacks (Catalog& catalog, const std::filesy
         return results;
     std::vector<std::filesystem::path> files;
     for (const auto& entry : std::filesystem::directory_iterator (folder, ec))
-        if (entry.is_regular_file (ec) && lowerExtension (entry.path().filename().string()) == ".osppack")
+        if (entry.is_regular_file (ec) && lowerExtension (osp::utf8Of (entry.path().filename())) == ".osppack")
             files.push_back (entry.path());
     std::sort (files.begin(), files.end());
     for (const auto& file : files)
@@ -681,7 +682,7 @@ PackResult exportPack (Catalog& catalog, const std::filesystem::path& storeDir, 
         item.kind = PackItem::Kind::sound;
         item.sha256 = hexOf (hash);
         item.uid = "sound-" + item.sha256.substr (0, 20);
-        item.path = "sounds/" + item.sha256 + lowerExtension (where.file->filename().string());
+        item.path = "sounds/" + item.sha256 + lowerExtension (osp::utf8Of (where.file->filename()));
         std::error_code ec;
         item.bytes = static_cast<std::int64_t> (std::filesystem::file_size (*where.file, ec));
         item.name = name;
@@ -710,17 +711,17 @@ PackResult exportPack (Catalog& catalog, const std::filesystem::path& storeDir, 
         const auto hex = io::sha256OfFile (file);
         if (! hex)
         {
-            result.error = a->name + "'s file cannot be read (" + file.filename().string() + ")";
+            result.error = a->name + "'s file cannot be read (" + osp::utf8Of (file.filename()) + ")";
             return result;
         }
         {
             // Only content that will load: a well-formed state with its version; a file marked as a
             // Starting State never travels as a preset.
-            const auto xml = juce::XmlDocument::parse (juce::File (juce::String::fromUTF8 (file.string().c_str())));
+            const auto xml = juce::XmlDocument::parse (juce::File (juce::String::fromUTF8 (osp::utf8Of (file).c_str())));
             const bool state = a->type == AssetType::templateState;
             if (xml == nullptr || ! xml->hasAttribute ("stateVersion") || (! state && xml->getIntAttribute ("startingState") == 1))
             {
-                result.error = a->name + " is not a valid " + (state ? "Starting State" : "preset") + " (" + file.filename().string() + ")";
+                result.error = a->name + " is not a valid " + (state ? "Starting State" : "preset") + " (" + osp::utf8Of (file.filename()) + ")";
                 return result;
             }
         }

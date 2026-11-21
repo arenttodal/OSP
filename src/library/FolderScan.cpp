@@ -4,6 +4,7 @@
 #include "io/ContentHash.h"
 #include "library/Classifier.h"
 #include "library/Tagging.h"
+#include "core/PathText.h"
 
 #include <algorithm>
 #include <cctype>
@@ -86,7 +87,7 @@ namespace
     {
         for (const auto& part : relative)
         {
-            const auto s = part.string();
+            const auto s = osp::utf8Of (part);
             if (! s.empty() && s[0] == '.' && s != "." && s != "..")
                 return true;
         }
@@ -126,8 +127,8 @@ namespace
 
 bool passesPatterns (const std::filesystem::path& relative, const std::string& include, const std::string& exclude)
 {
-    const auto name = lower (relative.filename().string());
-    const auto path = lower (relative.generic_string());
+    const auto name = lower (osp::utf8Of (relative.filename()));
+    const auto path = lower (osp::utf8GenericOf (relative));
     auto matches = [&] (const std::string& p) { return wildcard (p.c_str(), name.c_str()) || wildcard (p.c_str(), path.c_str()); };
     for (const auto& p : patterns (exclude))
         if (matches (p))
@@ -169,7 +170,7 @@ ScanSummary scanFolder (Catalog& catalog, const ScanRoot& root, const ScanSettin
             return;
         ++progress.found;
         ++summary.found;
-        const auto path = file.string();
+        const auto path = osp::utf8Of (file);
         seen.insert (path);
         const auto size = static_cast<std::int64_t> (std::filesystem::file_size (file, ec));
         const auto time = modified (file);
@@ -195,7 +196,7 @@ ScanSummary scanFolder (Catalog& catalog, const ScanRoot& root, const ScanSettin
         if (io::readAudioFileInfo (file, info, error))
         {
             f.state = "indexed";
-            f.format = lower (file.extension().string().substr (1));
+            f.format = lower (osp::utf8Of (file.extension()).substr (1));
             f.sampleRate = info.sampleRate;
             f.channels = info.channels;
             f.durationSeconds = info.sampleRate > 0.0 ? static_cast<double> (info.frames) / info.sampleRate : 0.0;
@@ -378,7 +379,7 @@ bool analyseContent (Catalog& catalog, const std::string& path, const std::strin
         error = decoded.error;
         return false;
     }
-    const auto name = evidenceFromName (std::filesystem::path (path).filename().string());
+    const auto name = evidenceFromName (osp::utf8Of (osp::pathFromUtf8 (path).filename()));
     const auto c = classifySound (decoded.audio, &name);
     return catalog.putAnalysis (contentHash, classifierVersion, toString (c.soundClass), toJson (c));
 }
@@ -387,7 +388,7 @@ ImportRequest requestWithEvidence (const Catalog& catalog, const std::filesystem
 {
     ImportRequest request;
     request.file = file;
-    const auto name = evidenceFromName (file.filename().string());
+    const auto name = evidenceFromName (osp::utf8Of (file.filename()));
     const auto folders = rootPath.empty() ? NameEvidence {} : evidenceFromFolders (file, rootPath);
     for (const auto& t : name.tags)
         request.tags.push_back ({ t.tag, TagSource::filename, t.confidence });

@@ -15,6 +15,7 @@
 #include "research/RenderMetrics.h"
 #include "research/RenderSession.h"
 #include "research/SourceAnalysis.h"
+#include "core/PathText.h"
 
 #include <algorithm>
 #include <chrono>
@@ -285,7 +286,7 @@ std::string registerGroundTruth (const std::vector<std::filesystem::path>& files
         auto loaded = loadAndAnalyse (f);
         if (loaded.ok && loaded.analysis.pitch.detected)
         {
-            names.push_back (f.filename().string());
+            names.push_back (osp::utf8Of (f.filename()));
             sources.push_back (std::move (loaded));
         }
     }
@@ -426,7 +427,7 @@ ExperimentSummary runExperiment (const std::filesystem::path& planFile, const st
                 setPaths.push_back (item.toString().toStdString());
         const auto rel = json::has (s, "path") ? json::getString (s, "path") : (setPaths.empty() ? std::string() : setPaths.front());
         const auto sectionId = json::getString (s, "id", rel);
-        const auto path = std::filesystem::path (rel).is_absolute() ? std::filesystem::path (rel) : corpusRoot / rel;
+        const auto path = osp::pathFromUtf8 (rel).is_absolute() ? osp::pathFromUtf8 (rel) : corpusRoot / rel;
         auto source = loadAndAnalyse (path);
         if (! source.ok)
         {
@@ -444,7 +445,7 @@ ExperimentSummary runExperiment (const std::filesystem::path& planFile, const st
         auto section = json::object();
         json::set (section, "id", json::str (sectionId));
         json::set (section, "title", json::str (json::getString (s, "label", sectionId)));
-        json::set (section, "note", json::str ("Source: " + path.filename().string() + " (" + source.analysis.pitch.noteName + ")"));
+        json::set (section, "note", json::str ("Source: " + osp::utf8Of (path.filename()) + " (" + source.analysis.pitch.noteName + ")"));
         sections.append (section);
 
         // Models are shared by conditions that need the same build (with or without anchors).
@@ -456,7 +457,7 @@ ExperimentSummary runExperiment (const std::filesystem::path& planFile, const st
                 return;
             for (const auto& item : setPaths)
             {
-                const auto full = std::filesystem::path (item).is_absolute() ? std::filesystem::path (item) : corpusRoot / item;
+                const auto full = osp::pathFromUtf8 (item).is_absolute() ? osp::pathFromUtf8 (item) : corpusRoot / item;
                 auto loaded = loadAndAnalyse (full);
                 if (loaded.ok)
                     setSources.push_back (std::move (loaded));
@@ -465,7 +466,7 @@ ExperimentSummary runExperiment (const std::filesystem::path& planFile, const st
             }
             std::vector<instrument::SetSource> inputs;
             for (std::size_t i = 0; i < setSources.size(); ++i)
-                inputs.push_back ({ &setSources[i].audio, &setSources[i].analysis, std::filesystem::path (setPaths[i]).filename().string() });
+                inputs.push_back ({ &setSources[i].audio, &setSources[i].analysis, osp::utf8Of (osp::pathFromUtf8 (setPaths[i]).filename()) });
             InstrumentBuildOptions options;
             options.seed = seed;
             set = instrument::buildSet (inputs, options, {}, true);

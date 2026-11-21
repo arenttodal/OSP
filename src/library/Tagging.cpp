@@ -1,4 +1,5 @@
 #include "library/Tagging.h"
+#include "core/PathText.h"
 
 #include <algorithm>
 #include <cctype>
@@ -222,7 +223,7 @@ NameEvidence evidenceFromFolders (const std::filesystem::path& file, const std::
     std::vector<std::string> folders;
     for (const auto& part : relative)
         if (part != "." && part != "..")
-            folders.push_back (part.string());
+            folders.push_back (osp::utf8Of (part));
     // The folder nearest the file weighs most (0.55), each one further out a little less.
     for (std::size_t i = 0; i < folders.size(); ++i)
     {

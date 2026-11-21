@@ -21,6 +21,7 @@
 #include "library/PresetCategory.h"
 #include "library/Classifier.h"
 #include "analysis/phrase/PhraseEdits.h"
+#include "core/PathText.h"
 
 #include <algorithm>
 #include <map>
@@ -385,7 +386,7 @@ OspAudioProcessor::OspAudioProcessor()
     }
     // Factory packs shipped with the plugin, when new or newer (user content is never touched).
     if (const auto factory = factoryPackSource(); factory.isDirectory())
-        libraryHub->postBackground ([folder = std::filesystem::path (factory.getFullPathName().toStdString()), places = packPlaces()] (library::Catalog& c) {
+        libraryHub->postBackground ([folder = osp::pathFromUtf8 (factory.getFullPathName().toStdString()), places = packPlaces()] (library::Catalog& c) {
             library::installFactoryPacks (c, folder, places);
         });
     parameters.state.addListener (this);   // META-MODULATION's links (ModLinks)
@@ -2463,7 +2464,7 @@ void OspAudioProcessor::startEdit (int layer, const juce::String& name, AtlasEdi
             const auto& src = request.atlas.sources.front();
             const auto hash = src.contentHash.rfind ("sha256:", 0) == 0 ? src.contentHash.substr (7) : src.contentHash;
             if (auto stored = store.find (hash))
-                if (auto loaded = io::loadAudioFile (std::filesystem::path (stored->getFullPathName().toStdString())); loaded.ok)
+                if (auto loaded = io::loadAudioFile (osp::pathFromUtf8 (stored->getFullPathName().toStdString())); loaded.ok)
                 {
                     decoded = std::make_shared<const AudioData> (std::move (loaded.audio));
                     audio = decoded.get();
@@ -2661,7 +2662,7 @@ void OspAudioProcessor::loadExample (int layer)
     {
         auto audio = testsignals::vowel (midiToHz (57), 5.0, 48000.0, 1);
         std::string error;
-        io::writeAudioFile (std::filesystem::path (file.getFullPathName().toStdString()), audio, io::SampleFormat::pcm24, error);
+        io::writeAudioFile (osp::pathFromUtf8 (file.getFullPathName().toStdString()), audio, io::SampleFormat::pcm24, error);
     }
     loadFile (file, layer);
 }
@@ -4407,7 +4408,7 @@ bool OspAudioProcessor::canSaveInPlace() const
         return false;
     const auto places = packPlaces();
     for (const auto& dir : { places.packsDir, places.factoryDir })
-        if (file.isAChildOf (juce::File (juce::String::fromUTF8 (dir.string().c_str()))))
+        if (file.isAChildOf (juce::File (juce::String::fromUTF8 (osp::utf8Of (dir).c_str()))))
             return false;
     return true;
 }
@@ -4814,7 +4815,7 @@ bool OspAudioProcessor::restorePreviousState()
 
 juce::File OspAudioProcessor::libraryTrashFolder()
 {
-    return juce::File (juce::String (library::Catalog::defaultFile().parent_path().string())).getChildFile ("Trash");
+    return juce::File (juce::String (osp::utf8Of (library::Catalog::defaultFile().parent_path()))).getChildFile ("Trash");
 }
 
 std::optional<juce::File> OspAudioProcessor::renamePresetFile (const juce::File& file, const juce::String& newName, juce::String& error)

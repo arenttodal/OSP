@@ -17,6 +17,7 @@
 #include <fstream>
 #include <map>
 #include <sstream>
+#include "core/PathText.h"
 
 namespace osp::research
 {
@@ -196,7 +197,7 @@ BakeoffSummary runBakeoff (const BakeoffPlan& plan, const std::filesystem::path&
 
     for (const auto& src : plan.sources)
     {
-        const auto path = std::filesystem::path (src.path).is_absolute() ? std::filesystem::path (src.path)
+        const auto path = osp::pathFromUtf8 (src.path).is_absolute() ? osp::pathFromUtf8 (src.path)
                                                                           : plan.corpusRoot / src.path;
         auto source = loadAndAnalyse (path);
         if (! source.ok)

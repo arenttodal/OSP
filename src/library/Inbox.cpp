@@ -3,6 +3,7 @@
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
 #include "library/FolderScan.h"
+#include "core/PathText.h"
 
 #include <algorithm>
 #include <cctype>
@@ -36,7 +37,7 @@ namespace
 
 std::optional<std::filesystem::path> cloudPlaceholderTarget (const std::filesystem::path& file)
 {
-    const auto name = file.filename().string();
+    const auto name = osp::utf8Of (file.filename());
     if (name.size() > 8 && name[0] == '.' && lower (name.substr (name.size() - 7)) == ".icloud")
         return file.parent_path() / name.substr (1, name.size() - 8);
     return std::nullopt;
@@ -44,7 +45,7 @@ std::optional<std::filesystem::path> cloudPlaceholderTarget (const std::filesyst
 
 bool isTemporaryDownload (const std::filesystem::path& file)
 {
-    const auto name = lower (file.filename().string());
+    const auto name = lower (osp::utf8Of (file.filename()));
     for (const char* suffix : { ".part", ".partial", ".download", ".crdownload", ".tmp", ".dropbox", ".sb-" })
         if (name.size() > std::string (suffix).size() && name.find (suffix) != std::string::npos)
             return true;
@@ -57,7 +58,7 @@ InboxPass reconcileInbox (Catalog& catalog, const std::vector<std::filesystem::p
     std::error_code ec;
     for (const auto& folderPath : folders)
     {
-        const auto folder = folderPath.string();
+        const auto folder = osp::utf8Of (folderPath);
         std::map<std::string, InboxItem> known;
         for (auto& item : catalog.inboxItems (folder))
             known[item.path] = item;
@@ -87,17 +88,17 @@ InboxPass reconcileInbox (Catalog& catalog, const std::vector<std::filesystem::p
                     present[target->string()] = true;
                 return;
             }
-            const auto name = file.filename().string();
+            const auto name = osp::utf8Of (file.filename());
             if (name.empty() || name[0] == '.' || isTemporaryDownload (file) || ! io::isSupportedAudioExtension (file))
                 return;
-            present[file.string()] = false;
+            present[osp::utf8Of (file)] = false;
         };
         const auto options = std::filesystem::directory_options::skip_permission_denied;
         if (policy.recursive)
         {
             for (std::filesystem::recursive_directory_iterator it (folderPath, options, ec), end; it != end && ! ec; it.increment (ec))
             {
-                const auto leaf = it->path().filename().string();
+                const auto leaf = osp::utf8Of (it->path().filename());
                 if (it->is_symlink (ec))
                     continue;   // never followed
                 if (it->is_directory (ec) && ! leaf.empty() && leaf[0] == '.')

@@ -1,4 +1,5 @@
 #include "library/Catalog.h"
+#include "core/PathText.h"
 
 #include <sqlite3.h>
 
@@ -264,18 +265,19 @@ std::optional<Origin> originFrom (const std::string& s) noexcept
 
 std::filesystem::path Catalog::defaultFile()
 {
-    if (const char* dir = std::getenv ("OSP_LIBRARY_DIR"); dir != nullptr && *dir != 0)
-        return std::filesystem::path (dir) / "catalog.db";
+    // (read in UTF-16 on Windows: a user folder named with any letter comes through whole)
+    if (const auto dir = osp::pathFromEnvironment ("OSP_LIBRARY_DIR"); ! dir.empty())
+        return dir / "catalog.db";
 #if defined(__APPLE__)
-    const char* home = std::getenv ("HOME");
-    return std::filesystem::path (home != nullptr ? home : ".") / "Library/Application Support/OSP/Library/catalog.db";
+    const auto home = osp::pathFromEnvironment ("HOME");
+    return (home.empty() ? std::filesystem::path (".") : home) / "Library/Application Support/OSP/Library/catalog.db";
 #elif defined(_WIN32)
-    const char* appData = std::getenv ("APPDATA");
-    return std::filesystem::path (appData != nullptr ? appData : ".") / "OSP/Library/catalog.db";
+    const auto appData = osp::pathFromEnvironment ("APPDATA");
+    return (appData.empty() ? std::filesystem::path (".") : appData) / "OSP/Library/catalog.db";
 #else
-    const char* data = std::getenv ("XDG_DATA_HOME");
-    const char* home = std::getenv ("HOME");
-    const auto base = data != nullptr && *data != 0 ? std::filesystem::path (data) : std::filesystem::path (home != nullptr ? home : ".") / ".local/share";
+    const auto data = osp::pathFromEnvironment ("XDG_DATA_HOME");
+    const auto home = osp::pathFromEnvironment ("HOME");
+    const auto base = ! data.empty() ? data : (home.empty() ? std::filesystem::path (".") : home) / ".local/share";
     return base / "OSP/Library/catalog.db";
 #endif
 }
@@ -285,9 +287,9 @@ std::unique_ptr<Catalog> Catalog::open (const std::filesystem::path& file, std::
     std::error_code ec;
     std::filesystem::create_directories (file.parent_path(), ec);
     sqlite3* db = nullptr;
-    if (sqlite3_open_v2 (file.string().c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nullptr) != SQLITE_OK)
+    if (sqlite3_open_v2 (osp::utf8Of (file).c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nullptr) != SQLITE_OK)
     {
-        error = "cannot open the Library at " + file.string() + (db != nullptr ? std::string (": ") + sqlite3_errmsg (db) : std::string());
+        error = "cannot open the Library at " + osp::utf8Of (file) + (db != nullptr ? std::string (": ") + sqlite3_errmsg (db) : std::string());
         sqlite3_close (db);
         return nullptr;
     }
@@ -1656,7 +1658,7 @@ bool Catalog::snapshotTo (const std::filesystem::path& file)
     std::error_code ec;
     std::filesystem::remove (file, ec);   // VACUUM INTO refuses an existing file
     Statement s (db, "VACUUM INTO ?1");
-    s.bind (1, file.string());
+    s.bind (1, osp::utf8Of (file));
     if (! s.run())
     {
         error = sqlite3_errmsg (db);
@@ -1670,7 +1672,7 @@ std::optional<Catalog::MergeReport> Catalog::mergeFrom (const std::filesystem::p
 {
     {
         Statement attach (db, "ATTACH DATABASE ?1 AS b");
-        attach.bind (1, other.string());
+        attach.bind (1, osp::utf8Of (other));
         if (! attach.run())
         {
             error = sqlite3_errmsg (db);

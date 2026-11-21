@@ -10,6 +10,7 @@
 #include "io/NoteAtlasJson.h"
 #include "model/PlaybackPreparation.h"
 #include "model/RootChoice.h"
+#include "core/PathText.h"
 
 #include <algorithm>
 #include <chrono>
@@ -25,7 +26,7 @@ namespace
 {
     std::filesystem::path toPath (const juce::File& f)
     {
-        return std::filesystem::path (f.getFullPathName().toStdString());
+        return osp::pathFromUtf8 (f.getFullPathName().toStdString());
     }
 
     constexpr int waveformBuckets = 8192;   // under a period per bucket: peaks keep their texture
@@ -575,7 +576,7 @@ LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& st
                 std::vector<std::filesystem::path> search;
                 for (const auto& f : request.searchFolders)
                     search.emplace_back (f);
-                if (auto resolved = io::resolveSource (src, std::filesystem::path (request.atlasFolder), search))
+                if (auto resolved = io::resolveSource (src, osp::pathFromUtf8 (request.atlasFolder), search))
                 {
                     found = resolved->path;
                     exact = resolved->match == atlas::RelinkResult::exact;
@@ -613,7 +614,7 @@ LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& st
             if (! fromStore)
             {
                 std::error_code ec;
-                kept->lastKnownPath = std::filesystem::absolute (*found, ec).string();
+                kept->lastKnownPath = osp::utf8Of (std::filesystem::absolute (*found, ec));
             }
             if (! exact && fileHash)
                 kept->contentHash = io::contentId (*fileHash);

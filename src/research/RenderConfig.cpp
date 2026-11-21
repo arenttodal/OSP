@@ -1,6 +1,7 @@
 #include "research/RenderConfig.h"
 
 #include "io/JsonUtil.h"
+#include "core/PathText.h"
 
 #include <algorithm>
 #include <array>
@@ -217,7 +218,7 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
         const auto engine = parseEngine (json::getString (root, "engine"));
         if (! engine)
         {
-            error = "unknown engine '" + json::getString (root, "engine") + "' in " + path.string();
+            error = "unknown engine '" + json::getString (root, "engine") + "' in " + osp::utf8Of (path);
             return std::nullopt;
         }
         config.engine = *engine;
@@ -346,7 +347,7 @@ std::optional<RenderConfig> loadRenderConfig (const std::filesystem::path& path,
             if (i > 0 && json::has (l, "source"))
             {
                 const std::filesystem::path source = json::getString (l, "source");
-                config.layerSources[li] = (source.is_absolute() ? source : path.parent_path() / source).string();
+                config.layerSources[li] = osp::utf8Of ((source.is_absolute() ? source : path.parent_path() / source));
             }
             if (json::has (l, "sourceMode"))
                 es.sourceMode[li] = json::getString (l, "sourceMode") == "granular" ? SourceMode::granular : SourceMode::oneShot;

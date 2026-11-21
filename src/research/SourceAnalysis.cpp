@@ -3,6 +3,7 @@
 #include "analysis/Analyzer.h"
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
+#include "core/PathText.h"
 
 #include <exception>
 
@@ -24,8 +25,8 @@ AnalysedSource loadAndAnalyse (const std::filesystem::path& path, const Analysis
         result.analysis = Analyzer::analyse (loaded.audio, options);
 
         auto& src = result.analysis.source;
-        src.filename = path.filename().string();
-        src.path = path.string();
+        src.filename = osp::utf8Of (path.filename());
+        src.path = osp::utf8Of (path);
         if (const auto hash = io::sha256OfFile (path))
             src.contentHash = io::contentId (*hash);
         src.format = loaded.info.formatName;

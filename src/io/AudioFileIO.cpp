@@ -1,4 +1,5 @@
 #include "io/AudioFileIO.h"
+#include "core/PathText.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
@@ -12,7 +13,7 @@ namespace
 {
     std::string lowerExtension (const std::filesystem::path& path)
     {
-        auto ext = path.extension().string();
+        auto ext = osp::utf8Of (path.extension());
         std::transform (ext.begin(), ext.end(), ext.begin(), [] (unsigned char c) { return static_cast<char> (std::tolower (c)); });
         return ext;
     }
@@ -21,7 +22,7 @@ namespace
     {
         std::error_code ec;
         auto absolute = std::filesystem::absolute (path, ec);
-        return juce::File (juce::String::fromUTF8 ((ec ? path : absolute).string().c_str()));
+        return juce::File (juce::String::fromUTF8 (osp::utf8Of ((ec ? path : absolute)).c_str()));
     }
 }
 
@@ -36,12 +37,12 @@ bool readAudioFileInfo (const std::filesystem::path& path, AudioFileInfo& info, 
     std::error_code ec;
     if (! std::filesystem::is_regular_file (path, ec))
     {
-        error = "file not found: " + path.string();
+        error = "file not found: " + osp::utf8Of (path);
         return false;
     }
     if (! isSupportedAudioExtension (path))
     {
-        error = "unsupported file type '" + path.extension().string() + "' (supported: WAV, AIFF, FLAC)";
+        error = "unsupported file type '" + osp::utf8Of (path.extension()) + "' (supported: WAV, AIFF, FLAC)";
         return false;
     }
     juce::AudioFormatManager formats;
@@ -51,7 +52,7 @@ bool readAudioFileInfo (const std::filesystem::path& path, AudioFileInfo& info, 
     std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (toJuceFile (path).createInputStream()));
     if (reader == nullptr)
     {
-        error = "could not read " + path.filename().string() + " (damaged, or an encoding OSP does not read)";
+        error = "could not read " + osp::utf8Of (path.filename()) + " (damaged, or an encoding OSP does not read)";
         return false;
     }
     info.formatName = reader->getFormatName().contains ("AIFF") ? "AIFF" : (reader->getFormatName().contains ("FLAC") ? "FLAC" : "WAV");
@@ -62,7 +63,7 @@ bool readAudioFileInfo (const std::filesystem::path& path, AudioFileInfo& info, 
     info.frames = reader->lengthInSamples;
     if (! (info.sampleRate >= 1000.0 && info.sampleRate <= 768000.0) || info.channels < 1 || info.frames <= 0)
     {
-        error = path.filename().string() + " holds no playable audio";
+        error = osp::utf8Of (path.filename()) + " holds no playable audio";
         return false;
     }
     // Uncompressed audio whose header promises more than the file holds: cut short (damaged,
@@ -73,7 +74,7 @@ bool readAudioFileInfo (const std::filesystem::path& path, AudioFileInfo& info, 
         const auto size = std::filesystem::file_size (path, ec);
         if (! ec && bytesPerFrame > 0 && static_cast<std::uintmax_t> (info.frames) * bytesPerFrame > size)
         {
-            error = path.filename().string() + " is shorter than its header says (damaged, or still being copied)";
+            error = osp::utf8Of (path.filename()) + " is shorter than its header says (damaged, or still being copied)";
             return false;
         }
     }
@@ -87,13 +88,13 @@ LoadResult loadAudioFile (const std::filesystem::path& path, const LoadOptions& 
     std::error_code ec;
     if (! std::filesystem::is_regular_file (path, ec))
     {
-        result.error = "file not found: " + path.string();
+        result.error = "file not found: " + osp::utf8Of (path);
         return result;
     }
 
     if (! isSupportedAudioExtension (path))
     {
-        result.error = "unsupported file type '" + path.extension().string() + "' (supported: WAV, AIFF, FLAC)";
+        result.error = "unsupported file type '" + osp::utf8Of (path.extension()) + "' (supported: WAV, AIFF, FLAC)";
         return result;
     }
 
@@ -106,7 +107,7 @@ LoadResult loadAudioFile (const std::filesystem::path& path, const LoadOptions& 
     std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (toJuceFile (path).createInputStream()));
     if (reader == nullptr)
     {
-        result.error = "could not decode " + path.filename().string()
+        result.error = "could not decode " + osp::utf8Of (path.filename())
                        + " (malformed file or unsupported encoding; supported: PCM 8/16/24/32-bit, 32-bit float)";
         return result;
     }
@@ -162,7 +163,7 @@ LoadResult loadAudioFile (const std::filesystem::path& path, const LoadOptions& 
 
         if (! reader->read (pointers.data(), channels, position, count))
         {
-            result.error = "read error in " + path.filename().string() + " at frame " + std::to_string (position);
+            result.error = "read error in " + osp::utf8Of (path.filename()) + " at frame " + std::to_string (position);
             result.audio = {};
             return result;
         }
@@ -210,7 +211,7 @@ bool writeAudioFile (const std::filesystem::path& path, const AudioData& audio, 
     std::unique_ptr<juce::OutputStream> stream = std::make_unique<juce::FileOutputStream> (file);
     if (! static_cast<juce::FileOutputStream*> (stream.get())->openedOk())
     {
-        error = "cannot open for writing: " + path.string();
+        error = "cannot open for writing: " + osp::utf8Of (path);
         return false;
     }
 
@@ -244,7 +245,7 @@ bool writeAudioFile (const std::filesystem::path& path, const AudioData& audio, 
             offset[c] = pointers[c] + position;
         if (! writer->writeFromFloatArrays (offset.data(), static_cast<int> (offset.size()), count))
         {
-            error = "write failed: " + path.string();
+            error = "write failed: " + osp::utf8Of (path);
             return false;
         }
     }

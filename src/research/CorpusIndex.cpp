@@ -3,6 +3,7 @@
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
 #include "io/JsonUtil.h"
+#include "core/PathText.h"
 
 #include <algorithm>
 #include <cctype>
@@ -13,7 +14,7 @@ namespace osp::research
 
 std::string CorpusEntry::folderName() const
 {
-    std::string stem = std::filesystem::path (filename).stem().string();
+    std::string stem = osp::utf8Of (osp::pathFromUtf8 (filename).stem());
     std::string clean;
     for (unsigned char c : stem)
         clean += (std::isalnum (c) || c == '-' || c == '_') ? static_cast<char> (c) : '_';
@@ -28,7 +29,7 @@ std::string CorpusEntry::folderName() const
 CorpusIndex buildCorpusIndex (const std::filesystem::path& root)
 {
     CorpusIndex index;
-    index.root = root.string();
+    index.root = osp::utf8Of (root);
 
     std::error_code ec;
     if (! std::filesystem::is_directory (root, ec))
@@ -40,7 +41,7 @@ CorpusIndex buildCorpusIndex (const std::filesystem::path& root)
         if (ec)
             break;
         const auto& path = it->path();
-        const auto name = path.filename().string();
+        const auto name = osp::utf8Of (path.filename());
         if (! name.empty() && name.front() == '.')
         {
             if (it->is_directory (ec))
@@ -54,8 +55,8 @@ CorpusIndex buildCorpusIndex (const std::filesystem::path& root)
 
         CorpusEntry entry;
         entry.filename = name;
-        entry.relativePath = std::filesystem::relative (path, root, ec).generic_string();
-        auto ext = path.extension().string();
+        entry.relativePath = osp::utf8GenericOf (std::filesystem::relative (path, root, ec));
+        auto ext = osp::utf8Of (path.extension());
         if (! ext.empty())
             ext.erase (0, 1);
         std::transform (ext.begin(), ext.end(), ext.begin(), [] (unsigned char c) { return static_cast<char> (std::tolower (c)); });

@@ -5,6 +5,13 @@
 > (`packaging/windows/osp.iss`: the VST3 to Common Files\VST3, the standalone with its factory
 > packs to Program Files\ANDOR\OSP; not signed) and runs the test suite. On demand: the
 > Actions tab, or a commit message containing `[windows]` (the regular CI stays macOS only).
+> - **Windows fixes from its test runs:** SQLite with FTS5 (vcpkg `sqlite3[core,fts5]`; the
+>   Library's search failed without it); Memo Lab's `WinMain`; 8 MB stacks for executables
+>   (tests keep a processor on the stack); and **UTF-8 paths everywhere** (`src/core/PathText.h`:
+>   `pathFromUtf8`, `utf8Of`, `utf8GenericOf`, `pathFromEnvironment`) - on Windows a narrow
+>   `std::filesystem` string is the ANSI code page, so a user folder or a sample named with
+>   any letter outside ASCII was garbled (and SQLite, which takes UTF-8 names, could not open
+>   the catalog). All `.string()` / string-to-path conversions in the product go through them.
 >
 > **21 Nov 2026, rack modulation steps 3-5 (`docs/research/rack-modulation.md`):**
 > - **Every rack and effect control can be modulated:** the SPACE, ECHO and MOVEMENT racks

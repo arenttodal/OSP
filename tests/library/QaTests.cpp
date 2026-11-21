@@ -23,6 +23,7 @@
 #include <chrono>
 #include <fstream>
 #include <thread>
+#include "core/PathText.h"
 
 using namespace osp;
 using namespace osp::library;
@@ -51,17 +52,18 @@ namespace
             std::error_code ec;
             std::filesystem::remove_all (dir, ec);
         }
-        std::filesystem::path write (const std::filesystem::path& relative, const AudioData& audio, io::SampleFormat format = io::SampleFormat::pcm24)
+        // (names in UTF-8, as OSP keeps them: on Windows a narrow string is not)
+        std::filesystem::path write (const std::string& relative, const AudioData& audio, io::SampleFormat format = io::SampleFormat::pcm24)
         {
-            const auto path = files / relative;
+            const auto path = files / osp::pathFromUtf8 (relative);
             std::filesystem::create_directories (path.parent_path());
             std::string error;
             REQUIRE (io::writeAudioFile (path, audio, format, error));
             return path;
         }
-        std::filesystem::path bytes (const std::filesystem::path& relative, const std::string& data)
+        std::filesystem::path bytes (const std::string& relative, const std::string& data)
         {
-            const auto path = files / relative;
+            const auto path = files / osp::pathFromUtf8 (relative);
             std::filesystem::create_directories (path.parent_path());
             std::ofstream (path, std::ios::binary) << data;
             return path;

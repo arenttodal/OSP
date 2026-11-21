@@ -10,6 +10,7 @@
 #include "research/RenderMetrics.h"
 #include "research/RenderSession.h"
 #include "research/SourceAnalysis.h"
+#include "core/PathText.h"
 
 #include <atomic>
 #include <chrono>
@@ -106,7 +107,7 @@ namespace
                     {
                         const auto wav = options.rendersDir / folder / (base + ".wav");
                         if (io::writeAudioFile (wav, output.audio, io::SampleFormat::float32, error))
-                            render.wavPath = wav.string();
+                            render.wavPath = osp::utf8Of (wav);
                         else
                             render.issueCodes.push_back ("write-failed");
                     }
@@ -338,7 +339,7 @@ CorpusRunSummary runCorpus (const CorpusRunOptions& options)
 
     auto root = json::object();
     json::set (root, "schemaVersion", 1);
-    json::set (root, "corpus", json::str (options.corpusDir.string()));
+    json::set (root, "corpus", json::str (osp::utf8Of (options.corpusDir)));
     json::set (root, "profile", json::str (options.profileName));
     json::set (root, "fixtures", json::stringArray (options.fixtures));
     std::vector<std::string> engineNames;

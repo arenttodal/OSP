@@ -28,6 +28,7 @@
 #include <optional>
 #include <vector>
 #include <set>
+#include "core/PathText.h"
 
 namespace osp::plugin
 {
@@ -841,7 +842,7 @@ private:
     /** Phrase analyses (Phase 4): one at a time, at most ten minutes of audio waiting. Declared
         before the loader pool, so it outlives every loader job that waits on it. */
     phrase::AnalysisQueue analysisQueue { 1, 600.0 };
-    io::PhraseAnalysisCache analysisCache { std::filesystem::path (store.phraseAnalysisFolder().getFullPathName().toStdString()) };
+    io::PhraseAnalysisCache analysisCache { osp::pathFromUtf8 (store.phraseAnalysisFolder().getFullPathName().toStdString()) };
     static constexpr int atlasThreads = 2;
     juce::ThreadPool loaderPool { 1 };
     std::mutex resultsMutex;               // loader <-> message thread only, never audio

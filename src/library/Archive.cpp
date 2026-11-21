@@ -1,6 +1,7 @@
 #include "library/Archive.h"
 
 #include "io/ContentHash.h"
+#include "core/PathText.h"
 
 #include <juce_core/juce_core.h>
 
@@ -146,17 +147,17 @@ int compareVersions (const std::string& a, const std::string& b)
 
 ArchiveReader::ArchiveReader (const std::filesystem::path& file, const ArchiveLimits& l) : limits (l)
 {
-    const juce::File f (juce::String (file.string()));
+    const juce::File f (juce::String (osp::utf8Of (file)));
     if (! f.existsAsFile())
     {
-        error = file.filename().string() + " is not there";
+        error = osp::utf8Of (file.filename()) + " is not there";
         return;
     }
     zip = std::make_unique<juce::ZipFile> (f);
     const int n = zip->getNumEntries();
     if (n == 0)
     {
-        error = file.filename().string() + " is not a readable archive (or it is empty)";
+        error = osp::utf8Of (file.filename()) + " is not a readable archive (or it is empty)";
         return;
     }
     if (n > limits.maxEntries)
@@ -252,12 +253,12 @@ bool ArchiveReader::extract (const std::string& name, const std::filesystem::pat
     temp += ".partial";
     {
         std::unique_ptr<juce::InputStream> in (zip->createStreamForEntry (it->second.first));
-        juce::File out (juce::String (temp.string()));
+        juce::File out (juce::String (osp::utf8Of (temp)));
         out.deleteFile();
         juce::FileOutputStream stream (out);
         if (in == nullptr || ! stream.openedOk())
         {
-            why = "cannot write " + target.filename().string() + " (disk full or no permission?)";
+            why = "cannot write " + osp::utf8Of (target.filename()) + " (disk full or no permission?)";
             return false;
         }
         // At most the size the archive declared (a lying header cannot fill the disk).
@@ -285,7 +286,7 @@ bool ArchiveReader::extract (const std::string& name, const std::filesystem::pat
     if (ec)
     {
         std::filesystem::remove (temp, ec);
-        why = "cannot place " + target.filename().string();
+        why = "cannot place " + osp::utf8Of (target.filename());
         return false;
     }
     return true;
@@ -314,18 +315,18 @@ bool ArchiveWriter::writeTo (const std::filesystem::path& out, std::string& why)
         if (e.isText)
             builder.addEntry (new juce::MemoryInputStream (e.text.data(), e.text.size(), true), 9, juce::String (e.name), juce::Time::getCurrentTime());
         else
-            builder.addFile (juce::File (juce::String (e.source.string())), e.compress ? 6 : 0, juce::String (e.name));
+            builder.addFile (juce::File (juce::String (osp::utf8Of (e.source))), e.compress ? 6 : 0, juce::String (e.name));
     }
     auto temp = out;
     temp += ".partial";
-    const juce::File tempFile (juce::String (temp.string()));
+    const juce::File tempFile (juce::String (osp::utf8Of (temp)));
     tempFile.deleteFile();
     {
         juce::FileOutputStream stream (tempFile);
         if (! stream.openedOk() || ! builder.writeToStream (stream, nullptr))
         {
             tempFile.deleteFile();
-            why = "cannot write " + out.filename().string() + " (disk full or no permission?)";
+            why = "cannot write " + osp::utf8Of (out.filename()) + " (disk full or no permission?)";
             return false;
         }
     }
@@ -344,7 +345,7 @@ bool ArchiveWriter::writeTo (const std::filesystem::path& out, std::string& why)
     if (ec)
     {
         tempFile.deleteFile();
-        why = "cannot place " + out.filename().string();
+        why = "cannot place " + osp::utf8Of (out.filename());
         return false;
     }
     return true;

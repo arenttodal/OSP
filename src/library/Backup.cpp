@@ -4,6 +4,7 @@
 #include "io/ContentHash.h"
 #include "library/Archive.h"
 #include "library/SoundImport.h"
+#include "core/PathText.h"
 
 #include <juce_core/juce_core.h>
 
@@ -36,7 +37,7 @@ namespace
 
     std::string lowerExtension (const std::filesystem::path& p)
     {
-        auto ext = p.extension().string();
+        auto ext = osp::utf8Of (p.extension());
         std::transform (ext.begin(), ext.end(), ext.begin(), [] (unsigned char c) { return static_cast<char> (std::tolower (c)); });
         return ext;
     }
@@ -65,7 +66,7 @@ namespace
             const auto hash = io::sha256OfFile (from);
             if (! hash)
             {
-                why = "cannot read " + from.filename().string();
+                why = "cannot read " + osp::utf8Of (from.filename());
                 return false;
             }
             sha256 = *hash;
@@ -77,15 +78,15 @@ namespace
         if (ec || ! sameBytes (temp, sha256))
         {
             std::filesystem::remove (temp, ec);
-            why = ec ? "cannot write " + to.filename().string() + " (disk full or no permission?)"
-                     : from.filename().string() + " does not match its checksum (damaged)";
+            why = ec ? "cannot write " + osp::utf8Of (to.filename()) + " (disk full or no permission?)"
+                     : osp::utf8Of (from.filename()) + " does not match its checksum (damaged)";
             return false;
         }
         std::filesystem::rename (temp, to, ec);
         if (ec)
         {
             std::filesystem::remove (temp, ec);
-            why = "cannot place " + to.filename().string();
+            why = "cannot place " + osp::utf8Of (to.filename());
             return false;
         }
         return true;
@@ -101,7 +102,7 @@ namespace
         for (std::filesystem::recursive_directory_iterator it (folder, std::filesystem::directory_options::skip_permission_denied, ec), end; it != end && ! ec;
              it.increment (ec))
         {
-            const auto leaf = it->path().filename().string();
+            const auto leaf = osp::utf8Of (it->path().filename());
             if (! leaf.empty() && leaf[0] == '.')
             {
                 if (it->is_directory (ec))
@@ -112,7 +113,7 @@ namespace
                 continue;
             if (! extensions.empty() && std::find (extensions.begin(), extensions.end(), lowerExtension (it->path())) == extensions.end())
                 continue;
-            list.emplace_back (it->path(), std::filesystem::relative (it->path(), folder, ec).generic_string());
+            list.emplace_back (it->path(), osp::utf8GenericOf (std::filesystem::relative (it->path(), folder, ec)));
         }
         std::sort (list.begin(), list.end(), [] (const auto& x, const auto& y) { return x.second < y.second; });
         return list;
@@ -123,12 +124,12 @@ namespace
         std::error_code ec;
         for (int n = 1; n < 1000; ++n)
         {
-            const auto candidate = target.parent_path() / (target.stem().string() + (n == 1 ? " (restored)" : " (restored " + std::to_string (n) + ")") + target.extension().string());
+            const auto candidate = target.parent_path() / (osp::utf8Of (target.stem()) + (n == 1 ? " (restored)" : " (restored " + std::to_string (n) + ")") + osp::utf8Of (target.extension()));
             if (! std::filesystem::exists (candidate, ec))
                 return candidate;
         }
-        return target.parent_path() / (target.stem().string() + " (restored " + std::to_string (std::chrono::system_clock::now().time_since_epoch().count()) + ")"
-                                       + target.extension().string());
+        return target.parent_path() / (osp::utf8Of (target.stem()) + " (restored " + std::to_string (std::chrono::system_clock::now().time_since_epoch().count()) + ")"
+                                       + osp::utf8Of (target.extension()));
     }
 
     struct Manifest
@@ -162,7 +163,7 @@ namespace
             return std::nullopt;
         }
         juce::var v;
-        if (juce::JSON::parse (juce::File (juce::String (file.string())).loadFileAsString(), v).failed() || v.getProperty ("format", "") != "ospbackup")
+        if (juce::JSON::parse (juce::File (juce::String (osp::utf8Of (file))).loadFileAsString(), v).failed() || v.getProperty ("format", "") != "ospbackup")
         {
             why = "its manifest is not readable";
             return std::nullopt;
@@ -209,7 +210,7 @@ namespace
                 why = "it lists a file that is not valid (" + cleanText (e.path, 200) + ")";
                 return std::nullopt;
             }
-            if (e.path.rfind ("store/", 0) == 0 && std::filesystem::path (e.path).filename().string().rfind (e.sha256 + ".", 0) != 0)
+            if (e.path.rfind ("store/", 0) == 0 && osp::utf8Of (osp::pathFromUtf8 (e.path).filename()).rfind (e.sha256 + ".", 0) != 0)
             {
                 why = "a stored sound's name does not match its checksum (" + cleanText (e.path, 200) + ")";
                 return std::nullopt;
@@ -234,7 +235,7 @@ BackupResult exportBackup (Catalog& catalog, const BackupPlaces& places, const s
     std::error_code ec;
     if (std::filesystem::exists (out, ec))
     {
-        result.error = out.filename().string() + " is there already: choose another name";
+        result.error = osp::utf8Of (out.filename()) + " is there already: choose another name";
         return result;
     }
     auto partial = out;
@@ -276,8 +277,8 @@ BackupResult exportBackup (Catalog& catalog, const BackupPlaces& places, const s
         const auto hex = hexOf (hash);
         if (const auto stored = findStored (places.storeDir, hex))
         {
-            if (storeNames.insert (stored->filename().string()).second)
-                jobs.push_back ({ *stored, "store/" + stored->filename().string(), hex });
+            if (storeNames.insert (osp::utf8Of (stored->filename())).second)
+                jobs.push_back ({ *stored, "store/" + osp::utf8Of (stored->filename()), hex });
             continue;
         }
         const auto where = resolveSound (catalog, places.storeDir, hash);
@@ -302,7 +303,7 @@ BackupResult exportBackup (Catalog& catalog, const BackupPlaces& places, const s
     if (options.includeUntracked)
         for (const auto& entry : std::filesystem::directory_iterator (places.storeDir, ec))
         {
-            const auto leaf = entry.path().filename().string();
+            const auto leaf = osp::utf8Of (entry.path().filename());
             const auto stem = leaf.substr (0, leaf.find ('.'));
             if (isHex64 (stem) && io::isSupportedAudioExtension (entry.path()) && leaf.find (".partial") == std::string::npos && plainFile (entry.path())
                 && storeNames.insert (leaf).second)
@@ -354,9 +355,9 @@ BackupResult exportBackup (Catalog& catalog, const BackupPlaces& places, const s
     root->setProperty ("pluginVersion", juce::String (places.pluginVersion));
     root->setProperty ("catalogVersion", catalog.version());
     auto* roots = new juce::DynamicObject();
-    roots->setProperty ("presets", juce::String (places.presetsDir.string()));
-    roots->setProperty ("templates", juce::String (places.templatesDir.string()));
-    roots->setProperty ("packs", juce::String (places.packsDir.string()));
+    roots->setProperty ("presets", juce::String (osp::utf8Of (places.presetsDir)));
+    roots->setProperty ("templates", juce::String (osp::utf8Of (places.templatesDir)));
+    roots->setProperty ("packs", juce::String (osp::utf8Of (places.packsDir)));
     root->setProperty ("roots", juce::var (roots));
     auto* counts = new juce::DynamicObject();
     counts->setProperty ("records", result.records);
@@ -380,7 +381,7 @@ BackupResult exportBackup (Catalog& catalog, const BackupPlaces& places, const s
     for (const auto& n : result.notIncluded)
         missing.add (juce::String (n));
     root->setProperty ("notIncluded", missing);
-    if (! juce::File (juce::String ((partial / "manifest.json").string())).replaceWithText (juce::JSON::toString (juce::var (root))))
+    if (! juce::File (juce::String (osp::utf8Of ((partial / "manifest.json")))).replaceWithText (juce::JSON::toString (juce::var (root))))
     {
         result.error = "cannot write the backup's manifest (disk full?)";
         return result;
@@ -388,7 +389,7 @@ BackupResult exportBackup (Catalog& catalog, const BackupPlaces& places, const s
     std::filesystem::rename (partial, out, ec);
     if (ec)
     {
-        result.error = "cannot name the backup " + out.filename().string();
+        result.error = "cannot name the backup " + osp::utf8Of (out.filename());
         return result;
     }
     abandon.keep = true;
@@ -446,7 +447,7 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
         {
             std::error_code e;
             for (const char* suffix : { "", "-wal", "-shm" })
-                std::filesystem::remove (file.string() + suffix, e);
+                std::filesystem::remove (osp::utf8Of (file) + suffix, e);
         }
     } removeTemp { temp };
     std::filesystem::copy_file (folder / "catalog.db", temp, ec);
@@ -495,9 +496,9 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
     }
     // 3. The records, merged.
     const auto merged = catalog.mergeFrom (temp, options.newerWins,
-                                           { { m->presetsRoot, places.presetsDir.string() },
-                                             { m->templatesRoot, places.templatesDir.string() },
-                                             { m->packsRoot, places.packsDir.string() } });
+                                           { { m->presetsRoot, osp::utf8Of (places.presetsDir) },
+                                             { m->templatesRoot, osp::utf8Of (places.templatesDir) },
+                                             { m->packsRoot, osp::utf8Of (places.packsDir) } });
     if (! merged)
     {
         report.error = "the Library could not take the backup's records (" + catalog.lastError() + "); nothing was changed";
@@ -527,8 +528,8 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
                 rest = f.path.substr (top.size()), oldRoot = from, newRoot = to;
         if (rest.empty())
             continue;
-        target = newRoot / std::filesystem::path (rest);
-        const auto oldPath = (oldRoot / std::filesystem::path (rest)).string();
+        target = newRoot / osp::pathFromUtf8 (rest);
+        const auto oldPath = osp::utf8Of ((oldRoot / osp::pathFromUtf8 (rest)));
         const auto owner = idOfFile.count (oldPath) > 0 ? idOfFile[oldPath] : std::string();
         auto sha = f.sha256;
         std::string problem;
@@ -569,7 +570,7 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
         ++report.filesBeside;
         if (! owner.empty())
             if (const auto a = catalog.asset (owner))
-                catalog.movePreset (owner, beside.string(), a->name);
+                catalog.movePreset (owner, osp::utf8Of (beside), a->name);
     }
     // 5. Settings (only where there are none) and favourites (both kept).
     for (const auto& f : m->files)
@@ -580,16 +581,16 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
             copyVerified (folder / f.path, places.settingsFile, sha, problem);
         if (f.path == "favourites.txt")
         {
-            auto here = juce::StringArray::fromLines (juce::File (juce::String (places.favouritesFile.string())).loadFileAsString());
+            auto here = juce::StringArray::fromLines (juce::File (juce::String (osp::utf8Of (places.favouritesFile))).loadFileAsString());
             here.removeEmptyStrings();
-            auto theirs = juce::StringArray::fromLines (juce::File (juce::String ((folder / f.path).string())).loadFileAsString());
+            auto theirs = juce::StringArray::fromLines (juce::File (juce::String (osp::utf8Of ((folder / f.path)))).loadFileAsString());
             for (const auto& name : theirs)
                 if (name.isNotEmpty() && here.addIfNotAlreadyThere (juce::String (cleanText (name.toStdString(), 200))))
                     ++report.favourites;
             if (report.favourites > 0)
             {
                 std::filesystem::create_directories (places.favouritesFile.parent_path(), ec);
-                juce::File (juce::String (places.favouritesFile.string())).replaceWithText (here.joinIntoString ("\n") + "\n");
+                juce::File (juce::String (osp::utf8Of (places.favouritesFile))).replaceWithText (here.joinIntoString ("\n") + "\n");
             }
         }
     }

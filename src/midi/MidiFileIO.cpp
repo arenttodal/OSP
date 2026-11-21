@@ -1,4 +1,5 @@
 #include "midi/MidiFileIO.h"
+#include "core/PathText.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
@@ -13,7 +14,7 @@ namespace
     {
         std::error_code ec;
         const auto absolute = std::filesystem::absolute (path, ec);
-        return juce::File (juce::String::fromUTF8 ((ec ? path : absolute).string().c_str()));
+        return juce::File (juce::String::fromUTF8 (osp::utf8Of ((ec ? path : absolute)).c_str()));
     }
 
     constexpr int ticksPerQuarter = 960;
@@ -25,7 +26,7 @@ std::optional<MidiSequence> readMidiFile (const std::filesystem::path& path, std
     const auto file = toJuceFile (path);
     if (! file.existsAsFile())
     {
-        error = "MIDI file not found: " + path.string();
+        error = "MIDI file not found: " + osp::utf8Of (path);
         return std::nullopt;
     }
 
@@ -33,18 +34,18 @@ std::optional<MidiSequence> readMidiFile (const std::filesystem::path& path, std
     juce::MidiFile midi;
     if (! stream.openedOk() || ! midi.readFrom (stream))
     {
-        error = "could not parse MIDI file: " + path.string();
+        error = "could not parse MIDI file: " + osp::utf8Of (path);
         return std::nullopt;
     }
     if (midi.getTimeFormat() <= 0)
     {
-        error = "SMPTE-timed MIDI files are not supported: " + path.string();
+        error = "SMPTE-timed MIDI files are not supported: " + osp::utf8Of (path);
         return std::nullopt;
     }
     midi.convertTimestampTicksToSeconds();
 
     MidiSequence sequence;
-    sequence.name = path.stem().string();
+    sequence.name = osp::utf8Of (path.stem());
 
     for (int t = 0; t < midi.getNumTracks(); ++t)
     {
@@ -117,7 +118,7 @@ bool writeMidiFile (const std::filesystem::path& path, const MidiSequence& seque
     juce::FileOutputStream out (file);
     if (! out.openedOk() || ! midi.writeTo (out, 1))
     {
-        error = "cannot write MIDI file: " + path.string();
+        error = "cannot write MIDI file: " + osp::utf8Of (path);
         return false;
     }
     return true;

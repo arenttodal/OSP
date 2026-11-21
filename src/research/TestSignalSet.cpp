@@ -3,6 +3,7 @@
 #include "audio/utility/TestSignals.h"
 #include "core/PitchMath.h"
 #include "io/AudioFileIO.h"
+#include "core/PathText.h"
 
 #include <cmath>
 #include <cstring>
@@ -85,7 +86,7 @@ bool writeAifcFloat32 (const std::filesystem::path& path, const AudioData& audio
     stream.write (file.data(), static_cast<std::streamsize> (file.size()));
     if (! stream)
     {
-        error = "cannot write " + path.string();
+        error = "cannot write " + osp::utf8Of (path);
         return false;
     }
     return true;

@@ -2,6 +2,7 @@
 
 #include "analysis/phrase/AnalysisJobs.h"
 #include "io/NoteAtlasJson.h"
+#include "core/PathText.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -76,7 +77,7 @@ bool PhraseAnalysisCache::store (const atlas::NoteAtlas& atlas, const phrase::An
     std::filesystem::create_directories (dir, ec);
     if (ec)
     {
-        error = "cannot create " + dir.string() + ": " + ec.message();
+        error = "cannot create " + osp::utf8Of (dir) + ": " + ec.message();
         return false;
     }
     // Paths are hints of one session; the cache holds the analysis, not where the file was.

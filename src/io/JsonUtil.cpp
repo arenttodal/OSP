@@ -1,4 +1,5 @@
 #include "io/JsonUtil.h"
+#include "core/PathText.h"
 
 #include <cmath>
 
@@ -11,7 +12,7 @@ namespace
     {
         std::error_code ec;
         const auto absolute = std::filesystem::absolute (path, ec);
-        return juce::File (juce::String::fromUTF8 ((ec ? path : absolute).string().c_str()));
+        return juce::File (juce::String::fromUTF8 (osp::utf8Of ((ec ? path : absolute)).c_str()));
     }
 }
 
@@ -141,7 +142,7 @@ bool writeFile (const std::filesystem::path& path, const juce::var& value, std::
 
     if (! toJuceFile (path).replaceWithText (juce::String::fromUTF8 (toString (value).c_str()) + "\n"))
     {
-        error = "cannot write " + path.string();
+        error = "cannot write " + osp::utf8Of (path);
         return false;
     }
     return true;
@@ -164,12 +165,12 @@ std::optional<juce::var> readFile (const std::filesystem::path& path, std::strin
     const auto file = toJuceFile (path);
     if (! file.existsAsFile())
     {
-        error = "file not found: " + path.string();
+        error = "file not found: " + osp::utf8Of (path);
         return std::nullopt;
     }
     auto parsed = parse (file.loadFileAsString().toStdString(), error);
     if (! parsed)
-        error = path.string() + ": " + error;
+        error = osp::utf8Of (path) + ": " + error;
     return parsed;
 }
 

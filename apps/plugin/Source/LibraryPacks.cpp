@@ -6,6 +6,7 @@
 #include "LibraryCapture.h"
 #include "LibraryPlaces.h"
 #include "library/Archive.h"
+#include "core/PathText.h"
 
 namespace osp::plugin
 {
@@ -23,7 +24,7 @@ namespace
         return juce::String (static_cast<double> (bytes) / (1024.0 * 1024.0 * 1024.0), 2) + " GB";
     }
 
-    std::filesystem::path pathOf (const juce::File& f) { return std::filesystem::path (f.getFullPathName().toStdString()); }
+    std::filesystem::path pathOf (const juce::File& f) { return osp::pathFromUtf8 (f.getFullPathName().toStdString()); }
 
     juce::String counts (const library::PackResult& r)
     {
@@ -304,7 +305,7 @@ namespace
     /** What was last published from a collection, so the next version starts from it. */
     juce::File publishingFile (const std::string& collectionId)
     {
-        const auto dir = juce::File (juce::String (library::Catalog::defaultFile().parent_path().string())).getChildFile ("Publishing");
+        const auto dir = juce::File (juce::String (osp::utf8Of (library::Catalog::defaultFile().parent_path()))).getChildFile ("Publishing");
         return dir.getChildFile (juce::File::createLegalFileName (juce::String (collectionId)) + ".json");
     }
 

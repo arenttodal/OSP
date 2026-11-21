@@ -2,6 +2,7 @@
 
 #include "io/AudioFileIO.h"
 #include "library/SoundImport.h"
+#include "core/PathText.h"
 
 namespace osp::plugin
 {
@@ -148,7 +149,7 @@ void LibraryService::soundLoaded (const LoadedInstrument& instrument, int layer,
                 }
                 std::error_code ec;
                 info.fileSize = static_cast<std::int64_t> (std::filesystem::file_size (*stored, ec));
-                info.format = stored->extension().string().empty() ? std::string() : stored->extension().string().substr (1);
+                info.format = osp::utf8Of (stored->extension()).empty() ? std::string() : osp::utf8Of (stored->extension()).substr (1);
             }
             library::Asset asset;
             asset.origin = library::Origin::user;

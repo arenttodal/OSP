@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <fstream>
 #include <thread>
+#include "core/PathText.h"
 
 using namespace osp;
 using namespace osp::library;
@@ -48,7 +49,8 @@ namespace
         }
         std::filesystem::path write (const std::string& relative, const AudioData& audio)
         {
-            const auto path = files / relative;
+            // (UTF-8 and the platform's own separators, as the scanner records paths)
+            const auto path = (files / osp::pathFromUtf8 (relative)).make_preferred();
             std::filesystem::create_directories (path.parent_path());
             std::string error;
             REQUIRE (io::writeAudioFile (path, audio, io::SampleFormat::pcm24, error));

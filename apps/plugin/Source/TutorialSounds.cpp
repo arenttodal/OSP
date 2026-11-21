@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <functional>
 #include <iterator>
+#include "core/PathText.h"
 
 namespace osp::plugin::tutorial
 {
@@ -201,7 +202,7 @@ juce::Array<juce::File> files (Example e, juce::String& error)
                 return {};
             }
             std::string message;
-            if (! io::writeAudioFile (std::filesystem::path (file.getFullPathName().toStdString()), spec.make(), io::SampleFormat::pcm24, message))
+            if (! io::writeAudioFile (osp::pathFromUtf8 (file.getFullPathName().toStdString()), spec.make(), io::SampleFormat::pcm24, message))
             {
                 error = juce::String (message);
                 return {};

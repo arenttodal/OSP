@@ -1,4 +1,5 @@
 #include "MemoSources.h"
+#include "core/PathText.h"
 
 #include <sqlite3.h>
 
@@ -74,14 +75,14 @@ namespace
     bool isPackage (const fs::path& p)
     {
         static const std::vector<std::string> packages { ".app", ".bundle", ".photoslibrary", ".logicx", ".band", ".framework", ".plugin", ".component", ".vst3" };
-        auto ext = p.extension().string();
+        auto ext = osp::utf8Of (p.extension());
         std::transform (ext.begin(), ext.end(), ext.begin(), [] (unsigned char c) { return static_cast<char> (std::tolower (c)); });
         return std::find (packages.begin(), packages.end(), ext) != packages.end();
     }
 
     bool inside (const fs::path& child, const fs::path& root)
     {
-        const auto c = child.lexically_normal().string(), r = root.lexically_normal().string();
+        const auto c = osp::utf8Of (child.lexically_normal()), r = osp::utf8Of (root.lexically_normal());
         return c.size() > r.size() && c.compare (0, r.size(), r) == 0 && (r.back() == '/' || c[r.size()] == '/');
     }
 
@@ -105,7 +106,7 @@ namespace
             if (cancelled.load())
                 return;
             const auto path = entry.path();
-            const auto name = juce::String::fromUTF8 (path.filename().string().c_str());
+            const auto name = juce::String::fromUTF8 (osp::utf8Of (path.filename()).c_str());
             // A link is followed only while it stays inside the approved folder.
             fs::path real = path;
             if (entry.is_symlink (ec))
@@ -124,7 +125,7 @@ namespace
             }
             if (const auto target = placeholderTarget (name); target.isNotEmpty())
             {
-                const juce::File placeholder (juce::String::fromUTF8 (path.string().c_str()));
+                const juce::File placeholder (juce::String::fromUTF8 (osp::utf8Of (path).c_str()));
                 if (! isSupported (placeholder.getSiblingFile (target)))
                     continue;
                 Recording r;
@@ -140,7 +141,7 @@ namespace
             }
             if (name.startsWithChar ('.'))
                 continue;
-            const juce::File file (juce::String::fromUTF8 (real.string().c_str()));
+            const juce::File file (juce::String::fromUTF8 (osp::utf8Of (real).c_str()));
             if (! isSupported (file))
                 continue;
             Recording r;

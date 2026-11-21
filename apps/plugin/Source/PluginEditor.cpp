@@ -14,6 +14,7 @@
 #endif
 
 #include <map>
+#include "core/PathText.h"
 
 namespace osp::plugin
 {
@@ -24,7 +25,7 @@ namespace
 
     bool isAudioFile (const juce::File& file)
     {
-        return io::isSupportedAudioExtension (std::filesystem::path (file.getFullPathName().toStdString()));
+        return io::isSupportedAudioExtension (osp::pathFromUtf8 (file.getFullPathName().toStdString()));
     }
 }
 

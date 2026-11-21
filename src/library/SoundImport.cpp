@@ -3,6 +3,7 @@
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
 #include "library/Classifier.h"
+#include "core/PathText.h"
 
 #include <algorithm>
 #include <cctype>
@@ -15,7 +16,7 @@ namespace
 {
     std::string lowerExtension (const std::filesystem::path& p)
     {
-        auto ext = p.extension().string();
+        auto ext = osp::utf8Of (p.extension());
         std::transform (ext.begin(), ext.end(), ext.begin(), [] (unsigned char c) { return static_cast<char> (std::tolower (c)); });
         return ext;
     }
@@ -27,7 +28,7 @@ namespace
     {
         static std::atomic<unsigned> counter { 0 };
         const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-        return target.parent_path() / (target.filename().string() + "." + std::to_string (stamp) + "-" + std::to_string (counter++) + ".partial");
+        return target.parent_path() / (osp::utf8Of (target.filename()) + "." + std::to_string (stamp) + "-" + std::to_string (counter++) + ".partial");
     }
 }
 
@@ -50,7 +51,7 @@ std::optional<std::filesystem::path> findStored (const std::filesystem::path& st
     }
     for (const auto& entry : std::filesystem::directory_iterator (storeDir, ec))
     {
-        const auto name = entry.path().filename().string();
+        const auto name = osp::utf8Of (entry.path().filename());
         if (name.rfind (sha256Hex + ".", 0) == 0 && name.find (".partial") == std::string::npos && name.find (".analysis.json") == std::string::npos
             && entry.is_regular_file (ec))
             return entry.path();
@@ -65,7 +66,7 @@ int clearInterruptedImports (const std::filesystem::path& storeDir, std::chrono:
     const auto cutoff = std::filesystem::file_time_type::clock::now() - age;
     for (const auto& entry : std::filesystem::directory_iterator (storeDir, ec))
     {
-        const auto name = entry.path().filename().string();
+        const auto name = osp::utf8Of (entry.path().filename());
         const bool partial = name.size() >= 8 && name.compare (name.size() - 8, 8, ".partial") == 0;
         const bool derived = name.rfind (".derived-", 0) == 0;   // a slice being saved when the host quit
         if (! partial && ! derived)
@@ -95,14 +96,14 @@ std::optional<std::filesystem::path> storeContent (const std::filesystem::path& 
     if (ec)
     {
         std::filesystem::remove (temp, ec);
-        why = "cannot copy " + file.filename().string() + " into the Library (disk full or no permission?)";
+        why = "cannot copy " + osp::utf8Of (file.filename()) + " into the Library (disk full or no permission?)";
         return std::nullopt;
     }
     const auto copied = io::sha256OfFile (temp);
     if (! copied || *copied != hex || cancelled (cancel))
     {
         std::filesystem::remove (temp, ec);
-        why = cancelled (cancel) ? "cancelled" : "the copy of " + file.filename().string() + " did not match the original (the drive may be failing)";
+        why = cancelled (cancel) ? "cancelled" : "the copy of " + osp::utf8Of (file.filename()) + " did not match the original (the drive may be failing)";
         return std::nullopt;
     }
     if (auto raced = findStored (storeDir, hex))
@@ -117,7 +118,7 @@ std::optional<std::filesystem::path> storeContent (const std::filesystem::path& 
     if (ec)
     {
         std::filesystem::remove (temp, ec);
-        why = "cannot store " + file.filename().string() + " in the Library";
+        why = "cannot store " + osp::utf8Of (file.filename()) + " in the Library";
         return std::nullopt;
     }
     return target;
@@ -130,14 +131,14 @@ ImportResult importSound (Catalog& catalog, const std::filesystem::path& storeDi
     // 1. Valid, readable audio (header only: nothing is decoded here).
     if (! std::filesystem::is_regular_file (request.file, ec))
     {
-        result.error = request.file.filename().string() + " is not there any more (moved, renamed or on a disconnected drive)";
+        result.error = osp::utf8Of (request.file.filename()) + " is not there any more (moved, renamed or on a disconnected drive)";
         return result;
     }
     {
         std::ifstream probe (request.file, std::ios::binary);
         if (! probe.good())
         {
-            result.error = "cannot read " + request.file.filename().string() + " (no permission?)";
+            result.error = "cannot read " + osp::utf8Of (request.file.filename()) + " (no permission?)";
             return result;
         }
     }
@@ -157,7 +158,7 @@ ImportResult importSound (Catalog& catalog, const std::filesystem::path& storeDi
     const auto hash = io::sha256OfFile (request.file);
     if (! hash)
     {
-        result.error = "cannot read " + request.file.filename().string() + " to the end";
+        result.error = "cannot read " + osp::utf8Of (request.file.filename()) + " to the end";
         return result;
     }
     result.contentHash = io::contentId (*hash);
@@ -183,7 +184,7 @@ ImportResult importSound (Catalog& catalog, const std::filesystem::path& storeDi
     //    found again by the next import of the same bytes).
     Asset asset;
     asset.origin = request.origin;
-    asset.name = request.name.empty() ? request.file.stem().string() : request.name;
+    asset.name = request.name.empty() ? osp::utf8Of (request.file.stem()) : request.name;
     SoundInfo sound;
     sound.contentHash = result.contentHash;
     sound.managed = true;
@@ -198,11 +199,11 @@ ImportResult importSound (Catalog& catalog, const std::filesystem::path& storeDi
     sound.provenance = request.provenance;
     sound.rootMidi = request.rootMidi;
     const auto absolute = std::filesystem::absolute (request.file, ec);
-    const auto place = ! request.place.empty() ? request.place : (ec ? request.file : absolute).string();
+    const auto place = ! request.place.empty() ? request.place : osp::utf8Of ((ec ? request.file : absolute));
     const auto added = catalog.addImportedSound (asset, sound, place, request.origin == Origin::captured ? "inbox" : "original");
     if (! added)
     {
-        result.error = "the Library could not record " + request.file.filename().string() + " (" + catalog.lastError() + ")";
+        result.error = "the Library could not record " + osp::utf8Of (request.file.filename()) + " (" + catalog.lastError() + ")";
         return result;
     }
     result.assetId = added->id;
@@ -308,7 +309,7 @@ namespace
         std::error_code ec;
         if (! entry.is_regular_file (ec))
             return {};
-        const auto name = entry.path().filename().string();
+        const auto name = osp::utf8Of (entry.path().filename());
         if (name.find (".partial") != std::string::npos || name.find (".analysis.json") != std::string::npos)
             return {};
         const auto dot = name.find ('.');
@@ -375,7 +376,7 @@ TrashEmptied emptyTrash (Catalog& catalog, const std::filesystem::path& storeDir
                 const auto size = static_cast<std::int64_t> (std::filesystem::file_size (file, ec));
                 if (! moveAway (file))
                 {
-                    result.failed.push_back (file.string());
+                    result.failed.push_back (osp::utf8Of (file));
                     continue;   // the record stays with its file
                 }
                 ++result.files;

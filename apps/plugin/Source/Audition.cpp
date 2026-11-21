@@ -2,6 +2,7 @@
 
 #include "io/AudioFileIO.h"
 #include "library/SoundImport.h"
+#include "core/PathText.h"
 
 namespace osp::plugin
 {
@@ -10,7 +11,7 @@ namespace osp::plugin
 
 juce::File LibrarySettings::file()
 {
-    return juce::File (juce::String (library::Catalog::defaultFile().parent_path().string())).getChildFile ("settings.json");
+    return juce::File (juce::String (osp::utf8Of (library::Catalog::defaultFile().parent_path()))).getChildFile ("settings.json");
 }
 
 LibrarySettings LibrarySettings::load()
@@ -131,7 +132,7 @@ Audition::Found Audition::find (library::Catalog& catalog, const std::filesystem
     if (! where.file)
     {
         found.error = found.name + " cannot be found"
-                    + (where.missing.empty() ? juce::String (".") : " (last seen at " + juce::String (where.missing.front().string()) + ").");
+                    + (where.missing.empty() ? juce::String (".") : " (last seen at " + juce::String (osp::utf8Of (where.missing.front())) + ").");
         return found;
     }
     found.ok = true;
@@ -220,7 +221,7 @@ void Audition::prepare (int slotIndex, const std::string& assetId, std::optional
         decode (found);
         return;
     }
-    const auto storeDir = std::filesystem::path (store.getFullPathName().toStdString());
+    const auto storeDir = osp::pathFromUtf8 (store.getFullPathName().toStdString());
     library.post ([token, storeDir, assetId, decode] (library::Catalog& catalog) {
         if (token.expired())
             return;
@@ -303,7 +304,7 @@ void Audition::decode (const std::string& assetId, const juce::File& file, Decod
         work (found);
         return;
     }
-    const auto storeDir = std::filesystem::path (store.getFullPathName().toStdString());
+    const auto storeDir = osp::pathFromUtf8 (store.getFullPathName().toStdString());
     library.post ([token, storeDir, assetId, work] (library::Catalog& catalog) {
         if (! token.expired())
             work (find (catalog, storeDir, assetId));
@@ -332,7 +333,7 @@ const std::vector<float>* Audition::overview (const std::string& assetId)
         return nullptr;
     overviewsPending.insert (assetId);
     std::weak_ptr<bool> token = alive;
-    const auto storeDir = std::filesystem::path (store.getFullPathName().toStdString());
+    const auto storeDir = osp::pathFromUtf8 (store.getFullPathName().toStdString());
     auto overviewOf = [this, token, assetId] (Found found) {
         decoder.addJob ([this, token, assetId, found] {
             if (token.expired())
@@ -513,7 +514,7 @@ void Audition::setGainDb (float db)
 void Audition::loadIntoLayer (const std::string& assetId, int layer, Done done)
 {
     std::weak_ptr<bool> token = alive;
-    const auto storeDir = std::filesystem::path (store.getFullPathName().toStdString());
+    const auto storeDir = osp::pathFromUtf8 (store.getFullPathName().toStdString());
     library.post ([this, token, storeDir, assetId, layer, done] (library::Catalog& catalog) {
         if (token.expired())
             return;
@@ -541,7 +542,7 @@ void Audition::commit (Done done)
         return;
     }
     std::weak_ptr<bool> token = alive;
-    const auto storeDir = std::filesystem::path (store.getFullPathName().toStdString());
+    const auto storeDir = osp::pathFromUtf8 (store.getFullPathName().toStdString());
     library.post ([this, token, storeDir, wanted, done] (library::Catalog& catalog) {
         if (token.expired())
             return;

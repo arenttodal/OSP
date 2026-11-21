@@ -1,4 +1,5 @@
 #include "io/ContentHash.h"
+#include "core/PathText.h"
 
 #include <juce_cryptography/juce_cryptography.h>
 
@@ -12,7 +13,7 @@ std::optional<std::string> sha256OfFile (const std::filesystem::path& path)
         return std::nullopt;
 
     const auto absolute = std::filesystem::absolute (path, ec);
-    juce::File file (juce::String::fromUTF8 (absolute.string().c_str()));
+    juce::File file (juce::String::fromUTF8 (osp::utf8Of (absolute).c_str()));
     juce::FileInputStream stream (file);
     if (! stream.openedOk())
         return std::nullopt;

@@ -12,6 +12,7 @@
 #include "library/FolderScan.h"
 #include "library/PresetCategory.h"
 #include "library/SoundImport.h"
+#include "core/PathText.h"
 
 namespace osp::plugin
 {
@@ -2227,7 +2228,7 @@ void LibraryPanel::requestDetail()
         return;
     const auto id = row (i).id;
     const auto hash = row (i).contentHash;
-    const auto storeDir = std::filesystem::path (SampleStore::defaultDirectory().getFullPathName().toStdString());
+    const auto storeDir = osp::pathFromUtf8 (SampleStore::defaultDirectory().getFullPathName().toStdString());
     juce::Component::SafePointer<LibraryPanel> safe (this);
     processor.libraryService().request<LibrarySoundDetail> (
         [id, hash, storeDir] (library::Catalog& c) {
@@ -2925,7 +2926,7 @@ namespace
             emptyTrash.setTitle ("Empty the Library trash");
             emptyTrash.onClick = [this] { confirmEmpty(); };
             showStore.onClick = [] { SampleStore::defaultDirectory().revealToUser(); };
-            showLibrary.onClick = [] { juce::File (juce::String (library::Catalog::defaultFile().string())).revealToUser(); };
+            showLibrary.onClick = [] { juce::File (juce::String (osp::utf8Of (library::Catalog::defaultFile()))).revealToUser(); };
             close.onClick = [this] { panel.closeSheet(); };
             inboxFolders.setTitle ("Inbox folders");
             addInbox.setTitle ("Add an Inbox folder");
@@ -2962,7 +2963,7 @@ namespace
         void measure()
         {
             juce::Component::SafePointer<SettingsSheet> safe (this);
-            const auto storeDir = std::filesystem::path (SampleStore::defaultDirectory().getFullPathName().toStdString());
+            const auto storeDir = osp::pathFromUtf8 (SampleStore::defaultDirectory().getFullPathName().toStdString());
             processor.libraryService().request<std::tuple<library::StorageUsage, std::string, library::Catalog::CacheUsage>> (
                 [storeDir] (library::Catalog& c) { return std::make_tuple (library::storageUsage (c, storeDir), c.integrityCheck(), c.cacheUsage()); },
                 [safe] (std::tuple<library::StorageUsage, std::string, library::Catalog::CacheUsage> answer) {
@@ -3082,12 +3083,12 @@ namespace
                                                                 [safe, &proc] (int choice) {
                                                                     if (safe == nullptr || choice != 0)
                                                                         return;
-                                                                    const auto storeDir = std::filesystem::path (SampleStore::defaultDirectory().getFullPathName().toStdString());
+                                                                    const auto storeDir = osp::pathFromUtf8 (SampleStore::defaultDirectory().getFullPathName().toStdString());
                                                                     const auto inUse = proc.soundsInUse();
                                                                     proc.libraryService().request<library::TrashEmptied> (
                                                                         [storeDir, inUse] (library::Catalog& c) {
                                                                             return library::emptyTrash (c, storeDir, inUse, [] (const std::filesystem::path& file) {
-                                                                                return juce::File (juce::String (file.string())).moveToTrash();
+                                                                                return juce::File (juce::String (osp::utf8Of (file))).moveToTrash();
                                                                             });
                                                                         },
                                                                         [safe] (library::TrashEmptied done) {
@@ -3143,7 +3144,7 @@ namespace
         void scan()
         {
             juce::Component::SafePointer<MissingSheet> safe (this);
-            const auto storeDir = std::filesystem::path (SampleStore::defaultDirectory().getFullPathName().toStdString());
+            const auto storeDir = osp::pathFromUtf8 (SampleStore::defaultDirectory().getFullPathName().toStdString());
             processor.libraryService().request<std::vector<Missing>> (
                 [storeDir] (library::Catalog& c) {
                     std::vector<Missing> found;
@@ -3155,7 +3156,7 @@ namespace
                         {
                             const auto where = library::resolveSound (c, storeDir, s->contentHash);
                             if (! where.file)
-                                found.push_back ({ a.id, s->contentHash, juce::String (a.name), where.missing.empty() ? juce::String() : juce::String (where.missing.front().string()) });
+                                found.push_back ({ a.id, s->contentHash, juce::String (a.name), where.missing.empty() ? juce::String() : juce::String (osp::utf8Of (where.missing.front())) });
                         }
                     return found;
                 },

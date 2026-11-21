@@ -1,6 +1,7 @@
 #include "io/ArpPatternJson.h"
 
 #include "io/JsonUtil.h"
+#include "core/PathText.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
@@ -161,18 +162,18 @@ std::string newArpPatternId()
 std::vector<MidiPhrase> readMidiPhrases (const std::filesystem::path& path, std::string& error)
 {
     std::vector<MidiPhrase> phrases;
-    juce::File file (path.string());
+    juce::File file (osp::utf8Of (path));
     juce::FileInputStream in (file);
     if (! in.openedOk())
     {
-        error = "cannot open " + path.filename().string();
+        error = "cannot open " + osp::utf8Of (path.filename());
         return phrases;
     }
     juce::MidiFile midi;
     int fileType = 0;
     if (! midi.readFrom (in, true, &fileType))
     {
-        error = path.filename().string() + " is not a Standard MIDI File";
+        error = osp::utf8Of (path.filename()) + " is not a Standard MIDI File";
         return phrases;
     }
     const int ppq = midi.getTimeFormat();
@@ -234,7 +235,7 @@ std::vector<MidiPhrase> readMidiPhrases (const std::filesystem::path& path, std:
         }
     }
     if (phrases.empty() && error.empty())
-        error = path.filename().string() + " has no notes";
+        error = osp::utf8Of (path.filename()) + " has no notes";
     return phrases;
 }
 
