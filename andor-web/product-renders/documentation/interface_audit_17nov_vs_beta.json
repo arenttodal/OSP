@@ -1,0 +1,150 @@
+{
+ "A1M_R1": {
+  "changed_share_pct": 0.02,
+  "changed_box_px_at_25pct": [
+   213,
+   975,
+   1114,
+   1136
+  ],
+  "size": [
+   1170,
+   2532
+  ],
+  "max_change_levels": 29.0
+ },
+ "A1_R1_W": {
+  "changed_share_pct": 0.01,
+  "changed_box_px_at_25pct": [
+   1756,
+   542,
+   1825,
+   567
+  ],
+  "size": [
+   1920,
+   1080
+  ],
+  "max_change_levels": 28.0
+ },
+ "A1_R1": {
+  "changed_share_pct": 0.02,
+  "changed_box_px_at_25pct": [
+   1703,
+   542,
+   1777,
+   571
+  ],
+  "size": [
+   1920,
+   1080
+  ],
+  "max_change_levels": 32.0
+ },
+ "A2": {
+  "changed_share_pct": 0.04,
+  "changed_box_px_at_25pct": [
+   361,
+   722,
+   1655,
+   858
+  ],
+  "size": [
+   1920,
+   1280
+  ],
+  "max_change_levels": 38.0
+ },
+ "B1_R4": {
+  "changed_share_pct": 0.0,
+  "changed_box_px_at_25pct": [
+   949,
+   671,
+   1007,
+   692
+  ],
+  "size": [
+   1080,
+   1350
+  ],
+  "max_change_levels": 17.0
+ },
+ "B2_115_R4": {
+  "changed_share_pct": 0.0,
+  "changed_box_px_at_25pct": [
+   866,
+   1119,
+   929,
+   1138
+  ],
+  "size": [
+   1080,
+   1920
+  ],
+  "max_change_levels": 20.0
+ },
+ "M01_sharp": {
+  "changed_share_pct": 0.18,
+  "changed_box_px_at_25pct": [
+   23,
+   924,
+   1281,
+   1238
+  ],
+  "size": [
+   1920,
+   1920
+  ],
+  "max_change_levels": 38.0
+ },
+ "M02_sharp": {
+  "changed_share_pct": 0.0,
+  "changed_box_px_at_25pct": null,
+  "size": [
+   1920,
+   1280
+  ],
+  "max_change_levels": 1.0
+ },
+ "M03_sharp": {
+  "changed_share_pct": 0.0,
+  "changed_box_px_at_25pct": null,
+  "size": [
+   1920,
+   1280
+  ],
+  "max_change_levels": 1.0
+ },
+ "M04_sharp": {
+  "changed_share_pct": 0.0,
+  "changed_box_px_at_25pct": null,
+  "size": [
+   1920,
+   1280
+  ],
+  "max_change_levels": 11.0
+ },
+ "M05_sharp": {
+  "changed_share_pct": 0.0,
+  "changed_box_px_at_25pct": null,
+  "size": [
+   1920,
+   1280
+  ],
+  "max_change_levels": 1.0
+ },
+ "M06_R2_sharp": {
+  "changed_share_pct": 0.13,
+  "changed_box_px_at_25pct": [
+   282,
+   0,
+   574,
+   136
+  ],
+  "size": [
+   1920,
+   1280
+  ],
+  "max_change_levels": 26.0
+ }
+}
