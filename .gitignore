@@ -56,3 +56,5 @@ __pycache__/
 
 # Release outputs (packaging/release/andor-release.sh): installers are kept, never committed.
 /dist/
+packaging/windows/stage/
+packaging/windows/output/

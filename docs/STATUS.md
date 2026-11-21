@@ -1,5 +1,11 @@
 # Status
 
+> **21 Nov 2026, Windows test build (owner's request):** `.github/workflows/windows-test.yml`
+> builds ANDOR OSP with MSVC (VST3 + standalone, x64), packages an Inno Setup installer
+> (`packaging/windows/osp.iss`: the VST3 to Common Files\VST3, the standalone with its factory
+> packs to Program Files\ANDOR\OSP; not signed) and runs the test suite. On demand: the
+> Actions tab, or a commit message containing `[windows]` (the regular CI stays macOS only).
+>
 > **21 Nov 2026, rack modulation steps 3-5 (`docs/research/rack-modulation.md`):**
 > - **Every rack and effect control can be modulated:** the SPACE, ECHO and MOVEMENT racks
 >   and the FX library's effects (and any other control a USER macro can move) take routes.

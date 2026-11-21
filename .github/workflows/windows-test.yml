@@ -1,0 +1,63 @@
+name: Windows test build
+
+# ANDOR OSP for Windows (64-bit, MSVC): the VST3 and the standalone, an Inno Setup installer
+# (OSP-Windows-test-setup.exe, not signed), then the test suite. On demand only (the regular
+# CI is macOS): run it from the Actions tab, or push a commit whose message contains
+# "[windows]". The installer is uploaded before the tests run, so a test failure still leaves
+# it to look at; the run is red then.
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  windows:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[windows]')
+    runs-on: windows-2022
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch factory packs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash packaging/factory-packs/fetch.sh
+
+      - name: Configure
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DOSP_BUILD_PLUGIN=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Package (installer and zip)
+        run: |
+          set -e
+          version=$(grep '^PRODUCT_VERSION=' packaging/release/products/osp/version.env | cut -d= -f2)
+          pre=$(grep '^PRODUCT_PRERELEASE=' packaging/release/products/osp/version.env | cut -d= -f2)
+          [ -n "$pre" ] && version="$version-$pre"
+          art=build/apps/plugin/OSP_Plugin_artefacts/Release
+          ls -R "$art" | head -40
+          stage=packaging/windows/stage
+          rm -rf "$stage" && mkdir -p "$stage/Factory"
+          cp -R "$art/VST3/OSP.vst3" "$stage/"
+          cp "$art/Standalone/OSP.exe" "$stage/"
+          cp packaging/factory-packs/*.osppack "$stage/Factory/" 2>/dev/null || true
+          iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ ! -f "$iscc" ]; then choco install innosetup -y --no-progress; fi
+          (cd packaging/windows && "$iscc" "//DAppVersion=$version" osp.iss)
+          mkdir -p dist
+          cp packaging/windows/output/OSP-Windows-test-setup.exe dist/
+          (cd "$stage" && 7z a -tzip ../../../dist/OSP-Windows-test-files.zip OSP.vst3 OSP.exe Factory > /dev/null)
+          cp packaging/windows/README.txt dist/
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OSP-Windows-test
+          path: dist/
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
