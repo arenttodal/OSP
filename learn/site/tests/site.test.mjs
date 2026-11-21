@@ -7,7 +7,8 @@ let playwright;
 try { playwright = require('playwright'); } catch { playwright = require(require.resolve('playwright', { paths: ['/usr/lib/node_modules', '/opt/node22/lib/node_modules', process.cwd()] })); }
 const { chromium } = playwright;
 
-const PORT = 4329, ROOT = `http://localhost:${PORT}/learn/`;
+const BASE = (process.env.LEARN_BASE ?? '/').replace(/\/?$/, '/');
+const PORT = 4329, ROOT = `http://localhost:${PORT}${BASE}`;
 const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { stdio: 'pipe' });
 await new Promise((ok, fail) => {
   const t = setTimeout(() => fail(new Error('preview did not start')), 30000);

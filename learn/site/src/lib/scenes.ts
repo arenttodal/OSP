@@ -8,7 +8,7 @@ export interface Scene {
   duration: number; status: string; productCommit: string; segments: Segment[]; disclosures: string[];
 }
 
-const BASE = '/learn/media/osp/';
+const BASE = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}media/osp/`;
 type Entry = (typeof manifest)['scenes'][number];
 
 export function scene(id: string): Scene {

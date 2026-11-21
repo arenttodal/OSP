@@ -1,7 +1,8 @@
-// Every internal link, video, poster and image in the built site resolves to a file (base /learn/).
+// Every internal link, video, poster and image in the built site resolves to a file (base: LEARN_BASE, default /).
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+const base = (process.env.LEARN_BASE ?? '/').replace(/\/?$/, '/');
 const dist = resolve(dirname(fileURLToPath(import.meta.url)), '../dist');
 const pages = [];
 const walk = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); statSync(p).isDirectory() ? walk(p) : p.endsWith('.html') && pages.push(p); } };
@@ -11,9 +12,9 @@ let checked = 0;
 for (const page of pages) {
   const html = readFileSync(page, 'utf8');
   for (const [, url] of html.matchAll(/(?:href|src|poster)="([^"#?]+)/g)) {
-    if (!url.startsWith('/learn/')) continue;
+    if (!url.startsWith(base) || url.startsWith('//')) continue;
     checked++;
-    let p = join(dist, decodeURI(url.slice('/learn/'.length)));
+    let p = join(dist, decodeURI(url.slice(base.length)));
     if (url.endsWith('/')) p = join(p, 'index.html');
     if (!existsSync(p)) bad.push(`${page.slice(dist.length)} → ${url}`);
   }
