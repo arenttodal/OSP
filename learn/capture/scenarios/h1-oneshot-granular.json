@@ -26,13 +26,13 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "one layer (bowed), One Shot",
+    "state": "one layer (Prophet-6 Freeze), One Shot",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "bowed"
+          "file:Prophet-6 Freeze.wav"
         ]
       }
     ]

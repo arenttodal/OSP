@@ -21,13 +21,13 @@
   "fps": 30,
   "maxSeconds": 16.0,
   "start": {
-    "state": "one layer (bowed), Granular",
+    "state": "one layer (Prophet-6 pad), Granular",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "bowed"
+          "file:Prophet-6 Pad.aif"
         ]
       },
       {

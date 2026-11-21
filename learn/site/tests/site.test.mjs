@@ -82,7 +82,23 @@ try {
     check('the active step follows the clip', cur !== 'choose-chord' && t > 3.9, `t=${t.toFixed(2)}, step=${cur}`);
     await desk.close();
   }
-  // 7. basic accessibility on every kind of page
+  // 7. sound: clips start muted; the sound button unmutes and is remembered on the next guide
+  {
+    const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await desk.goto(`${ROOT}osp/make-an-instrument/load-and-play/`);
+    await desk.waitForTimeout(600);
+    const before = await desk.$eval('video', (v) => v.muted);
+    await desk.click('[data-sound]');
+    const after = await desk.$eval('video', (v) => v.muted);
+    const pressed = await desk.getAttribute('[data-sound]', 'aria-pressed');
+    await desk.goto(`${ROOT}osp/play-and-layer/pedal-loop/`);
+    await desk.waitForTimeout(600);
+    const remembered = await desk.getAttribute('[data-sound]', 'aria-pressed');
+    check('sound: starts muted and the button unmutes (the next page tries the remembered choice)', before === true && after === false && pressed === 'true' && remembered !== null,
+      JSON.stringify({ before, after, pressed, remembered }));
+    await desk.close();
+  }
+  // 8. basic accessibility on every kind of page
   for (const p of ['osp/', 'osp/play-and-layer/', 'osp/play-and-layer/pedal-loop/', 'osp/play-and-layer/pedal-loop/pedal-down/', 'osp/reference/pedal-loop/', 'osp/search/']) {
     await page.goto(ROOT + p);
     const a = await page.evaluate(() => ({

@@ -61,3 +61,4 @@ __pycache__/
 learn/capture/out/
 learn/capture/fixtures/Tutorial *.wav
 learn/capture/fixtures/user/
+learn/capture/fixtures/generated/

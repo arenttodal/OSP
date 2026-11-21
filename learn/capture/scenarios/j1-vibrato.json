@@ -21,13 +21,13 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "one layer (bowed)",
+    "state": "one layer (sine)",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "bowed"
+          "gen:Sine C4.wav"
         ]
       }
     ]
@@ -90,7 +90,7 @@
         {
           "do": "midi",
           "keys": [
-            57
+            60
           ],
           "state": "on",
           "velocity": 90
@@ -120,7 +120,7 @@
         {
           "do": "midi",
           "keys": [
-            57
+            60
           ],
           "state": "off"
         },

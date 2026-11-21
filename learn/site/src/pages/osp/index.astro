@@ -27,10 +27,16 @@ const fs = scene(featured.data.scene);
     </div>
     <div class="feature-clip">
       <video muted playsinline loop preload="metadata" poster={fs.poster} width={fs.width} height={fs.height}
-             aria-label={`Silent demonstration: ${featured.data.title}`} data-feature>
+             aria-label={`${fs.hasAudio ? 'Demonstration' : 'Silent demonstration'}: ${featured.data.title}`} data-feature>
         <source src={fs.webm} type="video/webm" />
         <source src={fs.mp4} type="video/mp4" />
       </video>
+      {fs.hasAudio && (
+        <button type="button" class="feature-sound" data-feature-sound aria-pressed="false" aria-label="Sound">
+          <svg class="i-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="m17 9 4 6m0-6-4 6" /></svg>
+          <svg class="i-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /></svg>
+        </button>
+      )}
     </div>
   </section>
 
@@ -66,5 +72,12 @@ const fs = scene(featured.data.scene);
   <script>
     const v = document.querySelector<HTMLVideoElement>('[data-feature]');
     if (v && !matchMedia('(prefers-reduced-motion: reduce)').matches) { v.play().catch(() => {}); }
+    const b = document.querySelector<HTMLButtonElement>('[data-feature-sound]');
+    if (v && b) b.addEventListener('click', () => {
+      v.muted = !v.muted;
+      b.setAttribute('aria-pressed', String(!v.muted));
+      try { localStorage.setItem('learn-andor:sound', v.muted ? '0' : '1'); } catch { /* storage unavailable */ }
+      if (!v.muted && v.paused) v.play().catch(() => {});
+    });
   </script>
 </Base>

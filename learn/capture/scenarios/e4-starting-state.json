@@ -21,13 +21,13 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "one layer (bowed)",
+    "state": "one layer (Prophet-6 pad)",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "bowed"
+          "file:Prophet-6 Pad.aif"
         ]
       }
     ]
@@ -110,7 +110,7 @@
         },
         {
           "do": "key",
-          "note": 55,
+          "note": 60,
           "seconds": 1.2,
           "after": 0.1
         },

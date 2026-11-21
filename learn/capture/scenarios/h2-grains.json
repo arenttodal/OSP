@@ -21,13 +21,13 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "one layer (bowed), Granular, a note held",
+    "state": "one layer (Prophet-6 pad), Granular, a note held",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "bowed"
+          "file:Prophet-6 Pad.aif"
         ]
       },
       {
@@ -38,7 +38,7 @@
       {
         "do": "holdNotes",
         "keys": [
-          48
+          60
         ],
         "velocity": 90
       },

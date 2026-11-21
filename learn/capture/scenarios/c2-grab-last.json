@@ -19,13 +19,13 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "one layer (bowed), Sidechain input connected, the phrase already playing into it",
+    "state": "one layer (Prophet-6 pad), Sidechain input connected, the phrase already playing into it",
     "input": true,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "bowed"
+          "file:Prophet-6 Pad.aif"
         ]
       },
       {

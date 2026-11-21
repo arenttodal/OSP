@@ -21,20 +21,20 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "two layers (bowed, voice), a note held",
+    "state": "two layers (Prophet-6 pad, saw), a note held",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "bowed",
-          "voice"
+          "file:Prophet-6 Pad.aif",
+          "gen:Saw C4.wav"
         ]
       },
       {
         "do": "holdNotes",
         "keys": [
-          55
+          60
         ],
         "velocity": 90
       },

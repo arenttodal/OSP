@@ -21,15 +21,15 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "three layers (bowed, voice, pluck), ARP panel open, ARP on, LINK on, a chord held",
+    "state": "three layers (sine pluck, saw, sine), ARP panel open, ARP on, LINK on, a chord held",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "bowed",
-          "voice",
-          "pluck"
+          "gen:Pluck C4.wav",
+          "gen:Saw C4.wav",
+          "gen:Sine C4.wav"
         ]
       },
       {
@@ -43,10 +43,10 @@
       {
         "do": "holdNotes",
         "keys": [
-          48,
-          55,
           60,
-          64
+          64,
+          67,
+          71
         ],
         "velocity": 90
       },
@@ -228,6 +228,6 @@
     ]
   },
   "disclosures": [
-    "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+    "The held chord (Cmaj7: C4 E4 G4 B4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
   ]
 }

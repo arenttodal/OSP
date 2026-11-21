@@ -174,6 +174,16 @@ kbd { font: 500 11px var(--mono); padding: 2px 5px; border: 1px solid var(--bord
 .lg-segs span { display: block; width: 100%; height: 4px; border-radius: 2px; background: rgba(244, 241, 233, .18); overflow: hidden; }
 .lg-segs i { display: block; height: 100%; width: 0; background: #e0895e; }
 .lg-time { font: 500 12px var(--mono); color: var(--stage-text); flex: none; }
+.lg-sound, .feature-sound { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 10px; border: 0; border-radius: 999px; cursor: pointer; font: 500 12px var(--mono); }
+.lg-sound { flex: none; background: rgba(244, 241, 233, .12); color: var(--stage-text); }
+.lg-sound:hover { background: rgba(244, 241, 233, .2); }
+.lg-sound[aria-pressed="true"] { background: #f4f1e9; color: var(--stage-frame); }
+.lg-sound svg, .feature-sound svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.lg-sound .i-on, .feature-sound .i-on, .lg-sound[aria-pressed="true"] .i-off, .feature-sound[aria-pressed="true"] .i-off { display: none; }
+.lg-sound[aria-pressed="true"] .i-on, .feature-sound[aria-pressed="true"] .i-on { display: block; }
+.feature-clip { position: relative; }
+.feature-sound { position: absolute; right: 14px; bottom: 14px; width: 40px; height: 40px; padding: 0; justify-content: center; background: rgba(255, 255, 255, .92); color: var(--text); box-shadow: 0 4px 14px rgba(0, 0, 0, .25); }
+@media (max-width: 760px) { .lg-sound-text { display: none; } .lg-sound { padding: 0 8px; } }
 .note { font-size: 14px; color: var(--text-2); margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--bg-2); }
 
 .lg-steps { grid-area: steps; padding: 20px var(--gutter) 24px; display: flex; flex-direction: column; gap: 14px; background: var(--bg-elev); border-top: 1px solid var(--border); }

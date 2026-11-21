@@ -19,13 +19,13 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "one layer (voice), SYNTH at 60 %, a note held",
+    "state": "one layer (Prophet-6 pad), SYNTH at 60 %, a note held",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "voice"
+          "file:Prophet-6 Pad.aif"
         ]
       },
       {
@@ -36,7 +36,7 @@
       {
         "do": "holdNotes",
         "keys": [
-          57
+          60
         ],
         "velocity": 90
       },

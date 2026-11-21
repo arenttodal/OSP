@@ -6,6 +6,8 @@ export interface Segment { id: string; start: number; end: number; still: string
 export interface Scene {
   id: string; webm: string; mp4: string; poster: string; width: number; height: number;
   duration: number; status: string; productCommit: string; segments: Segment[]; disclosures: string[];
+  /** The clip carries the instrument's own sound (captured with the frames). */
+  hasAudio: boolean;
 }
 
 const BASE = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}media/osp/`;
@@ -22,7 +24,7 @@ export function scene(id: string): Scene {
   return {
     id, webm: BASE + e.video.files.webm.path, mp4: BASE + e.video.files.mp4.path, poster: BASE + e.poster.path,
     width: e.video.width, height: e.video.height, duration: e.video.duration, status: e.validation.status,
-    productCommit: e.productCommit, segments, disclosures: e.disclosures ?? [],
+    productCommit: e.productCommit, segments, disclosures: e.disclosures ?? [], hasAudio: Boolean((e as { audio?: unknown }).audio),
   };
 }
 

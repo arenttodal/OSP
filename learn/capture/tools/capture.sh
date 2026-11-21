@@ -19,6 +19,7 @@ scenes=("$@")
 if [ ${#scenes[@]} -eq 0 ]; then
   for f in learn/capture/scenarios/*.json; do scenes+=("$(basename "$f" .json)"); done
 fi
+python3 learn/capture/tools/make-sounds.py > /dev/null   # basic sounds (saw, sine, pluck), identical every run
 failed=0
 for s in "${scenes[@]}"; do
   out="learn/capture/out/$s"

@@ -21,13 +21,13 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "one layer (bowed)",
+    "state": "one layer (Prophet-6 pad)",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "bowed"
+          "file:Prophet-6 Pad.aif"
         ]
       }
     ]
@@ -42,7 +42,7 @@
         },
         {
           "do": "drop",
-          "sound": "voice",
+          "sound": "gen:Saw C4.wav",
           "target": "droptarget:add B",
           "seconds": 1.1
         },
@@ -69,7 +69,7 @@
       "do": [
         {
           "do": "drop",
-          "sound": "pluck",
+          "sound": "gen:Pluck C4.wav",
           "target": "droptarget:add C",
           "seconds": 1.1
         },
@@ -96,7 +96,7 @@
       "do": [
         {
           "do": "key",
-          "note": 55,
+          "note": 60,
           "seconds": 1.0,
           "after": 0.1
         },

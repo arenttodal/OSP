@@ -95,7 +95,7 @@ const curriculum = groups.map((gr) => ({ ...gr, guides: all.filter((g) => g.data
         )}
         <div class="lg-stage">
           <video muted playsinline loop preload="metadata" poster={seg(active).still ?? s.poster} width={s.width} height={s.height}
-                 aria-label={`Silent demonstration: ${d.title}`} data-video>
+                 aria-label={`${s.hasAudio ? 'Demonstration' : 'Silent demonstration'}: ${d.title}`} data-video>
             <source src={s.webm} type="video/webm" />
             <source src={s.mp4} type="video/mp4" />
           </video>
@@ -111,13 +111,20 @@ const curriculum = groups.map((gr) => ({ ...gr, guides: all.filter((g) => g.data
               })}
             </div>
             <span class="lg-time"><span data-time>0:00</span> / {clock(s.duration)}</span>
+            {s.hasAudio && (
+              <button type="button" class="lg-sound" data-sound aria-pressed="false" aria-label="Sound">
+                <svg class="i-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="m17 9 4 6m0-6-4 6" /></svg>
+                <svg class="i-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /></svg>
+                <span class="lg-sound-text">Sound</span>
+              </button>
+            )}
           </div>
         </div>
         {d.editorial?.hostVerification && <p class="note host">{d.editorial.hostVerification}</p>}
       </div>
 
       <aside class="lg-steps" aria-label="Steps">
-        <div class="lg-steps-head"><h2 class="label">Steps</h2><span class="label">Silent · {Math.round(s.duration)} s</span></div>
+        <div class="lg-steps-head"><h2 class="label">Steps</h2><span class="label">{s.hasAudio ? '' : 'Silent · '}{Math.round(s.duration)} s</span></div>
         <ol class="steps" data-pagefind-ignore>
           {d.steps.map((x, i) => {
             const g = seg(x.id);
@@ -196,7 +203,10 @@ const curriculum = groups.map((gr) => ({ ...gr, guides: all.filter((g) => g.data
         setActive(i);
         if (reduce && items[i].dataset.still) video.poster = items[i].dataset.still!;
         video.currentTime = starts[i] + 0.01;
-        if (play && !reduce) video.play().catch(() => {});
+        if (play && !reduce) video.play().catch(() => {
+          // Sound was remembered but this page has had no click yet: play muted instead.
+          if (!video.muted) { video.muted = true; sound?.setAttribute('aria-pressed', 'false'); root.classList.remove('has-sound'); video.play().catch(() => {}); }
+        });
         paint();
       };
       video.addEventListener('play', () => { toggle.setAttribute('aria-label', 'Pause'); root.classList.add('is-playing'); requestAnimationFrame(loop); });
@@ -211,6 +221,25 @@ const curriculum = groups.map((gr) => ({ ...gr, guides: all.filter((g) => g.data
         if (e.key === 'ArrowRight' && active < items.length - 1) { e.preventDefault(); choose(active + 1); }
         if (e.key === 'ArrowLeft' && active > 0) { e.preventDefault(); choose(active - 1); }
       });
+      // Sound: clips start muted (browsers only autoplay silent video); the choice is remembered.
+      const sound = root.querySelector<HTMLButtonElement>('[data-sound]');
+      const SOUND = 'learn-andor:sound';
+      const setSound = (on: boolean, remember: boolean) => {
+        video.muted = !on;
+        sound?.setAttribute('aria-pressed', String(on));
+        root.classList.toggle('has-sound', on);
+        if (remember) { try { localStorage.setItem(SOUND, on ? '1' : '0'); } catch { /* storage unavailable */ } }
+      };
+      if (sound) {
+        sound.addEventListener('click', () => {
+          const on = video.muted;
+          setSound(on, true);
+          if (on && video.paused && !reduce) video.play().catch(() => {});
+        });
+        let wanted = false;
+        try { wanted = localStorage.getItem(SOUND) === '1'; } catch { /* storage unavailable */ }
+        if (wanted) setSound(true, false);
+      }
       const fromHash = items.findIndex((li) => `#${li.dataset.step}` === location.hash);
       const start = () => seek(fromHash >= 0 ? fromHash : active, !reduce);
       if (video.readyState >= 1) start(); else video.addEventListener('loadedmetadata', start, { once: true });

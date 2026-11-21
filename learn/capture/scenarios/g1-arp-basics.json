@@ -22,21 +22,22 @@
   "fps": 30,
   "maxSeconds": 16.0,
   "start": {
-    "state": "one layer (pluck), a chord held, ARP closed",
+    "state": "one layer (sine pluck), a chord held, ARP closed",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "pluck"
+          "gen:Pluck C4.wav"
         ]
       },
       {
         "do": "holdNotes",
         "keys": [
-          57,
           60,
-          64
+          64,
+          67,
+          71
         ],
         "velocity": 90
       },

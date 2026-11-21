@@ -22,13 +22,13 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "one layer (pluck)",
+    "state": "one layer (Prophet-6 pad)",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "pluck"
+          "file:Prophet-6 Pad.aif"
         ]
       }
     ]
@@ -123,7 +123,7 @@
         {
           "do": "midi",
           "keys": [
-            57
+            60
           ],
           "state": "on",
           "velocity": 90
@@ -149,7 +149,7 @@
         {
           "do": "midi",
           "keys": [
-            57
+            60
           ],
           "state": "off"
         },

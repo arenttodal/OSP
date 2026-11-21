@@ -21,19 +21,19 @@
   "fps": 30,
   "maxSeconds": 15.0,
   "start": {
-    "state": "one layer (voice), a note held",
+    "state": "one layer (saw), a note held",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "voice"
+          "gen:Saw C4.wav"
         ]
       },
       {
         "do": "holdNotes",
         "keys": [
-          57
+          60
         ],
         "velocity": 90
       },

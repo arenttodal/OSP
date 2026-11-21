@@ -439,10 +439,12 @@ private:
 
     juce::File tutorialFile (const juce::String& id, int index = 0)
     {
-        if (id.startsWith ("file:"))
+        if (id.startsWith ("file:") || id.startsWith ("gen:"))
         {
-            // A recording supplied by the owner for the tutorials (learn/capture/fixtures/user).
-            const auto f = sourceFixtures().getChildFile ("user").getChildFile (id.fromFirstOccurrenceOf ("file:", false, false));
+            // file: a recording supplied by the owner (learn/capture/fixtures/user);
+            // gen: a basic sound written by tools/make-sounds.py (learn/capture/fixtures/generated).
+            const auto folder = id.startsWith ("gen:") ? "generated" : "user";
+            const auto f = sourceFixtures().getChildFile (folder).getChildFile (id.fromFirstOccurrenceOf (":", false, false));
             if (! f.existsAsFile())
                 throw Failure ("sound file not found: " + f.getFullPathName().toStdString());
             noteFixture (id, f);
