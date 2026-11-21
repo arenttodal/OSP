@@ -17,6 +17,11 @@ Cloudflare dashboard → Workers & Pages → Create → Pages → Connect to Git
 | Build output directory | `dist` |
 | Environment variable | `NODE_VERSION` = `22` (also in `.nvmrc`) |
 
+**Connected:** Pages project `andor-learn` → https://andor-learn.pages.dev. Automatic production
+deployments on; preview branches: none; build watch paths: `learn/*`, so only changes under `learn/`
+start a build. Check a build in the project's Deployments tab: its log ends with the content check
+(`content: 30 guides, …`) and Pagefind (`Indexed 155 pages`).
+
 The build copies the captured clips from `learn/assets/osp/` (committed) and fails if a guide does not
 match a captured, validated scene.
 
