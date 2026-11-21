@@ -1,0 +1,20 @@
+{
+ "draft (768 px, 6 samples)": {
+  "residual_mean_levels": 2.585,
+  "residual_p99": 21.04,
+  "share_over_6_levels": 0.119,
+  "mean_shift_px_per_frame": 4.075
+ },
+ "final 1920 (96 samples)": {
+  "residual_mean_levels": 2.031,
+  "residual_p99": 18.71,
+  "share_over_6_levels": 0.0906,
+  "mean_shift_px_per_frame": 4.085
+ },
+ "final 4K downscaled": {
+  "residual_mean_levels": 2.063,
+  "residual_p99": 19.03,
+  "share_over_6_levels": 0.0935,
+  "mean_shift_px_per_frame": 4.087
+ }
+}
