@@ -5,10 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ANDOR OSP: H01 C hero mock</title>
 <!--
-  H01 C as a website hero: the render is a clean plate (no type baked in); the headline and the call to
-  action are native HTML on top of it, so they stay sharp, translatable, editable and accessible.
-  The plate leaves its top band as plain ivory for them. Copy is a placeholder.
-  ?plate=<file> swaps the image (default: H01_C_R4_plate.jpg beside this file).
+  H01 C as a website hero. The renders are clean plates (no type baked in); the headline, the line and the
+  call to action are native HTML on top, so they stay sharp, translatable, editable and accessible.
+  Copy is a placeholder.
+
+  Two compositions, chosen by the browser (art direction with <picture>):
+  - portrait screens (phones; up to 4:5): H01_C_R4_mobile, rendered natively in portrait. The instrument
+    spans the width in the lower half; the upper half is clean ivory for the copy;
+  - everything wider (tablets in landscape, laptops, desktops): H01_C_R4, 16:9. object-fit: cover crops it
+    to the screen, keeping the instrument in view (object-position below).
+  Each comes in several widths (srcset) and in WebP with a JPEG fallback; the browser picks the smallest
+  file that is sharp on the device.
 -->
 <style>
   @font-face { font-family: "EB Garamond"; src: url("../typography/fonts/EBGaramond-Regular.ttf") format("truetype"); }
@@ -18,7 +25,8 @@
   * { box-sizing: border-box; margin: 0; }
   body { background: var(--plate); color: var(--text); font-family: "Inter Tight", system-ui, sans-serif; }
   .hero { position: relative; min-height: 100svh; overflow: hidden; display: grid; }
-  .hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 62%; }
+  .hero picture, .hero img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .hero img { object-fit: cover; object-position: 50% 62%; }
   .copy { position: relative; z-index: 1; align-self: start; justify-self: center; text-align: center;
           padding: clamp(40px, 7vh, 88px) 16px 0; }
   h1 { font-family: "EB Garamond", Georgia, serif; font-weight: 400; letter-spacing: -0.01em;
@@ -26,20 +34,33 @@
   p { margin-top: 14px; font-weight: 300; font-size: clamp(15px, 1.25vw, 19px); color: var(--text-2); }
   .cta { display: inline-block; margin-top: 26px; padding: 13px 26px; border-radius: 999px; background: var(--text);
          color: #f6f2ec; font-weight: 760; font-size: 15px; letter-spacing: 0.01em; text-decoration: none; }
+  @media (max-aspect-ratio: 4/5) {
+    .hero img { object-position: 50% 60%; }
+    .copy { padding-top: clamp(56px, 11vh, 120px); max-width: 30em; }
+    h1 { font-size: clamp(36px, 10.5vw, 56px); }
+    p { font-size: 16px; margin-top: 12px; }
+    .cta { margin-top: 22px; padding: 14px 28px; font-size: 16px; }
+  }
 </style>
 </head>
 <body>
   <section class="hero" aria-label="ANDOR OSP">
-    <img id="plate" src="H01_C_R4_plate.jpg" alt="ANDOR OSP instrument, seen from the front on an ivory backdrop">
+    <picture>
+      <source media="(max-aspect-ratio: 4/5)" type="image/webp"
+              srcset="img/H01_C_R4_mobile_860w.webp 860w, img/H01_C_R4_mobile_1290w.webp 1290w" sizes="100vw">
+      <source media="(max-aspect-ratio: 4/5)"
+              srcset="img/H01_C_R4_mobile_860w.jpg 860w, img/H01_C_R4_mobile_1290w.jpg 1290w" sizes="100vw">
+      <source type="image/webp"
+              srcset="img/H01_C_R4_desktop_1920w.webp 1920w, img/H01_C_R4_desktop_2560w.webp 2560w, img/H01_C_R4_desktop_3840w.webp 3840w" sizes="100vw">
+      <img id="plate" src="img/H01_C_R4_desktop_1920w.jpg"
+           srcset="img/H01_C_R4_desktop_1920w.jpg 1920w, img/H01_C_R4_desktop_2560w.jpg 2560w, img/H01_C_R4_desktop_3840w.jpg 3840w" sizes="100vw"
+           alt="ANDOR OSP instrument, seen from the front on an ivory backdrop">
+    </picture>
     <div class="copy">
       <h1>One sound.<br>An entire instrument.</h1>
       <p>ANDOR OSP turns a single recording into a playable instrument.</p>
       <a class="cta" href="#beta">Join the beta</a>
     </div>
   </section>
-  <script>
-    const q = new URLSearchParams(location.search).get("plate");
-    if (q) document.getElementById("plate").src = q;
-  </script>
 </body>
 </html>

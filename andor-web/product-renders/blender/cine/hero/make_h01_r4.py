@@ -30,8 +30,13 @@ DISPLAY_FLAG = {"name": "Display flag", "mirror": True, "aim": [0.0, 0.065, 0.01
 EL, LENS = 32.0, 90
 D, SHIFT = float(os.environ.get("H01_D", 1.385)), float(os.environ.get("H01_SHIFT", 0.048))
 DC, SHIFTC = float(os.environ.get("H01_DC", 1.60)), float(os.environ.get("H01_SHIFTC", 0.085))
-
-
+# phone portrait (iPhone Pro Max 1290 x 2796): the same 90 mm lens and 32 deg elevation; Blender fits the sensor
+# to the frame's height, so the camera stands further back for the instrument to fill the width
+DM, SHIFTM = float(os.environ.get("H01_DM", 1.60)), float(os.environ.get("H01_SHIFTM", 0.15))
+# the rig fits the 36 mm sensor to the frame's width: in portrait the 90 mm lens would see a tall, wide view and a
+# tiny instrument. The phone keeps the desktop perspective (the camera about 1.5 m away, as C's 1.6 m) and fills
+# the width with a longer lens instead.
+LENSM = float(os.environ.get("H01_LENSM", 118))
 def front(el, d, target=(0.0, 0.0, 0.0)):
     """camera on the centre line, `el` degrees above horizontal, `d` metres from the target."""
     e = math.radians(el)
@@ -104,6 +109,20 @@ frame("H01_C_R4", "Desktop website plate (R4)",
       stage(IVORY_CYC, B_LIGHTS, B_FLAGS),
       world=0.05, exposure=-0.2, typography={"layout": "H01_C_R4"},
       rationale="The website hero plate: B's ivory light, the instrument larger than in R3 and set in the lower two thirds, the top band left as clean ivory for the website's own headline and call to action. No type is baked into the plate.")
+
+# a tall frame sees the cyclorama far above and the floor in front of the instrument, which B's light leaves dark:
+# two broad washes linked to the stage only (the instrument's light is unchanged; it still shadows the floor)
+M_WASH = [light("Wall wash", [0.0, -0.6, 2.4], [0.0, 1.6, 1.3], [3.0, 1.5], 85, WARM, link="stage"),
+          light("Floor wash", [0.0, 0.05, 1.6], [0.0, 0.05, 0.0], [1.6, 1.0], 9, WARM, link="stage")]
+
+# C on a phone: a native portrait composition (not a crop of the desktop plate, where the instrument would be
+# a sliver): the instrument fills the width in the lower half, the top is clean ivory for the native headline
+# and button. Same light as B and C.
+frame("H01_C_R4_mobile", "Website plate, phone portrait (R4)",
+      {"lens": LENSM, "fstop": 11, "position": front(EL, DM), "target": [0.0, 0.0, 0.0], "shift": [0.0, SHIFTM]},
+      stage(IVORY_CYC, B_LIGHTS + M_WASH, B_FLAGS),
+      world=0.05, exposure=-0.2, aspect=[1290, 2796], typography={"layout": "H01_C_R4_mobile"},
+      rationale="The website hero plate for phones: B's ivory light and the approved square-on geometry, composed natively in portrait. The instrument spans the width in the lower half; the upper half is clean ivory for the page's own headline and call to action.")
 
 for s in frames:
     json.dump(s, open(os.path.join(OUT, s["id"] + ".json"), "w"), indent=1)
