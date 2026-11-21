@@ -5,6 +5,11 @@ Repository `arenttodal/OSP`, branch `claude/friendly-pascal-0y48r0`. Blender 4.2
 **Sources:** `scripts/andor_scene.py` @ `e50aaaf`, `config/campaign_setups.json` @ `a233b26`, `scripts/prep_textures.py` @ `1a0cf7e`, `scripts/web_derivatives.py` @ `2399528`.
 **Scene textures** (`blender/textures_current/`, git-ignored, archived with Package A): `geometry.json` sha256 `f13d38eaa767…`, `osp_face.png` sha256 `e2a8abc7fbd5…`, `teak_strip.png` sha256 `cb7ecafcb641…`.
 
+**Revision, 21 Nov (interface audit, `review_fixes_21nov.md`):**
+- **M01 sharp and cinematic:** re-rendered on the frozen interface (`textures_0.9.0-beta.1`, 32e0bee), because the macro arcs had changed colour.
+- **M06 sharp:** the approved R2 master, with only its top-edge arc replaced from a frozen-interface render. This affects 1.2 % of the frame; every other pixel is unchanged.
+- **M06 cinematic and all other masters:** as listed below, on the 17 Nov interface. The visible difference is at most a footer key, 0.04 % of the frame.
+
 Every master is a 16-bit PNG in sRGB (AgX view, 'AgX - Punchy' look, baked). The derivatives are 8-bit sRGB AVIF and WebP. The full camera, light overrides, command line and SHA-256 hash of each master are in `asset_manifest.json`.
 
 | Asset | Master | Size | Alpha | Setup · shot · pass | Camera | Samples | Use | Derivatives |

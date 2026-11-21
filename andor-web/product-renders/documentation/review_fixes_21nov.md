@@ -25,13 +25,23 @@
 | A2 gallery, and the transparent set (same camera) | 0.04 % | footer key, macro arcs | keep |
 | B1-R4, B2 (dark, floating) | under 0.01 % | footer key | keep |
 | M02, M03, M04, M05 (details) | 0 % | none: these crops don't include the macro row or footer | keep |
-| **M01 macro knobs** | 0.18 % | **the arcs around FILTER and MOVEMENT: green and blue before, teal and ochre now**, in a close-up whose subject is these controls | **re-render** |
-| **M06 touch strips** | 0.13 % | **a macro arc at the top edge: orange before, sage now**, soft but clearly coloured | **re-render** |
+| **M01 macro knobs** | 0.18 % | **the arcs around FILTER and MOVEMENT: green and blue before, teal and ochre now**, in a close-up whose subject is these controls | **fixed (see below)** |
+| **M06 touch strips** | 0.13 % | **a macro arc at the top edge: orange before, sage now**, soft but clearly coloured | **fixed (see below)** |
 
-**Re-render on the frozen interface (running on the CPU at the time of writing; this note is updated when it finishes):**
-- **Images:** M01 and M06, sharp and cinematic.
-- **Settings:** the same shots, samples (80) and noise threshold (0.008) as C3.
-- **Rebuilt from them:** the web derivatives (`renders/web_c3/`), and Website Asset Kit v1's Framer-upload and responsive files.
+**What was done:**
+
+| Image | Treatment |
+|---|---|
+| **M01 sharp, M01 cinematic** | **Re-rendered** on the frozen interface: the same shot, samples (80) and noise threshold (0.008) as C3, about 8 minutes each on the CPU. Against the approved masters, only the two arcs change (0.10–0.16 % of the frame after a 3 px blur); everything else reproduces. |
+| **M06 sharp** | **The approved R2 master, with only the arc replaced.** Today's scene doesn't reproduce R2's sheen on the sensor glass exactly: its orange is more saturated, and the whole frame is about 2 levels darker, with the 17 Nov textures as well. A full re-render would have changed a look the owner approved. So the arc's pixels (1.2 % of the frame) come from the frozen-interface render, level-matched (+0.7 to +1.0 levels) and feathered over plain, out-of-focus panel. Every pixel outside the patch is unchanged. Before and after: `images/m06_sharp_arc_patch.jpg`. |
+| **M06 cinematic** | **Unchanged**, the approved master. At f/5.6 the arc is a faint smear that the comparison does not detect. |
+
+**Rebuilt from them:**
+- the web derivatives (`renders/web_c3/`, the M01 and M06 sharp files);
+- Website Asset Kit v1's Framer-upload and responsive files, and its `kit.json` byte sizes;
+- the part 1 detail JPEGs. The ZIP is reissued as revision 2.
+
+**Note for later re-renders of M06.** The committed scene no longer reproduces the R2 sensor sheen bit for bit. A future re-render of M06 should be compared with the R2 master before it replaces it.
 
 The remaining stills differ only by details of a few pixels at website size, so re-rendering them is not worth it. If a still is ever used large enough to show the footer, re-render it then: A1 and A2 are about 25 minutes each on the CPU.
 

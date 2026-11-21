@@ -1,0 +1,27 @@
+{
+ "sharp": {
+  "level_offset": [
+   0.67,
+   0.75,
+   0.98
+  ],
+  "patched_share_pct": 1.242,
+  "changed_box_px": [
+   0,
+   0,
+   927,
+   429
+  ],
+  "unchanged_outside_patch": true
+ },
+ "cine": {
+  "level_offset": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "patched_share_pct": 0.0,
+  "changed_box_px": null,
+  "unchanged_outside_patch": true
+ }
+}
