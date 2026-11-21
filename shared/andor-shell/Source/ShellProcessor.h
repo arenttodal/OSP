@@ -175,6 +175,8 @@ public:
     /** The rack is its modules' faces (the product's choice; not in the parity render). */
     bool fullBleedRacks() const noexcept { return ! referenceParity && product().fullBleedRacks; }
     bool stableModulationTabs() const noexcept { return ! referenceParity && product().stableModulationTabs; }
+    /** AMP 2 on the AMP tab (the product's ProductInfo::heldAttack; never in the parity render). */
+    bool showsHeldAttack() const noexcept { return ! referenceParity && product().heldAttack.has_value(); }
     // (the header's MIX, the ARPEGGIATOR's X, the GRANULAR key: the product's, never in parity)
     bool headerMixShown() const noexcept { return referenceParity || product().headerMix; }
     bool crossCloseKeys() const noexcept { return ! referenceParity && product().crossCloseKeys; }
