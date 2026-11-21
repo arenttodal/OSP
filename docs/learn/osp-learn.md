@@ -2,7 +2,8 @@
 
 _15 Nov 2026. Branch `claude/osp-learn-2` (supersedes `claude/osp-learn`, which built on V1).
 Updated 20 Nov 2026 on `feature/learn-beta-in-plugin` (from the beta line `claude/macos-release`
-at `9ff2120`): six lessons and 17 Info topics for the beta features (see "Beta readiness" below)._
+at `9ff2120`): six lessons and 17 Info topics for the beta features. 21 Nov 2026: three more for
+the effects (their types, the full racks, FX ROUTING) and 11 Info topics._
 
 ANDOR OSP's own plugin (`OspAudioProcessorEditor`) now uses **ANDOR Learn 2.0**, the shared
 framework in `shared/andor-learn` that ANDOR ANALOG uses. OSP has no copy or parallel version of
@@ -74,11 +75,13 @@ gesture, so they report nothing. The adapter also reports the edited layer's `la
   - `CaptureEditor::onUserAction`: `capture.record.started`, `capture.kept`, `capture.discarded`,
     from the page's own click handler.
   - `andor::learn::actions` gained the three Custom Patterns IDs (constants only).
+  - `FxRoutingView::onLearnAction` (21 Nov): `routing.bypass.toggled` and `routing.rack.opened`,
+    from the view's own click, key and menu handlers.
   - Nothing painted changed, so no visual reference moves.
 
 ## OSP-specific code
 
-- `apps/plugin/Source/OspLearn.cpp` holds the catalog (21 lessons, 57 Info topics), the targets,
+- `apps/plugin/Source/OspLearn.cpp` holds the catalog (24 lessons, 68 Info topics), the targets,
   the states, `createLearn` / `tickLearn` / `learnAction` and the click hooks.
 - **Click hooks.** The adapter wraps the existing callbacks: card KEY DNA and REIMAGINED, the
   macro labels, ARP's toggle, the mod tab, a mod drop, the preset bar's Library and the drop
@@ -134,6 +137,9 @@ to presets or sessions (progress is a per-user file), and no DSP file changed.
 | | Add vibrato to a recording (`osp.vibrato`) | MOD, VIBRATO on, the wheel controls it, DEPTH, RATE, the wheel up, DELAY / RISE, SOURCES | bowed | a sound |
 | | Modulation (`osp.modulation`) | LFO 1 tab, SHAPE (SINE), RATE, connect (drag), depth (ring), listen | bowed | a sound |
 | | Shape the sound (`osp.sound`) | FILTER, DRIVE, MOVEMENT (open), a movement, ECHO, SPACE, compare | bowed | a sound |
+| | Try the effect types (`osp.modes`) | MOVEMENT (its name), its mode, its knob; ECHO (its name), its type; SPACE (its name), its type; compare | bowed | a sound |
+| | Open a full rack (`osp.racks`) | a double-click on SPACE, the rack's MODE, its presets, close it (double-click or the collapse key), the other racks | bowed | a sound |
+| | Mix and route the effects (`osp.routing`) | the routing key, the mixer (a layer's LEVEL), the chain, a tile's light, a tile's rack (double-click), changing the route (explained), back to the cards | layered | a sound |
 | | Create a macro (`osp.usermacros`) | USER, a right-click on LEVEL, Macro 1, its range, turn it, review | pluck | a sound |
 | Managing sounds | Presets and instruments (`osp.presets`) | Library, what a preset keeps, Save…, Export instrument…, Open instrument file… | bowed | a sound |
 
@@ -197,6 +203,11 @@ against current component bounds.
 | `osp.arp.strum[.light]`, `osp.arp.satellite[.light]` | the title-row keys (`strumKey`, `satelliteKey`; `.light`: their light part). Touches are watched (`<id>.touched`) | panel open | expands the panel |
 | `osp.arp.strum.panel`, `osp.strum.{direction,spread}` | the STRUM popover, DIRECTION, the shown SPREAD knob (ms or division) | STRUM's panel open | opens it from its key |
 | `osp.arp.satellite.panel`, `osp.satellite.{mode,rate}` | the SATELLITE popover, PAN / ORBIT / BOUNCE, the shown RATE knob | SATELLITE's panel open | opens it from its key |
+| `osp.echo.type`, `osp.space.type` | ECHO's / SPACE's type selector in their quick settings (by parameter) | that popover open | opens it |
+| `osp.rack` | the rack below the instrument (touches watched: its collapse key reports `osp.rack.touched`) | a module shown | — |
+| `osp.rack.{mode,preset}` | the shown module's MODE and presets slots (`rackSlot` 2 and 3) | a module shown | opens SPACE's |
+| `osp.routing.button` | FX ROUTING's header key | always | — (opening is the task) |
+| `osp.routing.{mixer,chain,tile,light,add,settings}` | the routing view's mixer, chain, first tile, its light, + ADD EFFECT, the gear | the view shown | shows the view |
 | `osp.source.rec` | the edited card's REC key | a layer | — (opening is the task) |
 | `osp.capture.{page,record,grab,meter}` | the card's CAPTURE page; `recordArea`, the four `grabArea`s, `pictureArea` | CAPTURE open | opens the page |
 | `osp.source.synth` | the edited card's SYNTH chip | a layer, nothing covering the well | — (opening is the task) |
@@ -211,7 +222,9 @@ against current component bounds.
 - the beta features: `osp.arp.unlinked`, `osp.arp.edit.{A,B,C}`, `osp.arp.custom.{browser.open,
   editor.open,on}`, `osp.arp.strum.{on,chord,open}`, `osp.arp.satellite.open`, `osp.satellite.on`,
   `osp.capture.{open,recording,connected}` (`connected` reads `captureInputConnected()`, not the
-  meter, so Learn never takes the page's peak), `osp.synth.open`, `osp.synth.imprint`.
+  meter, so Learn never takes the page's peak), `osp.synth.open`, `osp.synth.imprint`;
+- the effects: `osp.popup.{echo,space}.open`, `osp.rack.open`, `osp.rack.{space,echo,movement,
+  filter,fx}.open`, `osp.routing.open`.
 
 ## Editorial verification
 
@@ -256,12 +269,12 @@ line). The main checks:
 
 ## Tests
 
-`osp_plugin_tests "[learn]"`: 24 cases, 1862 assertions, all passing (Linux, headless, 20 Nov
-2026).
+`osp_plugin_tests "[learn]"`: 27 cases, 2367 assertions, all passing (Linux, headless and under
+xvfb, 21 Nov 2026).
 
 - **Catalog.**
   - It is valid against the editor's targets.
-  - It has 21 lessons and 57 Info topics, with the groups in order.
+  - It has 24 lessons and 68 Info topics, with the groups in order.
   - The menu has Learn 2.0's labels.
   - Learn is idle (no component) until asked.
 - **Quick Start, end to end.**
@@ -313,6 +326,11 @@ line). The main checks:
     not cover it.
   - Navigation (Show me, Back, Continue, X) in every lesson, the six new ones included, leaves
     every parameter as it was.
+- **The effects** (21 Nov): the program's own open (a popover, a rack, the routing view) or
+  bypass never completes a step; the names' clicks, a double-click on SPACE, the mode and type
+  gestures, the routing key, the mixer's LEVEL, a tile's light and a double-click on a tile do.
+  Geometry at the three widths for ECHO's and SPACE's types, MOVEMENT's mode, the rack's MODE
+  and presets, the routing key, the mixer, a tile's light and a tile.
 
 `[learn-shots]` (hidden; `OSP_LEARN_SHOTS=<dir>`) renders every step of every lesson at 1086 and
 869 px, plus the browser, Info, the reset confirmation, a set-up step, a blocked step and a

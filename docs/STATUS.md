@@ -1,5 +1,18 @@
 # Status
 
+> **21 Nov 2026, Learn: the effects (branch `feature/learn-beta-in-plugin`, owner's request):**
+> - **Three lessons** (24 now): `osp.modes` "Try the effect types" (MOVEMENT's modes, ECHO's
+>   types, SPACE's spaces from each name's quick settings), `osp.racks` "Open a full rack" (a
+>   double-click on SPACE, its MODE and presets, closing it; the other racks), `osp.routing` "Mix
+>   and route the effects" (the routing key, the mixer, the chain, a tile's light, a tile's rack,
+>   the route explained, back to the cards).
+> - **11 Info topics** (68 now) and their targets and states (`osp.echo.type`, `osp.space.type`,
+>   `osp.rack[.mode/.preset]`, `osp.routing.*`).
+> - **Reports:** the macro names' rack double-click and "Open Rack" report `rack.toggled` (OSP's
+>   editor); the rack's collapse key through Learn's touch watcher on the rack; shared, opt-in:
+>   `FxRoutingView::onLearnAction` (`routing.bypass.toggled`, `routing.rack.opened`).
+> - **Tests:** `[learn]` 27 cases, 2367 assertions (headless and under xvfb).
+>
 > **20 Nov 2026, in-plugin Learn for the beta (branch `feature/learn-beta-in-plugin`, from the
 > beta line `claude/macos-release` at `9ff2120`; spec: `docs/learn-studio/beta-readiness-in-
 > plugin-learn.md` on `feature/learn-capture-studio`; details: `docs/learn/osp-learn.md`):**

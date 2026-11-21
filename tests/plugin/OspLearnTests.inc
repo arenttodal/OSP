@@ -132,8 +132,8 @@ TEST_CASE ("learn: OSP's own plugin has the shared Learn, idle until asked; its 
     INFO (rig.learn.problems().joinIntoString ("\n"));
     CHECK (rig.learn.isUsable());
     CHECK (rig.learn.catalog().productId == "osp");
-    CHECK (rig.learn.catalog().lessons.size() == 21);
-    CHECK (rig.learn.catalog().help.size() == 57);
+    CHECK (rig.learn.catalog().lessons.size() == 24);
+    CHECK (rig.learn.catalog().help.size() == 68);
     // Idle: no note, no browser, no ring (nothing of Learn's in the editor).
     CHECK_FALSE (rig.learn.isActive());
     CHECK (rig.learn.note() == nullptr);
@@ -1332,7 +1332,12 @@ TEST_CASE ("learn: the beta lessons' rings are the real controls and the note st
                                Case { "osp.arp.layers", "edit", "osp.arp.edit.B" }, Case { "osp.arp.custom", "row", "osp.arp.custom.row" },
                                Case { "osp.arp.strum", "strum", "osp.arp.strum.light" }, Case { "osp.arp.strum", "direction", "osp.strum.direction" },
                                Case { "osp.arp.strum", "spread", "osp.strum.spread" }, Case { "osp.satellite", "panel", "osp.arp.satellite" },
-                               Case { "osp.satellite", "mode", "osp.satellite.mode" }, Case { "osp.satellite", "rate", "osp.satellite.rate" } })
+                               Case { "osp.satellite", "mode", "osp.satellite.mode" }, Case { "osp.satellite", "rate", "osp.satellite.rate" },
+                               Case { "osp.modes", "echoType", "osp.echo.type" }, Case { "osp.modes", "spaceType", "osp.space.type" },
+                               Case { "osp.modes", "movementMode", "osp.movement.mode" }, Case { "osp.racks", "mode", "osp.rack.mode" },
+                               Case { "osp.racks", "presets", "osp.rack.preset" }, Case { "osp.routing", "open", "osp.routing.button" },
+                               Case { "osp.routing", "mixer", "osp.routing.mixer" }, Case { "osp.routing", "bypass", "osp.routing.light" },
+                               Case { "osp.routing", "rack", "osp.routing.tile" } })
         {
             INFO (c.lesson << " / " << c.step);
             if (juce::String (c.step) == "edit")
@@ -1372,7 +1377,195 @@ TEST_CASE ("learn: the beta lessons' rings are the real controls and the note st
                 rig.ui.engineCard (layer).setCaptureOpen (false);
                 rig.ui.engineCard (layer).setSynthOpen (false);
             }
+            rig.ui.setSourceViewShown (false);
+            for (const auto k : { osp::plugin::rack::Kind::space, osp::plugin::rack::Kind::echo, osp::plugin::rack::Kind::movement, osp::plugin::rack::Kind::fx })
+                rig.ui.setRackExpanded (k, false);
             rig.tick();
         }
     }
+}
+
+//==============================================================================
+// The effects: their types (quick settings), their full racks (a double-click on the name) and
+// FX ROUTING (the mixer, the chain, a tile's light and rack).
+
+namespace
+{
+    /** A macro's name (MacroLabel), as Learn finds it. */
+    osp::plugin::MacroLabel& macroLabel (LearnRig& rig, const juce::String& targetId)
+    {
+        const auto* target = rig.learn.targets().find (targetId);
+        REQUIRE (target != nullptr);
+        auto* label = dynamic_cast<osp::plugin::MacroLabel*> (target->component());
+        REQUIRE (label != nullptr);
+        return *label;
+    }
+} // namespace
+
+TEST_CASE ("learn: Try the effect types - each name's quick settings, MOVEMENT's mode, ECHO's type, SPACE's space", "[plugin][learn][effects]")
+{
+    LearnRig rig (1448);
+    loadLearnExample (rig, "bowed");
+    startOnCurrent (rig, "osp.modes");
+    REQUIRE (rig.stepId() == "movement");
+    rig.ui.openPopup (3);   // (as Show me opens it: not the musician's)
+    rig.tick();
+    CHECK_FALSE (rig.stepDone());
+    rig.ui.closePopup();
+    rig.tick();
+    auto& movement = macroLabel (rig, "osp.macro.movement.label");
+    REQUIRE (movement.onClick != nullptr);
+    movement.onClick();   // a click on MOVEMENT (the label's own handler)
+    rig.tick();
+    REQUIRE (rig.stepDone());
+    rig.next();
+    REQUIRE (rig.stepId() == "movementMode");
+    CHECK (rig.learn.targets().boundsIn ("osp.movement.mode", *rig.learn.highlight()->getParentComponent()).has_value());
+    rig.automate ("movement.mode", 2.0f);
+    CHECK_FALSE (rig.stepDone());
+    rig.userSet ("movement.mode", 1.0f);
+    REQUIRE (rig.stepDone());
+    rig.next();
+    REQUIRE (rig.stepId() == "movementAmount");
+    rig.userSet ("motion", 40.0f);
+    REQUIRE (rig.stepDone());
+    rig.next();
+    REQUIRE (rig.stepId() == "echo");
+    macroLabel (rig, "osp.macro.echo.label").onClick();
+    rig.tick();
+    REQUIRE (rig.stepDone());
+    rig.next();
+    REQUIRE (rig.stepId() == "echoType");
+    CHECK (rig.learn.targets().boundsIn ("osp.echo.type", *rig.learn.highlight()->getParentComponent()).has_value());
+    rig.userSet ("echo.type", rig.p.parameterValue ("echo.type") >= 0.5f ? 0.0f : 1.0f);
+    REQUIRE (rig.stepDone());
+    rig.next();
+    REQUIRE (rig.stepId() == "space");
+    macroLabel (rig, "osp.macro.space.label").onClick();
+    rig.tick();
+    REQUIRE (rig.stepDone());
+    rig.next();
+    REQUIRE (rig.stepId() == "spaceType");
+    CHECK (rig.learn.targets().boundsIn ("osp.space.type", *rig.learn.highlight()->getParentComponent()).has_value());
+    rig.automate ("space.type", 2.0f);
+    CHECK_FALSE (rig.stepDone());
+    rig.userSet ("space.type", 1.0f);
+    REQUIRE (rig.stepDone());
+    rig.next();
+    CHECK (rig.stepId() == "compare");
+    rig.ui.closePopup();
+}
+
+TEST_CASE ("learn: Open a full rack - a double-click on SPACE, its MODE, its presets, closed again; the program's own open does not count", "[plugin][learn][effects]")
+{
+    using Kind = osp::plugin::rack::Kind;
+    LearnRig rig (1448);
+    loadLearnExample (rig, "bowed");
+    startOnCurrent (rig, "osp.racks");
+    REQUIRE (rig.stepId() == "open");
+    rig.ui.setRackExpanded (Kind::space, true);   // (as Show me opens it)
+    rig.tick();
+    CHECK_FALSE (rig.stepDone());
+    rig.ui.setRackExpanded (Kind::space, false);
+    rig.tick();
+    auto& space = macroLabel (rig, "osp.macro.space.label");
+    space.mouseDoubleClick (learnPress (space, space.getLocalBounds().getCentre().toFloat()));   // the musician's double-click
+    rig.tick();
+    REQUIRE (rig.ui.effectsRack().isShown (Kind::space));
+    REQUIRE (rig.stepDone());
+    rig.next();
+    REQUIRE (rig.stepId() == "mode");
+    {
+        auto& content = *rig.learn.highlight()->getParentComponent();
+        const auto mode = rig.learn.targets().boundsIn ("osp.rack.mode", content);
+        REQUIRE (mode.has_value());
+        auto* module = rig.ui.effectsRack().module (Kind::space);
+        REQUIRE (module != nullptr);
+        CHECK (*mode == content.getLocalArea (module, osp::plugin::rackSlot (*module, 2)));
+    }
+    rig.userSet ("space.type", rig.p.parameterValue ("space.type") >= 0.5f ? 0.0f : 1.0f);
+    REQUIRE (rig.stepDone());
+    rig.next();
+    REQUIRE (rig.stepId() == "presets");
+    CHECK (rig.learn.targets().boundsIn ("osp.rack.preset", *rig.learn.highlight()->getParentComponent()).has_value());
+    rig.next();
+    REQUIRE (rig.stepId() == "close");
+    // The rack's own collapse key is reported through Learn's watcher on the rack.
+    auto* watcher = rig.learn.touchWatcher ("osp.rack");
+    REQUIRE (watcher != nullptr);
+    CHECK (watcher->watched() == &rig.ui.effectsRack());
+    space.mouseDoubleClick (learnPress (space, space.getLocalBounds().getCentre().toFloat()));
+    rig.tick();
+    CHECK_FALSE (rig.ui.effectsRack().isShown (Kind::space));
+    REQUIRE (rig.stepDone());
+    rig.next();
+    CHECK (rig.stepId() == "others");
+}
+
+TEST_CASE ("learn: Mix and route the effects - the routing key, the mixer, a tile's light and its rack, back to the cards", "[plugin][learn][effects]")
+{
+    LearnRig rig (1448);
+    loadLearnExample (rig, "layered");
+    startOnCurrent (rig, "osp.routing");
+    REQUIRE (rig.stepId() == "open");
+    rig.ui.setSourceViewShown (true);   // (as Show me shows it)
+    rig.tick();
+    CHECK_FALSE (rig.stepDone());
+    rig.ui.setSourceViewShown (false);
+    rig.tick();
+    REQUIRE (rig.ui.sourceViewToggle().onClick != nullptr);
+    rig.ui.sourceViewToggle().onClick();   // the routing key (its own handler)
+    rig.tick();
+    REQUIRE (rig.ui.sourceViewShown());
+    REQUIRE (rig.stepDone());
+    auto* view = dynamic_cast<osp::plugin::FxRoutingView*> (rig.ui.sourceViewComponent());
+    REQUIRE (view != nullptr);
+    view->syncNow();
+    rig.tick();
+    rig.next();
+    REQUIRE (rig.stepId() == "mixer");
+    REQUIRE (view->mixerRowCount() == 2);
+    rig.automate ("layerB.level", -6.0f);
+    CHECK_FALSE (rig.stepDone());
+    rig.userSet ("layerB.level", -3.0f);   // (the mixer's knob: the layer's LEVEL, a gesture)
+    REQUIRE (rig.stepDone());
+    rig.next();
+    REQUIRE (rig.stepId() == "chain");
+    rig.next();
+    REQUIRE (rig.stepId() == "bypass");
+    REQUIRE_FALSE (view->tiles().empty());
+    const auto tile = view->tiles().front();
+    {
+        auto& content = *rig.learn.highlight()->getParentComponent();
+        const auto light = rig.learn.targets().boundsIn ("osp.routing.light", content);
+        REQUIRE (light.has_value());
+        CHECK (light->contains (content.getLocalArea (view, tile.light).getCentre()));
+    }
+    view->toggleBypass (tile.id);   // (the program's own call)
+    view->toggleBypass (tile.id);
+    rig.tick();
+    CHECK_FALSE (rig.stepDone());
+    view->mouseDown (learnPress (*view, tile.light.getCentre().toFloat()));   // the light, clicked
+    rig.tick();
+    REQUIRE (rig.stepDone());
+    view->mouseDown (learnPress (*view, tile.light.getCentre().toFloat()));   // (and back)
+    view->mouseUp (learnPress (*view, tile.light.getCentre().toFloat()));
+    rig.next();
+    REQUIRE (rig.stepId() == "rack");
+    const auto body = juce::Point<float> (static_cast<float> (tile.bounds.getCentreX()), static_cast<float> (tile.bounds.getBottom() - 6));
+    REQUIRE_FALSE (tile.light.contains (body.toInt()));
+    view->mouseDoubleClick (learnPress (*view, body));
+    rig.tick();
+    CHECK (rig.learn.targets().state ("osp.rack.open"));
+    REQUIRE (rig.stepDone());
+    for (const auto k : { osp::plugin::rack::Kind::space, osp::plugin::rack::Kind::echo, osp::plugin::rack::Kind::movement, osp::plugin::rack::Kind::fx })
+        rig.ui.setRackExpanded (k, false);
+    rig.next();
+    REQUIRE (rig.stepId() == "route");
+    rig.next();
+    REQUIRE (rig.stepId() == "close");
+    rig.ui.sourceViewToggle().onClick();
+    rig.tick();
+    CHECK_FALSE (rig.ui.sourceViewShown());
+    REQUIRE (rig.stepDone());
 }

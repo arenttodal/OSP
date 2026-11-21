@@ -340,7 +340,11 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             rackOfMacro[i] = *kind;
             const auto k = *kind;
             juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
-            knob.label->setRackActions ([this, k] { toggleRackFromLabel (k); }, [safe, index, k, i] {
+            knob.label->setRackActions ([this, k] {
+                toggleRackFromLabel (k);
+                learnAction (andor::learn::actions::rackToggled, "osp.rack");   // (the musician's double-click or Enter)
+            },
+                                        [safe, index, k, i] {
                 if (safe == nullptr)
                     return;
                 juce::PopupMenu menu;
@@ -353,7 +357,10 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
                 });
                 menu.addItem (safe->isMacroRackOpen (k) ? "Close Rack" : "Open Rack", [safe, k] {
                     if (safe != nullptr)
+                    {
                         safe->toggleRackFromLabel (k);
+                        safe->learnAction (andor::learn::actions::rackToggled, "osp.rack");
+                    }
                 });
                 menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (safe->macros[i].label.get()));
             });

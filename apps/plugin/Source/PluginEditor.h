@@ -402,6 +402,8 @@ private:
     void tickLearn();
     /** A CAPTURE page's clicks reported to Learn (once per page: pages are made when they open). */
     void hookCapturePage (CaptureEditor* page);
+    /** The routing view's clicks reported to Learn (once: the view is made when first shown). */
+    void hookRoutingView();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OspAudioProcessorEditor)
 };

@@ -1014,6 +1014,129 @@ static Catalog ospCatalog()
         c.lessons.push_back (l);
     }
     {
+        // Browsing the effects' types: MOVEMENT's modes, ECHO's types, SPACE's spaces (each from
+        // its name's quick settings).
+        Lesson l;
+        l.id = "osp.modes";
+        l.title = "Try the effect types";
+        l.description = "Browse MOVEMENT's modes, ECHO's types and SPACE's spaces.";
+        l.minutes = 4;
+        l.exampleId = "bowed";
+        auto opened = [] (int macro, const char* state, juce::String id, juce::String target, juce::String title, juce::String body) {
+            auto s = step (std::move (id), std::move (target), std::move (title), std::move (body),
+                           Completion::action ({ "macro." + juce::String (macro) + ".opened" }, Condition::state (state))
+                               .withAlreadyDone (Condition::state (state), "Already open"));
+            s.revealOnEnter = false;
+            return s;
+        };
+        l.steps.push_back (opened (3, "osp.popup.movement.open", "movement", "osp.macro.movement.label", "Open MOVEMENT",
+                                   "Click the word MOVEMENT above its knob. Its quick settings open, the mode at the top right."));
+        auto movementMode = step ("movementMode", "osp.movement.mode", "Choose a movement",
+                                  "Choose DRIFT, TAPE, CHORUS, PULSE or SHAPER. Each mode brings its own controls and picture; play while you switch.",
+                                  edited ("movement.mode"));
+        movementMode.unavailableBody = "MOVEMENT's settings are closed. Show me opens them again.";
+        l.steps.push_back (movementMode);
+        l.steps.push_back (step ("movementAmount", "osp.macro.movement", "Set how much", "Turn the MOVEMENT knob to set how much of the mode you hear.", edited ("motion")));
+        l.steps.push_back (opened (5, "osp.popup.echo.open", "echo", "osp.macro.echo.label", "Open ECHO", "Click the word ECHO above its knob."));
+        auto echoType = step ("echoType", "osp.echo.type", "Choose an echo",
+                              "Choose TAPE, BBD or ASCEND: a tape echo, a bucket-brigade delay, or repeats that climb by an interval. The ECHO knob sets how loud the repeats are.",
+                              edited ("echo.type"));
+        echoType.unavailableBody = "ECHO's settings are closed. Show me opens them again.";
+        l.steps.push_back (echoType);
+        l.steps.push_back (opened (4, "osp.popup.space.open", "space", "osp.macro.space.label", "Open SPACE", "Click the word SPACE above its knob."));
+        auto spaceType = step ("spaceType", "osp.space.type", "Choose a space",
+                               "Choose ROOM, HALL, PLATE or SPRING, or one of SPACE's other engines: ABYSS, VINTAGE and BLOOM. The SPACE knob sets how much you hear.",
+                               Completion::action ({ param ("space.type"), param ("space.engine"), param ("space.vintage.variant"), param ("space.abyss.variant") },
+                                                   Condition::always()));
+        spaceType.unavailableBody = "SPACE's settings are closed. Show me opens them again.";
+        l.steps.push_back (spaceType);
+        l.steps.push_back (step ("compare", "osp.macros", "Compare",
+                                 "Switch types while you play the same notes. A type changes the effect, never the recording; each knob still sets how much of it you hear."));
+        l.completionText = "MOVEMENT, ECHO and SPACE each offer several types from their names. Double-click a name for its full rack (the next lesson).";
+        setUp (l, { soundReady() }, "The effects shape any sound: use your current one, or the bowed example.");
+        c.lessons.push_back (l);
+    }
+    {
+        // The full racks: a double-click on a macro's name (DRIVE, FILTER, MOVEMENT, ECHO, SPACE).
+        Lesson l;
+        l.id = "osp.racks";
+        l.title = "Open a full rack";
+        l.description = "Double-click an effect's name for all of its settings.";
+        l.minutes = 3;
+        l.exampleId = "bowed";
+        const auto spaceOpen = Condition::state ("osp.rack.space.open");
+        auto open = step ("open", "osp.macro.space.label", "Open SPACE's rack",
+                          "Double-click the word SPACE. Its full rack opens below the instrument, and the window grows to make room. A single click still opens the quick settings.",
+                          Completion::action ({ andor::learn::actions::rackToggled }, spaceOpen).withAlreadyDone (spaceOpen, "SPACE's rack is already open."));
+        open.revealOnEnter = false;
+        l.steps.push_back (open);
+        const juce::String closed = "The rack is closed. Show me opens it again.";
+        auto mode = step ("mode", "osp.rack.mode", "Its MODE",
+                          "MODE is the same choice as in the quick settings; here every control of the mode is laid out at once. Choose another.",
+                          Completion::action ({ param ("space.type"), param ("space.engine"), param ("space.vintage.variant"), param ("space.abyss.variant") }, Condition::always()));
+        mode.unavailableBody = closed;
+        l.steps.push_back (mode);
+        auto presets = step ("presets", "osp.rack.preset", "Presets",
+                             "The presets bar steps through SPACE's presets with its arrows; its name opens the list, where you can also save your settings as your own.");
+        presets.unavailableBody = closed;
+        l.steps.push_back (presets);
+        auto close = step ("close", "osp.rack", "Close it",
+                           "Double-click SPACE again, or click the rack's collapse key, to close it. Opening and closing a rack never changes a setting.",
+                           Completion::action ({ andor::learn::actions::rackToggled, andor::learn::actions::touched ("osp.rack") }, Condition::isNot (spaceOpen)));
+        close.unavailableBody = "The rack is already closed.";
+        l.steps.push_back (close);
+        l.steps.push_back (step ("others", "osp.macros", "The other racks",
+                                 "DRIVE, FILTER, MOVEMENT and ECHO open their racks the same way. A right-click on a name offers Quick Settings or Open Rack; Enter opens the rack of the name in focus."));
+        l.completionText = "Each effect has quick settings (a click on its name) and a full rack (a double-click). Both change the same settings.";
+        setUp (l, { soundReady() }, "A rack shapes any sound: use your current one, or the bowed example.");
+        c.lessons.push_back (l);
+    }
+    {
+        // FX ROUTING: the view in the cards' place - the mixer, the chain, a tile's light and rack.
+        Lesson l;
+        l.id = "osp.routing";
+        l.title = "Mix and route the effects";
+        l.description = "Balance the layers and see the path through the effects.";
+        l.minutes = 4;
+        l.exampleId = "layered";
+        const auto shown = Condition::state ("osp.routing.open");
+        auto open = step ("open", "osp.routing.button", "Open FX ROUTING",
+                          "Click the routing key beside SAVE at the top. The routing view takes the cards' place; opening it changes nothing you hear.",
+                          Completion::action ({ andor::learn::actions::sourceViewToggled }, shown).withAlreadyDone (shown, "The routing view is already open."));
+        open.revealOnEnter = false;
+        l.steps.push_back (open);
+        const juce::String closed = "The routing view is closed. Show me opens it again.";
+        auto mixer = step ("mixer", "osp.routing.mixer", "The mixer",
+                           "On the left, one row per layer: its knob is the layer's LEVEL, the same as on its card. Turn one to balance the layers.",
+                           Completion::action ({ param ("layerA.level"), param ("layerB.level"), param ("layerC.level") }, Condition::always()));
+        mixer.unavailableBody = closed;
+        l.steps.push_back (mixer);
+        auto chain = step ("chain", "osp.routing.chain", "The chain",
+                           "One wire runs from the mixer through the effects to OUTPUT. Each tile is an effect: its name, what it is set to, and its light.");
+        chain.unavailableBody = closed;
+        l.steps.push_back (chain);
+        auto bypass = step ("bypass", "osp.routing.light", "Bypass an effect",
+                            "Click a tile's light to bypass that effect and hear the sound without it. Click it again to bring it back.",
+                            Completion::action ({ "routing.bypass.toggled" }, Condition::always()));
+        bypass.unavailableBody = closed;
+        l.steps.push_back (bypass);
+        auto rack = step ("rack", "osp.routing.tile", "Open an effect's rack",
+                          "Double-click a tile: its full rack opens below the instrument. A single click opens the tile's quick settings instead.",
+                          Completion::action ({ "routing.rack.opened" }, Condition::state ("osp.rack.open")).viaMenu());
+        rack.unavailableBody = closed;
+        l.steps.push_back (rack);
+        auto route = step ("route", "osp.routing.chain", "Change the route",
+                           "Drag a tile into a gap to move it, or onto another tile to run the two in parallel. A drop changes the sound, as one undo step; "
+                           "the gear's Restore original brings the original route back, and + ADD EFFECT opens the library of effects.");
+        route.unavailableBody = closed;
+        l.steps.push_back (route);
+        l.steps.push_back (step ("close", "osp.routing.button", "Back to the cards", "Click the routing key again to return to the cards.",
+                                 Completion::action ({ andor::learn::actions::sourceViewToggled }, Condition::isNot (shown))));
+        l.completionText = "FX ROUTING shows how the layers reach the effects and in which order. Viewing it changes nothing; a drop or a menu choice edits the route.";
+        setUp (l, { soundReady() }, "The routing view shows any sound's path: use your current sound, or the layered example (two layers in the mixer).");
+        c.lessons.push_back (l);
+    }
+    {
         // USER MACROS (ANDOR ANALOG's lesson, on the edited layer's LEVEL).
         Lesson l;
         l.id = "osp.usermacros";
@@ -1136,6 +1259,21 @@ static Catalog ospCatalog()
     help ("osp.macro.movement", "MOVEMENT", "How the sound changes over time: DRIFT, TAPE, CHORUS, PULSE or SHAPER. The knob sets how much.", "osp.sound");
     help ("osp.macro.echo", "ECHO", "Repeats of the sound (TAPE, BBD or ASCEND). The knob sets how loud they are; 0 % is off.", "osp.sound");
     help ("osp.macro.space", "SPACE", "Reverb: the knob sets how much. Click the name for ROOM, HALL, PLATE, SPRING and the other spaces.", "osp.sound");
+    help ("osp.movement.mode", "MOVEMENT mode", "DRIFT, TAPE, CHORUS, PULSE or SHAPER: how the sound moves. Each mode has its own controls; the knob sets how much.", "osp.modes");
+    help ("osp.echo.type", "ECHO type", "TAPE (a tape echo), BBD (a bucket-brigade delay) or ASCEND (repeats that climb by an interval).", "osp.modes");
+    help ("osp.space.type", "SPACE type", "ROOM, HALL, PLATE or SPRING, or SPACE's other engines: ABYSS, VINTAGE and BLOOM, with their variants.", "osp.modes");
+    help ("osp.rack", "Rack", "An effect's full settings, below the instrument. A double-click on DRIVE, FILTER, MOVEMENT, ECHO or SPACE opens or closes it; so does its collapse key.",
+          "osp.racks");
+    help ("osp.rack.mode", "MODE", "The rack's mode: the same choice as the quick settings, every control of the mode laid out.", "osp.racks");
+    help ("osp.rack.preset", "Presets", "Steps through the effect's presets with its arrows; the name opens the list, where your own settings can be saved too.", "osp.racks");
+    help ("osp.routing.button", "FX ROUTING", "Shows the routing view in the cards' place: the layers' mixer and the path through the effects. Showing it changes nothing you hear.",
+          "osp.routing");
+    help ("osp.routing.mixer", "Mixer", "One row per layer; its knob is the layer's LEVEL.", "osp.routing");
+    help ("osp.routing.chain", "Effects chain",
+          "The path from the mixer to OUTPUT. A tile's light bypasses it; a click opens its quick settings, a double-click its rack. Drag a tile into a gap to move it, onto another to run them in parallel.",
+          "osp.routing");
+    help ("osp.routing.add", "+ ADD EFFECT", "Opens the library of effects to add to the chain.", "osp.routing");
+    help ("osp.routing.settings", "Routing settings", "The gear: Restore original, and FX CHAIN presets that keep a route and its effects' settings.", "osp.routing");
     help ("macros.bank", "CORE and USER macros",
           "CORE holds the six main sound controls. USER holds six macros you assign yourself: right-click a knob and choose Assign to Macro, or drag the light under a USER knob onto it.",
           "osp.usermacros");
@@ -1368,6 +1506,54 @@ struct OspLearnTargets
                      return e.popupIndex == popup && e.popup != nullptr ? findTagged (e.popup.get(), InstrumentHost::reimaginedModeParameterId (p.editLayer(), "mode")) : nullptr;
                  },
                  {}, [&e, &p] { e.openPopup (OspAudioProcessorEditor::reimaginedPopup + p.editLayer()); return e.popup != nullptr; } });
+
+        // The effects' type selectors in their quick settings (by parameter).
+        t.add ({ "osp.echo.type", inPopup (OspAudioProcessorEditor::echoPopup, "echo.type"), {}, openIt (OspAudioProcessorEditor::echoPopup), {}, true });
+        t.add ({ "osp.space.type", inPopup (4, "space.type"), {}, openIt (4), {}, true });
+        t.addState ("osp.popup.echo.open", [&e] { return e.popupIndex == OspAudioProcessorEditor::echoPopup; });
+        t.addState ("osp.popup.space.open", [&e] { return e.popupIndex == 4; });
+
+        // The racks (below the instrument): the rack itself (its touches are reported: the
+        // collapse key is the rack's own), and the shown module's MODE and presets.
+        const rack::Kind rackKinds[] = { rack::Kind::space, rack::Kind::echo, rack::Kind::movement, rack::Kind::filter, rack::Kind::fx };
+        auto shownModule = [&e, rackKinds]() -> rack::Module* {
+            for (const auto k : rackKinds)
+                if (auto* m = e.racks.module (k))
+                    return m;
+            return nullptr;
+        };
+        auto openSpaceRack = [&e] {
+            e.setRackExpanded (rack::Kind::space, true);
+            return e.racks.isShown (rack::Kind::space);
+        };
+        auto rackSlotOf = [] (int slot) { return Target::Area ([slot] (juce::Component& c) { return rackSlot (static_cast<rack::Module&> (c), slot); }); };
+        t.add ({ "osp.rack", comp (e.racks), {}, {}, [&e] { return e.racks.height() > 0.0f; }, true, true });
+        t.add ({ "osp.rack.mode", [shownModule] { return static_cast<juce::Component*> (shownModule()); }, rackSlotOf (2), openSpaceRack, {}, true });
+        t.add ({ "osp.rack.preset", [shownModule] { return static_cast<juce::Component*> (shownModule()); }, rackSlotOf (3), openSpaceRack, {}, true });
+        t.addState ("osp.rack.open", [shownModule] { return shownModule() != nullptr; });
+        for (const auto k : rackKinds)
+            t.addState ("osp.rack." + rack::name (k).toLowerCase() + ".open", [&e, k] { return e.racks.isShown (k); });
+
+        // FX ROUTING: its header key and the view in the cards' place (made when first shown).
+        auto routing = [&e] { return e.routingOpen ? dynamic_cast<FxRoutingView*> (e.routingView.get()) : nullptr; };
+        auto openRouting = [&e, routing] {
+            e.setSourceViewShown (true);
+            return routing() != nullptr;
+        };
+        auto routingPart = [routing] { return Target::Locator ([routing] { return static_cast<juce::Component*> (routing()); }); };
+        auto viewArea = [] (std::function<juce::Rectangle<int> (FxRoutingView&)> f) {
+            return Target::Area ([f] (juce::Component& c) { return f (static_cast<FxRoutingView&> (c)); });
+        };
+        t.add ({ "osp.routing.button", comp (e.routingKey), {}, {}, {}, true });
+        t.add ({ "osp.routing.view", routingPart(), {}, openRouting });
+        t.add ({ "osp.routing.mixer", routingPart(), viewArea ([] (FxRoutingView& v) { return v.mixerBounds(); }), openRouting, {}, true });
+        t.add ({ "osp.routing.chain", routingPart(), viewArea ([] (FxRoutingView& v) { return v.chainBounds(); }), openRouting, {}, true });
+        t.add ({ "osp.routing.tile", routingPart(), viewArea ([] (FxRoutingView& v) { return v.tiles().empty() ? juce::Rectangle<int>() : v.tiles().front().bounds; }), openRouting });
+        t.add ({ "osp.routing.light", routingPart(), viewArea ([] (FxRoutingView& v) { return v.tiles().empty() ? juce::Rectangle<int>() : v.tiles().front().light.expanded (3); }),
+                 openRouting });
+        t.add ({ "osp.routing.add", [routing] { auto* v = routing(); return v != nullptr ? &v->addEffectButton() : nullptr; }, {}, openRouting, {}, true });
+        t.add ({ "osp.routing.settings", [routing] { auto* v = routing(); return v != nullptr ? &v->settingsButton() : nullptr; }, {}, openRouting, {}, true });
+        t.addState ("osp.routing.open", [routing] { return routing() != nullptr; });
 
         // The arpeggiator.
         auto expandArp = [&e] { e.setArpExpanded (true); return e.arpShown; };
@@ -1843,6 +2029,14 @@ void OspAudioProcessorEditor::createLearn()
                 learnAction ("pitchwheel.opened", "osp.wheel.pitch");
         };
     }
+    // FX ROUTING's key (its own handler), and the view's own clicks (it is made when first shown).
+    auto routingClick = routingKey.onClick;
+    routingKey.onClick = [this, routingClick] {
+        if (routingClick != nullptr)
+            routingClick();
+        hookRoutingView();
+        learnAction (andor::learn::actions::sourceViewToggled, "osp.routing.button");
+    };
     auto subRow = arpButton.onSecondRow;
     arpButton.onSecondRow = [this, subRow] {
         if (subRow != nullptr)
@@ -1896,6 +2090,12 @@ void OspAudioProcessorEditor::hookCapturePage (CaptureEditor* page)
         page->onUserAction = [this] (const juce::String& action) { learnAction (action, "osp.capture.page"); };
 }
 
+void OspAudioProcessorEditor::hookRoutingView()
+{
+    if (auto* view = dynamic_cast<FxRoutingView*> (routingView.get()); view != nullptr && view->onLearnAction == nullptr)
+        view->onLearnAction = [this] (const juce::String& action) { learnAction (action, "osp.routing.chain"); };
+}
+
 void OspAudioProcessorEditor::tickLearn()
 {
     if (learn == nullptr)
@@ -1913,6 +2113,7 @@ void OspAudioProcessorEditor::tickLearn()
     for (int layer = 0; layer < OspAudioProcessor::numLayers; ++layer)
         hookCapturePage (cards[static_cast<std::size_t> (layer)]->captureEditorComponent());
     hookCapturePage (newLayerCapture.get());
+    hookRoutingView();
     // A step on a granular control keeps the strip showing (it otherwise follows the pointer).
     if (learn->noteKind() == andor::learn::LearnController::NoteKind::lesson)
         if (const auto* s = learn->runner().step(); s != nullptr && (s->targetId.startsWith ("osp.granular.") || s->targetId == "osp.source.keyDna"))

@@ -1888,8 +1888,14 @@ void FxRoutingView::showSummaryMenu (int index)
             name << " " << (id.slot + 1);
         juce::PopupMenu one;
         one.addItem ("Quick settings", [this, id] { showQuick (id); });
-        one.addItem ("Open rack", [this, id] { openEditor (id); });
-        one.addItem ("Bypass / enable", [this, id] { toggleBypass (id); });
+        one.addItem ("Open rack", [this, id] {
+            openEditor (id);
+            learnReport ("routing.rack.opened");
+        });
+        one.addItem ("Bypass / enable", [this, id] {
+            if (toggleBypass (id))
+                learnReport ("routing.bypass.toggled");
+        });
         one.addItem ("Remove", [this, id] { remove (id); });
         m.addSubMenu (name, one);
     }
@@ -1943,7 +1949,8 @@ void FxRoutingView::mouseDown (const juce::MouseEvent& e)
     }
     if (t.light.contains (e.getPosition()))
     {
-        toggleBypass (t.id);
+        if (toggleBypass (t.id))
+            learnReport ("routing.bypass.toggled");
         return;
     }
     pressed = t.id;
@@ -1991,6 +1998,7 @@ void FxRoutingView::mouseDoubleClick (const juce::MouseEvent& e)
     {
         showQuick (std::nullopt);   // (the full rack instead)
         openEditor (placed[static_cast<std::size_t> (i)].id);
+        learnReport ("routing.rack.opened");
     }
 }
 
@@ -2053,10 +2061,16 @@ bool FxRoutingView::keyPressed (const juce::KeyPress& key)
     if (! selected)
         return false;
     if (key == juce::KeyPress::spaceKey)
-        return toggleBypass (*selected);
+    {
+        const bool done = toggleBypass (*selected);
+        if (done)
+            learnReport ("routing.bypass.toggled");
+        return done;
+    }
     if (key == juce::KeyPress::returnKey)
     {
         openEditor (*selected);
+        learnReport ("routing.rack.opened");
         return true;
     }
     if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey)
@@ -2068,12 +2082,18 @@ void FxRoutingView::showTileMenu (InstanceId id)
 {
     juce::PopupMenu m;
     m.addItem ("Quick settings", [this, id] { showQuick (id); });
-    m.addItem ("Expand", [this, id] { openEditor (id); });
+    m.addItem ("Expand", [this, id] {
+        openEditor (id);
+        learnReport ("routing.rack.opened");
+    });
     bool bypassed = false;
     for (const auto& t : placed)
         if (t.id == id)
             bypassed = t.bypassed;
-    m.addItem (bypassed ? "Enable" : "Bypass", [this, id] { toggleBypass (id); });
+    m.addItem (bypassed ? "Enable" : "Bypass", [this, id] {
+        if (toggleBypass (id))
+            learnReport ("routing.bypass.toggled");
+    });
     m.addSeparator();
     m.addItem ("Move left", [this, id] {
         if (auto g = route(); fx::nudgeEffect (g, id, -1))

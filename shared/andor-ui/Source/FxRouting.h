@@ -29,6 +29,12 @@ public:
     explicit FxRoutingView (osp::plugin::InstrumentHost& host);
     ~FxRoutingView() override;
 
+    /** ANDOR Learn (opt-in, null by default): what the musician's own gesture did, reported from
+        its handler after it acted: "routing.bypass.toggled" (a tile's light, Space, the menus)
+        and "routing.rack.opened" (a double-click on a tile, Return, the menus' Open rack /
+        Expand). The programmatic calls (toggleBypass, openEditor ...) never report. */
+    std::function<void (const juce::String& actionId)> onLearnAction;
+
     void paint (juce::Graphics&) override;
     void paintOverChildren (juce::Graphics&) override;
     void resized() override;
@@ -123,6 +129,11 @@ private:
     class TileKnob;
 
     void timerCallback() override;
+    void learnReport (const char* actionId)
+    {
+        if (onLearnAction != nullptr)
+            onLearnAction (actionId);
+    }
     void syncMixer();
     void layoutChain();
     void projectRoute();
