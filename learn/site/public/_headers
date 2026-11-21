@@ -5,7 +5,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: SAMEORIGIN
 
-# Captured clips and stills: content-addressed by their capture run; safe to cache for a day.
+# Captured clips and stills: every URL carries the file's checksum (?v=…), so a re-capture is a new URL.
 /media/*
   Cache-Control: public, max-age=86400
 

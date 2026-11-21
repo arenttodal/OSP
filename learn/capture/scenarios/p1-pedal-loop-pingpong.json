@@ -41,6 +41,37 @@
       "mark": "loop-off",
       "do": [
         {
+          "do": "pointer",
+          "shown": false
+        },
+        {
+          "do": "midi",
+          "keys": [
+            60
+          ],
+          "state": "on",
+          "velocity": 100
+        },
+        {
+          "do": "hold",
+          "seconds": 1.4
+        },
+        {
+          "do": "midi",
+          "keys": [
+            60
+          ],
+          "state": "off"
+        },
+        {
+          "do": "hold",
+          "seconds": 0.4
+        },
+        {
+          "do": "pointer",
+          "shown": true
+        },
+        {
           "do": "hold",
           "seconds": 0.6
         },

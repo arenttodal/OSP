@@ -22,7 +22,7 @@
   "fps": 30,
   "maxSeconds": 16.0,
   "start": {
-    "state": "one layer (Prophet-6 pad)",
+    "state": "one layer (Prophet-6 pad), a note held",
     "input": false,
     "setup": [
       {
@@ -30,6 +30,13 @@
         "sounds": [
           "file:Prophet-6 Pad.aif"
         ]
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          60
+        ],
+        "velocity": 90
       }
     ]
   },
@@ -94,7 +101,7 @@
         },
         {
           "do": "type",
-          "text": "Warm Bow"
+          "text": "Warm Pad"
         },
         {
           "do": "hold",
@@ -148,5 +155,7 @@
       "apps/plugin/Source/PluginEditor.cpp"
     ]
   },
-  "disclosures": []
+  "disclosures": [
+    "The held note is sent as MIDI by the runner, as a keyboard would."
+  ]
 }

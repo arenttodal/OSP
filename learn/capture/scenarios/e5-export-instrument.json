@@ -22,7 +22,7 @@
   "fps": 30,
   "maxSeconds": 16.0,
   "start": {
-    "state": "one layer (Prophet-6 pad)",
+    "state": "one layer (Prophet-6 pad), a note held",
     "input": false,
     "setup": [
       {
@@ -30,6 +30,13 @@
         "sounds": [
           "file:Prophet-6 Pad.aif"
         ]
+      },
+      {
+        "do": "holdNotes",
+        "keys": [
+          60
+        ],
+        "velocity": 90
       }
     ]
   },
@@ -97,6 +104,7 @@
     ]
   },
   "disclosures": [
-    "The clip stops at the menu item: choosing it opens the system's save dialog, which is not filmed."
+    "The clip stops at the menu item: choosing it opens the system's save dialog, which is not filmed.",
+    "The held note is sent as MIDI by the runner, as a keyboard would."
   ]
 }

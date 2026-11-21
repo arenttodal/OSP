@@ -37,6 +37,11 @@
       "mark": "open-library",
       "do": [
         {
+          "do": "key",
+          "note": 60,
+          "seconds": 1.0
+        },
+        {
           "do": "hold",
           "seconds": 0.5
         },

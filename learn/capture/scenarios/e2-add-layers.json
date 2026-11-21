@@ -41,6 +41,15 @@
           "seconds": 0.6
         },
         {
+          "do": "key",
+          "note": 60,
+          "seconds": 0.9
+        },
+        {
+          "do": "hold",
+          "seconds": 0.3
+        },
+        {
           "do": "drop",
           "sound": "gen:Saw C4.wav",
           "target": "droptarget:add B",
@@ -56,6 +65,11 @@
         {
           "do": "hold",
           "seconds": 1.0
+        },
+        {
+          "do": "key",
+          "note": 60,
+          "seconds": 0.9
         }
       ],
       "expect": [
@@ -83,6 +97,11 @@
         {
           "do": "hold",
           "seconds": 1.0
+        },
+        {
+          "do": "key",
+          "note": 60,
+          "seconds": 0.9
         }
       ],
       "expect": [
