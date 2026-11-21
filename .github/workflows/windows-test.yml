@@ -68,3 +68,7 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Unit tests, each with its time (to name a crash's test)
+        if: failure()
+        run: ./build/tests/Release/osp_tests.exe "[unit]" --durations yes 2>&1 | tail -60

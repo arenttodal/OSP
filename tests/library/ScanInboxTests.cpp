@@ -136,7 +136,9 @@ TEST_CASE ("library scan: fast index, deep analysis, incremental rescans, correc
     CHECK (summary.unchanged == 4);
     CHECK (summary.analysed == 0);
     // The user says the loop is a one-shot: that survives every rescan and re-analysis.
-    const auto loopFile = *p.catalog->scanFile ((p.files / "Loops/Beat 120bpm.wav").string());
+    const auto loopFound = p.catalog->scanFile (osp::utf8Of ((p.files / "Loops/Beat 120bpm.wav").make_preferred()));
+    REQUIRE (loopFound);   // (never dereferenced empty: the scanner records the platform's separators)
+    const auto loopFile = *loopFound;
     REQUIRE (p.catalog->setClassificationOverride (loopFile.contentHash, "likely-one-shot"));
     p.write ("Loops/Beat 120bpm.wav", loop());   // written again: changed time, same content
     summary = scanFolder (*p.catalog, root, {}, control, progress);

@@ -58,7 +58,9 @@ namespace
             const auto path = files / osp::pathFromUtf8 (relative);
             std::filesystem::create_directories (path.parent_path());
             std::string error;
-            REQUIRE (io::writeAudioFile (path, audio, format, error));
+            const bool written = io::writeAudioFile (path, audio, format, error);
+            INFO (osp::utf8Of (path) << ": " << error);
+            REQUIRE (written);
             return path;
         }
         std::filesystem::path bytes (const std::string& relative, const std::string& data)
