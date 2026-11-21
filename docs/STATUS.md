@@ -2,8 +2,9 @@
 
 > **21 Nov 2026, Learn ANDOR: every clip with sound (branch `feature/learn-capture-studio`):**
 > - The capture keeps the instrument's own output, sample-aligned with the frames, levels it to
->   −16 LUFS and muxes it into the WebM (Opus) and MP4 (AAC). 28 clips have sound; the two that play
->   no notes (save, export) stay silent.
+>   −16 LUFS and muxes it into the WebM (Opus) and MP4 (AAC). All 30 clips have sound (save and
+>   export hold a note; add layers, starting state and pedal loop play a note early). Media URLs
+>   carry their file's checksum so returning visitors never hear a cached silent copy.
 > - Sounds: the owner's Prophet-6 recordings (pad; two decaying notes) where they fit, otherwise a
 >   generated saw, sine or sine pluck (`learn/capture/tools/make-sounds.py`). Chords are Cmaj7.
 > - Site: a sound button on the guide player and on the featured clip; clips start muted, the

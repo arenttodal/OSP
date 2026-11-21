@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.e1-save-preset",
   "title": "Save the sound as a preset",
-  "scenarioDigest": "sha256:b7ea689711378940190b3baac9e039efff8ee8cc89478390c96e0493a3c75cfa",
+  "scenarioDigest": "sha256:ec53d747e0182f2e6f245ebabc9855adf264ea4eacda343854251a180f7cb0d7",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -34,7 +34,9 @@
       "bytes": 1772370
     }
   ],
-  "disclosures": [],
+  "disclosures": [
+    "The held note is sent as MIDI by the runner, as a keyboard would."
+  ],
   "source": {
     "width": 3416,
     "height": 2100,
@@ -57,18 +59,24 @@
       "webm": {
         "path": "e1-save-preset/e1-save-preset.webm",
         "codec": "vp9",
-        "bytes": 327620,
-        "sha256": "98f2d7943ff2b5c85e2afef25513af9b84402f6f3234fbee0ca03e93724c4afe"
+        "bytes": 479216,
+        "sha256": "bb7dfea772924e4943f03b3cd5a00c4c27717eb706a8e45bf4215605298fdc68"
       },
       "mp4": {
         "path": "e1-save-preset/e1-save-preset.mp4",
         "codec": "h264",
-        "bytes": 400729,
-        "sha256": "59cad4ccde6e767e28250edff7b10fc886044f20a6e035a4446cc792e8d4d81e"
+        "bytes": 576615,
+        "sha256": "169632f6a0cb6286a507641b6b68f1eb266f7a8ab0971482c972d39db1632a82"
       }
     }
   },
-  "audio": null,
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -10.8,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
+  },
   "marks": {
     "open-library": 0.0,
     "save": 2.767,
@@ -82,14 +90,14 @@
   "poster": {
     "path": "e1-save-preset/poster.webp",
     "frame": 261,
-    "sha256": "e2233d4f05c62785002e08323e31fd320053b967dc01868dc2e82c3c69ec7373",
+    "sha256": "4c89f3128de97e13f2ddf274fb59db30f8c2dfdf8c3a313a53285e37bebb66d1",
     "master": "learn/capture/out/e1-save-preset/poster.png"
   },
   "run": {
-    "wallSeconds": 62.584,
-    "meanFrameMs": 192.4,
-    "slowdown": 5.77,
-    "notesPlayed": 0
+    "wallSeconds": 95.854,
+    "meanFrameMs": 286.4,
+    "slowdown": 8.59,
+    "notesPlayed": 1
   },
   "validation": {
     "status": "passed",
@@ -128,9 +136,29 @@
         "detail": ""
       },
       {
-        "check": "no notes played: clip stays silent",
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "9.700 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-33.6 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -10.8 dBTP"
       },
       {
         "check": "no blank frames",

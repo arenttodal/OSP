@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.p1-pedal-loop-pingpong",
   "title": "Hold a note with the sustain pedal (Pedal Loop)",
-  "scenarioDigest": "sha256:2244b4578a1492ad05a145686cae00a5b4adbf9c3b2ae45b94245fc8cff2ebc2",
+  "scenarioDigest": "sha256:c479d4fe61ed7a716dca2c0225401f1e7cdf4dd266cec58aac6e706b52438c00",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -39,7 +39,7 @@
     "width": 3416,
     "height": 2100,
     "fps": 30,
-    "frames": 392,
+    "frames": 448,
     "crop": [
       0,
       77,
@@ -51,36 +51,36 @@
     "width": 1600,
     "height": 1000,
     "fps": 30,
-    "frames": 392,
-    "duration": 13.067,
+    "frames": 448,
+    "duration": 14.933,
     "files": {
       "webm": {
         "path": "p1-pedal-loop-pingpong/p1-pedal-loop-pingpong.webm",
         "codec": "vp9",
-        "bytes": 602151,
-        "sha256": "c31970195baee6e5fa38826ede36c558a1173b1184132a4bea9e7d4564aa708f"
+        "bytes": 695491,
+        "sha256": "3cc81f100bd45309a68e450313685f15c5f55f23441503076b7d2f26b0011e7d"
       },
       "mp4": {
         "path": "p1-pedal-loop-pingpong/p1-pedal-loop-pingpong.mp4",
         "codec": "h264",
-        "bytes": 522120,
-        "sha256": "3ca19add0d71dc1be0ad220a01d2f35814347e56f506ed0672b4648ee356e12c"
+        "bytes": 622711,
+        "sha256": "d60ffc5f291c7e8b71d060be8b1e759b3bbed79368e9506e0ab7925ab7d9f1b1"
       }
     }
   },
   "audio": {
     "source": "the instrument's output during the filmed frames",
     "loudness": -16.0,
-    "truePeak": -4.4,
+    "truePeak": -4.1,
     "webm": "opus 96k",
     "mp4": "aac 128k"
   },
   "marks": {
     "loop-off": 0.0,
-    "choose-ping-pong": 2.533,
-    "play-note": 6.033,
-    "pedal-down": 6.967,
-    "pedal-up": 10.6
+    "choose-ping-pong": 4.4,
+    "play-note": 7.9,
+    "pedal-down": 8.833,
+    "pedal-up": 12.467
   },
   "steps": {
     "loop-off": "p1-pedal-loop-pingpong/steps/loop-off.webp",
@@ -91,15 +91,15 @@
   },
   "poster": {
     "path": "p1-pedal-loop-pingpong/poster.webp",
-    "frame": 363,
-    "sha256": "0f8411dbd8a3f3eee331ff5052200f4bf0621c01b92f58530d0ae518317ec86e",
+    "frame": 433,
+    "sha256": "6b8f24c5fe8f3b605aa811348bfaa898509cb661642efb70d8a8100dd0a3a63e",
     "master": "learn/capture/out/p1-pedal-loop-pingpong/poster.png"
   },
   "run": {
-    "wallSeconds": 87.006,
-    "meanFrameMs": 210.3,
-    "slowdown": 6.31,
-    "notesPlayed": 1
+    "wallSeconds": 106.038,
+    "meanFrameMs": 225.7,
+    "slowdown": 6.77,
+    "notesPlayed": 2
   },
   "validation": {
     "status": "passed",
@@ -120,7 +120,7 @@
       {
         "check": "master frame count = frames.json",
         "passed": true,
-        "detail": "392 / 392"
+        "detail": "448 / 448"
       },
       {
         "check": "every editor size fits the canvas",
@@ -140,12 +140,12 @@
       {
         "check": "audio length = video length",
         "passed": true,
-        "detail": "13.067 s"
+        "detail": "14.933 s"
       },
       {
         "check": "audio is not silent",
         "passed": true,
-        "detail": "-31.9 LUFS before levelling"
+        "detail": "-32.2 LUFS before levelling"
       },
       {
         "check": "soundtrack muxed (webm)",
@@ -160,7 +160,7 @@
       {
         "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
         "passed": true,
-        "detail": "-16.0 LUFS, true peak -4.4 dBTP"
+        "detail": "-16.0 LUFS, true peak -4.1 dBTP"
       },
       {
         "check": "no blank frames",
@@ -170,12 +170,12 @@
       {
         "check": "no frozen run longer than 4.6 s",
         "passed": true,
-        "detail": "longest unchanged run 1.87 s"
+        "detail": "longest unchanged run 1.33 s"
       },
       {
         "check": "webm frames = master",
         "passed": true,
-        "detail": "392"
+        "detail": "448"
       },
       {
         "check": "webm size",
@@ -185,7 +185,7 @@
       {
         "check": "mp4 frames = master",
         "passed": true,
-        "detail": "392"
+        "detail": "448"
       },
       {
         "check": "mp4 size",
@@ -195,7 +195,7 @@
       {
         "check": "duration 6-15 s (one clip) or declared",
         "passed": true,
-        "detail": "13.07 s"
+        "detail": "14.93 s"
       },
       {
         "check": "poster not blank",

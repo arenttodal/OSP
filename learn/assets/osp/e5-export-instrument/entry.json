@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.e5-export-instrument",
   "title": "Export a portable instrument",
-  "scenarioDigest": "sha256:9e6bf6faf723a86faddc9ff1cec223e754966593070f60549e6555afb8fcadd9",
+  "scenarioDigest": "sha256:5dd2c9c81c85ac56f7714d5bb269704c223e006a0a2a6df937b891f7f1924f18",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -33,7 +33,8 @@
     }
   ],
   "disclosures": [
-    "The clip stops at the menu item: choosing it opens the system's save dialog, which is not filmed."
+    "The clip stops at the menu item: choosing it opens the system's save dialog, which is not filmed.",
+    "The held note is sent as MIDI by the runner, as a keyboard would."
   ],
   "source": {
     "width": 3416,
@@ -57,18 +58,24 @@
       "webm": {
         "path": "e5-export-instrument/e5-export-instrument.webm",
         "codec": "vp9",
-        "bytes": 280478,
-        "sha256": "014dc629f071be75e403d1cffacc9b9b141c9cfc48c6f243b1243465cac2b540"
+        "bytes": 425697,
+        "sha256": "63c39614148a69b24240cad7639a99ae7eef573d1dea215622141aae34467ea6"
       },
       "mp4": {
         "path": "e5-export-instrument/e5-export-instrument.mp4",
         "codec": "h264",
-        "bytes": 212377,
-        "sha256": "a0520463b21309c60cfe6c4f9aabe8fe63418c189c9e2b9409b0e0a2f47ef915"
+        "bytes": 375668,
+        "sha256": "917e237b0a65942754428fe8a1215f22eb92d5339c364247d25dc99955c7b532"
       }
     }
   },
-  "audio": null,
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -11.0,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
+  },
   "marks": {
     "open-menu": 0.0,
     "export": 3.367
@@ -79,15 +86,15 @@
   },
   "poster": {
     "path": "e5-export-instrument/poster.webp",
-    "frame": 171,
-    "sha256": "ae60169c3f9ba7edec76c9506e7ee99b2e9423f68c794e091fdb04a2af9632c2",
+    "frame": 172,
+    "sha256": "9b798934f7afedad0a6d761b0025c8a65e719499fed48d7a9d8685d7c9d23d00",
     "master": "learn/capture/out/e5-export-instrument/poster.png"
   },
   "run": {
-    "wallSeconds": 37.456,
-    "meanFrameMs": 165.7,
-    "slowdown": 4.97,
-    "notesPlayed": 0
+    "wallSeconds": 60.906,
+    "meanFrameMs": 273.7,
+    "slowdown": 8.21,
+    "notesPlayed": 1
   },
   "validation": {
     "status": "passed",
@@ -126,9 +133,29 @@
         "detail": ""
       },
       {
-        "check": "no notes played: clip stays silent",
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "6.700 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-33.4 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -11.0 dBTP"
       },
       {
         "check": "no blank frames",
@@ -138,7 +165,7 @@
       {
         "check": "no frozen run longer than 3.8 s",
         "passed": true,
-        "detail": "longest unchanged run 2.87 s"
+        "detail": "longest unchanged run 0.03 s"
       },
       {
         "check": "webm frames = master",

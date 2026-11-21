@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.e4-starting-state",
   "title": "Load a starting state",
-  "scenarioDigest": "sha256:030561158105282c95c4a20d101d33c0abdd18688e1a735ec2a377703f131fbe",
+  "scenarioDigest": "sha256:60795d2866ae1b080d9009d55b4ba00aefb6c3bdea0b3801dc2aa3115ff266db",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -38,7 +38,7 @@
     "width": 2896,
     "height": 2100,
     "fps": 30,
-    "frames": 318,
+    "frames": 372,
     "crop": [
       12,
       0,
@@ -50,34 +50,34 @@
     "width": 1600,
     "height": 1170,
     "fps": 30,
-    "frames": 318,
-    "duration": 10.6,
+    "frames": 372,
+    "duration": 12.4,
     "files": {
       "webm": {
         "path": "e4-starting-state/e4-starting-state.webm",
         "codec": "vp9",
-        "bytes": 536955,
-        "sha256": "cd3032d6873d6f53ec76863b220bc1288cc75d1cd6a1606469ff147991439885"
+        "bytes": 547608,
+        "sha256": "b1e2bb829b1ae7fb56a9dcddc4d88fc09bfb8aab4f5bfd632dab11783a069498"
       },
       "mp4": {
         "path": "e4-starting-state/e4-starting-state.mp4",
         "codec": "h264",
-        "bytes": 578855,
-        "sha256": "8f649767cabc30d5572f7fd7a931060e2e2bdb49b373cefd36bc418612ee3b5a"
+        "bytes": 682260,
+        "sha256": "109f5ba98bda9b6e521ed574f06870971a66c21b680b2e46840386e1bf94cac9"
       }
     }
   },
   "audio": {
     "source": "the instrument's output during the filmed frames",
-    "loudness": -16.0,
-    "truePeak": -9.9,
+    "loudness": -16.1,
+    "truePeak": -9.2,
     "webm": "opus 96k",
     "mp4": "aac 128k"
   },
   "marks": {
     "open-library": 0.0,
-    "choose-state": 2.767,
-    "play": 5.633
+    "choose-state": 4.567,
+    "play": 7.433
   },
   "steps": {
     "open-library": "e4-starting-state/steps/open-library.webp",
@@ -86,15 +86,15 @@
   },
   "poster": {
     "path": "e4-starting-state/poster.webp",
-    "frame": 288,
-    "sha256": "dae1970d5f7abed93ec177605867f3503f69e76e08f6ed4c1a11f6f143979744",
+    "frame": 345,
+    "sha256": "07c6e29fcb47d2d81942078856feb17d97df970e5a29e6825d4e73c2693f0e4a",
     "master": "learn/capture/out/e4-starting-state/poster.png"
   },
   "run": {
-    "wallSeconds": 54.196,
-    "meanFrameMs": 152.2,
-    "slowdown": 4.56,
-    "notesPlayed": 1
+    "wallSeconds": 73.092,
+    "meanFrameMs": 178.2,
+    "slowdown": 5.35,
+    "notesPlayed": 2
   },
   "validation": {
     "status": "passed",
@@ -115,7 +115,7 @@
       {
         "check": "master frame count = frames.json",
         "passed": true,
-        "detail": "318 / 318"
+        "detail": "372 / 372"
       },
       {
         "check": "every editor size fits the canvas",
@@ -135,12 +135,12 @@
       {
         "check": "audio length = video length",
         "passed": true,
-        "detail": "10.600 s"
+        "detail": "12.400 s"
       },
       {
         "check": "audio is not silent",
         "passed": true,
-        "detail": "-29.6 LUFS before levelling"
+        "detail": "-30.6 LUFS before levelling"
       },
       {
         "check": "soundtrack muxed (webm)",
@@ -155,7 +155,7 @@
       {
         "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
         "passed": true,
-        "detail": "-16.0 LUFS, true peak -9.9 dBTP"
+        "detail": "-16.1 LUFS, true peak -9.2 dBTP"
       },
       {
         "check": "no blank frames",
@@ -170,7 +170,7 @@
       {
         "check": "webm frames = master",
         "passed": true,
-        "detail": "318"
+        "detail": "372"
       },
       {
         "check": "webm size",
@@ -180,7 +180,7 @@
       {
         "check": "mp4 frames = master",
         "passed": true,
-        "detail": "318"
+        "detail": "372"
       },
       {
         "check": "mp4 size",
@@ -190,7 +190,7 @@
       {
         "check": "duration 6-15 s (one clip) or declared",
         "passed": true,
-        "detail": "10.60 s"
+        "detail": "12.40 s"
       },
       {
         "check": "poster not blank",
