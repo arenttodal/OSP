@@ -37,7 +37,7 @@
         },
         {
           "do": "drop",
-          "sound": "bowed",
+          "sound": "file:Prophet-6 Pad.aif",
           "target": "learn:osp.source.dropZone",
           "seconds": 1.1
         }
@@ -76,17 +76,17 @@
         },
         {
           "do": "key",
-          "note": 48,
-          "seconds": 0.9
-        },
-        {
-          "do": "key",
-          "note": 55,
-          "seconds": 0.9
-        },
-        {
-          "do": "key",
           "note": 60,
+          "seconds": 0.9
+        },
+        {
+          "do": "key",
+          "note": 64,
+          "seconds": 0.9
+        },
+        {
+          "do": "key",
+          "note": 67,
           "seconds": 1.2
         },
         {

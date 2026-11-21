@@ -20,13 +20,13 @@
   "fps": 30,
   "maxSeconds": 18.0,
   "start": {
-    "state": "one layer (the plucked example, a decaying note), One Shot, PEDAL LOOP Normal",
+    "state": "one layer (a decaying Prophet-6 note), One Shot, PEDAL LOOP Normal",
     "input": false,
     "setup": [
       {
         "do": "addLayers",
         "sounds": [
-          "pluck"
+          "file:Prophet-6 Freeze 2.wav"
         ]
       },
       {
@@ -115,7 +115,7 @@
         {
           "do": "midi",
           "keys": [
-            57
+            60
           ],
           "state": "on",
           "velocity": 100
@@ -159,7 +159,7 @@
         {
           "do": "midi",
           "keys": [
-            57
+            60
           ],
           "state": "off"
         },

@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.d2-arp-strum",
   "title": "Strum a chord",
-  "scenarioDigest": "sha256:29bcddf3d65ca4dc9f40a8ee48f2b43aef3f5e28171c035d8ae4c5d629d33000",
+  "scenarioDigest": "sha256:c594015491e37c3cf7bd9270db5a3307c2aaf731e363729acb7abd598192d86c",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -24,26 +24,20 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "file:Prophet-6 Freeze 2.wav",
+      "file": "Prophet-6 Freeze 2.wav",
+      "sha256": "85408a071842f8b1687844860624288d1cd98f469fe2b26ce2599f06c97ff58a",
+      "bytes": 1718492
     },
     {
-      "id": "tutorial:voice",
-      "file": "Tutorial Voice A3.wav",
-      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-      "bytes": 1440104
-    },
-    {
-      "id": "tutorial:pluck",
-      "file": "Tutorial Pluck A3.wav",
-      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-      "bytes": 230504
+      "id": "file:Prophet-6 Freeze.wav",
+      "file": "Prophet-6 Freeze.wav",
+      "sha256": "bef2a38a2718a297649612a87fc27b9629571c6fabe99c639348deae2b4c57c9",
+      "bytes": 3384060
     }
   ],
   "disclosures": [
-    "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+    "The held chord (Cmaj7: C4 E4 G4 B4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
   ],
   "source": {
     "width": 2896,
@@ -67,16 +61,23 @@
       "webm": {
         "path": "d2-arp-strum/d2-arp-strum.webm",
         "codec": "vp9",
-        "bytes": 1223845,
-        "sha256": "1df27e391b0ed750add707ebb9823ca151eeb2d9947e66bb1e485ee0d95f6c8d"
+        "bytes": 1391635,
+        "sha256": "b660eaf5b6b5bc86f15959170086783ec52f352a86199d9b083d9a60553bf82d"
       },
       "mp4": {
         "path": "d2-arp-strum/d2-arp-strum.mp4",
         "codec": "h264",
-        "bytes": 1264460,
-        "sha256": "fc09f6d6be9005e1f61fdf4d58398081776459a18020b08daa3397d23b2fac25"
+        "bytes": 1334690,
+        "sha256": "1748ebf0e61adbbf494c4575ee70a32ff7111dddffc00a25c92e3885986611a6"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -4.6,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "choose-chord": 0.0,
@@ -94,14 +95,14 @@
   },
   "poster": {
     "path": "d2-arp-strum/poster.webp",
-    "frame": 356,
-    "sha256": "46ba41933bc2884a330d3ba4e0b9d19a209c4dbe25280e441c3007b78bdaacf9",
+    "frame": 359,
+    "sha256": "55ef25fac1a18be7c6cdc34f655e7546c646fd874d5cf86243b0d2f2078d9dd9",
     "master": "learn/capture/out/d2-arp-strum/poster.png"
   },
   "run": {
-    "wallSeconds": 100.861,
-    "meanFrameMs": 237.9,
-    "slowdown": 7.14,
+    "wallSeconds": 94.986,
+    "meanFrameMs": 225.5,
+    "slowdown": 6.76,
     "notesPlayed": 285
   },
   "validation": {
@@ -139,6 +140,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "12.600 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-28.6 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -4.6 dBTP"
       },
       {
         "check": "no blank frames",

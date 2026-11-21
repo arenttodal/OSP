@@ -60,3 +60,4 @@ __pycache__/
 # ANDOR Learn capture: frame sequences and masters stay outside Git
 learn/capture/out/
 learn/capture/fixtures/Tutorial *.wav
+learn/capture/fixtures/user/

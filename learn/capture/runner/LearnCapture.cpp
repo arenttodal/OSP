@@ -46,6 +46,7 @@
 #include <cstdio>
 #include <dlfcn.h>
 #include <cstring>
+#include <array>
 
 using namespace osp::plugin;
 
@@ -67,6 +68,13 @@ struct Failure : std::runtime_error
 {
     using std::runtime_error::runtime_error;
 };
+
+/** learn/capture/fixtures: the scenario folder's sibling (set by main from --scenario). */
+juce::File& sourceFixtures()
+{
+    static juce::File dir;
+    return dir;
+}
 
 juce::String str (const juce::var& v, const char* key, juce::String fallback = {})
 {
@@ -339,6 +347,7 @@ public:
         result->setProperty ("fixtures", fixtureLog);
         result->setProperty ("notesPlayed", processor != nullptr ? processor->playedVelocityCount() : 0);
         writeFramesJson();
+        try { writeRecordedAudio(); } catch (const Failure& f) { result->setProperty ("audioError", juce::String (f.what())); }
         out.getChildFile ("run.json").replaceWithText (juce::JSON::toString (juce::var (result), false));
         teardown();
         return rc;
@@ -430,6 +439,15 @@ private:
 
     juce::File tutorialFile (const juce::String& id, int index = 0)
     {
+        if (id.startsWith ("file:"))
+        {
+            // A recording supplied by the owner for the tutorials (learn/capture/fixtures/user).
+            const auto f = sourceFixtures().getChildFile ("user").getChildFile (id.fromFirstOccurrenceOf ("file:", false, false));
+            if (! f.existsAsFile())
+                throw Failure ("sound file not found: " + f.getFullPathName().toStdString());
+            noteFixture (id, f);
+            return f;
+        }
         const auto example = tutorial::fromId (id);
         if (! example)
             throw Failure ("unknown tutorial sound " + id.toStdString());
@@ -456,7 +474,8 @@ private:
         o->setProperty ("bytes", static_cast<juce::int64> (data.getSize()));
         fixtureLog.add (juce::var (o));
         fixtures.createDirectory();
-        f.copyFileTo (fixtures.getChildFile (f.getFileName()));
+        if (! f.isAChildOf (fixtures))   // owner recordings already live under the fixtures folder
+            f.copyFileTo (fixtures.getChildFile (f.getFileName()));
     }
 
     void setupAction (const juce::var& a)
@@ -582,7 +601,7 @@ private:
         noteFixture (id, f);
     }
 
-    void pumpAudio()
+    void pumpAudio (bool record = false)
     {
         for (int done = 0; done < samplesPerFrame; done += blockSize)
         {
@@ -610,8 +629,34 @@ private:
                 midi.addEvent (m, 0);
             pendingMidi.clear();
             processor->processBlock (buffer, midi);
+            if (record)
+            {
+                // The host side of the block (not the audio thread): keep what the instrument played.
+                const int outs = std::min (2, processor->getTotalNumOutputChannels());
+                for (int c = 0; c < 2; ++c)
+                {
+                    const auto* src = buffer.getReadPointer (std::min (c, std::max (0, outs - 1)));
+                    recorded[static_cast<std::size_t> (c)].insert (recorded[static_cast<std::size_t> (c)].end(), src, src + blockSize);
+                }
+            }
         }
     }
+
+    /** The instrument's output during the filmed frames, sample-aligned with them (frame n starts
+        at sample n * samplesPerFrame), for the clip's soundtrack. */
+    void writeRecordedAudio()
+    {
+        if (recorded[0].empty())
+            return;
+        auto audio = osp::AudioData::allocate (2, static_cast<std::int64_t> (recorded[0].size()), sampleRate);
+        audio.channels[0] = recorded[0];
+        audio.channels[1] = recorded[1];
+        std::string error;
+        if (! osp::io::writeAudioFile (out.getChildFile ("audio.wav").getFullPathName().toStdString(), audio, osp::io::SampleFormat::float32, error))
+            throw Failure ("cannot write audio.wav: " + error);
+    }
+
+    std::array<std::vector<float>, 2> recorded;
 
     //==========================================================================
     // Targets (editor coordinates)
@@ -1170,7 +1215,7 @@ private:
     void frame()
     {
         const auto t0 = std::chrono::steady_clock::now();
-        pumpAudio();
+        pumpAudio (true);
         pumpMessages();
         const auto deadline = clockStart + std::chrono::microseconds (static_cast<long long> ((records.size() + 1) * 1.0e6 / fps));
         while (std::chrono::steady_clock::now() < deadline)
@@ -1668,6 +1713,7 @@ int main (int argc, char** argv)
         std::cerr << "not an andor.learn.scenario of schemaVersion 1: " << scenarioPath << "\n";
         return 2;
     }
+    sourceFixtures() = scenarioFile.getParentDirectory().getSiblingFile ("fixtures");
     const auto outDir = juce::File::getCurrentWorkingDirectory().getChildFile (outPath);
     const auto fixtures = fixturesPath.isNotEmpty() ? juce::File::getCurrentWorkingDirectory().getChildFile (fixturesPath) : outDir.getChildFile ("fixtures");
     Runner runner (scenario, outDir, fixtures);

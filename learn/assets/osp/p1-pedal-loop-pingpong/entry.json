@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.p1-pedal-loop-pingpong",
   "title": "Hold a note with the sustain pedal (Pedal Loop)",
-  "scenarioDigest": "sha256:dc020509c50cf0b10600320f92d88262780c7c0b4e200c7ef8e8345b298ac6c0",
+  "scenarioDigest": "sha256:2244b4578a1492ad05a145686cae00a5b4adbf9c3b2ae45b94245fc8cff2ebc2",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -25,10 +25,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:pluck",
-      "file": "Tutorial Pluck A3.wav",
-      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-      "bytes": 230504
+      "id": "file:Prophet-6 Freeze 2.wav",
+      "file": "Prophet-6 Freeze 2.wav",
+      "sha256": "85408a071842f8b1687844860624288d1cd98f469fe2b26ce2599f06c97ff58a",
+      "bytes": 1718492
     }
   ],
   "disclosures": [
@@ -57,16 +57,23 @@
       "webm": {
         "path": "p1-pedal-loop-pingpong/p1-pedal-loop-pingpong.webm",
         "codec": "vp9",
-        "bytes": 451656,
-        "sha256": "8e0d0ebd14a96fdb20ecd923ea62ddf684aa769e5173d07faef2212dcec6e424"
+        "bytes": 602151,
+        "sha256": "c31970195baee6e5fa38826ede36c558a1173b1184132a4bea9e7d4564aa708f"
       },
       "mp4": {
         "path": "p1-pedal-loop-pingpong/p1-pedal-loop-pingpong.mp4",
         "codec": "h264",
-        "bytes": 368730,
-        "sha256": "cf68fb368dc75bd191b5158ca440c717435956f0f9ac11784f0dcd6c8f380d66"
+        "bytes": 522120,
+        "sha256": "3ca19add0d71dc1be0ad220a01d2f35814347e56f506ed0672b4648ee356e12c"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -4.4,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "loop-off": 0.0,
@@ -84,14 +91,14 @@
   },
   "poster": {
     "path": "p1-pedal-loop-pingpong/poster.webp",
-    "frame": 362,
-    "sha256": "a1ff638ae0060d80caa45778e3c91e631140162fcfaef893a187ad861e2f3b3c",
+    "frame": 363,
+    "sha256": "0f8411dbd8a3f3eee331ff5052200f4bf0621c01b92f58530d0ae518317ec86e",
     "master": "learn/capture/out/p1-pedal-loop-pingpong/poster.png"
   },
   "run": {
-    "wallSeconds": 89.583,
-    "meanFrameMs": 217.3,
-    "slowdown": 6.52,
+    "wallSeconds": 87.006,
+    "meanFrameMs": 210.3,
+    "slowdown": 6.31,
     "notesPlayed": 1
   },
   "validation": {
@@ -129,6 +136,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "13.067 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-31.9 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -4.4 dBTP"
       },
       {
         "check": "no blank frames",

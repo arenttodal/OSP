@@ -25,9 +25,9 @@
       {
         "do": "addLayers",
         "sounds": [
-          "bowed",
-          "voice",
-          "pluck"
+          "file:Prophet-6 Freeze 2.wav",
+          "file:Prophet-6 Freeze.wav",
+          "file:Prophet-6 Freeze 2.wav"
         ]
       },
       {
@@ -41,10 +41,10 @@
       {
         "do": "holdNotes",
         "keys": [
-          48,
-          55,
           60,
-          64
+          64,
+          67,
+          71
         ],
         "velocity": 90
       },
@@ -222,6 +222,6 @@
     ]
   },
   "disclosures": [
-    "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+    "The held chord (Cmaj7: C4 E4 G4 B4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
   ]
 }

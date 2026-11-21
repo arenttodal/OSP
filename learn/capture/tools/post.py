@@ -43,6 +43,20 @@ def sha256(path):
     return h.hexdigest()
 
 
+TARGET_LUFS = -16.0
+
+
+def audio_stats(path):
+    """EBU R128 loudness of a file (ffmpeg loudnorm's measurement pass) and its duration."""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-af", f"loudnorm=I={TARGET_LUFS}:TP=-1.5:LRA=20:print_format=json",
+                        "-f", "null", "-"], capture_output=True, text=True)
+    j = json.loads(r.stderr[r.stderr.rindex("{"):r.stderr.rindex("}") + 1])
+    d = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)], capture_output=True, text=True).stdout
+    f = lambda k: max(-70.0, float(j[k])) if j[k] not in ("-inf", "inf") else -70.0
+    return {"I": f("input_i"), "TP": f("input_tp"), "LRA": max(0.0, float(j["input_lra"])), "thresh": f("input_thresh"),
+            "offset": float(j["target_offset"]), "duration": float(d)}
+
+
 def probe(path):
     out = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
                           "-show_entries", "stream=width,height,nb_read_frames,r_frame_rate,codec_name",
@@ -320,6 +334,33 @@ def main():
         e.wait()
         check(f"encoder exit ({e.args[e.args.index('-c:v') + 1]})", e.returncode == 0)
 
+    # Soundtrack: the instrument's own output, recorded by the runner in step with the frames
+    # (frame n starts at sample n * 1600). Levelled to one loudness for every clip, a short fade
+    # at each end for the loop, then muxed in without touching the video.
+    audio = None
+    audio_src = run_dir / "audio.wav"
+    if audio_src.exists():
+        stats = audio_stats(audio_src)
+        check("audio length = video length", abs(stats["duration"] - len(frames) / fps) < 0.01, f'{stats["duration"]:.3f} s')
+        check("audio is not silent", stats["I"] > -60.0, f'{stats["I"]:.1f} LUFS before levelling')
+        master_wav = run_dir / "audio-master.wav"
+        dur = len(frames) / fps
+        level = (f'loudnorm=I={TARGET_LUFS}:TP=-1.5:LRA=20:measured_I={stats["I"]}:measured_TP={stats["TP"]}:'
+                 f'measured_LRA={stats["LRA"]}:measured_thresh={stats["thresh"]}:offset={stats["offset"]}:linear=true')
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(audio_src), "-af",
+                        f"{level},aresample=48000,afade=t=in:d=0.02,afade=t=out:st={dur - 0.3:.3f}:d=0.3", "-c:a", "pcm_f32le", str(master_wav)], check=True)
+        for path, codec in ((webm, ["-c:a", "libopus", "-b:a", "96k"]), (mp4, ["-c:a", "aac", "-b:a", "128k"])):
+            tmp = path.with_name(path.stem + ".tmp" + path.suffix)
+            r = subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(path), "-i", str(master_wav), "-map", "0:v", "-map", "1:a",
+                                "-c:v", "copy", *codec, "-t", f"{dur:.3f}"] + (["-movflags", "+faststart"] if path.suffix == ".mp4" else []) + [str(tmp)])
+            check(f"soundtrack muxed ({path.suffix[1:]})", r.returncode == 0)
+            if r.returncode == 0:
+                tmp.replace(path)
+        after = audio_stats(master_wav)
+        check(f"audio levelled to {TARGET_LUFS} LUFS (±1.5)", abs(after["I"] - TARGET_LUFS) <= 1.5, f'{after["I"]:.1f} LUFS, true peak {after["TP"]:.1f} dBTP')
+        audio = {"source": "the instrument's output during the filmed frames", "loudness": round(after["I"], 1), "truePeak": round(after["TP"], 1),
+                 "webm": "opus 96k", "mp4": "aac 128k"}
+
     # Poster: in the final hold, the frame that changes least (nothing animating), unannotated
     # except for what is on screen in the instrument itself.
     tail = rendered[-min(len(rendered), int(fps * 1.0)):]
@@ -373,6 +414,7 @@ def main():
         "video": {"width": out_w, "height": out_h, "fps": fps, "frames": len(frames), "duration": round(duration, 3),
                   "files": {"webm": {"path": rel(webm), "codec": "vp9", "bytes": webm.stat().st_size, "sha256": sha256(webm)},
                             "mp4": {"path": rel(mp4), "codec": "h264", "bytes": mp4.stat().st_size, "sha256": sha256(mp4)}}},
+        "audio": audio,
         "marks": {m: round(at / fps, 3) for m, at in sorted(marks_at.items(), key=lambda kv: kv[1])},
         "steps": {m: rel(out_dir / "steps" / f"{m}.webp") for m in marks_at},
         "poster": {"path": rel(poster_webp), "frame": best[0], "sha256": sha256(poster_webp), "master": str(poster_png)},
