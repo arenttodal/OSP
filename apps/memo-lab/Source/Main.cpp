@@ -96,8 +96,18 @@ private:
 juce::JUCEApplicationBase* juce_CreateApplication();
 juce::JUCEApplicationBase* juce_CreateApplication() { return new osp::memolab::MemoLabApplication(); }
 
+#if JUCE_WINDOWS
+// A GUI application on Windows starts in WinMain, and JUCE's main takes no arguments there
+// (what START_JUCE_APPLICATION writes on Windows).
+int __stdcall WinMain (struct HINSTANCE__*, struct HINSTANCE__*, char*, int)
+{
+    juce::JUCEApplicationBase::createInstance = &juce_CreateApplication;
+    return juce::JUCEApplicationBase::main();
+}
+#else
 int main (int argc, char* argv[])
 {
     juce::JUCEApplicationBase::createInstance = &juce_CreateApplication;
     return juce::JUCEApplicationBase::main (argc, const_cast<const char**> (argv));
 }
+#endif

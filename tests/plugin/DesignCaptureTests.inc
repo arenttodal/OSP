@@ -5,18 +5,25 @@
 //   OSP_DESIGN_CAPTURE=<dir> xvfb-run -a build-plugin/apps/plugin/osp_plugin_tests "[design-capture]"
 // Included at the end of PluginProcessorTests.cpp.
 
-#include <cxxabi.h>
+#if defined(__GNUG__)
+ #include <cxxabi.h>
+#endif
 
 namespace designcapture
 {
     juce::String className (const juce::Component& c)
     {
+       #if defined(__GNUG__)
         int status = 0;
         const char* mangled = typeid (c).name();
         char* demangled = abi::__cxa_demangle (mangled, nullptr, nullptr, &status);
         juce::String name = status == 0 && demangled != nullptr ? juce::String (demangled) : juce::String (mangled);
         std::free (demangled);
         return name;
+       #else
+        // MSVC's names are readable already ("class osp::plugin::X").
+        return juce::String (typeid (c).name()).fromFirstOccurrenceOf (" ", false, false);
+       #endif
     }
 
     void savePng (const juce::Image& image, const juce::File& file)
