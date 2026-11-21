@@ -262,6 +262,13 @@ enum class Dest : std::uint8_t
     synthToneA, synthToneB, synthToneC,
     synthImprintA, synthImprintB, synthImprintC,
     synthMotionA, synthMotionB, synthMotionC,
+    // Any other control the instrument reads every block (a rack's or an effect's parameter):
+    // `parameter` is what a route chooses (its control named by the host, by parameter ID);
+    // the engine reads route r's as paramRoute0 + r, one shared value per block (a shared
+    // stage: global sources only), which the host adds to that control's normalised travel.
+    parameter,
+    paramRoute0,
+    paramRouteLast = paramRoute0 + 15,
     // An instrument's own controls: products built from the ANDOR Instrument Shell name them
     // (setProductDestinations); ANDOR OSP names none, so it never offers or reads these.
     product0,
@@ -277,6 +284,15 @@ constexpr int destCount = static_cast<int> (Dest::count);
 */
 constexpr int hostDestCount = static_cast<int> (Dest::keyDnaAmountA);
 constexpr int maxProductDests = destCount - static_cast<int> (Dest::product0);
+/** A route's own parameter destination (Dest::parameter, as the engine reads route `slot`'s). */
+constexpr Dest paramRouteDest (int slot) noexcept { return static_cast<Dest> (static_cast<int> (Dest::paramRoute0) + slot); }
+constexpr bool isParamRoute (Dest d) noexcept
+{
+    return static_cast<int> (d) >= static_cast<int> (Dest::paramRoute0) && static_cast<int> (d) <= static_cast<int> (Dest::paramRouteLast);
+}
+/** A destination that is "a control named by the host": the choice or a route's own. */
+constexpr bool isParameterDest (Dest d) noexcept { return d == Dest::parameter || isParamRoute (d); }
+constexpr int paramRouteSlot (Dest d) noexcept { return isParamRoute (d) ? static_cast<int> (d) - static_cast<int> (Dest::paramRoute0) : -1; }
 constexpr bool isProductDest (Dest d) noexcept { return static_cast<int> (d) >= static_cast<int> (Dest::product0) && static_cast<int> (d) < destCount; }
 constexpr Dest productDest (int index) noexcept { return static_cast<Dest> (static_cast<int> (Dest::product0) + index); }
 constexpr int productIndex (Dest d) noexcept { return isProductDest (d) ? static_cast<int> (d) - static_cast<int> (Dest::product0) : -1; }
@@ -367,7 +383,7 @@ inline int choiceOf (Dest d) noexcept
     in that parameter's choice order after "None" (append only): the frozen `dest` list keeps
     its automation, and a route whose `destExt` is set plays that destination instead.
 */
-inline constexpr std::array<Dest, 28> extendedDests { Dest::keyDnaAmountA, Dest::keyDnaAmountB, Dest::keyDnaAmountC, Dest::mixPosition, Dest::mixTowardsC,
+inline constexpr std::array<Dest, 29> extendedDests { Dest::keyDnaAmountA, Dest::keyDnaAmountB, Dest::keyDnaAmountC, Dest::mixPosition, Dest::mixTowardsC,
                                                       Dest::synthAmountA, Dest::synthAmountB, Dest::synthAmountC,
                                                       Dest::vibratoDepth, Dest::vibratoAmount,
                                                       // (rack modulation: the FILTER rack, then each layer's SYNTH page)
@@ -376,7 +392,9 @@ inline constexpr std::array<Dest, 28> extendedDests { Dest::keyDnaAmountA, Dest:
                                                       Dest::synthDetuneA, Dest::synthDetuneB, Dest::synthDetuneC,
                                                       Dest::synthToneA, Dest::synthToneB, Dest::synthToneC,
                                                       Dest::synthImprintA, Dest::synthImprintB, Dest::synthImprintC,
-                                                      Dest::synthMotionA, Dest::synthMotionB, Dest::synthMotionC };
+                                                      Dest::synthMotionA, Dest::synthMotionB, Dest::synthMotionC,
+                                                      // (any other control, named by the host: rack modulation step 3)
+                                                      Dest::parameter };
 constexpr int extendedChoiceCount = 1 + static_cast<int> (extendedDests.size());
 inline Dest destFromExtendedChoice (int choice) noexcept
 {
@@ -385,6 +403,8 @@ inline Dest destFromExtendedChoice (int choice) noexcept
 /** The extended parameter's choice for a destination (0: it is not one of them). */
 inline int extendedChoiceOf (Dest d) noexcept
 {
+    if (isParamRoute (d))
+        d = Dest::parameter;
     for (std::size_t i = 0; i < extendedDests.size(); ++i)
         if (extendedDests[i] == d)
             return static_cast<int> (i) + 1;
@@ -395,6 +415,12 @@ inline Dest routeDestFromChoices (int destChoice, int extendedChoice) noexcept
 {
     const auto extended = destFromExtendedChoice (extendedChoice);
     return extended != Dest::none ? extended : destFromChoice (destChoice);
+}
+/** ... as route `slot` plays it: a parameter destination is the route's own (paramRoute). */
+inline Dest routeDestFromChoices (int destChoice, int extendedChoice, int slot) noexcept
+{
+    const auto d = routeDestFromChoices (destChoice, extendedChoice);
+    return d == Dest::parameter && slot >= 0 && slot < 16 ? paramRouteDest (slot) : d;
 }
 
 /** What full depth moved before state version 11 (fixed, smaller spans). Older sessions'
@@ -416,6 +442,7 @@ struct Route
     int target = -1;
 };
 constexpr int maxRoutes = 16;
+static_assert (static_cast<int> (Dest::paramRouteLast) - static_cast<int> (Dest::paramRoute0) + 1 == maxRoutes, "one parameter destination per route");
 
 /** Everything the modulation system needs, as one plain value (copied to the audio thread). */
 struct Settings

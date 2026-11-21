@@ -481,7 +481,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     // scaled as a whole: proportions never drift between sizes.
     content.onPaint = [this] (juce::Graphics& g) { paintInstrument (g); };
     // The FX library's rack: hidden until the routing view opens an effect.
-    content.addChildComponent (racks);
+    content.addChildComponent (racks, content.getIndexOfChildComponent (&modOverlay));   // (under the overlay: the halos of its knobs show)
     racks.setFullBleed (true);
     racks.onLayoutChanged = [this] { rackChanged(); };
     // FX ROUTING: its key beside SAVE (as ANDOR ANALOG's), its view in the cards' place.

@@ -1,5 +1,23 @@
 # Status
 
+> **21 Nov 2026, rack modulation steps 3-5 (`docs/research/rack-modulation.md`):**
+> - **Every rack and effect control can be modulated:** the SPACE, ECHO and MOVEMENT racks
+>   and the FX library's effects (and any other control a USER macro can move) take routes.
+>   Right-click the knob or drop a source on it. These are shared stages, so they take the
+>   global sources (LFOs, global envelopes, VEL and NOTE of the latest key, the wheel, CCs,
+>   PRESSURE), not a POLY LFO.
+> - **How:** a route's destination PARAMETER (`destExt` choice 29) plus the control's ID in
+>   `ModLinks.param<n>`; the engine gives each such route's value per block
+>   (`parameterModulation`), and the processor adds it to the control's `LiveOffsets` on top
+>   of the USER macros. No route: nothing written, bit for bit as before. Schema golden: the
+>   one new choice name.
+> - **Interface fix:** OSP's rack host lay above the modulation overlay, so no halo ever
+>   showed on a rack's knobs (the FILTER rack's from steps 1-2 included). It is now under it.
+> - **NEXT, ANDOR ANALOG:** the shared parts are in, but its product engine must add the
+>   routes' values to its own raw parameter values (ANALOG repository). Until then the shell
+>   offers no parameter routes. Plan in the design note.
+> - **Tests:** `[rackmod]` now 9 cases (`[parammod]` for these steps).
+>
 > **20 Nov 2026, rack modulation steps 1-2 (owner's request: "MOD and LFO on the parameters
 > inside the FX racks"; `docs/research/rack-modulation.md`):**
 > - **New destinations (per voice):** the FILTER rack's MIN, MAX, DRIVE, ENV AMOUNT, ENV

@@ -580,7 +580,7 @@ void ShellProcessor::applyModulation() noexcept
     {
         auto& route = s.routes[r];
         route.source = static_cast<osp::mod::Source> (std::clamp (juce::roundToInt (modRouteParams[5 * r]->load()), 0, osp::mod::sourceCount));
-        route.dest = osp::mod::routeDestFromChoices (juce::roundToInt (modRouteParams[5 * r + 1]->load()), juce::roundToInt (modRouteParams[5 * r + 4]->load()));
+        route.dest = osp::mod::routeDestFromChoices (juce::roundToInt (modRouteParams[5 * r + 1]->load()), juce::roundToInt (modRouteParams[5 * r + 4]->load()), static_cast<int> (r));
         route.depth = 0.01 * modRouteParams[5 * r + 2]->load();
         route.enabled = modRouteParams[5 * r + 3]->load() >= 0.5f;
         route.target = modRouteTargets[r].load (std::memory_order_relaxed);

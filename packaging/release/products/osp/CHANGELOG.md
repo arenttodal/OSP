@@ -50,6 +50,9 @@ The first signed and notarized beta of ANDOR OSP, for invited testers (November 
 - **More things to modulate:** the FILTER rack's MIN, MAX, DRIVE, ENV AMOUNT, ENV ATTACK and
   ENV DECAY, and each SYNTH page's DETUNE, TONE, IMPRINT and MOTION. Right-click the knob and
   assign an LFO, an envelope, VEL, NOTE, the MOD WHEEL or a CC; each note follows its own.
+- **Modulate the effects:** every control of the SPACE, ECHO and MOVEMENT racks and of the FX
+  library's effects takes an LFO, an envelope, the MOD WHEEL, VEL, NOTE, a CC or PRESSURE:
+  right-click the knob, or drag a source onto it. The ring around the knob shows the route.
 - The Library and preset browser, seven built-in Starting States, ANDOR Learn lessons and
   tutorials.
 

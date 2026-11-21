@@ -404,7 +404,10 @@ public:
     std::function<void (juce::PopupMenu&, const juce::String& parameterId)> extendContextMenu;
     /** Assigns through the processor's one path (source 0..4); selects the route, or shows why
         it could not be made. Returns the route's slot, -1 when refused. */
-    int assign (int source, mod::Dest dest);
+    int assign (int source, mod::Dest dest, const juce::String& parameterId = {});
+    /** The destination a control stands for (its own, or mod::Dest::parameter for any other
+        control the instrument reads every block: a rack's, an effect's), none if neither. */
+    mod::Dest destFor (const juce::String& parameterId, bool perVoice) const;
     /** A source dropped on a control the overlay does not ring (the header MIX): assigns the
         destination it stands for; a refusal is shown by `area` (root coordinates). */
     int dropOn (int source, const juce::String& parameterId, juce::Rectangle<float> area);

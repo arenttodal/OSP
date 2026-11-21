@@ -668,6 +668,48 @@ void OspAudioProcessor::applyUserMacros (int samples) noexcept
     }
 }
 
+void OspAudioProcessor::applyParameterRoutes() noexcept
+{
+    // Each control's sum of the routes moving it (a fixed table: no allocation). A route at 0
+    // (bypassed, its source still) leaves its control exactly as the macros have it.
+    std::array<int, mod::maxRoutes> controls {};
+    std::array<double, mod::maxRoutes> sums {};
+    int count = 0;
+    for (int r = 0; r < mod::maxRoutes; ++r)
+    {
+        const int index = modRouteParamIndex[static_cast<std::size_t> (r)].load (std::memory_order_relaxed);
+        const double value = index >= 0 ? engine.parameterModulation (r) : 0.0;
+        if (index < 0 || value == 0.0)
+            continue;
+        int k = 0;
+        while (k < count && controls[static_cast<std::size_t> (k)] != index)
+            ++k;
+        if (k == count)
+        {
+            controls[static_cast<std::size_t> (count)] = index;
+            sums[static_cast<std::size_t> (count++)] = 0.0;
+        }
+        sums[static_cast<std::size_t> (k)] += value;
+    }
+    auto macroOffset = [this] (int index) {
+        const auto at = static_cast<std::size_t> (index);
+        return at < userMacroTouched.size() && userMacroTouched[at] != 0 ? userMacroOffsets[at] : 0.0;
+    };
+    for (int i = 0; i < paramRouteAppliedCount; ++i)
+    {
+        const int index = paramRouteApplied[static_cast<std::size_t> (i)];
+        if (std::find (controls.begin(), controls.begin() + count, index) == controls.begin() + count)
+            liveOffsets.setOffset (index, static_cast<float> (macroOffset (index)));   // (no route now: the macros' alone)
+    }
+    for (int k = 0; k < count; ++k)
+    {
+        const int index = controls[static_cast<std::size_t> (k)];
+        liveOffsets.setOffset (index, static_cast<float> (macroOffset (index) + sums[static_cast<std::size_t> (k)]));
+    }
+    paramRouteApplied = controls;
+    paramRouteAppliedCount = count;
+}
+
 void OspAudioProcessor::applyParameters (bool force) noexcept
 {
     {
@@ -1016,7 +1058,7 @@ void OspAudioProcessor::applyModulation (bool force) noexcept
         const auto& rp = modRouteParams[r];
         auto& route = s.routes[r];
         route.source = static_cast<mod::Source> (std::clamp (juce::roundToInt (rp[0]->load()), 0, mod::sourceCount));
-        route.dest = mod::routeDestFromChoices (std::clamp (juce::roundToInt (rp[1]->load()), 0, mod::hostDestCount - 1), juce::roundToInt (rp[4]->load()));
+        route.dest = mod::routeDestFromChoices (std::clamp (juce::roundToInt (rp[1]->load()), 0, mod::hostDestCount - 1), juce::roundToInt (rp[4]->load()), static_cast<int> (r));
         route.depth = 0.01 * rp[2]->load();
         route.enabled = rp[3]->load() >= 0.5f;
         route.target = modRouteTargets[r].load (std::memory_order_relaxed);
@@ -1266,7 +1308,14 @@ void OspAudioProcessor::publishModulationCurves() noexcept
 void OspAudioProcessor::refreshModLinks()
 {
     for (int r = 0; r < mod::maxRoutes; ++r)
+    {
         modRouteTargets[static_cast<std::size_t> (r)].store (resolveModTarget (r), std::memory_order_relaxed);
+        // A parameter route's control (the link as stored: the route's own parameters may
+        // follow a moment later; the engine gives 0 for a route that is not one).
+        const auto id = modRouteParameterLink (r);
+        const int index = id.isNotEmpty() && userMacroReads (id) ? liveOffsets.indexOf (id) : -1;
+        modRouteParamIndex[static_cast<std::size_t> (r)].store (index, std::memory_order_relaxed);
+    }
 }
 
 void OspAudioProcessor::valueTreePropertyChanged (juce::ValueTree& tree, const juce::Identifier&)
@@ -1720,6 +1769,7 @@ void OspAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         }
     }
     applyUserMacros (numSamples);   // USER MACROS: before anything reads a parameter (they move its base)
+    applyParameterRoutes();         // (and the parameter routes on top of them)
     applyParameters (false);
     // Recording a Custom ARP pattern: the notes as played (the on-screen keyboard merged),
     // before any arpeggiator, so its own output is never captured.

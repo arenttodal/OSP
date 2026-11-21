@@ -2130,7 +2130,7 @@ void ModulationOverlay::collect (juce::Component& c)
         if (auto* slider = dynamic_cast<juce::Slider*> (child))
         {
             const auto id = slider->getProperties()["paramId"].toString();
-            const bool destination = id.isNotEmpty() && ! modui::destinationsShownBy (id).empty();
+            const bool destination = id.isNotEmpty() && (! modui::destinationsShownBy (id).empty() || ospProcessor.parameterModulatable (id));
             if (destination || (id.isNotEmpty() && macroEligible != nullptr && macroEligible (id)))
             {
                 Target t;
@@ -2188,7 +2188,7 @@ std::vector<const InstrumentHost::ModRouteInfo*> ModulationOverlay::routesOf (co
     const auto dests = modui::destinationsShownBy (t.parameterId);
     std::vector<const InstrumentHost::ModRouteInfo*> list;
     for (const auto& r : routes)
-        if (std::find (dests.begin(), dests.end(), r.route.dest) != dests.end())
+        if (std::find (dests.begin(), dests.end(), r.route.dest) != dests.end() || (mod::isParamRoute (r.route.dest) && r.parameter == t.parameterId))
             list.push_back (&r);
     return list;
 }
@@ -2222,7 +2222,7 @@ float ModulationOverlay::positionOf (const Target& t, double offset, mod::Dest d
     if (dest == mod::Dest::arpRate)
         return arpRatePosition (static_cast<double> (mod::destInfo (dest).span) * offset);
     // A product's own control: its knob's whole travel (the engine moves it the same way).
-    if (mod::isProductDest (dest))
+    if (mod::isProductDest (dest) || mod::isParameterDest (dest))
         return std::clamp (baseOf (t) + static_cast<float> (mod::destInfo (dest).span * offset), 0.0f, 1.0f);
     const auto& range = param->getNormalisableRange();
     const double base = param->convertFrom0to1 (baseOf (t));   // (after the macros: the engine's order)
@@ -2609,7 +2609,7 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
     juce::Component::SafePointer<ModulationOverlay> safe (this);
     const auto list = routesOf (t);
     // (a control only a product's macro may move: no empty MODULATION heading)
-    const bool modulatable = ! list.empty() || modui::destinationFor (parameterId, false) != mod::Dest::none || modui::destinationFor (parameterId, true) != mod::Dest::none;
+    const bool modulatable = ! list.empty() || destFor (parameterId, false) != mod::Dest::none || destFor (parameterId, true) != mod::Dest::none;
     if (modulatable)
         menu.addSectionHeader ("MODULATION");
     for (const auto* r : list)
@@ -2658,7 +2658,7 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
         menu.addSeparator();
     for (const int source : modui::menuSources (p, false))   // MOD WHEEL, LFO 1, LFO 2, ENV (ENV 2 when used), VEL, NOTE, CC 1-4, PRESSURE
     {
-        const auto primary = modui::destinationFor (parameterId, modui::isPerVoice (p, source));
+        const auto primary = destFor (parameterId, modui::isPerVoice (p, source));
         if (primary == mod::Dest::none)
             continue;
         std::vector<std::pair<mod::Dest, juce::String>> dests { { primary, {} } };
@@ -2681,12 +2681,14 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
                 continue;
             bool assigned = false;
             for (const auto* r : list)
-                assigned = assigned || (r->route.source == static_cast<mod::Source> (source + 1) && r->route.dest == dest);
+                assigned = assigned
+                           || (r->route.source == static_cast<mod::Source> (source + 1)
+                               && (r->route.dest == dest || (mod::isParameterDest (dest) && mod::isParamRoute (r->route.dest))));
             const auto label = juce::String (assigned ? "Edit " : "Assign ") + modui::menuLabel (p, source) + suffix;
             const auto d = dest;
-            menu.addItem (label, true, assigned, [safe, source, d] {
+            menu.addItem (label, true, assigned, [safe, source, d, parameterId] {
                 if (safe != nullptr)
-                    safe->assign (source, d);
+                    safe->assign (source, d, parameterId);
             });
         }
     }
@@ -2736,9 +2738,18 @@ juce::PopupMenu ModulationOverlay::contextMenu (const juce::String& parameterId)
     return menu;
 }
 
-int ModulationOverlay::assign (int source, mod::Dest dest)
+mod::Dest ModulationOverlay::destFor (const juce::String& parameterId, bool perVoice) const
 {
-    const auto result = ospProcessor.assignModulation (static_cast<mod::Source> (source + 1), dest, 50.0f);
+    // The instrument's own destination for the control, else (rack modulation) any other
+    // control the instrument reads every block, by its parameter.
+    const auto d = modui::destinationFor (parameterId, perVoice);
+    return d == mod::Dest::none && ospProcessor.parameterModulatable (parameterId) ? mod::Dest::parameter : d;
+}
+
+int ModulationOverlay::assign (int source, mod::Dest dest, const juce::String& parameterId)
+{
+    const auto result = mod::isParameterDest (dest) ? ospProcessor.assignParameterModulation (static_cast<mod::Source> (source + 1), parameterId, 50.0f)
+                                                    : ospProcessor.assignModulation (static_cast<mod::Source> (source + 1), dest, 50.0f);
     if (result.slot < 0)
     {
         showNotice (result.error);
@@ -2844,15 +2855,15 @@ int ModulationOverlay::drop (int source, juce::Point<float> where)
         depthChooser (source, hit.routes).showMenuAsync (juce::PopupMenu::Options().withDeletionCheck (*this));
         return -1;
     }
-    const auto dest = modui::destinationFor (hit.parameterId, modui::isPerVoice (ospProcessor, source));
-    return dest != mod::Dest::none ? assign (source, dest) : -1;
+    const auto dest = destFor (hit.parameterId, modui::isPerVoice (ospProcessor, source));
+    return dest != mod::Dest::none ? assign (source, dest, hit.parameterId) : -1;
 }
 
 int ModulationOverlay::dropOn (int source, const juce::String& parameterId, juce::Rectangle<float> area)
 {
     noticeAnchor = area;
-    const auto dest = modui::destinationFor (parameterId, modui::isPerVoice (ospProcessor, source));
-    return dest != mod::Dest::none ? assign (source, dest) : -1;
+    const auto dest = destFor (parameterId, modui::isPerVoice (ospProcessor, source));
+    return dest != mod::Dest::none ? assign (source, dest, parameterId) : -1;
 }
 
 juce::PopupMenu ModulationOverlay::depthChooser (int source, const std::vector<int>& slots)
@@ -2964,9 +2975,12 @@ juce::String ModulationOverlay::dragTip() const
             return refusal;
         return source + arrow + modui::sourceLabel (mod::sourceIndex (r->route.source)) + " / " + ospProcessor.destName (r->route.dest) + " DEPTH";
     }
-    const auto dest = modui::destinationFor (hit.parameterId, modui::isPerVoice (ospProcessor, dragSource));
+    const auto dest = destFor (hit.parameterId, modui::isPerVoice (ospProcessor, dragSource));
     if (dest == mod::Dest::none || ! ospProcessor.canModulate (static_cast<mod::Source> (dragSource + 1), dest))
         return {};
+    if (dest == mod::Dest::parameter)
+        if (auto* param = ospProcessor.apvts().getParameter (hit.parameterId))
+            return source + arrow + param->getName (64).toUpperCase();
     return source + arrow + ospProcessor.destName (dest);
 }
 
@@ -3217,7 +3231,7 @@ void ModulationOverlay::paintHalo (juce::Graphics& g, const Target& t, int index
 void ModulationOverlay::paintDragTarget (juce::Graphics& g, const Target& t, int index, const HaloHit& hit)
 {
     const auto c = modui::sourceColour (dragSource);
-    const auto dest = modui::destinationFor (t.parameterId, isPolySource (ospProcessor, dragSource));
+    const auto dest = destFor (t.parameterId, isPolySource (ospProcessor, dragSource));
     const bool baseOk = dest != mod::Dest::none && ospProcessor.canModulate (static_cast<mod::Source> (dragSource + 1), dest);
     const bool overThis = hit.target == index;
     const auto list = routesOf (t);
@@ -3326,7 +3340,7 @@ void ModulationOverlay::paint (juce::Graphics& g)
         // (its value inside the ring, a route's depth on the ring).
         if (dragSource >= 0)
         {
-            const auto dest = modui::destinationFor (t.parameterId, isPolySource (ospProcessor, dragSource));
+            const auto dest = destFor (t.parameterId, isPolySource (ospProcessor, dragSource));
             const bool baseOk = dest != mod::Dest::none && ospProcessor.canModulate (static_cast<mod::Source> (dragSource + 1), dest);
             if (! baseOk && routesOf (t).empty())
                 continue;

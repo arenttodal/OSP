@@ -43,7 +43,7 @@ mod::Dest InstrumentHost::routeDest (int slot) const
 {
     if (slot < 0 || slot >= mod::maxRoutes)
         return mod::Dest::none;
-    return mod::routeDestFromChoices (juce::roundToInt (parameterValue (modRouteId (slot, "dest"))), juce::roundToInt (parameterValue (modRouteId (slot, "destExt"))));
+    return mod::routeDestFromChoices (juce::roundToInt (parameterValue (modRouteId (slot, "dest"))), juce::roundToInt (parameterValue (modRouteId (slot, "destExt"))), slot);
 }
 
 void InstrumentHost::setRouteDest (int slot, mod::Dest dest)

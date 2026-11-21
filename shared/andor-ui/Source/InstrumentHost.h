@@ -413,6 +413,9 @@ public:
         int slot = -1;
         mod::Route route;   ///< a depth route: route.target is its target's slot
         mod::RouteState state = mod::RouteState::empty;
+        /** A parameter route (route.dest a mod::isParamRoute): the control it moves (its
+            parameter ID; empty: none, or not a parameter route). */
+        juce::String parameter;
         bool isDepth() const noexcept { return mod::isDepthRoute (route); }
     };
     std::vector<ModRouteInfo> modulationRoutes() const;
@@ -432,6 +435,20 @@ public:
         joining the two is selected, never duplicated and its depth kept; a new one starts at
         `depthPercent` (one undo step). `error` says why nothing was made. */
     ModAssignResult assignModulation (mod::Source source, mod::Dest dest, float depthPercent = 50.0f);
+    /** Rack modulation: a route from `source` to any other control the instrument reads every
+        block (a rack's or an effect's parameter; parameterModulatable), by its parameter ID -
+        the same rules (a shared stage: global sources only), the same selection of an
+        existing pairing, one undo step. The control is kept with the route (ModLinks). */
+    ModAssignResult assignParameterModulation (mod::Source source, const juce::String& parameterId, float depthPercent = 50.0f);
+    /** A control a parameter route can move (the product reads it every block as a plain
+        number: its LiveParam). None by default; a product that applies parameter routes says. */
+    virtual bool parameterModulatable (const juce::String& parameterId) const
+    {
+        juce::ignoreUnused (parameterId);
+        return false;
+    }
+    /** The control a parameter route moves (empty: none, or not a parameter route). */
+    juce::String modRouteParameter (int slot) const;
     /** META-MODULATION through the same path: `source` moves the depth of the route in
         `targetSlot` (one level only, never a source on its own route's depth). */
     ModAssignResult assignDepthModulation (mod::Source source, int targetSlot, float depthPercent = 20.0f);
@@ -772,6 +789,10 @@ public:
 protected:
     juce::ValueTree modLinks() const;
     void setModLink (int slot, int uid, int targetUid);
+    /** A parameter route's control (ModLinks "param<n>"; empty removes it), and the link as
+        stored whatever the route's parameters say now. */
+    void setModRouteParameter (int slot, const juce::String& parameterId);
+    juce::String modRouteParameterLink (int slot) const;
     int newModRouteUid() const;
     /** A depth route's target slot by identity (the slot holding the target's ID), whatever the parameters say now. */
     int resolveModTarget (int slot) const;

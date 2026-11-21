@@ -1009,6 +1009,7 @@ void InstrumentEngine::setModulation (const mod::Settings& settings) noexcept
         modArpRouted.fill (false);
         modMixOffset.fill (0.0);
         modMixRouted = false;
+        modParamOffset.fill (0.0);
         for (auto& o : modEqOffset)
             o.fill (0.0);
         modGlobalApplied = false;
@@ -1096,6 +1097,7 @@ void InstrumentEngine::applyGlobalModulation (int samples) noexcept
         modArpRouted.fill (false);
         modMixOffset.fill (0.0);
         modMixRouted = false;
+        modParamOffset.fill (0.0);
         return;
     }
     // Effective values next to the stored ones (config.macros never changes here).
@@ -1135,6 +1137,8 @@ void InstrumentEngine::applyGlobalModulation (int samples) noexcept
     }
     modMixRouted = c.has (mod::Dest::mixPosition) || c.has (mod::Dest::mixTowardsC);
     modMixOffset = { offset (mod::Dest::mixPosition), offset (mod::Dest::mixTowardsC) };
+    for (int r = 0; r < mod::maxRoutes; ++r)
+        modParamOffset[static_cast<std::size_t> (r)] = offset (mod::paramRouteDest (r));
     modGlobalApplied = true;
     publishEffective (m);
 }

@@ -193,6 +193,24 @@ namespace
         { "synthMotionA", "SYNTH A MOTION", Owner::voice, 0, Domain::unit, 1.0, Update::continuous },
         { "synthMotionB", "SYNTH B MOTION", Owner::voice, 1, Domain::unit, 1.0, Update::continuous },
         { "synthMotionC", "SYNTH C MOTION", Owner::voice, 2, Domain::unit, 1.0, Update::continuous },
+        // Any other control (named by the host): its whole normalised travel, a shared stage.
+        { "parameter", "PARAMETER", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param1", "PARAMETER 1", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param2", "PARAMETER 2", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param3", "PARAMETER 3", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param4", "PARAMETER 4", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param5", "PARAMETER 5", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param6", "PARAMETER 6", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param7", "PARAMETER 7", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param8", "PARAMETER 8", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param9", "PARAMETER 9", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param10", "PARAMETER 10", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param11", "PARAMETER 11", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param12", "PARAMETER 12", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param13", "PARAMETER 13", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param14", "PARAMETER 14", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param15", "PARAMETER 15", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
+        { "param16", "PARAMETER 16", Owner::global, -1, Domain::unit, 1.0, Update::continuous },
     } };
 
     bool isEnvelope (Source s) noexcept { return s == Source::env1 || s == Source::env2; }

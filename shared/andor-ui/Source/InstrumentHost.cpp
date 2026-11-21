@@ -375,6 +375,7 @@ void InstrumentHost::removeModulationRoute (int slot, bool ownUndoStep)
         setParameterValue (modRouteId (r, "depth"), 0.0f);
         setParameterValue (modRouteId (r, "enabled"), 1.0f);
         setModLink (r, 0, 0);
+        setModRouteParameter (r, {});
     };
     for (const int dependent : depthRoutesOf (slot))
         clear (dependent);
@@ -416,6 +417,37 @@ void InstrumentHost::setModLink (int slot, int uid, int targetUid)
         else if (links.hasProperty (name))
             links.removeProperty (name, &undo());
     }
+}
+
+void InstrumentHost::setModRouteParameter (int slot, const juce::String& parameterId)
+{
+    if (slot < 0 || slot >= mod::maxRoutes)
+        return;
+    auto links = apvts().state.getChildWithName (modLinksType);
+    if (! links.isValid())
+    {
+        if (parameterId.isEmpty())
+            return;
+        links = juce::ValueTree (modLinksType);
+        links.setProperty ("schemaVersion", 1, nullptr);
+        apvts().state.appendChild (links, &undo());
+    }
+    const juce::Identifier name ("param" + juce::String (slot + 1));
+    if (parameterId.isNotEmpty())
+        links.setProperty (name, parameterId, &undo());
+    else if (links.hasProperty (name))
+        links.removeProperty (name, &undo());
+}
+
+juce::String InstrumentHost::modRouteParameterLink (int slot) const
+{
+    const auto links = modLinks();
+    return links.isValid() && slot >= 0 && slot < mod::maxRoutes ? links.getProperty ("param" + juce::String (slot + 1), juce::String()).toString() : juce::String();
+}
+
+juce::String InstrumentHost::modRouteParameter (int slot) const
+{
+    return slot >= 0 && slot < mod::maxRoutes && mod::isParamRoute (routeDest (slot)) ? modRouteParameterLink (slot) : juce::String();
 }
 
 int InstrumentHost::modRouteUid (int slot) const
@@ -566,6 +598,11 @@ InstrumentHost::ModAssignResult InstrumentHost::assignModulation (mod::Source so
         result.error = "A route's depth is modulated from its halo";
         return result;
     }
+    if (mod::isParameterDest (dest))
+    {
+        result.error = "Choose the control: right-click it, or drop the source on it";
+        return result;
+    }
     if (! mod::compatible (probe, source, dest))
     {
         result.error = pair + compatibilityReason (dest);
@@ -601,6 +638,48 @@ InstrumentHost::ModAssignResult InstrumentHost::assignModulation (mod::Source so
     return result;
 }
 
+InstrumentHost::ModAssignResult InstrumentHost::assignParameterModulation (mod::Source source, const juce::String& parameterId, float depthPercent)
+{
+    ModAssignResult result;
+    auto* param = apvts().getParameter (parameterId);
+    if (source == mod::Source::none || param == nullptr || ! parameterModulatable (parameterId))
+    {
+        result.error = "Nothing to assign";
+        return result;
+    }
+    const auto probe = modulationProbe();
+    if (! mod::compatible (probe, source, mod::Dest::parameter))
+    {
+        result.error = juce::String (mod::sourceName (source)) + " cannot reach " + param->getName (64).toUpperCase() + compatibilityReason (mod::Dest::parameter);
+        return result;
+    }
+    for (int r = 0; r < mod::maxRoutes; ++r)
+        if (probe.routes[static_cast<std::size_t> (r)].source == source && mod::isParamRoute (probe.routes[static_cast<std::size_t> (r)].dest)
+            && modRouteParameter (r) == parameterId)
+        {
+            result.slot = r;
+            result.existed = true;   // selected for editing, as it is
+            return result;
+        }
+    for (int r = 0; r < mod::maxRoutes && result.slot < 0; ++r)
+        if (probe.routes[static_cast<std::size_t> (r)].source == mod::Source::none)
+            result.slot = r;
+    if (result.slot < 0)
+    {
+        result.error = "All " + juce::String (mod::maxRoutes) + " modulation routes are in use: remove one first";
+        return result;
+    }
+    undo().beginNewTransaction ("Add modulation");
+    setModLink (result.slot, newModRouteUid(), 0);   // a new route: a new identity
+    setModRouteParameter (result.slot, parameterId);
+    setParameterValue (modRouteId (result.slot, "source"), static_cast<float> (source));
+    setRouteDest (result.slot, mod::Dest::parameter);
+    setParameterValue (modRouteId (result.slot, "depth"), depthPercent);
+    setParameterValue (modRouteId (result.slot, "enabled"), 1.0f);
+    commitRouteChange();
+    return result;
+}
+
 std::vector<InstrumentHost::ModRouteInfo> InstrumentHost::modulationRoutes() const
 {
     std::vector<ModRouteInfo> list;
@@ -614,6 +693,7 @@ std::vector<InstrumentHost::ModRouteInfo> InstrumentHost::modulationRoutes() con
             continue;
         if (! info.isDepth())
             info.route.target = -1;
+        info.parameter = modRouteParameter (r);
         info.state = mod::routeState (probe, r);
         list.push_back (info);
     }
@@ -843,6 +923,10 @@ std::unique_ptr<MiniPanel> InstrumentHost::createStrumPanel (int card)
 
 juce::String InstrumentHost::destName (mod::Dest dest) const
 {
+    // A parameter route: the control it moves, by its own name.
+    if (const int slot = mod::paramRouteSlot (dest); slot >= 0)
+        if (auto* param = apvts().getParameter (modRouteParameter (slot)))
+            return param->getName (64).toUpperCase();
     const juce::String name (mod::destInfo (dest).name);
     const auto own = characterName();
     if (own != "CHARACTER" && name.startsWith ("CHARACTER"))

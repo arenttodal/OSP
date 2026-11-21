@@ -446,6 +446,9 @@ public:
     void setUserMacroAssignments (const UserMacroState& state) override;
     juce::String userMacroParameterId (int macro) const override { return macro >= 0 && macro < usermacro::macroCount ? userMacroId (macro) : juce::String(); }
     bool userMacroReads (const juce::String& parameterId) const override;
+    /** Rack modulation: a parameter route can move what a USER macro can (a float the engine
+        reads every block); its value joins the macros' offset on that control. */
+    bool parameterModulatable (const juce::String& parameterId) const override { return userMacroReads (parameterId); }
     std::uint64_t userMacroRevision() const override { return userMacroRevisionCount; }
     /** The macros' smoothed sum on a parameter as the engine adds it now (normalised). */
     float userMacroOffsetOf (const juce::String& parameterId) const { return liveOffsets.offset (liveOffsets.indexOf (parameterId)); }
@@ -858,6 +861,13 @@ private:
         anything reads a parameter this block (so before global modulation). Nothing assigned and
         nothing gliding out: returns at once, no value touched. Audio thread. */
     void applyUserMacros (int samples) noexcept;
+    /** Rack modulation: each parameter route's value (the engine's, from the latest block)
+        added to its control's offset, on top of the USER macros'; a control no route moves
+        any more goes back to the macros' offset alone. Audio thread, after applyUserMacros. */
+    void applyParameterRoutes() noexcept;
+    std::array<std::atomic<int>, mod::maxRoutes> modRouteParamIndex {};   ///< each route's control (LiveOffsets index; -1: none)
+    std::array<int, mod::maxRoutes> paramRouteApplied {};                 ///< the controls written last block
+    int paramRouteAppliedCount = 0;
     UserMacroState userMacroState;                          ///< message thread (the sound's state)
     usermacro::Snapshot userMacroCompiled;
     usermacro::TripleBuffer<usermacro::Snapshot> userMacroTables;

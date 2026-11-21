@@ -476,6 +476,14 @@ public:
     static constexpr int arpDestCount = 5;
     double arpModulation (mod::Dest d) const noexcept;
     bool arpModulated (mod::Dest d) const noexcept;
+    /** A parameter route's value (route `slot` with Dest::parameter): what it adds to its
+        control's normalised travel this block (span x the sum of its sources, depth routes
+        included; 0 without one). The host adds it to the control it names. Audio thread,
+        between blocks (it is the latest block's). */
+    double parameterModulation (int slot) const noexcept
+    {
+        return slot >= 0 && slot < mod::maxRoutes ? modParamOffset[static_cast<std::size_t> (slot)] : 0.0;
+    }
     /** The mix as it plays now (the stored controls plus any MIX modulation, smoothed): the
         blend, and the triangle's x and y; and whether a route moves it (the header's live
         node). Lock-free, any thread. */
@@ -754,6 +762,7 @@ private:
     std::array<bool, arpDestCount> modArpRouted {};
     std::array<std::array<double, 4>, 3> modEqOffset {};   ///< per layer: bell octaves, bell dB, low shelf dB, high shelf dB
     std::array<double, 2> modMixOffset {};                 ///< MIX and MIX TOWARDS C (0 without a route)
+    std::array<double, mod::maxRoutes> modParamOffset {};  ///< each parameter route's value (normalised travel)
     bool modMixRouted = false;
     std::array<std::atomic<float>, 3> liveMixValue {};
     std::atomic<bool> liveMixModulated { false };
