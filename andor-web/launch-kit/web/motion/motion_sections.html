@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANDOR OSP: motion sections mock</title>
+<!--
+  The approved films placed in the sections the visual review assigned them, using the web delivery versions
+  (make_web_motion.sh -> media/) and motion.js. Copy is a placeholder. Reference for the site build, not the site.
+  Order follows the review: H01 C hero (h01_c_hero.html), the reveal, atmosphere, controls, the three engines.
+-->
+<style>
+  @font-face { font-family: "EB Garamond"; src: url("../../typography/fonts/EBGaramond-Regular.ttf") format("truetype"); }
+  @font-face { font-family: "Inter Tight"; font-weight: 300; src: url("../../typography/fonts/InterTight-300.ttf") format("truetype"); }
+  :root { --ivory: #f3efe8; --ink: #242723; --ink-2: #5c635a; --night: #0d0d0c; --night-ink: #ece6dc; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--ivory); color: var(--ink); font-family: "Inter Tight", system-ui, sans-serif; font-weight: 300; }
+  section { padding: clamp(56px, 10vw, 140px) 16px; }
+  section.dark { background: var(--night); color: var(--night-ink); }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  h2 { font-family: "EB Garamond", Georgia, serif; font-weight: 400; font-size: clamp(28px, 4vw, 52px); line-height: 1.08; }
+  p { margin-top: 14px; max-width: 34em; font-size: clamp(15px, 1.2vw, 18px); color: var(--ink-2); }
+  .dark p { color: #a9a39a; }
+  .head { margin-bottom: clamp(24px, 4vw, 48px); }
+
+  /* the film: the poster image holds the space (16:9) until the video can play, then the video fades in */
+  .andor-film { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; background: #111; }
+  .andor-film img, .andor-film video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .andor-film video { opacity: 0; transition: opacity .6s ease; }
+  .andor-film.is-playing video { opacity: 1; }
+  .andor-film__play { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px;
+                      border: 0; border-radius: 50%; background: rgba(246, 242, 236, .92); cursor: pointer; }
+  .andor-film__play::after { content: ""; position: absolute; left: 26px; top: 21px; border-style: solid;
+                             border-width: 11px 0 11px 18px; border-color: transparent transparent transparent var(--ink); }
+  .andor-film__play:focus-visible { outline: 2px solid var(--night-ink); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { .andor-film video { transition: none; } }
+</style>
+</head>
+<body>
+  <section class="dark" aria-labelledby="s-reveal">
+    <div class="wrap">
+      <div class="head"><h2 id="s-reveal">One sound. An entire instrument.</h2></div>
+      <figure class="andor-film" data-film="R01_CUT-R4-type-t1" data-base="media/" data-mode="once">
+        <picture><source type="image/webp" srcset="media/R01_CUT-R4-type-t1_poster.webp">
+          <img src="media/R01_CUT-R4-type-t1_poster.jpg" alt="The ANDOR OSP instrument revealed: a close pass over the keys, then the whole instrument under the ANDOR wordmark" loading="lazy" decoding="async"></picture>
+      </figure>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-atmos">
+    <div class="wrap">
+      <div class="head"><h2 id="s-atmos">Made to be played.</h2><p>Placeholder line about the instrument's character.</p></div>
+      <figure class="andor-film" data-film="R04_WIN16" data-base="media/" data-mode="once">
+        <picture><source type="image/webp" srcset="media/R04_WIN16_poster.webp">
+          <img src="media/R04_WIN16_poster.jpg" alt="Window light moving slowly across the ANDOR OSP instrument" loading="lazy" decoding="async"></picture>
+      </figure>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-controls">
+    <div class="wrap">
+      <div class="head"><h2 id="s-controls">Every control within reach.</h2><p>Placeholder line about the macros and source controls.</p></div>
+      <figure class="andor-film" data-film="D2_TRACK" data-base="media/" data-mode="once">
+        <picture><source type="image/webp" srcset="media/D2_TRACK_poster.webp">
+          <img src="media/D2_TRACK_poster.jpg" alt="A slow macro track along the instrument's row of controls" loading="lazy" decoding="async"></picture>
+      </figure>
+    </div>
+  </section>
+
+  <section class="dark" aria-labelledby="s-engines">
+    <div class="wrap">
+      <div class="head"><h2 id="s-engines">Three sources. One voice.</h2><p>Placeholder line about the three sound engines.</p></div>
+      <figure class="andor-film" data-film="R03_GLIDE-edit-15s5" data-base="media/" data-mode="once">
+        <picture><source type="image/webp" srcset="media/R03_GLIDE-edit-15s5_poster.webp">
+          <img src="media/R03_GLIDE-edit-15s5_poster.jpg" alt="The camera glides low across the instrument's three source displays" loading="lazy" decoding="async"></picture>
+      </figure>
+    </div>
+  </section>
+
+  <script src="motion.js" defer></script>
+</body>
+</html>
