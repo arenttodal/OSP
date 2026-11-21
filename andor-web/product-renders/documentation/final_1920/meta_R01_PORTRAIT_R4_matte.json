@@ -1,0 +1,3897 @@
+{
+ "interface_textures": "textures_0.9.0-beta.1",
+ "device": "OPTIX",
+ "devices": [
+  "NVIDIA GeForce RTX 4090"
+ ],
+ "denoise_gpu": true,
+ "interface_frozen": true,
+ "interface_commit": "32e0bee",
+ "spec": {
+  "id": "R01_PORTRAIT_R4",
+  "family": "R01 Monument (cut)",
+  "variant": "Shot 2: the A2 portrait with the wordmark (R4: whole instrument, T1)",
+  "setup": "ANDOR_FLOATING",
+  "base_shot": "B1_R4",
+  "aspect": [
+   16,
+   9
+  ],
+  "seconds": 6.5,
+  "handles": 1.0,
+  "camera": {
+   "lens": 65,
+   "fstop": 9,
+   "position": [
+    [
+     0.0,
+     [
+      0.5815,
+      -0.7433,
+      0.5462
+     ],
+     [
+      0.25,
+      0.0,
+      0.35,
+      1.0
+     ]
+    ],
+    [
+     6.5,
+     [
+      0.5905,
+      -0.7546,
+      0.5559
+     ]
+    ]
+   ],
+   "target": [
+    -0.01,
+    0.0,
+    -0.09
+   ]
+  },
+  "stage": {
+   "remove_lights": [
+    "Fill",
+    "Front kicker",
+    "Floor overhead"
+   ],
+   "flags": [
+    {
+     "name": "Display flag",
+     "mirror": true,
+     "aim": [
+      0.0,
+      0.065,
+      0.012
+     ],
+     "size": [
+      0.9,
+      0.6
+     ],
+     "distance": 1.0
+    }
+   ],
+   "add_lights": [
+    {
+     "name": "Monument sweep",
+     "position": [
+      0.75,
+      0.35,
+      0.7
+     ],
+     "target": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      1.4,
+      0.3
+     ],
+     "power": 22,
+     "rgb": [
+      1.0,
+      0.975,
+      0.95
+     ],
+     "spread": 180,
+     "link": "product",
+     "glossy_only": false
+    }
+   ]
+  },
+  "product": {
+   "translate": [
+    0.0,
+    0.0,
+    -0.098
+   ]
+  },
+  "lights": {
+   "Floor rake": {
+    "energy": 0.45
+   },
+   "Top line": {
+    "energy": 0.35
+   }
+  },
+  "exposure": 0.0,
+  "emission": 0.9,
+  "narrative": "Cut out to the portrait: the complete instrument at A2's three-quarter, the ANDOR wordmark standing in the dark behind it, the far corner crossing the foot of the letters. The camera eases back by 1.5 % and settles; the instrument and the type stay registered.",
+  "from_still": "SF_A2",
+  "typography": {
+   "style_layouts": {
+    "T1": [
+     "SF_A2",
+     "T1"
+    ]
+   },
+   "fade": [
+    0.0,
+    0.0
+   ],
+   "blur_from": 0.0
+  },
+  "notes": "R4: A2's direction at 1.10x its distance (the whole instrument in frame, with room at the front-right corner); 1.5 % settle as in R3; T1 only."
+ },
+ "pass": "matte",
+ "res": [
+  1920,
+  1080
+ ],
+ "samples": 4,
+ "noise": 0.01,
+ "fps": 24,
+ "frames_total": 204,
+ "handles_s": 1.0,
+ "blender": "4.2.0",
+ "frames": [
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.0,
+   "lens": 65.0,
+   "cam": [
+    0.358,
+    -0.8611,
+    0.6599
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.0417,
+   "lens": 65.0,
+   "cam": [
+    0.358,
+    -0.8611,
+    0.6599
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.0
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.0833,
+   "lens": 65.0,
+   "cam": [
+    0.358,
+    -0.8611,
+    0.6599
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.125,
+   "lens": 65.0,
+   "cam": [
+    0.358,
+    -0.8611,
+    0.6599
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.1667,
+   "lens": 65.0,
+   "cam": [
+    0.358,
+    -0.8611,
+    0.6599
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.2083,
+   "lens": 65.0,
+   "cam": [
+    0.358,
+    -0.8611,
+    0.6599
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.25,
+   "lens": 65.0,
+   "cam": [
+    0.3581,
+    -0.8612,
+    0.66
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.2917,
+   "lens": 65.0,
+   "cam": [
+    0.3581,
+    -0.8612,
+    0.66
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.3333,
+   "lens": 65.0,
+   "cam": [
+    0.3581,
+    -0.8612,
+    0.66
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.375,
+   "lens": 65.0,
+   "cam": [
+    0.3581,
+    -0.8613,
+    0.6601
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.4167,
+   "lens": 65.0,
+   "cam": [
+    0.3581,
+    -0.8614,
+    0.6601
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.4583,
+   "lens": 65.0,
+   "cam": [
+    0.3582,
+    -0.8614,
+    0.6601
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.5,
+   "lens": 65.0,
+   "cam": [
+    0.3582,
+    -0.8615,
+    0.6602
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.5417,
+   "lens": 65.0,
+   "cam": [
+    0.3582,
+    -0.8616,
+    0.6603
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.5833,
+   "lens": 65.0,
+   "cam": [
+    0.3583,
+    -0.8617,
+    0.6603
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.625,
+   "lens": 65.0,
+   "cam": [
+    0.3583,
+    -0.8617,
+    0.6604
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.6667,
+   "lens": 65.0,
+   "cam": [
+    0.3583,
+    -0.8618,
+    0.6604
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.7083,
+   "lens": 65.0,
+   "cam": [
+    0.3584,
+    -0.8619,
+    0.6605
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.75,
+   "lens": 65.0,
+   "cam": [
+    0.3584,
+    -0.862,
+    0.6606
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.7917,
+   "lens": 65.0,
+   "cam": [
+    0.3585,
+    -0.8621,
+    0.6607
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.8333,
+   "lens": 65.0,
+   "cam": [
+    0.3585,
+    -0.8623,
+    0.6608
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.875,
+   "lens": 65.0,
+   "cam": [
+    0.3586,
+    -0.8624,
+    0.6608
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.9167,
+   "lens": 65.0,
+   "cam": [
+    0.3586,
+    -0.8625,
+    0.6609
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 0.9583,
+   "lens": 65.0,
+   "cam": [
+    0.3587,
+    -0.8626,
+    0.661
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.0,
+   "lens": 65.0,
+   "cam": [
+    0.3587,
+    -0.8628,
+    0.6611
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.0417,
+   "lens": 65.0,
+   "cam": [
+    0.3588,
+    -0.8629,
+    0.6612
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.0833,
+   "lens": 65.0,
+   "cam": [
+    0.3588,
+    -0.8631,
+    0.6613
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.125,
+   "lens": 65.0,
+   "cam": [
+    0.3589,
+    -0.8632,
+    0.6614
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.1667,
+   "lens": 65.0,
+   "cam": [
+    0.359,
+    -0.8634,
+    0.6616
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.2083,
+   "lens": 65.0,
+   "cam": [
+    0.359,
+    -0.8635,
+    0.6617
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.25,
+   "lens": 65.0,
+   "cam": [
+    0.3591,
+    -0.8637,
+    0.6618
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.2917,
+   "lens": 65.0,
+   "cam": [
+    0.3592,
+    -0.8638,
+    0.6619
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.3333,
+   "lens": 65.0,
+   "cam": [
+    0.3592,
+    -0.864,
+    0.662
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.375,
+   "lens": 65.0,
+   "cam": [
+    0.3593,
+    -0.8641,
+    0.6621
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.4167,
+   "lens": 65.0,
+   "cam": [
+    0.3594,
+    -0.8643,
+    0.6622
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.4583,
+   "lens": 65.0,
+   "cam": [
+    0.3594,
+    -0.8645,
+    0.6624
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.5,
+   "lens": 65.0,
+   "cam": [
+    0.3595,
+    -0.8646,
+    0.6625
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.5417,
+   "lens": 65.0,
+   "cam": [
+    0.3596,
+    -0.8648,
+    0.6626
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.5833,
+   "lens": 65.0,
+   "cam": [
+    0.3596,
+    -0.865,
+    0.6627
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.625,
+   "lens": 65.0,
+   "cam": [
+    0.3597,
+    -0.8651,
+    0.6629
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.6667,
+   "lens": 65.0,
+   "cam": [
+    0.3598,
+    -0.8653,
+    0.663
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.7083,
+   "lens": 65.0,
+   "cam": [
+    0.3598,
+    -0.8655,
+    0.6631
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.75,
+   "lens": 65.0,
+   "cam": [
+    0.3599,
+    -0.8657,
+    0.6632
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.7917,
+   "lens": 65.0,
+   "cam": [
+    0.36,
+    -0.8658,
+    0.6633
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.8333,
+   "lens": 65.0,
+   "cam": [
+    0.3601,
+    -0.866,
+    0.6635
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.875,
+   "lens": 65.0,
+   "cam": [
+    0.3601,
+    -0.8662,
+    0.6636
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.9167,
+   "lens": 65.0,
+   "cam": [
+    0.3602,
+    -0.8663,
+    0.6637
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 1.9583,
+   "lens": 65.0,
+   "cam": [
+    0.3603,
+    -0.8665,
+    0.6638
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.0,
+   "lens": 65.0,
+   "cam": [
+    0.3603,
+    -0.8667,
+    0.664
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.0417,
+   "lens": 65.0,
+   "cam": [
+    0.3604,
+    -0.8668,
+    0.6641
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.0833,
+   "lens": 65.0,
+   "cam": [
+    0.3605,
+    -0.867,
+    0.6642
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.125,
+   "lens": 65.0,
+   "cam": [
+    0.3605,
+    -0.8672,
+    0.6643
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.1667,
+   "lens": 65.0,
+   "cam": [
+    0.3606,
+    -0.8673,
+    0.6644
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.2083,
+   "lens": 65.0,
+   "cam": [
+    0.3607,
+    -0.8675,
+    0.6645
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.25,
+   "lens": 65.0,
+   "cam": [
+    0.3607,
+    -0.8676,
+    0.6647
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.2917,
+   "lens": 65.0,
+   "cam": [
+    0.3608,
+    -0.8678,
+    0.6648
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.3333,
+   "lens": 65.0,
+   "cam": [
+    0.3609,
+    -0.8679,
+    0.6649
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.375,
+   "lens": 65.0,
+   "cam": [
+    0.3609,
+    -0.8681,
+    0.665
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.4167,
+   "lens": 65.0,
+   "cam": [
+    0.361,
+    -0.8682,
+    0.6651
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.4583,
+   "lens": 65.0,
+   "cam": [
+    0.3611,
+    -0.8684,
+    0.6652
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.5,
+   "lens": 65.0,
+   "cam": [
+    0.3611,
+    -0.8685,
+    0.6653
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.5417,
+   "lens": 65.0,
+   "cam": [
+    0.3612,
+    -0.8687,
+    0.6654
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.5833,
+   "lens": 65.0,
+   "cam": [
+    0.3612,
+    -0.8688,
+    0.6655
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.625,
+   "lens": 65.0,
+   "cam": [
+    0.3613,
+    -0.869,
+    0.6656
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.6667,
+   "lens": 65.0,
+   "cam": [
+    0.3613,
+    -0.8691,
+    0.6657
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.7083,
+   "lens": 65.0,
+   "cam": [
+    0.3614,
+    -0.8692,
+    0.6658
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.75,
+   "lens": 65.0,
+   "cam": [
+    0.3615,
+    -0.8694,
+    0.6659
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.7917,
+   "lens": 65.0,
+   "cam": [
+    0.3615,
+    -0.8695,
+    0.666
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.8333,
+   "lens": 65.0,
+   "cam": [
+    0.3616,
+    -0.8696,
+    0.6661
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.875,
+   "lens": 65.0,
+   "cam": [
+    0.3616,
+    -0.8698,
+    0.6662
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.9167,
+   "lens": 65.0,
+   "cam": [
+    0.3617,
+    -0.8699,
+    0.6663
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 2.9583,
+   "lens": 65.0,
+   "cam": [
+    0.3617,
+    -0.87,
+    0.6664
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.0,
+   "lens": 65.0,
+   "cam": [
+    0.3618,
+    -0.8701,
+    0.6665
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.0417,
+   "lens": 65.0,
+   "cam": [
+    0.3618,
+    -0.8703,
+    0.6666
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.0833,
+   "lens": 65.0,
+   "cam": [
+    0.3619,
+    -0.8704,
+    0.6667
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.125,
+   "lens": 65.0,
+   "cam": [
+    0.3619,
+    -0.8705,
+    0.6667
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.1667,
+   "lens": 65.0,
+   "cam": [
+    0.362,
+    -0.8706,
+    0.6668
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.2083,
+   "lens": 65.0,
+   "cam": [
+    0.362,
+    -0.8707,
+    0.6669
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.25,
+   "lens": 65.0,
+   "cam": [
+    0.3621,
+    -0.8708,
+    0.667
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.2917,
+   "lens": 65.0,
+   "cam": [
+    0.3621,
+    -0.8709,
+    0.6671
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.3333,
+   "lens": 65.0,
+   "cam": [
+    0.3621,
+    -0.871,
+    0.6671
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.375,
+   "lens": 65.0,
+   "cam": [
+    0.3622,
+    -0.8711,
+    0.6672
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.4167,
+   "lens": 65.0,
+   "cam": [
+    0.3622,
+    -0.8712,
+    0.6673
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.4583,
+   "lens": 65.0,
+   "cam": [
+    0.3623,
+    -0.8713,
+    0.6673
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.5,
+   "lens": 65.0,
+   "cam": [
+    0.3623,
+    -0.8714,
+    0.6674
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.5417,
+   "lens": 65.0,
+   "cam": [
+    0.3623,
+    -0.8715,
+    0.6675
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.5833,
+   "lens": 65.0,
+   "cam": [
+    0.3624,
+    -0.8716,
+    0.6676
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.625,
+   "lens": 65.0,
+   "cam": [
+    0.3624,
+    -0.8717,
+    0.6676
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.6667,
+   "lens": 65.0,
+   "cam": [
+    0.3625,
+    -0.8718,
+    0.6677
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.7083,
+   "lens": 65.0,
+   "cam": [
+    0.3625,
+    -0.8719,
+    0.6678
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.75,
+   "lens": 65.0,
+   "cam": [
+    0.3625,
+    -0.872,
+    0.6678
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.7917,
+   "lens": 65.0,
+   "cam": [
+    0.3626,
+    -0.8721,
+    0.6679
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.8333,
+   "lens": 65.0,
+   "cam": [
+    0.3626,
+    -0.8721,
+    0.6679
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.875,
+   "lens": 65.0,
+   "cam": [
+    0.3626,
+    -0.8722,
+    0.668
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.9167,
+   "lens": 65.0,
+   "cam": [
+    0.3627,
+    -0.8723,
+    0.668
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 3.9583,
+   "lens": 65.0,
+   "cam": [
+    0.3627,
+    -0.8724,
+    0.6681
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.0,
+   "lens": 65.0,
+   "cam": [
+    0.3627,
+    -0.8724,
+    0.6682
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.0417,
+   "lens": 65.0,
+   "cam": [
+    0.3628,
+    -0.8725,
+    0.6682
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.0833,
+   "lens": 65.0,
+   "cam": [
+    0.3628,
+    -0.8726,
+    0.6683
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.125,
+   "lens": 65.0,
+   "cam": [
+    0.3628,
+    -0.8727,
+    0.6683
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.1667,
+   "lens": 65.0,
+   "cam": [
+    0.3628,
+    -0.8727,
+    0.6684
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.2083,
+   "lens": 65.0,
+   "cam": [
+    0.3629,
+    -0.8728,
+    0.6684
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.25,
+   "lens": 65.0,
+   "cam": [
+    0.3629,
+    -0.8729,
+    0.6685
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.2917,
+   "lens": 65.0,
+   "cam": [
+    0.3629,
+    -0.8729,
+    0.6685
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.3333,
+   "lens": 65.0,
+   "cam": [
+    0.363,
+    -0.873,
+    0.6685
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.375,
+   "lens": 65.0,
+   "cam": [
+    0.363,
+    -0.873,
+    0.6686
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.4167,
+   "lens": 65.0,
+   "cam": [
+    0.363,
+    -0.8731,
+    0.6686
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.4583,
+   "lens": 65.0,
+   "cam": [
+    0.363,
+    -0.8732,
+    0.6687
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.5,
+   "lens": 65.0,
+   "cam": [
+    0.363,
+    -0.8732,
+    0.6687
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.5417,
+   "lens": 65.0,
+   "cam": [
+    0.3631,
+    -0.8733,
+    0.6688
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.5833,
+   "lens": 65.0,
+   "cam": [
+    0.3631,
+    -0.8733,
+    0.6688
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.625,
+   "lens": 65.0,
+   "cam": [
+    0.3631,
+    -0.8734,
+    0.6688
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.6667,
+   "lens": 65.0,
+   "cam": [
+    0.3631,
+    -0.8734,
+    0.6689
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.7083,
+   "lens": 65.0,
+   "cam": [
+    0.3632,
+    -0.8735,
+    0.6689
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.75,
+   "lens": 65.0,
+   "cam": [
+    0.3632,
+    -0.8735,
+    0.6689
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.7917,
+   "lens": 65.0,
+   "cam": [
+    0.3632,
+    -0.8736,
+    0.669
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.8333,
+   "lens": 65.0,
+   "cam": [
+    0.3632,
+    -0.8736,
+    0.669
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.875,
+   "lens": 65.0,
+   "cam": [
+    0.3632,
+    -0.8736,
+    0.669
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.9167,
+   "lens": 65.0,
+   "cam": [
+    0.3632,
+    -0.8737,
+    0.6691
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 4.9583,
+   "lens": 65.0,
+   "cam": [
+    0.3633,
+    -0.8737,
+    0.6691
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.0,
+   "lens": 65.0,
+   "cam": [
+    0.3633,
+    -0.8738,
+    0.6691
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.0417,
+   "lens": 65.0,
+   "cam": [
+    0.3633,
+    -0.8738,
+    0.6691
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.0833,
+   "lens": 65.0,
+   "cam": [
+    0.3633,
+    -0.8738,
+    0.6692
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.125,
+   "lens": 65.0,
+   "cam": [
+    0.3633,
+    -0.8739,
+    0.6692
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.1667,
+   "lens": 65.0,
+   "cam": [
+    0.3633,
+    -0.8739,
+    0.6692
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.2083,
+   "lens": 65.0,
+   "cam": [
+    0.3633,
+    -0.8739,
+    0.6692
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.25,
+   "lens": 65.0,
+   "cam": [
+    0.3634,
+    -0.874,
+    0.6693
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.2917,
+   "lens": 65.0,
+   "cam": [
+    0.3634,
+    -0.874,
+    0.6693
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.3333,
+   "lens": 65.0,
+   "cam": [
+    0.3634,
+    -0.874,
+    0.6693
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.375,
+   "lens": 65.0,
+   "cam": [
+    0.3634,
+    -0.8741,
+    0.6693
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.4167,
+   "lens": 65.0,
+   "cam": [
+    0.3634,
+    -0.8741,
+    0.6693
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.4583,
+   "lens": 65.0,
+   "cam": [
+    0.3634,
+    -0.8741,
+    0.6694
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.5,
+   "lens": 65.0,
+   "cam": [
+    0.3634,
+    -0.8741,
+    0.6694
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.5417,
+   "lens": 65.0,
+   "cam": [
+    0.3634,
+    -0.8742,
+    0.6694
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.5833,
+   "lens": 65.0,
+   "cam": [
+    0.3634,
+    -0.8742,
+    0.6694
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.625,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8742,
+    0.6694
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.0
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.6667,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8742,
+    0.6694
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.7083,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8742,
+    0.6695
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.75,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8743,
+    0.6695
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.7917,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8743,
+    0.6695
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.8333,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8743,
+    0.6695
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.875,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8743,
+    0.6695
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.9167,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8743,
+    0.6695
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 5.9583,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8743,
+    0.6695
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.0,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8743,
+    0.6695
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.0417,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8743,
+    0.6695
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.0833,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8744,
+    0.6695
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.125,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8744,
+    0.6696
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.1667,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8744,
+    0.6696
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.2083,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8744,
+    0.6696
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.25,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8744,
+    0.6696
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.2917,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8744,
+    0.6696
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.3333,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8744,
+    0.6696
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.375,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8744,
+    0.6696
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.4167,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8744,
+    0.6696
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Floor rake": 11.7,
+    "Key softbox": 16.245,
+    "Monument sweep": 22.0,
+    "Rim strip": 22.743,
+    "Top line": 0.967
+   },
+   "t": 6.4583,
+   "lens": 65.0,
+   "cam": [
+    0.3635,
+    -0.8744,
+    0.6696
+   ],
+   "target": [
+    -0.0057,
+    0.0165,
+    0.0237
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 2.1
+  }
+ ]
+}

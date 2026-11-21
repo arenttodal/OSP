@@ -1,0 +1,68 @@
+{
+ "R04_WIN16": {
+  "mean": {
+   "draft": 0.69,
+   "final": 0.65
+  },
+  "p99_5": {
+   "draft": 9.28,
+   "final": 7.35
+  },
+  "p99_5_reduction_pct": 21
+ },
+ "D2_TRACK": {
+  "mean": {
+   "draft": 3.18,
+   "final": 0.94
+  },
+  "p99_5": {
+   "draft": 30.16,
+   "final": 8.73
+  },
+  "p99_5_reduction_pct": 71
+ },
+ "R03_GLIDE": {
+  "mean": {
+   "draft": 2.26,
+   "final": 1.95
+  },
+  "p99_5": {
+   "draft": 23.54,
+   "final": 23.23
+  },
+  "p99_5_reduction_pct": 1
+ },
+ "R01_CLOSE_R4": {
+  "mean": {
+   "draft": 1.51,
+   "final": 0.64
+  },
+  "p99_5": {
+   "draft": 19.38,
+   "final": 4.99
+  },
+  "p99_5_reduction_pct": 74
+ },
+ "R01_PORTRAIT_R4": {
+  "mean": {
+   "draft": 0.32,
+   "final": 0.36
+  },
+  "p99_5": {
+   "draft": 5.28,
+   "final": 4.08
+  },
+  "p99_5_reduction_pct": 23
+ },
+ "R02_DIM_R4": {
+  "mean": {
+   "draft": 0.54,
+   "final": 0.49
+  },
+  "p99_5": {
+   "draft": 4.08,
+   "final": 3.02
+  },
+  "p99_5_reduction_pct": 26
+ }
+}

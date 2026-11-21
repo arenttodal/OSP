@@ -1,0 +1,6118 @@
+{
+ "interface_textures": "textures_0.9.0-beta.1",
+ "device": "OPTIX",
+ "devices": [
+  "NVIDIA GeForce RTX 4090"
+ ],
+ "denoise_gpu": true,
+ "interface_frozen": true,
+ "interface_commit": "32e0bee",
+ "spec": {
+  "id": "R02_DIM_R4",
+  "family": "R02 Silhouette",
+  "variant": "The pool of light, returning to dim (R4: peak -0.3 EV)",
+  "narrative": "Dim: the ceramic and the knobs are only just there, a faint rim along the edge. A narrow strip of light crosses the controls; behind it a soft pool gathers over the macro row and the labels come up into the light. Then, as slowly as it came, the light withdraws and the instrument returns to the dim it began in - shape still visible, nothing black. The camera does not move; the last frame is the first.",
+  "setup": "ANDOR_FLOATING",
+  "base_shot": "B1_R4",
+  "aspect": [
+   16,
+   9
+  ],
+  "seconds": 11.0,
+  "handles": 1.0,
+  "camera": {
+   "lens": 85,
+   "fstop": 8,
+   "position": [
+    [
+     0.0,
+     [
+      0.1278,
+      -0.5973,
+      0.5557
+     ]
+    ]
+   ],
+   "target": [
+    [
+     0.0,
+     [
+      -0.04,
+      -0.03,
+      0.0
+     ]
+    ]
+   ]
+  },
+  "stage": {
+   "remove_lights": [
+    "Key softbox",
+    "Top line",
+    "Front kicker",
+    "Fill",
+    "Floor overhead",
+    "Floor rake"
+   ],
+   "flags": [
+    {
+     "name": "Display flag",
+     "mirror": true,
+     "aim": [
+      0.0,
+      0.065,
+      0.012
+     ],
+     "size": [
+      0.9,
+      0.6
+     ],
+     "distance": 1.0
+    }
+   ],
+   "add_lights": [
+    {
+     "name": "Strip",
+     "position": [
+      -0.42,
+      -0.3,
+      0.14
+     ],
+     "target": [
+      -0.2,
+      -0.06,
+      0.0
+     ],
+     "size": [
+      0.03,
+      0.6
+     ],
+     "power": 0.5,
+     "rgb": [
+      1.0,
+      0.95,
+      0.88
+     ],
+     "spread": 40,
+     "link": "product"
+    },
+    {
+     "name": "Pool",
+     "position": [
+      -0.08,
+      -0.08,
+      0.7
+     ],
+     "target": [
+      -0.06,
+      -0.06,
+      0.0
+     ],
+     "size": [
+      0.14,
+      0.14
+     ],
+     "power": 0.6,
+     "rgb": [
+      1.0,
+      0.95,
+      0.88
+     ],
+     "spread": 16,
+     "link": "product"
+    }
+   ]
+  },
+  "lights": {
+   "Rim strip": {
+    "energy": [
+     [
+      0.0,
+      0.14
+     ]
+    ]
+   },
+   "Strip": {
+    "energy": [
+     [
+      0.0,
+      0.0,
+      [
+       0.5,
+       0.0,
+       0.4,
+       1.0
+      ]
+     ],
+     [
+      1.4,
+      0.6904,
+      "hold"
+     ],
+     [
+      4.2,
+      0.6904,
+      "smooth"
+     ],
+     [
+      6.4,
+      0.0
+     ]
+    ],
+    "translate": [
+     [
+      0.0,
+      [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "hold"
+     ],
+     [
+      0.6,
+      [
+       0.0,
+       0.0,
+       0.0
+      ],
+      [
+       0.45,
+       0.0,
+       0.55,
+       1.0
+      ]
+     ],
+     [
+      6.2,
+      [
+       0.36,
+       0.0,
+       0.0
+      ]
+     ]
+    ]
+   },
+   "Pool": {
+    "energy": [
+     [
+      0.0,
+      0.0,
+      "hold"
+     ],
+     [
+      2.6,
+      0.0,
+      [
+       0.55,
+       0.0,
+       0.35,
+       1.0
+      ]
+     ],
+     [
+      6.2,
+      0.6092,
+      [
+       0.45,
+       0.0,
+       0.6,
+       1.0
+      ]
+     ],
+     [
+      10.6,
+      0.0
+     ]
+    ],
+    "translate": [
+     [
+      0.0,
+      [
+       0.0,
+       0.0,
+       -0.14
+      ],
+      "hold"
+     ],
+     [
+      2.6,
+      [
+       0.0,
+       0.0,
+       -0.14
+      ],
+      [
+       0.4,
+       0.0,
+       0.3,
+       1.0
+      ]
+     ],
+     [
+      6.2,
+      [
+       0.0,
+       0.0,
+       0.0
+      ]
+     ]
+    ]
+   }
+  },
+  "world": 0.045,
+  "exposure": 0.0,
+  "emission": [
+   [
+    0.0,
+    0.0,
+    "hold"
+   ],
+   [
+    4.0,
+    0.0,
+    [
+     0.5,
+     0.0,
+     0.4,
+     1.0
+    ]
+   ],
+   [
+    6.4,
+    0.1787,
+    [
+     0.45,
+     0.0,
+     0.6,
+     1.0
+    ]
+   ],
+   [
+    10.6,
+    0.0
+   ]
+  ],
+  "notes": "R4: the strip, the pool and the display glow peak 0.3 EV lower (x 0.812); the dim level (Rim strip, world), the movement and the timing are R3's. Loop: every channel has the same value at 0 s and 11 s."
+ },
+ "pass": "beauty",
+ "res": [
+  1920,
+  1080
+ ],
+ "samples": 96,
+ "noise": 0.01,
+ "fps": 24,
+ "frames_total": 312,
+ "handles_s": 1.0,
+ "blender": "4.2.0",
+ "frames": [
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 0.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 0.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.002
+   },
+   "t": 0.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.004
+   },
+   "t": 0.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.008
+   },
+   "t": 0.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.012
+   },
+   "t": 0.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.018
+   },
+   "t": 0.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.026
+   },
+   "t": 0.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.036
+   },
+   "t": 0.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.047
+   },
+   "t": 0.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.061
+   },
+   "t": 0.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.077
+   },
+   "t": 0.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.095
+   },
+   "t": 0.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.116
+   },
+   "t": 0.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.137
+   },
+   "t": 0.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.16
+   },
+   "t": 0.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.183
+   },
+   "t": 0.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.205
+   },
+   "t": 0.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.226
+   },
+   "t": 0.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.244
+   },
+   "t": 0.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.261
+   },
+   "t": 0.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.276
+   },
+   "t": 0.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.289
+   },
+   "t": 0.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.3
+   },
+   "t": 0.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.31
+   },
+   "t": 1.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.318
+   },
+   "t": 1.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.324
+   },
+   "t": 1.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.33
+   },
+   "t": 1.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.335
+   },
+   "t": 1.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.338
+   },
+   "t": 1.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.341
+   },
+   "t": 1.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.343
+   },
+   "t": 1.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.344
+   },
+   "t": 1.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 1.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.001,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.001,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.002,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.003,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.004,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.005,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 2.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.006,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.007,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.009,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.011,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.012,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.015,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.017,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.02,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.023,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.026,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.029,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.033,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.037,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.041,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.046,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.051,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.057,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.063,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.069,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.076,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.083,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.091,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.099,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.108,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 3.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.117,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 4.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.127,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 4.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.137,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 4.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.147,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 4.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.158,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 4.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.168,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 4.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.179,
+    "Rim strip": 3.184,
+    "Strip": 0.345
+   },
+   "t": 4.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.19,
+    "Rim strip": 3.184,
+    "Strip": 0.343
+   },
+   "t": 4.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.2,
+    "Rim strip": 3.184,
+    "Strip": 0.342
+   },
+   "t": 4.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.21,
+    "Rim strip": 3.184,
+    "Strip": 0.339
+   },
+   "t": 4.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.22,
+    "Rim strip": 3.184,
+    "Strip": 0.336
+   },
+   "t": 4.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.229,
+    "Rim strip": 3.184,
+    "Strip": 0.332
+   },
+   "t": 4.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.239,
+    "Rim strip": 3.184,
+    "Strip": 0.328
+   },
+   "t": 4.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.247,
+    "Rim strip": 3.184,
+    "Strip": 0.323
+   },
+   "t": 4.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.256,
+    "Rim strip": 3.184,
+    "Strip": 0.317
+   },
+   "t": 4.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.263,
+    "Rim strip": 3.184,
+    "Strip": 0.312
+   },
+   "t": 4.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.271,
+    "Rim strip": 3.184,
+    "Strip": 0.305
+   },
+   "t": 4.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.278,
+    "Rim strip": 3.184,
+    "Strip": 0.298
+   },
+   "t": 4.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.284,
+    "Rim strip": 3.184,
+    "Strip": 0.291
+   },
+   "t": 4.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.291,
+    "Rim strip": 3.184,
+    "Strip": 0.284
+   },
+   "t": 4.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.296,
+    "Rim strip": 3.184,
+    "Strip": 0.276
+   },
+   "t": 4.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.302,
+    "Rim strip": 3.184,
+    "Strip": 0.268
+   },
+   "t": 4.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.307,
+    "Rim strip": 3.184,
+    "Strip": 0.259
+   },
+   "t": 4.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.312,
+    "Rim strip": 3.184,
+    "Strip": 0.25
+   },
+   "t": 4.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.316,
+    "Rim strip": 3.184,
+    "Strip": 0.241
+   },
+   "t": 5.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.321,
+    "Rim strip": 3.184,
+    "Strip": 0.232
+   },
+   "t": 5.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.324,
+    "Rim strip": 3.184,
+    "Strip": 0.223
+   },
+   "t": 5.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.328,
+    "Rim strip": 3.184,
+    "Strip": 0.213
+   },
+   "t": 5.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.332,
+    "Rim strip": 3.184,
+    "Strip": 0.204
+   },
+   "t": 5.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.335,
+    "Rim strip": 3.184,
+    "Strip": 0.194
+   },
+   "t": 5.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.338,
+    "Rim strip": 3.184,
+    "Strip": 0.184
+   },
+   "t": 5.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.341,
+    "Rim strip": 3.184,
+    "Strip": 0.175
+   },
+   "t": 5.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.343,
+    "Rim strip": 3.184,
+    "Strip": 0.165
+   },
+   "t": 5.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.346,
+    "Rim strip": 3.184,
+    "Strip": 0.155
+   },
+   "t": 5.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.348,
+    "Rim strip": 3.184,
+    "Strip": 0.145
+   },
+   "t": 5.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.35,
+    "Rim strip": 3.184,
+    "Strip": 0.136
+   },
+   "t": 5.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.352,
+    "Rim strip": 3.184,
+    "Strip": 0.126
+   },
+   "t": 5.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.354,
+    "Rim strip": 3.184,
+    "Strip": 0.117
+   },
+   "t": 5.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.355,
+    "Rim strip": 3.184,
+    "Strip": 0.107
+   },
+   "t": 5.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.357,
+    "Rim strip": 3.184,
+    "Strip": 0.098
+   },
+   "t": 5.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.358,
+    "Rim strip": 3.184,
+    "Strip": 0.089
+   },
+   "t": 5.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.359,
+    "Rim strip": 3.184,
+    "Strip": 0.081
+   },
+   "t": 5.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.36,
+    "Rim strip": 3.184,
+    "Strip": 0.073
+   },
+   "t": 5.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.361,
+    "Rim strip": 3.184,
+    "Strip": 0.065
+   },
+   "t": 5.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.362,
+    "Rim strip": 3.184,
+    "Strip": 0.057
+   },
+   "t": 5.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.363,
+    "Rim strip": 3.184,
+    "Strip": 0.05
+   },
+   "t": 5.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.364,
+    "Rim strip": 3.184,
+    "Strip": 0.043
+   },
+   "t": 5.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.364,
+    "Rim strip": 3.184,
+    "Strip": 0.036
+   },
+   "t": 5.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.365,
+    "Rim strip": 3.184,
+    "Strip": 0.03
+   },
+   "t": 6.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.365,
+    "Rim strip": 3.184,
+    "Strip": 0.024
+   },
+   "t": 6.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.365,
+    "Rim strip": 3.184,
+    "Strip": 0.019
+   },
+   "t": 6.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.365,
+    "Rim strip": 3.184,
+    "Strip": 0.015
+   },
+   "t": 6.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.365,
+    "Rim strip": 3.184,
+    "Strip": 0.011
+   },
+   "t": 6.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.366,
+    "Rim strip": 3.184,
+    "Strip": 0.007
+   },
+   "t": 6.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.365,
+    "Rim strip": 3.184,
+    "Strip": 0.005
+   },
+   "t": 6.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.365,
+    "Rim strip": 3.184,
+    "Strip": 0.002
+   },
+   "t": 6.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.365,
+    "Rim strip": 3.184,
+    "Strip": 0.001
+   },
+   "t": 6.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.365,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.364,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.363,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.363,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.362,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.361,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.36,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.358,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.357,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.356,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.354,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.352,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.35,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.348,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.346,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 6.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.344,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.341,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.339,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.336,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.333,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.331,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.327,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.324,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.321,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.317,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.314,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.31,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.306,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.302,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.298,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.294,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.289,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.285,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.28,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.275,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.27,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.265,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.26,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.255,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 7.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.25,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.244,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.239,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.233,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.227,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.222,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.216,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.21,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.204,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.198,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.192,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.186,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.18,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.174,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.168,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.162,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.156,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.15,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.144,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.138,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.133,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.127,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.121,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.6
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.115,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 8.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.11,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.104,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.099,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.094,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.089,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.084,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.079,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.074,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.5
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.069,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.065,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.06,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.056,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.052,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.048,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.044,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.041,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.037,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.034,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.031,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.028,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.025,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.022,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.02,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.017,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 9.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.015,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.0,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.013,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.0417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.011,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.0833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.009,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.125,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.008,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.1667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.006,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.2083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.005,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.25,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.004,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.2917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.003,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.3333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.4
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.002,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.375,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.001,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.4167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.001,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.4583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.5,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.5417,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.5833,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.625,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.6667,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.7083,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.75,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.7917,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.3
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.8333,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.875,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.2
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.9167,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  },
+  {
+   "lights_w": {
+    "Display card": 0.25,
+    "Pool": 0.0,
+    "Rim strip": 3.184,
+    "Strip": 0.0
+   },
+   "t": 10.9583,
+   "lens": 85.0,
+   "cam": [
+    -0.0379,
+    -0.5957,
+    0.6694
+   ],
+   "target": [
+    -0.0428,
+    -0.0041,
+    0.1137
+   ],
+   "tilt_deg": 0.0,
+   "render_s": 3.1
+  }
+ ]
+}
