@@ -1420,6 +1420,16 @@ void ModulationPanel::layoutTabs()
     const float right = static_cast<float> (getWidth()) - 14.0f;
     const int source = selectedSource();
     routesKey = expandKey = {};
+    amp2Plus = amp2One = amp2Two = amp2Close = {};
+    if (source < 0 && amp.hasHeldAttack())
+    {
+        // AMP 2's keys where a source's "+ ROUTE" would be: "+ AMP 2", or 1 | 2 x.
+        const float w = juce::GlyphArrangement::getStringWidth (fonts::make (11.5f, fonts::Weight::medium, 0.08f), "+ AMP 2") + 10.0f;
+        amp2Plus = { right - w, 3.0f, w, 18.0f };
+        amp2Close = { right - 16.0f, 4.0f, 16.0f, 16.0f };
+        amp2Two = { amp2Close.getX() - 4.0f - 20.0f, 4.0f, 20.0f, 16.0f };
+        amp2One = { amp2Two.getX() - 2.0f - 20.0f, 4.0f, 20.0f, 16.0f };
+    }
     if (source >= 0)
     {
         const int n = routeCount (source, false);
@@ -1441,6 +1451,8 @@ void ModulationPanel::layoutTabs()
         total += widths[static_cast<std::size_t> (t)];
     }
     float limit = (expandKey.isEmpty() ? (routesKey.isEmpty() ? right : routesKey.getX()) : expandKey.getX()) - 10.0f;
+    if (! amp2Plus.isEmpty())
+        limit = std::min (limit, std::min (amp2Plus.getX(), amp2One.getX()) - 10.0f);
     if (stableTabs)
     {
         // A place at the right end reserved for the route count whatever is shown (as wide
@@ -1490,6 +1502,19 @@ void ModulationPanel::refresh()
     {
         counts[static_cast<std::size_t> (s)] = routeCount (s, true);
         counts[static_cast<std::size_t> (mod::sourceCount + s)] = routeCount (s, false);
+    }
+    if (amp2Keys())
+    {
+        const bool on = amp.heldAttackOn(), two = amp.showingSecond();
+        const float flash = amp.heldAttackFlash();
+        if (on != shownAmp2On || two != shownAmp2Second || flash != shownAmp2Flash)
+        {
+            shownAmp2On = on;
+            shownAmp2Second = two;
+            shownAmp2Flash = flash;
+            strip.repaint();
+            amp.repaint (amp.graphBounds());
+        }
     }
     const bool editable = source >= 0 && curve.isEditable();
     if (counts != shownRouteCounts || editable != shownEditable)
@@ -1588,6 +1613,39 @@ void ModulationPanel::paintTabs (juce::Graphics& g)
         g.setColour (colour::text.withAlpha (hoverRoutes ? 0.9f : 0.55f));
         g.drawText (n == 0 ? juce::String ("+ ROUTE") : juce::String (n) + (n == 1 ? " ROUTE" : " ROUTES"), routesKey, juce::Justification::centredRight, false);
     }
+    if (amp2Keys())
+    {
+        if (! amp.heldAttackOn())
+        {
+            g.setFont (fonts::make (11.5f, fonts::Weight::medium, 0.08f));
+            g.setColour (colour::text.withAlpha (0.55f));
+            g.drawText ("+ AMP 2", amp2Plus, juce::Justification::centredRight, false);
+        }
+        else
+        {
+            // Tiny chips: which envelope the knobs edit (1 or 2), x switches AMP 2 off. "2" glows
+            // as a note begins with AMP 2's attack.
+            const float flash = amp.heldAttackFlash();
+            auto chip = [&] (juce::Rectangle<float> r, const juce::String& text, bool chosen, float glow) {
+                if (chosen || glow > 0.0f)
+                {
+                    g.setColour (colour::accent.withAlpha (chosen ? 0.22f + 0.5f * glow : 0.6f * glow));
+                    g.fillRoundedRectangle (r, 3.0f);
+                }
+                g.setColour (chosen ? colour::accent.darker (0.15f) : colour::text.withAlpha (0.3f));
+                g.drawRoundedRectangle (r.reduced (0.5f), 3.0f, 1.0f);
+                g.setFont (fonts::make (10.5f, fonts::Weight::medium, 0.04f));
+                g.setColour (colour::text.withAlpha (chosen ? 0.95f : 0.6f));
+                g.drawText (text, r, juce::Justification::centred, false);
+            };
+            chip (amp2One, "1", ! amp.showingSecond(), 0.0f);
+            chip (amp2Two, "2", amp.showingSecond(), flash);
+            g.setColour (colour::text.withAlpha (0.5f));
+            const auto x = amp2Close.reduced (5.0f);
+            g.drawLine (x.getX(), x.getY(), x.getRight(), x.getBottom(), 1.2f);
+            g.drawLine (x.getRight(), x.getY(), x.getX(), x.getBottom(), 1.2f);
+        }
+    }
     if (! expandKey.isEmpty())
     {
         // Expand: two small corner marks (the larger editor for the curve).
@@ -1638,8 +1696,34 @@ void ModulationPanel::paintSocket (juce::Graphics& g, juce::Point<float> c, juce
         g.fillEllipse (juce::Rectangle<float> (3.6f, 3.6f).withCentre (c));
 }
 
+bool ModulationPanel::amp2Keys() const
+{
+    return selectedSource() < 0 && amp.hasHeldAttack() && ! amp2Plus.isEmpty();
+}
+
 void ModulationPanel::tabMouseDown (const juce::MouseEvent& e)
 {
+    if (amp2Keys() && ! e.mods.isPopupMenu())
+    {
+        // AMP 2's keys: on (and shown), 1 / 2 (which the knobs edit), x (off).
+        const bool on = amp.heldAttackOn();
+        bool hit = true;
+        if (! on && amp2Plus.contains (e.position))
+            amp.setHeldAttackOn (true);
+        else if (on && amp2One.contains (e.position))
+            amp.showSecond (false);
+        else if (on && amp2Two.contains (e.position))
+            amp.showSecond (true);
+        else if (on && amp2Close.contains (e.position))
+            amp.setHeldAttackOn (false);
+        else
+            hit = false;
+        if (hit)
+        {
+            strip.repaint();
+            return;
+        }
+    }
     pressAt = e.position;
     pressTab = -1;
     dragSource = -1;

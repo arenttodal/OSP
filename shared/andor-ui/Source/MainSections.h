@@ -240,6 +240,22 @@ public:
         }
     }
 
+    /** AMP 2 (opt-in; ANDOR ANALOG): a second ATTACK for notes begun over held ones - its switch
+        and ATTACK parameters. While on, the picture shows AMP 2's attack as a faint ghost beside
+        AMP 1's, and with "2" chosen (showSecond) the A knob and the attack handle edit AMP 2's
+        (decay, sustain and release stay AMP 1's, dimmed). Unset: exactly as before. */
+    void setHeldAttack (const juce::String& enabledId, const juce::String& attackId);
+    bool hasHeldAttack() const noexcept { return heldAttackKnob != nullptr; }
+    bool heldAttackOn() const;
+    void setHeldAttackOn (bool on);
+    void showSecond (bool second);
+    bool showingSecond() const noexcept { return second; }
+    /** The engine's count of notes begun with AMP 2: a new one starts a short flash (true when
+        the count moved). */
+    bool noteHeldAttackCount (std::uint32_t count);
+    /** 0..1: the flash's strength now (the tab's "2" chip glows with it). */
+    float heldAttackFlash() const;
+
     /** Where a knob is now with its modulation (its parameter's 0..1; below 0: unknown, the set
         value is drawn). Set by the editor from the halos' own reading (ModulationOverlay::
         livePosition). Null (the default): the picture shows the set values only. */
@@ -265,6 +281,14 @@ private:
     float timeToX (float ms, float from, float span) const;
     juce::AudioProcessorValueTreeState& state;
     std::array<std::unique_ptr<MiniKnob>, 4> knobs;
+    std::unique_ptr<MiniKnob> heldAttackKnob;   ///< AMP 2's ATTACK (opt-in)
+    juce::String heldEnabledId, heldAttackId;
+    bool second = false;
+    std::uint32_t heldCount = 0;
+    bool heldCountKnown = false;
+    double flashStart = -1.0e9;
+    juce::String attackIdNow() const { return second && heldAttackKnob != nullptr ? heldAttackId : juce::String ("attack"); }
+    void applySecond();
     juce::Rectangle<int> graph;
     bool showsTitle = true;
     juce::String note;

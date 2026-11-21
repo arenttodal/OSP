@@ -1,5 +1,15 @@
 # Status
 
+> **21 Nov 2026, AMP 2's opt-in hook on the AMP tab (branch `claude/analog-unison`, for ANDOR
+> ANALOG):**
+> - `ProductInfo::heldAttack` (switch and attack parameter IDs, the engine's count of notes begun
+>   with it) puts AMP 2, a held-note attack, on the AMP tab: "+ AMP 2" where a source's "+ ROUTE"
+>   is, then `1 | 2 ×` chips; with "2" the A knob and the attack handle edit AMP 2's attack (D, S,
+>   R dimmed, AMP 1's), the other attack drawn as a dotted ghost; the "2" chip flashes as a note
+>   takes it. `EnvelopePanel::setHeldAttack` and `ModulationPanel`'s keys; unset (ANDOR OSP, every
+>   other product) nothing changes - the AMP tab exactly as before.
+> - ANALOG-only by the owner's decision (not a SPACE / ECHO / ARP feature: no OSP twin needed).
+
 > **20 Nov 2026, Custom Patterns open when clicked, on the ANALOG parity line (branches
 > `claude/analog-parity-r1-custom-arp` and `claude/analog-parity-r1`):**
 > - **The owner's report** (OSP's first test build: "nothing happens when I click custom

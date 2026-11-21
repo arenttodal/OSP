@@ -282,6 +282,21 @@ private:
     int hoverSocket = -1;
     bool pressedSocket = false;
     juce::Rectangle<float> routesKey, expandKey;
+    // AMP 2 (opt-in, the AMP tab's right end): "+ AMP 2", or its chips 1 | 2 x once on.
+    juce::Rectangle<float> amp2Plus, amp2One, amp2Two, amp2Close;
+    bool shownAmp2On = false, shownAmp2Second = false;
+    float shownAmp2Flash = 0.0f;
+    bool amp2Keys() const;
+public:
+    /** AMP 2's keys (tests): the "+" key, and the 1 / 2 / x chips (empty: none shown). */
+    juce::Rectangle<float> amp2PlusArea() const { return amp2Keys() && ! amp.heldAttackOn() ? amp2Plus : juce::Rectangle<float>(); }
+    juce::Rectangle<float> amp2ChipArea (int which) const
+    {
+        if (! amp2Keys() || ! amp.heldAttackOn())
+            return {};
+        return which == 1 ? amp2One : (which == 2 ? amp2Two : amp2Close);
+    }
+private:
     std::array<int, 2 * mod::sourceCount> shownRouteCounts {};   ///< active routes per source, then all routes
     bool shownEditable = false, stableTabs = false;
     juce::Point<float> pressAt;

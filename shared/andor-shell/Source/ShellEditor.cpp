@@ -437,6 +437,11 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         modPanel.onShowRoutes = [this] (int source) { openPopup (routesPopup, source); };
         modOverlay.onSelect = [this] (int source, int slot) { selectModulation (source, slot); };
         modPanel.ampEnvelope().livePosition = [this] (const juce::String& id) { return modOverlay.livePosition (id); };
+        if (const auto& held = shell.product().heldAttack)
+        {
+            modPanel.ampEnvelope().setHeldAttack (held->enabledId, held->attackId);   // (AMP 2: the product's)
+            modPanel.resized();
+        }
         modOverlay.onShowRoutes = [this] (int source) { openPopup (routesPopup, source); };
     }
     modPanel.onExpandCurve = [this] (int source) { openPopup (curvePopup, source); };
@@ -1975,6 +1980,8 @@ void ShellEditor::timerCallback()
     modPanel.refresh();
     modOverlay.refresh();
     modPanel.ampEnvelope().refreshLive();   // (its picture follows A D S R's modulation)
+    if (const auto& held = shell.product().heldAttack; held && held->count != nullptr)
+        modPanel.ampEnvelope().noteHeldAttackCount (held->count (shell));   // (AMP 2's "2" flashes as a note takes it)
     if (popup != nullptr)
         popup->refreshContent();
     if (learn != nullptr)

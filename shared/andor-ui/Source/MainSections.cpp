@@ -1117,13 +1117,82 @@ EnvelopePanel::EnvelopePanel (juce::AudioProcessorValueTreeState& s) : state (s)
     setTitle ("Amplitude envelope");
 }
 
+void EnvelopePanel::setHeldAttack (const juce::String& enabledId, const juce::String& attackId)
+{
+    if (state.getParameter (enabledId) == nullptr || state.getParameter (attackId) == nullptr)
+        return;
+    heldEnabledId = enabledId;
+    heldAttackId = attackId;
+    heldAttackKnob = std::make_unique<MiniKnob> (state, attackId, "A2", MiniKnob::Formatter ([] (double v) { return format::milliseconds (v); }));
+    heldAttackKnob->slider.setTooltip ("AMP 2's attack: notes begun while others are held swell in this slowly (decay, sustain and release: AMP 1's)");
+    addChildComponent (*heldAttackKnob);
+    applySecond();
+    resized();
+}
+
+bool EnvelopePanel::heldAttackOn() const
+{
+    auto* p = heldAttackKnob != nullptr ? state.getParameter (heldEnabledId) : nullptr;
+    return p != nullptr && p->getValue() >= 0.5f;
+}
+
+void EnvelopePanel::setHeldAttackOn (bool on)
+{
+    if (auto* p = heldAttackKnob != nullptr ? state.getParameter (heldEnabledId) : nullptr)
+    {
+        p->beginChangeGesture();
+        p->setValueNotifyingHost (on ? 1.0f : 0.0f);
+        p->endChangeGesture();
+    }
+    showSecond (on);   // (switched on: AMP 2 is what you came to set; off: back to AMP 1)
+}
+
+void EnvelopePanel::showSecond (bool s)
+{
+    second = s && heldAttackKnob != nullptr;
+    applySecond();
+    repaint();
+}
+
+void EnvelopePanel::applySecond()
+{
+    if (heldAttackKnob == nullptr)
+        return;
+    const bool two = second && heldAttackOn();
+    if (second != two)
+        second = two;
+    knobs[0]->setVisible (! two);
+    heldAttackKnob->setVisible (two);
+    for (std::size_t i = 1; i < knobs.size(); ++i)
+        knobs[i]->setAlpha (two ? 0.45f : 1.0f);   // (AMP 1's, shared)
+}
+
+bool EnvelopePanel::noteHeldAttackCount (std::uint32_t count)
+{
+    if (heldAttackKnob == nullptr)
+        return false;
+    const bool moved = heldCountKnown && count != heldCount;
+    heldCount = count;
+    heldCountKnown = true;
+    if (moved)
+        flashStart = juce::Time::getMillisecondCounterHiRes();
+    applySecond();   // (the switch may have moved from a preset or the host)
+    return moved || heldAttackFlash() > 0.0f;
+}
+
+float EnvelopePanel::heldAttackFlash() const
+{
+    const double t = (juce::Time::getMillisecondCounterHiRes() - flashStart) / 450.0;
+    return t >= 0.0 && t < 1.0 ? static_cast<float> (1.0 - t) : 0.0f;
+}
+
 EnvelopePanel::Shape EnvelopePanel::shape() const
 {
     auto v = [this] (const char* id) {
         auto* p = state.getParameter (id);
         return p != nullptr ? p->convertFrom0to1 (p->getValue()) : 0.0f;
     };
-    return { v ("attack"), v ("decay"), 0.01f * v ("sustainLevel"), v ("release") };
+    return { v (attackIdNow().toRawUTF8()), v ("decay"), 0.01f * v ("sustainLevel"), v ("release") };
 }
 
 EnvelopePanel::Shape EnvelopePanel::liveShape() const
@@ -1137,7 +1206,7 @@ EnvelopePanel::Shape EnvelopePanel::liveShape() const
         const float live = livePosition (id);
         return p->convertFrom0to1 (live >= 0.0f ? std::clamp (live, 0.0f, 1.0f) : p->getValue());
     };
-    return { v ("attack"), v ("decay"), 0.01f * v ("sustainLevel"), v ("release") };
+    return { v (attackIdNow().toRawUTF8()), v ("decay"), 0.01f * v ("sustainLevel"), v ("release") };
 }
 
 void EnvelopePanel::refreshLive()
@@ -1174,6 +1243,8 @@ void EnvelopePanel::resized()
     static constexpr std::array<float, 4> shares { 71.0f / 506.0f, 191.0f / 506.0f, 314.0f / 506.0f, 437.0f / 506.0f };
     for (std::size_t i = 0; i < knobs.size(); ++i)
         knobs[i]->setBounds (juce::Rectangle<int> (std::min (100, w / 5), 87).withCentre ({ juce::roundToInt (shares[i] * static_cast<float> (w)), h - 45 }));
+    if (heldAttackKnob != nullptr)
+        heldAttackKnob->setBounds (knobs[0]->getBounds());   // (AMP 2's A in AMP 1's place)
 }
 
 void EnvelopePanel::paint (juce::Graphics& g)
@@ -1217,6 +1288,18 @@ void EnvelopePanel::paint (juce::Graphics& g)
     const auto live = liveShape();
     const bool moved = ! (live == set);
     const auto curve = curveOf (moved ? handlesOf (live) : h);
+    if (heldAttackKnob != nullptr && heldAttackOn())
+    {
+        // AMP 2: the other attack as a ghost (the shown one is the curve), the rest shared.
+        auto other = set;
+        if (auto* p = state.getParameter (second ? juce::String ("attack") : heldAttackId))
+            other.attack = p->convertFrom0to1 (p->getValue());
+        juce::Path ghost;
+        const float dashes[] = { 2.0f, 3.0f };
+        juce::PathStrokeType (1.1f).createDashedStroke (ghost, curveOf (handlesOf (other)), dashes, 2);
+        g.setColour (colour::accent.withAlpha (0.42f + 0.4f * heldAttackFlash()));
+        g.fillPath (ghost);
+    }
     juce::Path fill (curve);
     fill.lineTo (r.getX(), r.getBottom());
     fill.closeSubPath();
@@ -1264,9 +1347,9 @@ void EnvelopePanel::mouseDown (const juce::MouseEvent& e)
             dragHandle = i;
         }
     }
-    const std::array<std::vector<const char*>, 3> ids { { { "attack" }, { "decay", "sustainLevel" }, { "release" } } };
+    const std::array<std::vector<juce::String>, 3> ids { { { attackIdNow() }, { "decay", "sustainLevel" }, { "release" } } };
     if (dragHandle >= 0)
-        for (const auto* id : ids[static_cast<std::size_t> (dragHandle)])
+        for (const auto& id : ids[static_cast<std::size_t> (dragHandle)])
             if (auto* p = state.getParameter (id))
                 p->beginChangeGesture();
     repaint();
@@ -1279,12 +1362,12 @@ void EnvelopePanel::mouseDrag (const juce::MouseEvent& e)
     const auto r = graph.toFloat().reduced (12.0f, 10.0f);
     const auto h = handles();
     const float w = std::max (1.0f, r.getWidth());
-    auto set = [this] (const char* id, float value) {
+    auto set = [this] (const juce::String& id, float value) {
         if (auto* p = state.getParameter (id))
             p->setValueNotifyingHost (p->convertTo0to1 (p->getNormalisableRange().snapToLegalValue (value)));
     };
     if (dragHandle == 0)
-        set ("attack", timeFromShare ((e.position.x - r.getX()) / (0.27f * w), attackMax));
+        set (attackIdNow(), timeFromShare ((e.position.x - r.getX()) / (0.27f * w), attackMax));
     else if (dragHandle == 1)
     {
         set ("decay", timeFromShare ((e.position.x - h[0].x) / (0.27f * w), decayMax));
@@ -1297,9 +1380,9 @@ void EnvelopePanel::mouseDrag (const juce::MouseEvent& e)
 
 void EnvelopePanel::mouseUp (const juce::MouseEvent&)
 {
-    const std::array<std::vector<const char*>, 3> ids { { { "attack" }, { "decay", "sustainLevel" }, { "release" } } };
+    const std::array<std::vector<juce::String>, 3> ids { { { attackIdNow() }, { "decay", "sustainLevel" }, { "release" } } };
     if (dragHandle >= 0)
-        for (const auto* id : ids[static_cast<std::size_t> (dragHandle)])
+        for (const auto& id : ids[static_cast<std::size_t> (dragHandle)])
             if (auto* p = state.getParameter (id))
                 p->endChangeGesture();
     dragHandle = -1;

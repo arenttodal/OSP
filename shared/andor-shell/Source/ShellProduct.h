@@ -260,6 +260,15 @@ struct ProductInfo
         does not follow the envelope as drawn (e.g. "GATE"), or empty. Polled by the editor.
         Unset: the picture as before. Interface only. */
     std::function<juce::String (osp::plugin::InstrumentHost&)> ampEnvelopeNote;
+    /** AMP 2 (opt-in; ANDOR ANALOG): a second, held-note ATTACK on the AMP tab - its switch and
+        attack parameters, and how many notes its engine has begun with it (the "2" chip flashes
+        as one does). Unset: the AMP tab exactly as in ANDOR OSP. */
+    struct HeldAttack
+    {
+        juce::String enabledId, attackId;
+        std::function<std::uint32_t (osp::plugin::InstrumentHost&)> count;
+    };
+    std::optional<HeldAttack> heldAttack;
     /** The musician starts editing the AMP envelope (one of its knobs or handles, or a host's
         touch on attack / decay / sustainLevel / release): e.g. the product gives the amplitude
         back to it. Message thread. Unset: nothing listens. */
