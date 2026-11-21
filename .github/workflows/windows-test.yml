@@ -26,7 +26,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash packaging/factory-packs/fetch.sh
 
-      - name: SQLite (vcpkg, static: the plug-in carries no extra DLL)
+      - name: SQLite from vcpkg, static (no extra DLL)
         run: |
           "$(cygpath -u "$VCPKG_INSTALLATION_ROOT")/vcpkg.exe" install sqlite3:x64-windows-static-md
 
