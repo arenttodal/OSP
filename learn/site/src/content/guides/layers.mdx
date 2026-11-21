@@ -7,7 +7,7 @@ group: play-and-layer
 order: 20
 title: "Add a second and third sound"
 purpose: "Layer up to three recordings in one instrument."
-about: "OSP layers up to three recordings, A, B and C, each with its own playback mode, knobs and arpeggiator settings. Drag a file beside the cards onto ADD LAYER, or use Add source… in the ••• menu; a folder dropped on a layer becomes one multi-sample sound."
+about: "OSP layers up to three recordings, A, B and C, each with its own playback mode, knobs and arpeggiator settings. Drag a file beside the cards onto Add layer, or use Add source… in the ••• menu; a folder dropped on a layer becomes one multi-sample sound."
 tags: ["layers", "add"]
 synonyms: ["layer", "add sound", "add source", "stack", "combine", "three sounds"]
 learn: { lessons: ["osp.layers"], info: [] }
@@ -17,7 +17,7 @@ scene: osp.scene.e2-add-layers
 quick: false
 verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
 steps:
-  - { id: add-b, instruction: "Drag a second file beside the card, onto ADD LAYER B.", result: "It becomes layer B." }
-  - { id: add-c, instruction: "Drag a third file onto ADD LAYER C.", result: "It becomes layer C." }
+  - { id: add-b, instruction: "Drag a second file beside the card, onto Add layer B.", result: "It becomes layer B." }
+  - { id: add-c, instruction: "Drag a third file onto Add layer C.", result: "It becomes layer C." }
   - { id: play-all, instruction: "Play a note.", result: "All three layers sound together." }
 ---

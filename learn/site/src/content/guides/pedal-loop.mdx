@@ -7,7 +7,7 @@ group: play-and-layer
 order: 15
 title: "Hold a note with the sustain pedal"
 purpose: "Loop a decaying note forward and back for as long as the pedal is down."
-about: "PEDAL LOOP sets what the sustain pedal does to One Shot notes on each layer: Normal (a standard sustain pedal), Forward (a forward loop) or Ping-Pong (a forward and reverse loop), chosen in the playback key's menu. Turn the card's LOOP off first, so the note decays on its own and only the pedal holds it; with LOOP on the note already sustains, and Forward then changes nothing."
+about: "Pedal loop sets what the sustain pedal does to One Shot notes on each layer: Normal (a standard sustain pedal), Forward (a forward loop) or Ping-Pong (a forward and reverse loop), chosen in the playback key's menu. Turn the card's Loop off first, so the note decays on its own and only the pedal holds it; with Loop on the note already sustains, and Forward then changes nothing."
 tags: ["pedal loop", "sustain pedal", "ping-pong"]
 synonyms: ["pedal loop", "sustain pedal", "ping pong", "ping-pong", "hold note", "freeze", "damper", "loop", "forward loop"]
 learn: { lessons: [], info: [] }
@@ -18,8 +18,8 @@ scene: osp.scene.p1-pedal-loop-pingpong
 quick: true
 verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
 steps:
-  - { id: loop-off, instruction: "Turn LOOP off on the card.", result: "The note now plays once and decays." }
-  - { id: choose-ping-pong, instruction: "Open the playback key's menu and choose Ping-Pong under PEDAL LOOP.", result: "The sustain pedal will hold notes in a forward/reverse loop." }
+  - { id: loop-off, instruction: "Turn Loop off on the card.", result: "The note now plays once and decays." }
+  - { id: choose-ping-pong, instruction: "Open the playback key's menu and choose Ping-Pong under Pedal loop.", result: "The sustain pedal will hold notes in a forward/reverse loop." }
   - { id: play-note, instruction: "Play a note.", result: "It starts to decay." }
   - { id: pedal-down, instruction: "Press the sustain pedal while the note sounds.", result: "The note loops back and forth near where it was playing." }
   - { id: pedal-up, instruction: "Release the pedal.", result: "The note plays on from the loop and fades." }

@@ -7,7 +7,7 @@ group: play-and-layer
 order: 25
 title: "Balance, mute and solo layers"
 purpose: "Set how much of each layer you hear."
-about: "Each card has its own LEVEL (up to +6 dB), TUNE, PAN, M (mute) and S (solo); while any layer is soloed, only soloed layers play and the others show NOT SOLOED. With two layers, MIX in the header balances A and B."
+about: "Each card has its own Level (up to +6 dB), Tune, Pan, M (mute) and S (solo); while any layer is soloed, only soloed layers play and the others show Not soloed. With two layers, Mix in the header balances A and B."
 tags: ["mix", "mute", "solo"]
 synonyms: ["level", "volume", "mute", "solo", "balance", "mix"]
 learn: { lessons: ["osp.layers"], info: [] }
@@ -17,8 +17,8 @@ scene: osp.scene.e3-mix-layers
 quick: false
 verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
 steps:
-  - { id: level-b, instruction: "Turn layer B's LEVEL.", result: "B gets quieter against A." }
-  - { id: solo-b, instruction: "Click S on layer B.", result: "Only B is heard; A shows NOT SOLOED." }
+  - { id: level-b, instruction: "Turn layer B's Level.", result: "B gets quieter against A." }
+  - { id: solo-b, instruction: "Click S on layer B.", result: "Only B is heard; A shows Not soloed." }
   - { id: unsolo-b, instruction: "Click S again.", result: "Both layers are heard." }
-  - { id: mute-a, instruction: "Click M on layer A.", result: "A is silent and shows MUTED." }
+  - { id: mute-a, instruction: "Click M on layer A.", result: "A is silent and shows Muted." }
 ---

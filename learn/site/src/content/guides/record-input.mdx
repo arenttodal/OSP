@@ -7,7 +7,7 @@ group: make-an-instrument
 order: 30
 title: "Record from an audio input"
 purpose: "Record a take from your input and play its notes from the keyboard."
-about: "CAPTURE records from OSP's audio input: the input chosen in the standalone app, or a track sent to OSP's Sidechain input in a DAW (DAW routing not yet verified). A take runs up to one minute; on STOP, OSP trims the silence and maps the notes it heard, so the take plays as an instrument straight away."
+about: "Capture records from OSP's audio input: the input chosen in the standalone app, or a track sent to OSP's Sidechain input in a DAW (DAW routing not yet verified). A take runs up to one minute; on Stop, OSP trims the silence and maps the notes it heard, so the take plays as an instrument straight away."
 tags: ["record", "capture", "input"]
 synonyms: ["record", "recording", "live input", "microphone", "audio input", "sidechain", "capture", "rec"]
 learn: { lessons: [], info: [] }
@@ -19,8 +19,8 @@ quick: true
 verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
 editorial: { hostVerification: "Host routing is not yet verified: sending a DAW track to OSP's Sidechain input has not been tested in Logic, Ableton or Reaper. The standalone app records from the audio input chosen in its settings." }
 steps:
-  - { id: open-record, instruction: "On an empty instrument, click Record….", result: "The CAPTURE page opens with the INPUT meter." }
-  - { id: record, instruction: "Click RECORD and play or sing into the input.", result: "The clock counts the take and the picture shows what arrives." }
-  - { id: stop, instruction: "Click STOP.", result: "OSP trims the take and maps its notes onto the layer." }
+  - { id: open-record, instruction: "On an empty instrument, click Record….", result: "The Capture page opens with the Input meter." }
+  - { id: record, instruction: "Click Record and play or sing into the input.", result: "The clock counts the take and the picture shows what arrives." }
+  - { id: stop, instruction: "Click Stop.", result: "OSP trims the take and maps its notes onto the layer." }
   - { id: play-mapped, instruction: "Play the keys.", result: "Each key plays a note from your take." }
 ---

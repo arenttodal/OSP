@@ -3,16 +3,16 @@ schemaVersion: 1
 kind: andor.learn.reference
 id: osp.ref.notes
 product: osp
-title: "MAP NOTES and NOTES"
+title: "Map notes and Notes"
 function: "Places each note found in a recording of several notes on its own key, so every key plays a real recorded note."
-location: "After a recording of several notes is loaded, the card asks Identify notes? with MAP NOTES and NO. The card's ⋮ menu also has Map notes…. Once mapped, the NOTES key on the card opens the note map."
+location: "After a recording of several notes is loaded, the card asks Identify notes? with Map notes and No. The card's ⋮ menu also has Map notes…. Once mapped, the Notes key on the card opens the note map."
 parameters:
-  - { name: "MAP NOTES", values: "on the card", does: "Finds the notes and places them on keys." }
-  - { name: "NOTES", values: "key on the card", does: "Shows each note found, the key it plays, and lets you move or leave out a note." }
-  - { name: "DETECTION", values: "FEWER · NORMAL · MORE", does: "How many separate notes OSP looks for. FEWER keeps no note shorter than 0.4 s." }
-  - { name: "FILL", values: "± semitones", does: "How far a recorded note may be transposed to cover keys between the notes found." }
+  - { name: "Map notes", values: "on the card", does: "Finds the notes and places them on keys." }
+  - { name: "Notes", values: "key on the card", does: "Shows each note found, the key it plays, and lets you move or leave out a note." }
+  - { name: "Detection", values: "Fewer · Normal · More", does: "How many separate notes OSP looks for. Fewer keeps no note shorter than 0.4 s." }
+  - { name: "Fill", values: "± semitones", does: "How far a recorded note may be transposed to cover keys between the notes found." }
 dependencies: ["A recording of several separate notes (a melody sung, hummed or played)."]
-example: "Load the example phrase, click MAP NOTES, then play the keys: each plays the recorded note nearest to it."
+example: "Load the example phrase, click Map notes, then play the keys: each plays the recorded note nearest to it."
 guides: ["osp.guide.make.phrase-map-notes"]
 synonyms: ["map notes", "note atlas", "phrase transformer", "phrase", "melody", "notes", "chop", "slice phrase"]
 parameterIds: []
@@ -20,6 +20,6 @@ verified: { commit: "6ef3376", date: "2026-11-20", notes: "docs/learn-studio/gat
 ---
 ## Status
 
-The card's header shows how many notes were found and a status such as Analyzing, Playable · enhancing, Ready or Needs review. Needs review means OSP is less certain about some notes; NOTES lets you check them.
+The card's header shows how many notes were found and a status such as Analyzing, Playable · enhancing, Ready or Needs review. Needs review means OSP is less certain about some notes; Notes lets you check them.
 
 Notes the phrase played more than once take turns when the key is repeated.

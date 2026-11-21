@@ -7,20 +7,20 @@ group: arpeggiator
 order: 20
 title: "Give each layer its own arpeggio"
 purpose: "Set a different pattern per layer, or keep one layer sustained."
-about: "With LINK on, every layer plays layer A's arpeggio; with LINK off, EDIT A | B | C sets each layer's own PATTERN, RATE, OCTAVES, custom pattern and STRUM, while GATE, SWING and VELOCITY stay shared. A layer unlit under PLAYS holds the keys as played, for example a sustained pad under two arpeggios."
+about: "With Link on, every layer plays layer A's arpeggio; with Link off, Edit A | B | C sets each layer's own Pattern, Rate, Octaves, custom pattern and Strum, while Gate, Swing and Velocity stay shared. A layer unlit under Plays holds the keys as played, for example a sustained pad under two arpeggios."
 tags: ["arp", "layers", "plays", "link"]
 synonyms: ["per layer arpeggiator", "independent patterns", "plays", "link", "edit", "sustained layer", "arp per source"]
 learn: { lessons: [], info: [] }
 reference: osp.ref.arpeggiator
 related: ["osp.guide.arp.strum", "osp.guide.arp.satellite"]
-preconditions: ["Two or three layers.", "ARP on, with notes held."]
+preconditions: ["Two or three layers.", "Arp on, with notes held."]
 scene: osp.scene.d1-arp-per-source
 quick: true
 verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
 steps:
-  - { id: linked, instruction: "With LINK on, every layer plays the same pattern.", result: "All three layers follow layer A's settings." }
-  - { id: link-off, instruction: "Click LINK to turn it off.", result: "EDIT A | B | C appears." }
-  - { id: edit-b, instruction: "Choose EDIT B, then a pattern for layer B.", result: "Layer B plays its own pattern." }
-  - { id: edit-c, instruction: "Choose EDIT C, then another pattern.", result: "Layer C plays a third pattern." }
-  - { id: plays-off-a, instruction: "Click A under PLAYS.", result: "Layer A holds the chord while B and C keep arpeggiating." }
+  - { id: linked, instruction: "With Link on, every layer plays the same pattern.", result: "All three layers follow layer A's settings." }
+  - { id: link-off, instruction: "Click Link to turn it off.", result: "Edit A | B | C appears." }
+  - { id: edit-b, instruction: "Choose Edit B, then a pattern for layer B.", result: "Layer B plays its own pattern." }
+  - { id: edit-c, instruction: "Choose Edit C, then another pattern.", result: "Layer C plays a third pattern." }
+  - { id: plays-off-a, instruction: "Click A under Plays.", result: "Layer A holds the chord while B and C keep arpeggiating." }
 ---

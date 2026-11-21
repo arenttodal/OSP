@@ -7,7 +7,7 @@ group: make-an-instrument
 order: 40
 title: "Grab what you just played"
 purpose: "Keep the last seconds of your input as a layer, without pressing record first."
-about: "While an input is connected, OSP keeps about the last minute of what arrived, so you can play first and decide afterwards. GRAB LAST takes the last 10, 20, 30 or 60 seconds and maps its notes onto the layer, replacing its sound in one undo step."
+about: "While an input is connected, OSP keeps about the last minute of what arrived, so you can play first and decide afterwards. Grab last takes the last 10, 20, 30 or 60 seconds and maps its notes onto the layer, replacing its sound in one undo step."
 tags: ["grab last", "capture", "input"]
 synonyms: ["grab last", "grab", "retrospective", "what I just played", "capture", "live input", "input history", "rec"]
 learn: { lessons: [], info: [] }
@@ -19,7 +19,7 @@ quick: true
 verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
 editorial: { hostVerification: "Host routing is not yet verified: sending a DAW track to OSP's Sidechain input has not been tested in Logic, Ableton or Reaper. The standalone app records from the audio input chosen in its settings." }
 steps:
-  - { id: open-capture, instruction: "Click REC on the card while audio arrives at the input.", result: "The CAPTURE page opens over the waveform." }
-  - { id: grab-last, instruction: "Under GRAB LAST, click 10 s.", result: "OSP keeps the last 10 seconds and maps its notes onto the layer." }
+  - { id: open-capture, instruction: "Click Rec on the card while audio arrives at the input.", result: "The Capture page opens over the waveform." }
+  - { id: grab-last, instruction: "Under Grab last, click 10 s.", result: "OSP keeps the last 10 seconds and maps its notes onto the layer." }
   - { id: play-mapped, instruction: "Play the keys.", result: "Each key plays a note from what you played." }
 ---

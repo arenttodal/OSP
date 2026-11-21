@@ -3,14 +3,14 @@ schemaVersion: 1
 kind: andor.learn.reference
 id: osp.ref.strum
 product: osp
-title: "STRUM"
+title: "Strum"
 function: "On a Chord step, plays the chord's notes one after another instead of together, like a strummed guitar."
-location: "The STRUM key on the ARPEGGIATOR panel's title row: its light switches it for the layer being edited, its name opens the STRUM panel."
+location: "The Strum key on the Arpeggiator panel's title row: its light switches it for the layer being edited, its name opens the Strum panel."
 parameters:
-  - { name: "Direction", values: "UP · DOWN · RANDOM · ALT", does: "The order of the strum: lowest to highest, highest to lowest, a new order each chord, or alternating." }
-  - { name: "FREE · SYNC", values: "", does: "SPREAD in milliseconds, or as a note value at the tempo." }
-  - { name: "SPREAD", values: "0–500 ms, or 1/64 … 1/8D", does: "The time from the first note to the last; kept shorter than the step." }
-dependencies: ["The Chord pattern on that layer. With another pattern the key shows an unavailable ring and the panel says STRUM plays with the CHORD pattern.", "Not on custom patterns."]
+  - { name: "Direction", values: "Up · Down · Random · Alt", does: "The order of the strum: lowest to highest, highest to lowest, a new order each chord, or alternating." }
+  - { name: "Free · Sync", values: "", does: "Spread in milliseconds, or as a note value at the tempo." }
+  - { name: "Spread", values: "0–500 ms, or 1/64 … 1/8D", does: "The time from the first note to the last; kept shorter than the step." }
+dependencies: ["The Chord pattern on that layer. With another pattern the key shows an unavailable ring and the panel says Strum plays with the Chord pattern.", "Not on custom patterns."]
 guides: ["osp.guide.arp.strum"]
 synonyms: ["strum", "strumming", "chord", "guitar", "spread", "rolled chord"]
 parameterIds: ["arp.strum.on", "arp.strum.direction", "arp.strum.ms", "arp.cardB.strum.on", "arp.cardC.strum.on"]

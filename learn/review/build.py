@@ -26,8 +26,8 @@ by_id = {e["scenario"]: e for e in manifest["scenes"]}
 # Groups, guide titles and step captions come from the public guides (learn/site/src/content/guides),
 # so the board and the site never disagree about what a step says.
 import re
-GROUP_TITLES = [("make-an-instrument", "Make an instrument"), ("play-and-layer", "Play and layer"), ("synth-imprint", "SYNTH & IMPRINT"),
-                ("arpeggiator", "Arpeggiator"), ("granular-key-dna", "Granular & KEY DNA"), ("shape-and-finish", "Shape and finish")]
+GROUP_TITLES = [("make-an-instrument", "Make an instrument"), ("play-and-layer", "Play and layer"), ("synth-imprint", "Synth & Imprint"),
+                ("arpeggiator", "Arpeggiator"), ("granular-key-dna", "Granular & Key DNA"), ("shape-and-finish", "Shape and finish")]
 guides = []
 for f in sorted((root / "site/src/content/guides").glob("*.mdx")):
     fm = f.read_text().split("---")[1]

@@ -5,14 +5,14 @@ id: osp.ref.arpeggiator
 product: osp
 title: "Arpeggiator"
 function: "Plays the notes you hold as a repeating pattern, with its own pattern, rate and octaves for each layer if you want."
-location: "The ARP key beside the keyboard: its light switches the arpeggiator on, its name opens the ARPEGGIATOR panel above the keyboard."
+location: "The Arp key beside the keyboard: its light switches the arpeggiator on, its name opens the Arpeggiator panel above the keyboard."
 parameters:
-  - { name: "PLAYS A B C", values: "per layer", does: "Which layers the arpeggiator plays. An unlit layer holds the keys as you play them." }
-  - { name: "LINK", values: "on · off", does: "On: every layer plays layer A's settings. Off: EDIT A | B | C chooses which layer's PATTERN, RATE, OCTAVES, CUSTOM and STRUM you are setting." }
-  - { name: "PATTERN", values: "Up … Random Once, Custom Patterns", does: "The order of the notes (18 built-in patterns)." }
-  - { name: "RATE", values: "1/4D … 1/32", does: "How quickly the notes follow each other." }
-  - { name: "OCTAVES", values: "1–4", does: "How many octaves the pattern climbs." }
-  - { name: "GATE · SWING · VELOCITY", values: "10–150 % · 0–100 % · 0–200 %", does: "Note length, swing and velocity; shared by all layers." }
+  - { name: "Plays A B C", values: "per layer", does: "Which layers the arpeggiator plays. An unlit layer holds the keys as you play them." }
+  - { name: "Link", values: "on · off", does: "On: every layer plays layer A's settings. Off: Edit A | B | C chooses which layer's Pattern, Rate, Octaves, Custom and Strum you are setting." }
+  - { name: "Pattern", values: "Up … Random Once, Custom Patterns", does: "The order of the notes (18 built-in patterns)." }
+  - { name: "Rate", values: "1/4D … 1/32", does: "How quickly the notes follow each other." }
+  - { name: "Octaves", values: "1–4", does: "How many octaves the pattern climbs." }
+  - { name: "Gate · Swing · Velocity", values: "10–150 % · 0–100 % · 0–200 %", does: "Note length, swing and velocity; shared by all layers." }
 dependencies: ["Held notes (from a MIDI keyboard or the on-screen keyboard)."]
 guides: ["osp.guide.arp.basics", "osp.guide.arp.per-source", "osp.guide.arp.custom"]
 synonyms: ["arp", "arpeggio", "pattern", "rate", "octaves", "plays", "link", "edit", "per layer arpeggiator", "independent patterns"]

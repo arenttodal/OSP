@@ -7,7 +7,7 @@ group: play-and-layer
 order: 10
 title: "Switch between One Shot and Granular"
 purpose: "Play the recording from start to end, or build each note from grains."
-about: "Each layer has two playback modes on its playback key: One Shot plays the recording from START at the note's pitch, and Granular rebuilds each note from many short, overlapping grains of the recording. The same menu holds PEDAL LOOP, which applies to One Shot only."
+about: "Each layer has two playback modes on its playback key: One Shot plays the recording from Start at the note's pitch, and Granular rebuilds each note from many short, overlapping grains of the recording. The same menu holds Pedal loop, which applies to One Shot only."
 tags: ["one shot", "granular"]
 synonyms: ["one shot", "granular", "grain", "playback mode", "grain cloud"]
 learn: { lessons: ["osp.playback"], info: [] }
@@ -17,7 +17,7 @@ scene: osp.scene.h1-oneshot-granular
 quick: false
 verified: { commit: "6ef3376", date: "2026-11-20", notes: "Checked against the capture run (learn/capture/out/<scene>/run.json) and the code fact sheets" }
 steps:
-  - { id: oneshot-play, instruction: "Play a note in One Shot.", result: "The recording plays from START at the note's pitch." }
+  - { id: oneshot-play, instruction: "Play a note in One Shot.", result: "The recording plays from Start at the note's pitch." }
   - { id: open-mode, instruction: "Click the playback key at the top right of the card.", result: "A menu shows One Shot and Granular." }
   - { id: choose-granular, instruction: "Choose Granular.", result: "The layer now builds each note from overlapping grains." }
   - { id: granular-play, instruction: "Play the same note again.", result: "The same recording, played as a grain cloud." }
