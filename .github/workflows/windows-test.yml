@@ -26,9 +26,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash packaging/factory-packs/fetch.sh
 
-      - name: SQLite from vcpkg, static (no extra DLL)
+      - name: SQLite from vcpkg, static, with FTS5 (the Library's search)
         run: |
-          "$(cygpath -u "$VCPKG_INSTALLATION_ROOT")/vcpkg.exe" install sqlite3:x64-windows-static-md
+          "$(cygpath -u "$VCPKG_INSTALLATION_ROOT")/vcpkg.exe" install "sqlite3[core,fts5]:x64-windows-static-md"
 
       - name: Configure
         run: |

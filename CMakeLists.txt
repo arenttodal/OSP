@@ -40,6 +40,10 @@ endif()
 if(MSVC)
     # Sources are UTF-8 (musical symbols in strings); large translation units (JUCE).
     add_compile_options(/utf-8 /bigobj)
+    # Executables' threads get 8 MB of stack, as on macOS and Linux (Windows' default is 1 MB):
+    # the tests keep a whole processor (~360 KB) on the stack, sometimes two. Plug-in DLLs are
+    # unaffected (their host decides).
+    string(APPEND CMAKE_EXE_LINKER_FLAGS " /STACK:8388608")
 endif()
 
 if(APPLE)

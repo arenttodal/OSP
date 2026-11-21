@@ -183,7 +183,8 @@ TEST_CASE ("memo lab: Voice Memos file names read as their moment", "[memo-lab][
     REQUIRE (dateFromFileName ("20241030 143012-AB12CD34").has_value());
     CHECK (dateFromFileName ("20241030 143012-AB12CD34")->formatted ("%Y-%m-%d %H:%M:%S") == "2024-10-30 14:30:12");
     CHECK_FALSE (dateFromFileName ("Cello idea").has_value());
-    CHECK (voiceMemosFolder().getFullPathName().endsWith ("Group Containers/group.com.apple.VoiceMemos.shared/Recordings"));
+    // (the path's separators as the platform writes them: backslashes on Windows)
+    CHECK (voiceMemosFolder().getFullPathName().replaceCharacter ('\\', '/').endsWith ("Group Containers/group.com.apple.VoiceMemos.shared/Recordings"));
 }
 
 TEST_CASE ("memo lab: a scan lists only readable recordings in approved folders, and says why others are not ready", "[memo-lab][unit]")
