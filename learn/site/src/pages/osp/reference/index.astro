@@ -4,9 +4,9 @@ import { getCollection } from 'astro:content';
 const refs = (await getCollection('reference')).sort((a, b) => a.data.title.localeCompare(b.data.title));
 const base = import.meta.env.BASE_URL;
 ---
-<Base title="Reference · Learn OSP" current="reference">
+<Base title="Reference · Learn ANDOR" current="reference">
   <div class="wrap">
-    <div class="crumbs"><a href={`${base}osp/`}>Learn OSP</a> / Reference</div>
+    <div class="crumbs"><a href={`${base}osp/`}>Learn ANDOR</a> / Reference</div>
     <h1>Reference</h1>
     <p class="lede">Exact facts about each feature: what it does, where it is and what it changes.</p>
     <div class="groups">{refs.map((r) => (<section class="group"><h3><a href={`${base}osp/reference/${r.data.id.split('.').pop()}/`}>{r.data.title}</a></h3><p>{r.data.function}</p></section>))}</div>

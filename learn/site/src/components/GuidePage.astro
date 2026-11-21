@@ -1,8 +1,12 @@
 ---
+// One guide as a full-window player: navigation along the top, the curriculum on the left, the
+// clip in the middle and its steps on the right, so nothing needs scrolling on a desktop screen.
+// The clip plays straight through; the step it is on is highlighted, and choosing a step jumps
+// to it. A step's own URL (or #step) opens the guide on that step. With reduced motion nothing
+// plays by itself and a step shows its still.
 import Base from '../layouts/Base.astro';
-import GuideView from './GuideView.astro';
-import { groupTitle } from '../data/groups';
-import { byId, urlOf, type Guide } from '../lib/guides';
+import { groups, groupTitle } from '../data/groups';
+import { allGuides, urlOf, clock, type Guide } from '../lib/guides';
 import { scene } from '../lib/scenes';
 import { getCollection } from 'astro:content';
 interface Props { guide: Guide; prev?: Guide; next?: Guide; step?: string }
@@ -10,53 +14,206 @@ const { guide, prev, next, step } = Astro.props;
 const d = guide.data;
 const base = import.meta.env.BASE_URL;
 const url = urlOf(guide);
-const map = await byId();
-const related = d.related.map((id) => map.get(id)).filter(Boolean) as Guide[];
+const all = await allGuides();
+const position = all.findIndex((g) => g.data.id === d.id) + 1;
+const inGroup = all.filter((g) => g.data.group === d.group);
+const groupPos = inGroup.findIndex((g) => g.data.id === d.id);
 const refs = await getCollection('reference');
 const ref = refs.find((r) => r.data.id === d.reference);
 const s = scene(d.scene);
+const seg = (id: string) => s.segments.find((x) => x.id === id)!;
 const stepIndex = step ? d.steps.findIndex((x) => x.id === step) : -1;
 const st = stepIndex >= 0 ? d.steps[stepIndex] : undefined;
+const active = st?.id ?? d.steps[0].id;
 const title = st ? `${d.title} · Step ${stepIndex + 1}: ${st.instruction}` : d.title;
+const curriculum = groups.map((gr) => ({ ...gr, guides: all.filter((g) => g.data.group === gr.slug) }));
 ---
-<Base title={`${title} · Learn OSP`} description={st ? st.result : d.purpose}>
-  <div class="wrap">
-    <div class="crumbs"><a href={`${base}osp/`}>Learn OSP</a> / <a href={`${base}osp/${d.group}/`}>{groupTitle(d.group)}</a> / {d.title}</div>
-    <article>
-      {st ? (
-        <div data-pagefind-body>
-          <h1 data-pagefind-meta="title">{d.title}</h1>
-          <span class="sr-only" data-pagefind-meta="where">{groupTitle(d.group)} · Step {stepIndex + 1}</span>
-          <p class="lede"><strong>Step {stepIndex + 1}.</strong> {st.instruction} {st.result}</p>
-          <p class="sr-only" data-pagefind-weight="6">{d.synonyms.join(', ')}</p>
-        </div>
-      ) : (
-        <div data-pagefind-body>
-          <h1 data-pagefind-meta="title">{d.title}</h1>
-          <span class="sr-only" data-pagefind-meta="where">{groupTitle(d.group)} · Guide</span>
-          <p class="lede">{d.purpose}</p>
-          <p class="sr-only" data-pagefind-weight="4">{d.synonyms.join(', ')} {d.tags.join(', ')}</p>
-        </div>
-      )}
-      <div class="guide">
-        <div>
-          <GuideView sceneId={d.scene} steps={d.steps} current={step} guideUrl={url} title={d.title} />
-          {d.editorial?.hostVerification && <p class="note host">{d.editorial.hostVerification}</p>}
-          <div class="pn">
-            {prev ? <a href={urlOf(prev)}>← {prev.data.title}</a> : <span></span>}
-            {next ? <a href={urlOf(next)}>{next.data.title} →</a> : <span></span>}
+<Base title={`${title} · Learn ANDOR`} description={st ? st.result : d.purpose} app>
+  <div class="lg" data-guide data-id={d.id} data-duration={s.duration} data-current={active} data-total={all.length}>
+    <header class="lg-top">
+      <a class="brand" href={`${base}osp/`}>Learn <b>ANDOR</b></a>
+      <nav class="lg-crumbs" aria-label="Breadcrumb">
+        <a href={`${base}osp/`}>OSP</a>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+        <a href={`${base}osp/${d.group}/`}>{groupTitle(d.group)}</a>
+      </nav>
+      <a class="lg-search" href={`${base}osp/search/`}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <span>Search</span><kbd>⌘K</kbd>
+      </a>
+      <div class="lg-pn">
+        {prev
+          ? <a class="icon-btn" href={urlOf(prev)} aria-label={`Previous guide: ${prev.data.title}`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6" /></svg></a>
+          : <span class="icon-btn is-off" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19 12H5m6-6-6 6 6 6" /></svg></span>}
+        <span class="lg-count">{position} / {all.length}</span>
+        {next
+          ? <a class="btn-dark" href={urlOf(next)} aria-label={`Next guide: ${next.data.title}`}><span>Next<span class="long">: {next.data.title}</span></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></a>
+          : <a class="btn-dark" href={`${base}osp/`}><span>All guides</span></a>}
+      </div>
+      <div class="lg-story" aria-hidden="true">
+        {inGroup.map((_, i) => <span><i style={`width:${i < groupPos ? 100 : 0}%`} data-story={i === groupPos ? '' : undefined}></i></span>)}
+      </div>
+    </header>
+
+    <div class="lg-body">
+      <nav class="lg-curr" aria-label="All guides">
+        <div class="lg-curr-head"><span class="label">Guides</span><span class="label" data-watched>{all.length} guides</span></div>
+        {curriculum.map((gr) => (
+          <details open={gr.slug === d.group}>
+            <summary><span>{gr.title}</span><span class="count">{gr.guides.length}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></summary>
+            <ul>
+              {gr.guides.map((g) => (
+                <li>
+                  <a href={urlOf(g)} data-gid={g.data.id} aria-current={g.data.id === d.id ? 'page' : undefined}>
+                    <span class="dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12.5 3.2 3.2L17 9" /></svg></span>
+                    <span class="t">{g.data.title}</span>
+                    <span class="d">{clock(scene(g.data.scene).duration)}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ))}
+      </nav>
+
+      <div class="lg-main">
+        {st ? (
+          <div data-pagefind-body>
+            <h1 data-pagefind-meta="title">{d.title}</h1>
+            <span class="sr-only" data-pagefind-meta="where">{groupTitle(d.group)} · Step {stepIndex + 1}</span>
+            <p class="lg-purpose">{d.purpose}</p>
+            <p class="sr-only">Step {stepIndex + 1}. {st.instruction} {st.result}</p>
+            <p class="sr-only" data-pagefind-weight="6">{d.synonyms.join(', ')}</p>
+          </div>
+        ) : (
+          <div data-pagefind-body>
+            <h1 data-pagefind-meta="title">{d.title}</h1>
+            <span class="sr-only" data-pagefind-meta="where">{groupTitle(d.group)} · Guide</span>
+            <p class="lg-purpose">{d.purpose}</p>
+            <p class="sr-only" data-pagefind-weight="4">{d.synonyms.join(', ')} {d.tags.join(', ')}</p>
+          </div>
+        )}
+        <div class="lg-stage">
+          <video muted playsinline loop preload="metadata" poster={seg(active).still ?? s.poster} width={s.width} height={s.height}
+                 aria-label={`Silent demonstration: ${d.title}`} data-video>
+            <source src={s.webm} type="video/webm" />
+            <source src={s.mp4} type="video/mp4" />
+          </video>
+          <div class="lg-ctl">
+            <button type="button" class="lg-play" data-toggle aria-label="Play">
+              <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+              <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+            </button>
+            <div class="lg-segs">
+              {d.steps.map((x, i) => {
+                const g = seg(x.id);
+                return <button type="button" data-seg={i} style={`flex-grow:${(g.end - g.start).toFixed(3)}`} aria-label={`Play step ${i + 1}`}><span><i></i></span></button>;
+              })}
+            </div>
+            <span class="lg-time"><span data-time>0:00</span> / {clock(s.duration)}</span>
           </div>
         </div>
-        <aside class="side">
-          {d.preconditions.length > 0 && (<><div class="label">Before you start</div><ul class="pre">{d.preconditions.map((p) => <li>{p}</li>)}</ul></>)}
-          {ref && (<p class="pre">Reference: <a href={`${base}osp/reference/${ref.data.id.split('.').pop()}/`}>{ref.data.title}</a></p>)}
-          {related.length > 0 && (
-            <div class="related"><div class="label">Related</div>
-              <ul>{related.map((r) => <li><a class="chip" href={urlOf(r)}>{r.data.title}</a></li>)}</ul></div>
-          )}
-          <p class="pre" style="margin-top:24px">Recorded from ANDOR OSP at {s.productCommit}. The pointer and outlines are drawn on top of the real interface.</p>
-        </aside>
+        {d.editorial?.hostVerification && <p class="note host">{d.editorial.hostVerification}</p>}
       </div>
-    </article>
+
+      <aside class="lg-steps" aria-label="Steps">
+        <div class="lg-steps-head"><h2 class="label">Steps</h2><span class="label">Silent · {Math.round(s.duration)} s</span></div>
+        <ol class="steps" data-pagefind-ignore>
+          {d.steps.map((x, i) => {
+            const g = seg(x.id);
+            return (
+              <li class="step" id={x.id} aria-current={x.id === active ? 'step' : undefined} data-step={x.id} data-start={g.start} data-end={g.end} data-still={g.still}>
+                <a href={`${url}${x.id}/`}>
+                  <span class="n">{i + 1}</span>
+                  <span class="tx"><b>{x.instruction}</b><span class="result">{x.result}</span></span>
+                </a>
+              </li>
+            );
+          })}
+        </ol>
+        {(d.about || ref) && (
+          <div class="lg-tip">
+            <h3 class="label">Good to know</h3>
+            {d.about && <p>{d.about}</p>}
+            {ref && <a href={`${base}osp/reference/${ref.data.id.split('.').pop()}/`}>Reference: {ref.data.title}</a>}
+          </div>
+        )}
+      </aside>
+    </div>
   </div>
+
+  <script>
+    const root = document.querySelector<HTMLElement>('[data-guide]');
+    if (root) {
+      const video = root.querySelector<HTMLVideoElement>('[data-video]')!;
+      const toggle = root.querySelector<HTMLButtonElement>('[data-toggle]')!;
+      const timeEl = root.querySelector<HTMLElement>('[data-time]')!;
+      const story = root.querySelector<HTMLElement>('[data-story]');
+      const items = [...root.querySelectorAll<HTMLLIElement>('li[data-step]')];
+      const fills = [...root.querySelectorAll<HTMLElement>('[data-seg] i')];
+      const starts = items.map((li) => parseFloat(li.dataset.start ?? '0'));
+      const ends = items.map((li) => parseFloat(li.dataset.end ?? '0'));
+      const duration = parseFloat(root.dataset.duration ?? '0');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let active = Math.max(0, items.findIndex((li) => li.dataset.step === root.dataset.current));
+
+      // Watched guides are remembered in this browser only (a convenience; never required).
+      const KEY = 'learn-andor:watched';
+      const read = (): string[] => { try { return JSON.parse(localStorage.getItem(KEY) ?? '[]'); } catch { return []; } };
+      const showWatched = (ids: string[]) => {
+        document.querySelectorAll<HTMLElement>('[data-gid]').forEach((a) => a.classList.toggle('is-watched', ids.includes(a.dataset.gid ?? '')));
+        const el = document.querySelector<HTMLElement>('[data-watched]');
+        if (el && ids.length) el.textContent = `${ids.length} of ${root.dataset.total} watched`;
+      };
+      const markWatched = () => {
+        const ids = read();
+        if (ids.includes(root.dataset.id ?? '')) return;
+        ids.push(root.dataset.id ?? '');
+        try { localStorage.setItem(KEY, JSON.stringify(ids)); } catch { /* storage unavailable */ }
+        showWatched(ids);
+      };
+      showWatched(read());
+
+      const setActive = (i: number) => {
+        active = i;
+        items.forEach((li, k) => (k === i ? li.setAttribute('aria-current', 'step') : li.removeAttribute('aria-current')));
+      };
+      const paint = () => {
+        const t = video.currentTime;
+        let k = 0;
+        starts.forEach((s, i) => { if (t + 0.05 >= s) k = i; });
+        if (k !== active && !video.paused) setActive(k);
+        fills.forEach((f, i) => {
+          const p = i < active ? 1 : i > active ? 0 : Math.min(1, Math.max(0, (t - starts[i]) / (ends[i] - starts[i])));
+          f.style.width = `${(p * 100).toFixed(1)}%`;
+        });
+        timeEl.textContent = `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+        if (story && duration) story.style.width = `${Math.min(100, (t / duration) * 100).toFixed(1)}%`;
+        if (duration && t >= duration - 0.6) markWatched();
+      };
+      const loop = () => { paint(); if (!video.paused) requestAnimationFrame(loop); };
+      const seek = (i: number, play: boolean) => {
+        setActive(i);
+        if (reduce && items[i].dataset.still) video.poster = items[i].dataset.still!;
+        video.currentTime = starts[i] + 0.01;
+        if (play && !reduce) video.play().catch(() => {});
+        paint();
+      };
+      video.addEventListener('play', () => { toggle.setAttribute('aria-label', 'Pause'); root.classList.add('is-playing'); requestAnimationFrame(loop); });
+      video.addEventListener('pause', () => { toggle.setAttribute('aria-label', 'Play'); root.classList.remove('is-playing'); });
+      video.addEventListener('timeupdate', () => { if (video.paused) paint(); });
+      toggle.addEventListener('click', () => (video.paused ? video.play().catch(() => {}) : video.pause()));
+      const choose = (i: number) => { seek(i, true); history.replaceState(null, '', `#${items[i].dataset.step}`); };
+      items.forEach((li, i) => li.querySelector('a')!.addEventListener('click', (e) => { e.preventDefault(); choose(i); }));
+      root.querySelectorAll<HTMLButtonElement>('[data-seg]').forEach((b) => b.addEventListener('click', () => choose(Number(b.dataset.seg))));
+      document.addEventListener('keydown', (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement).closest('input, textarea, select')) return;
+        if (e.key === 'ArrowRight' && active < items.length - 1) { e.preventDefault(); choose(active + 1); }
+        if (e.key === 'ArrowLeft' && active > 0) { e.preventDefault(); choose(active - 1); }
+      });
+      const fromHash = items.findIndex((li) => `#${li.dataset.step}` === location.hash);
+      const start = () => seek(fromHash >= 0 ? fromHash : active, !reduce);
+      if (video.readyState >= 1) start(); else video.addEventListener('loadedmetadata', start, { once: true });
+    }
+  </script>
 </Base>

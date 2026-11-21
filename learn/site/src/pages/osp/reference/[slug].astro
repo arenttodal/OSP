@@ -12,9 +12,9 @@ const { Content } = await render(entry);
 const guides = await byId();
 const base = import.meta.env.BASE_URL;
 ---
-<Base title={`${d.title} · Reference · Learn OSP`} description={d.function} current="reference">
+<Base title={`${d.title} · Reference · Learn ANDOR`} description={d.function} current="reference">
   <div class="wrap">
-    <div class="crumbs"><a href={`${base}osp/`}>Learn OSP</a> / <a href={`${base}osp/reference/`}>Reference</a> / {d.title}</div>
+    <div class="crumbs"><a href={`${base}osp/`}>Learn ANDOR</a> / <a href={`${base}osp/reference/`}>Reference</a> / {d.title}</div>
     <div class="ref">
       <nav aria-label="Reference articles"><ul>{all.map((r) => <li><a href={`${base}osp/reference/${r.data.id.split('.').pop()}/`} aria-current={r.data.id === d.id ? 'page' : undefined}>{r.data.title}</a></li>)}</ul></nav>
       <article data-pagefind-body>

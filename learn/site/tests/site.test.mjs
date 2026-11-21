@@ -59,7 +59,30 @@ try {
     check(`390 px: ${p} fits`, w <= 390, `scrollWidth ${w}`);
   }
   await phone.close();
-  // 6. basic accessibility on every kind of page
+  // 6. desktop: a guide fits one window (no page scroll), all its steps visible; the active step follows the clip
+  for (const [w, h] of [[1440, 900], [1280, 800]]) {
+    const desk = await browser.newPage({ viewport: { width: w, height: h } });
+    for (const p of ['osp/arpeggiator/strum/', 'osp/play-and-layer/midi-learn/', 'osp/make-an-instrument/record-input/']) {
+      await desk.goto(ROOT + p);
+      const m = await desk.evaluate(() => ({
+        scroll: document.documentElement.scrollHeight,
+        stepsOut: [...document.querySelectorAll('li[data-step]')].filter((li) => li.getBoundingClientRect().bottom > innerHeight).length,
+        video: document.querySelector('video').getBoundingClientRect().bottom <= innerHeight,
+      }));
+      check(`${w}×${h}: ${p} fits one window`, m.scroll <= h && m.stepsOut === 0 && m.video, JSON.stringify(m));
+    }
+    await desk.close();
+  }
+  {
+    const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await desk.goto(`${ROOT}osp/arpeggiator/strum/`);
+    await desk.waitForTimeout(5000);
+    const cur = await desk.$eval('li[aria-current="step"]', (li) => li.dataset.step).catch(() => '');
+    const t = await desk.$eval('video', (v) => v.currentTime);
+    check('the active step follows the clip', cur !== 'choose-chord' && t > 3.9, `t=${t.toFixed(2)}, step=${cur}`);
+    await desk.close();
+  }
+  // 7. basic accessibility on every kind of page
   for (const p of ['osp/', 'osp/play-and-layer/', 'osp/play-and-layer/pedal-loop/', 'osp/play-and-layer/pedal-loop/pedal-down/', 'osp/reference/pedal-loop/', 'osp/search/']) {
     await page.goto(ROOT + p);
     const a = await page.evaluate(() => ({

@@ -12,3 +12,5 @@ export async function byId() {
   for (const g of await allGuides()) m.set(g.data.id, g);
   return m;
 }
+/** A clip's length as m:ss, the way the gallery and the curriculum show it. */
+export const clock = (seconds: number) => `${Math.floor(Math.round(seconds) / 60)}:${String(Math.round(seconds) % 60).padStart(2, '0')}`;

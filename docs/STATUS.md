@@ -1,5 +1,18 @@
 # Status
 
+> **21 Nov 2026, Learn ANDOR website redesign (branch `feature/learn-capture-studio`; `learn/site/`):**
+> - The site is now **Learn ANDOR**, deployed as a noindex preview on Cloudflare Pages
+>   (`andor-learn.pages.dev`, built from this branch on every push under `learn/`).
+> - Owner picked a direction from three mockups: the **gallery** is a featured clip (Pedal Loop) plus
+>   one row of cards per topic; a **guide** is a full-window player with navigation along the top
+>   (previous / position / next, a progress bar per guide in the topic), the curriculum on the left,
+>   the clip with a segment per step in the middle and the steps plus "Good to know" on the right. It
+>   fits one window at 1180 px and wider; narrower screens stack. "Before you start", Related and the
+>   commit line were removed from guide pages.
+> - The clip now plays straight through with the active step following it (it used to loop one step).
+> - Tests: content check (30 guides, 12 references, 113 steps), 6,839 links, browser tests 35/35
+>   (adds one-window fit at 1440×900 and 1280×800, and the step following the clip).
+
 > **20 Nov 2026, ANDOR Learn: the full capture inventory and the Learn website preview (branch
 > `feature/learn-capture-studio`; `docs/learn-studio/gate-3-report.md`):**
 > - **30 clips, one per guide**, captured from the real editor at `6ef3376` (final run 30/30, 117

@@ -1,48 +1,70 @@
 ---
+// The gallery: one featured clip, then a row per topic. Every card opens its guide.
 import Base from '../../layouts/Base.astro';
-import Search from '../../components/Search.astro';
 import { groups } from '../../data/groups';
-import { allGuides, urlOf } from '../../lib/guides';
+import { allGuides, urlOf, clock } from '../../lib/guides';
 import { scene } from '../../lib/scenes';
 const guides = await allGuides();
-const quick = guides.filter((g) => g.data.quick);
-const start = guides.find((g) => g.data.id === 'osp.guide.make.load-and-play')!;
-const chips = ['record', 'grab last', 'map notes', 'strum', 'satellite', 'pedal loop', 'imprint', 'key dna'];
+const base = import.meta.env.BASE_URL;
+// Editorial choice: the feature shown at the top of the page.
+const featured = guides.find((g) => g.data.id === 'osp.guide.play.pedal-loop')!;
+const fs = scene(featured.data.scene);
 ---
-<Base title="Learn OSP · ANDOR" current="home">
-  <div class="wrap">
-    <section class="hero">
-      <div>
-        <div class="label">ANDOR OSP · One Shot Performer</div>
-        <h1>Learn OSP</h1>
-        <p class="lede">Each guide is a short, silent demonstration recorded from the real instrument, with numbered steps you can open directly.</p>
-        <Search chips={chips} />
-      </div>
-      <a class="qcard" href={urlOf(start)}>
-        <img src={scene(start.data.scene).poster} alt="" loading="eager" width="1600" height="1000" />
-        <div><span class="label">Quick start</span><h3>{start.data.title}</h3><p>{start.data.purpose}</p></div>
-      </a>
-    </section>
-
-    <h2>Go straight to</h2>
-    <div class="quick">
-      {quick.map((g) => (
-        <a class="qcard" href={urlOf(g)}>
-          <img src={scene(g.data.scene).poster} alt="" loading="lazy" width="1600" height="1000" />
-          <div><h3>{g.data.title}</h3><p>{g.data.purpose}</p></div>
+<Base title="Learn ANDOR · OSP guides" current="home">
+  <h1 class="sr-only">Learn ANDOR: guides for ANDOR OSP</h1>
+  <section class="feature wrap" aria-labelledby="feature-title">
+    <div class="feature-text">
+      <span class="eyebrow">Featured · Play and layer</span>
+      <h2 id="feature-title">Loop any note with the sustain pedal</h2>
+      <p>Turn LOOP off, set PEDAL LOOP to Ping-Pong, and the pedal holds the part of the note you are playing, forward and back.</p>
+      <div class="feature-cta">
+        <a class="btn-primary" href={urlOf(featured)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+          Watch the guide
         </a>
-      ))}
+        <span class="meta">{clock(fs.duration)} · {featured.data.steps.length} steps</span>
+      </div>
     </div>
+    <div class="feature-clip">
+      <video muted playsinline loop preload="metadata" poster={fs.poster} width={fs.width} height={fs.height}
+             aria-label={`Silent demonstration: ${featured.data.title}`} data-feature>
+        <source src={fs.webm} type="video/webm" />
+        <source src={fs.mp4} type="video/mp4" />
+      </video>
+    </div>
+  </section>
 
-    <h2>All guides</h2>
-    <div class="groups">
-      {groups.map((gr) => (
-        <section class="group">
-          <h3><a href={`${import.meta.env.BASE_URL}osp/${gr.slug}/`}>{gr.title}</a></h3>
-          <p>{gr.blurb}</p>
-          <ul>{guides.filter((g) => g.data.group === gr.slug).map((g) => <li><a href={urlOf(g)}>{g.data.title}</a></li>)}</ul>
+  <div class="rows">
+    {groups.map((gr) => {
+      const list = guides.filter((g) => g.data.group === gr.slug);
+      return (
+        <section class="row" aria-labelledby={`row-${gr.slug}`}>
+          <div class="row-head wrap">
+            <h2 id={`row-${gr.slug}`}><a href={`${base}osp/${gr.slug}/`}>{gr.title}</a></h2>
+            <a class="row-all" href={`${base}osp/${gr.slug}/`}>All {list.length}</a>
+          </div>
+          <ul class="row-track">
+            {list.map((g) => {
+              const s = scene(g.data.scene);
+              return (
+                <li>
+                  <a class="card" href={urlOf(g)}>
+                    <span class="card-media">
+                      <img src={s.poster} alt="" loading="lazy" width={s.width} height={s.height} />
+                      <span class="card-time">{clock(s.duration)}</span>
+                    </span>
+                    <span class="card-title">{g.data.title}</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
         </section>
-      ))}
-    </div>
+      );
+    })}
   </div>
+  <script>
+    const v = document.querySelector<HTMLVideoElement>('[data-feature]');
+    if (v && !matchMedia('(prefers-reduced-motion: reduce)').matches) { v.play().catch(() => {}); }
+  </script>
 </Base>

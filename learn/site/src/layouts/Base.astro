@@ -1,8 +1,12 @@
 ---
 import '../styles/global.css';
 import { productCommit } from '../lib/scenes';
-interface Props { title: string; description?: string; current?: 'home' | 'guides' | 'reference' | 'search'; }
-const { title, description = 'Short, silent demonstrations of each task in ANDOR OSP, recorded from the real instrument.', current } = Astro.props;
+interface Props {
+  title: string; description?: string; current?: 'home' | 'guides' | 'reference' | 'search';
+  /** A guide: a full-window player with its own top bar, no site header or footer. */
+  app?: boolean;
+}
+const { title, description = 'Short, silent demonstrations of each task in ANDOR OSP, recorded from the real instrument.', current, app = false } = Astro.props;
 const base = import.meta.env.BASE_URL;
 ---
 <!doctype html>
@@ -14,26 +18,52 @@ const base = import.meta.env.BASE_URL;
     <meta name="description" content={description} />
     <meta name="robots" content="noindex" />
   </head>
-  <body>
+  <body class={app ? 'is-app' : undefined} data-search-url={`${base}osp/search/`}>
     <a class="sr-only" href="#main">Skip to content</a>
-    <header class="site-head">
-      <div class="wrap">
-        <a class="brand" href={`${base}osp/`}>ANDOR<span>/OSP</span></a>
-        <nav aria-label="Main">
-          <a href={`${base}osp/`} aria-current={current === 'home' ? 'page' : undefined}>Learn</a>
-          <a href={`${base}osp/reference/`} aria-current={current === 'reference' ? 'page' : undefined}>Reference</a>
-        </nav>
-        <span class="spacer"></span>
-        <a class="head-search" href={`${base}osp/search/`}>Search<span class="long"> guides</span></a>
-      </div>
-    </header>
+    {!app && (
+      <header class="site-head">
+        <div class="wrap">
+          <a class="brand" href={`${base}osp/`}>Learn <b>ANDOR</b></a>
+          <nav aria-label="Main">
+            <a href={`${base}osp/`} aria-current={current === 'home' ? 'page' : undefined}>Guides</a>
+            <a href={`${base}osp/reference/`} aria-current={current === 'reference' ? 'page' : undefined}>Reference</a>
+          </nav>
+          <span class="spacer"></span>
+          {current !== 'search' && (
+            <form class="head-search" action={`${base}osp/search/`} method="get" role="search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <label class="sr-only" for="head-q">Search the guides</label>
+              <input id="head-q" name="q" type="search" placeholder="Search guides" autocomplete="off" />
+              <kbd>⌘K</kbd>
+            </form>
+          )}
+          {current !== 'search' && (
+            <a class="head-search-link" href={`${base}osp/search/`} aria-label="Search the guides">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            </a>
+          )}
+        </div>
+      </header>
+    )}
     <main id="main"><slot /></main>
-    <footer class="site-foot">
-      <div class="wrap">
-        <span>ANDOR OSP 0.9.0-beta.1 · guides captured at {productCommit}</span>
-        <span>Silent demonstrations recorded from the real instrument</span>
-        <span>Preview build · not published</span>
-      </div>
-    </footer>
+    {!app && (
+      <footer class="site-foot">
+        <div class="wrap">
+          <span>ANDOR OSP 0.9.0-beta.1 · guides captured at {productCommit}</span>
+          <span>Silent demonstrations recorded from the real instrument</span>
+          <span>Preview build · not published</span>
+        </div>
+      </footer>
+    )}
+    <script>
+      // ⌘K / Ctrl+K: the header's search field where there is one, otherwise the search page.
+      document.addEventListener('keydown', (e) => {
+        if (!(e.key === 'k' && (e.metaKey || e.ctrlKey))) return;
+        e.preventDefault();
+        const field = document.querySelector<HTMLInputElement>('#head-q, #learn-search');
+        if (field) field.focus();
+        else location.href = document.body.dataset.searchUrl ?? '/osp/search/';
+      });
+    </script>
   </body>
 </html>
