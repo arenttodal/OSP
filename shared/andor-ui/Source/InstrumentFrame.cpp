@@ -750,6 +750,14 @@ bool Overflow::scrollToShow (float top, float bottom)
     return scrolled != before;
 }
 
+void revealPopover (juce::Component& editor, const juce::Component& content, const juce::Component& popup, Overflow& overflow)
+{
+    if (! overflow.overflowing())
+        return;
+    const auto onEditor = editor.getLocalArea (&content, popup.getBounds()).toFloat();
+    overflow.scrollToShow (onEditor.getY() + overflow.offset(), onEditor.getBottom() + overflow.offset());
+}
+
 void Overflow::scrollBarMoved (juce::ScrollBar*, double newRangeStart)
 {
     scrolled = std::clamp (static_cast<float> (newRangeStart), 0.0f, std::max (0.0f, content - visible));

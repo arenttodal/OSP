@@ -1196,3 +1196,49 @@ TEST_CASE ("custom pattern r2: screenshots (on demand: OSP_CUSTOM_ARP_SHOTS=<dir
     ui->closePopup();
     ui->removeFromDesktop();
 }
+
+TEST_CASE ("custom pattern r2: in a window shorter than the instrument, the browser opens in view (scrolled to it)", "[plugin][arp-custom][arp-custom-r2]")
+{
+    // A short window (a laptop's screen, or a host that keeps its height) scrolls the instrument.
+    // The browser opens under the ARP panel, low in the instrument, and once ran below the
+    // window's edge, half out of reach: opening it now scrolls it into view (opening only).
+    using namespace customr2;
+    struct ShortHost final : juce::Component
+    {
+        ShortHost (juce::Component& e, int kept) : editor (e), height (kept) { addAndMakeVisible (editor); }
+        ~ShortHost() override { removeChildComponent (&editor); }
+        void childBoundsChanged (juce::Component*) override
+        {
+            if (! answering && editor.getHeight() != height)
+            {
+                const juce::ScopedValueSetter<bool> inside (answering, true);
+                editor.setSize (editor.getWidth(), height);   // (the old size, every time)
+            }
+        }
+        juce::Component& editor;
+        int height;
+        bool answering = false;
+    };
+    OspAudioProcessor p;
+    Window w (p);
+    const int shortHeight = 860;
+    w.base->setSize (1448, shortHeight);
+    ShortHost host (*w.base, shortHeight);
+    w.base->setSize (1448, juce::roundToInt (w.ui->instrumentHeight()));
+    w.ui->instrumentOverflow().settleNow();
+    w.ui->instrumentOverflow().settleNow();
+    REQUIRE (w.ui->instrumentOverflow().overflowing());
+    REQUIRE (w.base->getHeight() == shortHeight);
+    REQUIRE (w.ui->instrumentOverflow().offset() == 0.0f);
+    w.arp().openCustomBrowser();
+    auto* browser = w.browser();
+    REQUIRE (browser != nullptr);
+    const auto shown = w.base->getLocalArea (browser, browser->getLocalBounds());
+    CHECK (w.ui->instrumentOverflow().offset() > 0.0f);   // (scrolled to it)
+    CHECK (shown.getY() >= 0);
+    CHECK (shown.getBottom() <= w.base->getHeight() + osp::plugin::MiniPanel::shadowMargin);   // (its card in view)
+    const int fresh = browser->find (Browser::Kind::newPattern);
+    REQUIRE (fresh >= 0);
+    auto* under = w.base->getComponentAt (w.base->getLocalPoint (browser, browser->rowArea (fresh).getCentre()));
+    CHECK ((under == browser || browser->isParentOf (under)));
+}

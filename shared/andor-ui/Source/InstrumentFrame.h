@@ -262,6 +262,12 @@ namespace frame
         bool askedAgain = false, refused = false, asking = false;
     };
 
+    /** A popover just opened in a window shorter than the instrument (it scrolls): scrolls once
+        so the whole popover is in view - one opened low (the Custom Patterns browser under the
+        arpeggiator) would otherwise run below the window's edge. Call it on opening only, never
+        on a reposition, so the musician's own scrolling is left alone. Nothing while all fits. */
+    void revealPopover (juce::Component& editor, const juce::Component& content, const juce::Component& popup, Overflow& overflow);
+
     /** For tests (no screen to ask headless): the screen's room for the editor's height, in
         pixels, as if it stood on such a screen. 0: none (the default; a real screen is asked). */
     void overrideScreenRoom (int pixels) noexcept;

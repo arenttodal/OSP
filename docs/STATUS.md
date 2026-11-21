@@ -22,6 +22,11 @@
 >   the file that included it, and ANDOR ANALOG has its own `FxRouting.h` there, so the shell
 >   saw ANALOG's header and not `RoutingKey`. It now includes OSP's by path (no other shared
 >   header has the problem: the rest find their own folder's file first).
+> - **Popovers in a short window:** a window shorter than the instrument scrolls it; a popover
+>   opened low (the Custom Patterns browser under the ARP panel) ran below the window's edge.
+>   `frame::revealPopover` scrolls it into view once, on opening (ANDOR OSP's editor and the
+>   shell alike; nothing changes while all fits, so the captures are unchanged). Test:
+>   `custom pattern r2: in a window shorter than the instrument...`.
 > - Not taken from the beta: the DAMPEN Starting States commit (3c260390, ANDOR OSP's own
 >   presets), as with its release work, MIDI Learn and the POS-line fix.
 >

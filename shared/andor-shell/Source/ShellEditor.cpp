@@ -1311,6 +1311,7 @@ void ShellEditor::presentPopup (int which)
     popup->toFront (false);
     modOverlay.toFront (false);
     positionPopup();
+    frame::revealPopover (*this, content, *popup, overflow);   // (a short window: in view)
     frame::animatePopoverOpening (*popup);
     if (which >= 0 && which < frame::macroCount)
         macros[static_cast<std::size_t> (which)].label->setOpen (true);

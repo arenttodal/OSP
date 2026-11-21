@@ -686,6 +686,7 @@ void OspAudioProcessorEditor::presentPopup (int which)
     popup->toFront (false);
     modOverlay.toFront (false);
     positionPopup();
+    frame::revealPopover (*this, content, *popup, overflow);   // (a short window: in view)
     frame::animatePopoverOpening (*popup);
     if (isShowing())
         grabKeyboardFocus(); // Escape closes it
