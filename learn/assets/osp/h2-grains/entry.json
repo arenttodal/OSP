@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.h2-grains",
   "title": "Shape the grains",
-  "scenarioDigest": "sha256:235f0f41d57d3d71117472185eb177a411ee5719eda2b88203f3524fc647b1b8",
+  "scenarioDigest": "sha256:426d3750ea8d423022b4aa0d10fa157f63262946d1bbf48c89f1b463477027ff",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -28,10 +28,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     }
   ],
   "disclosures": [
@@ -59,16 +59,23 @@
       "webm": {
         "path": "h2-grains/h2-grains.webm",
         "codec": "vp9",
-        "bytes": 337052,
-        "sha256": "f0d3f73c7d83a16531e543a7faefeada73bd4e493e1ae1b2238291b69e588841"
+        "bytes": 431678,
+        "sha256": "1d0cdb062417858e11ff714bf9d26a1d16a765ce8e1ef521ecb28cea3f5b2760"
       },
       "mp4": {
         "path": "h2-grains/h2-grains.mp4",
         "codec": "h264",
-        "bytes": 362519,
-        "sha256": "df1cb0983d82a514e2080b46f1db0eadca8dbf6ca23d0b1199032b5da5066e96"
+        "bytes": 543560,
+        "sha256": "120968317ee7cd078b90ad5b4b1c856c84fa743585fa79a5fefd0afcc53890fb"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -7.7,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "reveal": 0.0,
@@ -84,14 +91,14 @@
   },
   "poster": {
     "path": "h2-grains/poster.webp",
-    "frame": 306,
-    "sha256": "3b2eef5e9e0e7063484141da27400f2474b6fadf49af27bb975672c4a3add6c0",
+    "frame": 316,
+    "sha256": "3dafc159cd4d9f8dc497bb2e192fde380c90ab8ac4a2ab67b44e95b0ad97fdfa",
     "master": "learn/capture/out/h2-grains/poster.png"
   },
   "run": {
-    "wallSeconds": 77.014,
-    "meanFrameMs": 206.9,
-    "slowdown": 6.21,
+    "wallSeconds": 78.361,
+    "meanFrameMs": 209.6,
+    "slowdown": 6.29,
     "notesPlayed": 1
   },
   "validation": {
@@ -131,6 +138,31 @@
         "detail": ""
       },
       {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "10.900 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-34.6 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -7.7 dBTP"
+      },
+      {
         "check": "no blank frames",
         "passed": true,
         "detail": "0 blank"
@@ -138,7 +170,7 @@
       {
         "check": "no frozen run longer than 2.5 s",
         "passed": true,
-        "detail": "longest unchanged run 0.40 s"
+        "detail": "longest unchanged run 0.53 s"
       },
       {
         "check": "webm frames = master",

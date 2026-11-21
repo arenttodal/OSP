@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.e5-export-instrument",
   "title": "Export a portable instrument",
-  "scenarioDigest": "sha256:fdae8b3deb8c97f7c4158bd7af9dbbd8e5143cafd8855ef3ae852f3b0ab90899",
+  "scenarioDigest": "sha256:9e6bf6faf723a86faddc9ff1cec223e754966593070f60549e6555afb8fcadd9",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -26,10 +26,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     }
   ],
   "disclosures": [
@@ -57,17 +57,18 @@
       "webm": {
         "path": "e5-export-instrument/e5-export-instrument.webm",
         "codec": "vp9",
-        "bytes": 291117,
-        "sha256": "cc2955c4d2d8788176c8c8c1ef635bda2adfd305c67a44430f9fdc767184d580"
+        "bytes": 280478,
+        "sha256": "014dc629f071be75e403d1cffacc9b9b141c9cfc48c6f243b1243465cac2b540"
       },
       "mp4": {
         "path": "e5-export-instrument/e5-export-instrument.mp4",
         "codec": "h264",
-        "bytes": 212802,
-        "sha256": "98eeb19b9bd2393982724759ab00948ddefdc26c4c3a9b82e534c62c2691e9b7"
+        "bytes": 212377,
+        "sha256": "a0520463b21309c60cfe6c4f9aabe8fe63418c189c9e2b9409b0e0a2f47ef915"
       }
     }
   },
+  "audio": null,
   "marks": {
     "open-menu": 0.0,
     "export": 3.367
@@ -79,13 +80,13 @@
   "poster": {
     "path": "e5-export-instrument/poster.webp",
     "frame": 171,
-    "sha256": "a8010c27ae8d15d484517b8376ba0b3ca7cd9e9c26f320e7b6bf9a2f85ffcddb",
+    "sha256": "ae60169c3f9ba7edec76c9506e7ee99b2e9423f68c794e091fdb04a2af9632c2",
     "master": "learn/capture/out/e5-export-instrument/poster.png"
   },
   "run": {
-    "wallSeconds": 39.042,
-    "meanFrameMs": 173.2,
-    "slowdown": 5.2,
+    "wallSeconds": 37.456,
+    "meanFrameMs": 165.7,
+    "slowdown": 4.97,
     "notesPlayed": 0
   },
   "validation": {
@@ -121,6 +122,11 @@
       },
       {
         "check": "encoder exit (libx264)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "no notes played: clip stays silent",
         "passed": true,
         "detail": ""
       },

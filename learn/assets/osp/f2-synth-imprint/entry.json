@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.f2-synth-imprint",
   "title": "Colour SYNTH with IMPRINT",
-  "scenarioDigest": "sha256:742b94ff4d0f183a6d60fea26455b475caf848405e4fae30a0513a3ed489f235",
+  "scenarioDigest": "sha256:6d4607e539fdd8d5e98238a5d4f1a628c3adef27e85d5a2a33731adba1b03164",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -22,10 +22,10 @@
   "targets": [],
   "fixtures": [
     {
-      "id": "tutorial:voice",
-      "file": "Tutorial Voice A3.wav",
-      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-      "bytes": 1440104
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     }
   ],
   "disclosures": [
@@ -53,16 +53,23 @@
       "webm": {
         "path": "f2-synth-imprint/f2-synth-imprint.webm",
         "codec": "vp9",
-        "bytes": 235677,
-        "sha256": "99b976c8b93888f2548beaeb2692d427e69e9edd2c1884c376f4b3677e7ecaea"
+        "bytes": 407754,
+        "sha256": "c94f0b1b2dd63bad0790a9b2d7983254807ac505716f623ae5286db78332d303"
       },
       "mp4": {
         "path": "f2-synth-imprint/f2-synth-imprint.mp4",
         "codec": "h264",
-        "bytes": 289623,
-        "sha256": "4288039dc6402c40ab91997278e34a16e7a759aac2a90285ac907b22a62fe0cb"
+        "bytes": 448729,
+        "sha256": "44498c1f1e23542dc132b2f3393b5d23b7432258be1b560cd2e933f3878237b1"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -8.0,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "open-synth": 0.0,
@@ -79,13 +86,13 @@
   "poster": {
     "path": "f2-synth-imprint/poster.webp",
     "frame": 279,
-    "sha256": "cd207c35e77ee16e3ab836673c8d43bcfe09b3dc2eb98c0e6f593efc57da0e6e",
+    "sha256": "c29292c93e6c7db7d5ae6a4f9f3ed702a91d3f47cafc876986892c6e1796a492",
     "master": "learn/capture/out/f2-synth-imprint/poster.png"
   },
   "run": {
-    "wallSeconds": 76.434,
-    "meanFrameMs": 214.2,
-    "slowdown": 6.43,
+    "wallSeconds": 73.22,
+    "meanFrameMs": 207.0,
+    "slowdown": 6.21,
     "notesPlayed": 1
   },
   "validation": {
@@ -123,6 +130,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "10.300 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-34.0 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -8.0 dBTP"
       },
       {
         "check": "no blank frames",

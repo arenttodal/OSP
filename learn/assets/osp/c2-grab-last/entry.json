@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.c2-grab-last",
   "title": "Grab what you just played",
-  "scenarioDigest": "sha256:747381694aa8941b6b0eb370eb7585c6bd2b4c62a04485c41cb6de6d9b5e4e71",
+  "scenarioDigest": "sha256:468c973aac6404a72b87b12989da96a8e54607c891f7ae166d0780036cb72a49",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -25,10 +25,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     },
     {
       "id": "input:phrase-d4",
@@ -63,16 +63,23 @@
       "webm": {
         "path": "c2-grab-last/c2-grab-last.webm",
         "codec": "vp9",
-        "bytes": 421757,
-        "sha256": "2c370a03b6ce402014f0455894c4df702a8b4981fad6f674320035c5f56b2f55"
+        "bytes": 488556,
+        "sha256": "bb4e8151650053485ef6bc4421582ed9a4e74fb5b6cf940e8da876acddf9c4e9"
       },
       "mp4": {
         "path": "c2-grab-last/c2-grab-last.mp4",
         "codec": "h264",
-        "bytes": 599463,
-        "sha256": "c5a85e1b4ef5689fd456dcadeef120ab3d810b813b10187fe907907471c56f34"
+        "bytes": 685693,
+        "sha256": "780e8d2e8b051d087d22d9637ef4b9057d21e1214177ab2c7b1446e6e6486e2d"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -8.6,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "open-capture": 0.0,
@@ -86,14 +93,14 @@
   },
   "poster": {
     "path": "c2-grab-last/poster.webp",
-    "frame": 329,
-    "sha256": "a7af7aba3a148569a6ce9bffac628f2c452dfaf7a55a1ac6f9afb6107c0db188",
+    "frame": 339,
+    "sha256": "48f8fea842ea73322a96c7aaddeb784c7dfdd26e3d2be3e0e84e109c251f1559",
     "master": "learn/capture/out/c2-grab-last/poster.png"
   },
   "run": {
-    "wallSeconds": 76.46600000000001,
-    "meanFrameMs": 203.2,
-    "slowdown": 6.1,
+    "wallSeconds": 70.693,
+    "meanFrameMs": 187.8,
+    "slowdown": 5.64,
     "notesPlayed": 4
   },
   "validation": {
@@ -131,6 +138,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "11.367 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-34.1 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -8.6 dBTP"
       },
       {
         "check": "no blank frames",

@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.h1-oneshot-granular",
   "title": "Switch between One Shot and Granular",
-  "scenarioDigest": "sha256:c61c3c17de6f85c707cc9fd7579afc56103345e45597be3ff751fd0240d7dfbc",
+  "scenarioDigest": "sha256:4100ea4919b078535be0ba675b5fdb4edfe099474a673628201389eb2f4bbd39",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -31,10 +31,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "file:Prophet-6 Freeze.wav",
+      "file": "Prophet-6 Freeze.wav",
+      "sha256": "bef2a38a2718a297649612a87fc27b9629571c6fabe99c639348deae2b4c57c9",
+      "bytes": 3384060
     }
   ],
   "disclosures": [],
@@ -60,16 +60,23 @@
       "webm": {
         "path": "h1-oneshot-granular/h1-oneshot-granular.webm",
         "codec": "vp9",
-        "bytes": 448433,
-        "sha256": "c992e0a20b3fe7d0c1b9005f77b6519d963337c0b99bb427ac27598766c1e667"
+        "bytes": 428961,
+        "sha256": "b70e68e3b42f2d8203d51844c55a42dd6a486593d2ae438fd844f6d95dbb5f63"
       },
       "mp4": {
         "path": "h1-oneshot-granular/h1-oneshot-granular.mp4",
         "codec": "h264",
-        "bytes": 459384,
-        "sha256": "e45eb5f897b0fc030649a2ec822c6cf1b1895e683fc0ab9788c63788d27448c3"
+        "bytes": 477086,
+        "sha256": "c961f2be4cca95d1c7b763db9876ebc28e80ca6d2d30d92dc7172dfb2a90a30d"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -17.4,
+    "truePeak": -1.5,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "oneshot-play": 0.0,
@@ -86,13 +93,13 @@
   "poster": {
     "path": "h1-oneshot-granular/poster.webp",
     "frame": 274,
-    "sha256": "74acbc73ca6b5f2fbac6098b7a3d63ccbfc718cc3c2a1009d436044c596f69ca",
+    "sha256": "a5ea4a94514652628fc327e20fd0fefc40187df1fa3be517912ac22fb25374c1",
     "master": "learn/capture/out/h1-oneshot-granular/poster.png"
   },
   "run": {
-    "wallSeconds": 66.506,
-    "meanFrameMs": 200.6,
-    "slowdown": 6.02,
+    "wallSeconds": 70.252,
+    "meanFrameMs": 209.7,
+    "slowdown": 6.29,
     "notesPlayed": 2
   },
   "validation": {
@@ -130,6 +137,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "10.133 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-36.9 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-17.4 LUFS, true peak -1.5 dBTP"
       },
       {
         "check": "no blank frames",

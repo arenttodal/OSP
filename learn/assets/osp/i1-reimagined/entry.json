@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.i1-reimagined",
   "title": "Reimagine a sound",
-  "scenarioDigest": "sha256:325ef573acceda11c90e49b48513f6ec0d2c845d397fe90ba6a050e12b607c08",
+  "scenarioDigest": "sha256:1965b2a685c19a49fe3bad6f2c06ece6cd4e55a9723c7fd4e1c6812a07574ecf",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -28,10 +28,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     }
   ],
   "disclosures": [
@@ -59,16 +59,23 @@
       "webm": {
         "path": "i1-reimagined/i1-reimagined.webm",
         "codec": "vp9",
-        "bytes": 306126,
-        "sha256": "22143447af9ef7958ea8beb0cc609cab30f99cdd8384dc64c273058771f1a01f"
+        "bytes": 390670,
+        "sha256": "c4e372038e0bed550a68efa5d655afe16d563bc5dadc3198e0b0001243175cab"
       },
       "mp4": {
         "path": "i1-reimagined/i1-reimagined.mp4",
         "codec": "h264",
-        "bytes": 252010,
-        "sha256": "076f4902dc18950671d36d7e14a7d444ef59e399fcf1bd723f5e1757738e7690"
+        "bytes": 373299,
+        "sha256": "4a41b501fe9f18aa2e8a0d78a41561dc1018ac87043e61a36c44122217408205"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -10.8,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "open-modes": 0.0,
@@ -82,14 +89,14 @@
   },
   "poster": {
     "path": "i1-reimagined/poster.webp",
-    "frame": 224,
-    "sha256": "9d8f15759d4c846b6b3bc5c9271d4ec02649f85cf0b98c24e6fba50c68c79fef",
+    "frame": 221,
+    "sha256": "fe190f7f6dd26dad683b108d14572c28b44777a4e623018e8334787b7ff99357",
     "master": "learn/capture/out/i1-reimagined/poster.png"
   },
   "run": {
-    "wallSeconds": 71.287,
-    "meanFrameMs": 261.6,
-    "slowdown": 7.85,
+    "wallSeconds": 70.45700000000001,
+    "meanFrameMs": 256.7,
+    "slowdown": 7.7,
     "notesPlayed": 1
   },
   "validation": {
@@ -127,6 +134,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "8.100 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-33.6 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -10.8 dBTP"
       },
       {
         "check": "no blank frames",

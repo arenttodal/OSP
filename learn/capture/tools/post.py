@@ -339,7 +339,13 @@ def main():
     # at each end for the loop, then muxed in without touching the video.
     audio = None
     audio_src = run_dir / "audio.wav"
-    if audio_src.exists():
+    silent_clip = False
+    if audio_src.exists() and not run.get("notesPlayed"):
+        # A clip that plays no notes (saving, exporting) has nothing to hear: it stays silent.
+        silent_clip = audio_stats(audio_src)["I"] <= -60.0
+        if silent_clip:
+            check("no notes played: clip stays silent", True)
+    if audio_src.exists() and not silent_clip:
         stats = audio_stats(audio_src)
         check("audio length = video length", abs(stats["duration"] - len(frames) / fps) < 0.01, f'{stats["duration"]:.3f} s')
         check("audio is not silent", stats["I"] > -60.0, f'{stats["I"]:.1f} LUFS before levelling')

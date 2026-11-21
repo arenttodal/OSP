@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.j1-vibrato",
   "title": "Add vibrato with the mod wheel",
-  "scenarioDigest": "sha256:b5ef5c1c37e8e3b4fc5e1328d9a17c74a5327f4f89d23a6b22bacc65b0f42822",
+  "scenarioDigest": "sha256:ef3cfbcb5be0da2a1de9bd1941a5f0e4f18cfa58b60dfb2f14636d1165f1be5f",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -27,10 +27,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "gen:Sine C4.wav",
+      "file": "Sine C4.wav",
+      "sha256": "94160af389d34f194a4a2edf870e95a36e8bb1f320ae05578b48844d3e3a27bd",
+      "bytes": 864044
     }
   ],
   "disclosures": [
@@ -58,16 +58,23 @@
       "webm": {
         "path": "j1-vibrato/j1-vibrato.webm",
         "codec": "vp9",
-        "bytes": 525200,
-        "sha256": "ba4e65612674c724c879fe428020a398041ec4430c0848403fac11df3dd3bca8"
+        "bytes": 566559,
+        "sha256": "cb16cff9892a919d8a4433ba14f9513bfd2239dfd2ce9a8116d48c30c13f17b7"
       },
       "mp4": {
         "path": "j1-vibrato/j1-vibrato.mp4",
         "codec": "h264",
-        "bytes": 511919,
-        "sha256": "e861739046e9a61f2e1374ede91995c2ecb00743281d174d033b80bab49d745c"
+        "bytes": 597615,
+        "sha256": "e271dd8e6b6ea8df71bf5fc2b5a48bd857f96a24c6f80b27cd0bbede3e02d7d3"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -14.0,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "open-mod": 0.0,
@@ -81,14 +88,14 @@
   },
   "poster": {
     "path": "j1-vibrato/poster.webp",
-    "frame": 284,
-    "sha256": "2875e6b5bb4068b46d9a858415511a58673d5dbba6e24f7d80fc9e21862f1326",
+    "frame": 265,
+    "sha256": "3aca808f7c52cdb2a407f71d2b8275e99d23d5aed926b8f813fcc0f7e0d0472f",
     "master": "learn/capture/out/j1-vibrato/poster.png"
   },
   "run": {
-    "wallSeconds": 60.278,
-    "meanFrameMs": 190.7,
-    "slowdown": 5.72,
+    "wallSeconds": 61.809000000000005,
+    "meanFrameMs": 196.8,
+    "slowdown": 5.9,
     "notesPlayed": 1
   },
   "validation": {
@@ -126,6 +133,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "9.767 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-33.8 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -14.0 dBTP"
       },
       {
         "check": "no blank frames",

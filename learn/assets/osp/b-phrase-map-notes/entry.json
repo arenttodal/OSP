@@ -66,16 +66,23 @@
       "webm": {
         "path": "b-phrase-map-notes/b-phrase-map-notes.webm",
         "codec": "vp9",
-        "bytes": 478108,
-        "sha256": "5333b7881f7f252d7097d75d8ab6e65f2a4f85e9ce7263123d47324f3c5974a8"
+        "bytes": 570164,
+        "sha256": "9c4d09341b1b9672f827002fbb9cdae522e9dab5d880138e50f0ce43f0dbc99b"
       },
       "mp4": {
         "path": "b-phrase-map-notes/b-phrase-map-notes.mp4",
         "codec": "h264",
-        "bytes": 491277,
-        "sha256": "d4741062e1398526e4ae3a792849ed8d8e5caf3d292a86abb853533d4172fda7"
+        "bytes": 598711,
+        "sha256": "514d11dab552ff868fab1a09b4e63218c2135a6cfc11e35870a1667bb5569034"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -8.6,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "drop-phrase": 0.0,
@@ -91,14 +98,14 @@
   },
   "poster": {
     "path": "b-phrase-map-notes/poster.webp",
-    "frame": 396,
-    "sha256": "5ebaa04a0da43a73725675069f3d46a37c6ac0266edc88a1045bd88ddb9a4dbb",
+    "frame": 397,
+    "sha256": "c08a7acbe5e28ecac3d834c1a95ad34a60c9b05b82a50701d76cd36f2dc6d32a",
     "master": "learn/capture/out/b-phrase-map-notes/poster.png"
   },
   "run": {
-    "wallSeconds": 76.09700000000001,
-    "meanFrameMs": 165.1,
-    "slowdown": 4.95,
+    "wallSeconds": 76.645,
+    "meanFrameMs": 166.7,
+    "slowdown": 5.0,
     "notesPlayed": 4
   },
   "validation": {
@@ -136,6 +143,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "14.167 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-33.9 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -8.6 dBTP"
       },
       {
         "check": "no blank frames",

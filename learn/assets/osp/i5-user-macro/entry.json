@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.i5-user-macro",
   "title": "Assign a USER macro",
-  "scenarioDigest": "sha256:4eb8fc9b69b8c391f90fd59912bbf9b1b75e09106bb1325ec581de2dced7984f",
+  "scenarioDigest": "sha256:0042cd95ca03c75541f314e57eae46c022f396a91b09359733c8470640237e9c",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -28,10 +28,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:pluck",
-      "file": "Tutorial Pluck A3.wav",
-      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-      "bytes": 230504
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     }
   ],
   "disclosures": [
@@ -59,16 +59,23 @@
       "webm": {
         "path": "i5-user-macro/i5-user-macro.webm",
         "codec": "vp9",
-        "bytes": 416370,
-        "sha256": "e297513f4a3e0675bdf98dd614d37240fdd37f6b2b74f06fc6985f86df59e095"
+        "bytes": 563653,
+        "sha256": "2a65adb2e952b6de0dd8148187ec9a8c6d4050eb5934140168353f1147672829"
       },
       "mp4": {
         "path": "i5-user-macro/i5-user-macro.mp4",
         "codec": "h264",
-        "bytes": 424004,
-        "sha256": "5d42b749b1c0abd6f8b260bdcd8273a87507f5ab0c64341024c50b8328babadf"
+        "bytes": 604838,
+        "sha256": "01693c99497b1d20a76a13d292a9ccaeb3cd33e52ef2dd303a3a821741a73adb"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -10.4,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "user-bank": 0.0,
@@ -84,14 +91,14 @@
   },
   "poster": {
     "path": "i5-user-macro/poster.webp",
-    "frame": 306,
-    "sha256": "e78dd9ccf1f25978d8325f9a3f6f88743d6332f503fe61a35ac7b8e7732ea432",
+    "frame": 313,
+    "sha256": "6274868d2f2b3d9b293475d77219365b28381e6a8884d57fd4a5f379a64036e9",
     "master": "learn/capture/out/i5-user-macro/poster.png"
   },
   "run": {
-    "wallSeconds": 67.111,
-    "meanFrameMs": 181.0,
-    "slowdown": 5.43,
+    "wallSeconds": 77.214,
+    "meanFrameMs": 205.1,
+    "slowdown": 6.15,
     "notesPlayed": 1
   },
   "validation": {
@@ -129,6 +136,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "11.200 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-31.8 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -10.4 dBTP"
       },
       {
         "check": "no blank frames",

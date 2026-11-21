@@ -1,5 +1,14 @@
 # Status
 
+> **21 Nov 2026, Learn ANDOR: every clip with sound (branch `feature/learn-capture-studio`):**
+> - The capture keeps the instrument's own output, sample-aligned with the frames, levels it to
+>   −16 LUFS and muxes it into the WebM (Opus) and MP4 (AAC). 28 clips have sound; the two that play
+>   no notes (save, export) stay silent.
+> - Sounds: the owner's Prophet-6 recordings (pad; two decaying notes) where they fit, otherwise a
+>   generated saw, sine or sine pluck (`learn/capture/tools/make-sounds.py`). Chords are Cmaj7.
+> - Site: a sound button on the guide player and on the featured clip; clips start muted, the
+>   choice is remembered. 30/30 captures pass; site tests 36/36.
+
 > **21 Nov 2026, Learn ANDOR website redesign (branch `feature/learn-capture-studio`; `learn/site/`):**
 > - The site is now **Learn ANDOR**, deployed as a noindex preview on Cloudflare Pages
 >   (`andor-learn.pages.dev`, built from this branch on every push under `learn/`).

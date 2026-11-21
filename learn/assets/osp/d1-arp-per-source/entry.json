@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.d1-arp-per-source",
   "title": "Give each layer its own arpeggio",
-  "scenarioDigest": "sha256:b88c98900e6650d5b6278f638854d62310b3ff3e65453d58260aecfd9b48060f",
+  "scenarioDigest": "sha256:e97e7d5d888cece91d5ba64813018ed35a0fbc4b0055266023995ae2a8bf4fc8",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -26,26 +26,26 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "gen:Pluck C4.wav",
+      "file": "Pluck C4.wav",
+      "sha256": "bd3442fca622cc1b17b2252b1d5229c5a2be79b901de039158b275fede7417dc",
+      "bytes": 172844
     },
     {
-      "id": "tutorial:voice",
-      "file": "Tutorial Voice A3.wav",
-      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-      "bytes": 1440104
+      "id": "gen:Saw C4.wav",
+      "file": "Saw C4.wav",
+      "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+      "bytes": 864044
     },
     {
-      "id": "tutorial:pluck",
-      "file": "Tutorial Pluck A3.wav",
-      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-      "bytes": 230504
+      "id": "gen:Sine C4.wav",
+      "file": "Sine C4.wav",
+      "sha256": "94160af389d34f194a4a2edf870e95a36e8bb1f320ae05578b48844d3e3a27bd",
+      "bytes": 864044
     }
   ],
   "disclosures": [
-    "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+    "The held chord (Cmaj7: C4 E4 G4 B4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
   ],
   "source": {
     "width": 2896,
@@ -69,16 +69,23 @@
       "webm": {
         "path": "d1-arp-per-source/d1-arp-per-source.webm",
         "codec": "vp9",
-        "bytes": 1030948,
-        "sha256": "b6a792017d6930ee5ee8aa8310cbc29ebdc123e6d65fe0257bbdd6a8f4a052c3"
+        "bytes": 1107238,
+        "sha256": "4ad67d1ad12a89eabe1d3827982162ea6483bcd32605509fa74a8a97c6d7e257"
       },
       "mp4": {
         "path": "d1-arp-per-source/d1-arp-per-source.mp4",
         "codec": "h264",
-        "bytes": 1085569,
-        "sha256": "9c5c4c944fd705d42a686aa5fb3147cba3bf43ea42e78f664cb6b826ebf35953"
+        "bytes": 1181389,
+        "sha256": "5f348a9435ee3e2ab897bb790192ca701611177875db56dcb2ba11a9d74edc89"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -5.5,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "linked": 0.0,
@@ -96,14 +103,14 @@
   },
   "poster": {
     "path": "d1-arp-per-source/poster.webp",
-    "frame": 328,
-    "sha256": "0379b670727796df0d4ddb455861a8189814a613c11a867d522eaf16b842ab33",
+    "frame": 330,
+    "sha256": "8f0b5d877fe3c0e98b800c05eb818c1d7931e83a58e9ddd03f767697ca265bc9",
     "master": "learn/capture/out/d1-arp-per-source/poster.png"
   },
   "run": {
-    "wallSeconds": 96.388,
-    "meanFrameMs": 241.1,
-    "slowdown": 7.23,
+    "wallSeconds": 87.95,
+    "meanFrameMs": 222.8,
+    "slowdown": 6.68,
     "notesPlayed": 128
   },
   "validation": {
@@ -143,6 +150,31 @@
         "detail": ""
       },
       {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "11.867 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-34.6 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -5.5 dBTP"
+      },
+      {
         "check": "no blank frames",
         "passed": true,
         "detail": "0 blank"
@@ -150,7 +182,7 @@
       {
         "check": "no frozen run longer than 3.2 s",
         "passed": true,
-        "detail": "longest unchanged run 0.03 s"
+        "detail": "longest unchanged run 0.07 s"
       },
       {
         "check": "webm frames = master",

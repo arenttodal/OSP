@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.g3-sub",
   "title": "Add SUB under your keys",
-  "scenarioDigest": "sha256:136652ae743e12a377a8533c30310980f7673967456ba5f47abbbf11ea837930",
+  "scenarioDigest": "sha256:0c63d6754a8974a5b36ddb2c59065c25da184bbfcc8e7d71a399c3b530bf7828",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -27,10 +27,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     }
   ],
   "disclosures": [
@@ -58,16 +58,23 @@
       "webm": {
         "path": "g3-sub/g3-sub.webm",
         "codec": "vp9",
-        "bytes": 644268,
-        "sha256": "809d87d82b9ba8f182956d0e8e2ab727f1305f9ccd9260806098435cfc145608"
+        "bytes": 725215,
+        "sha256": "f418d1d04764a035a8c39a3317e6d04be0ddbba8df3edcee9cc15eee6199a720"
       },
       "mp4": {
         "path": "g3-sub/g3-sub.mp4",
         "codec": "h264",
-        "bytes": 610143,
-        "sha256": "41883ccca928133b90a804749e7626da5b95e5ebfc025ecd29380941ee55a04e"
+        "bytes": 765494,
+        "sha256": "5dc1349140ccbb0462d35ddcff46cd5625fcff183d04d977f9321851be409e05"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -2.0,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "open-sub": 0.0,
@@ -85,15 +92,15 @@
   },
   "poster": {
     "path": "g3-sub/poster.webp",
-    "frame": 312,
-    "sha256": "e3dfb50da79e6e8ad4514d80c19ba20eec2db6acf5a9d6f1d14ee7d92a2747a7",
+    "frame": 327,
+    "sha256": "89b3e280aa5a95c9eef25bb58cc12a1fcb8f8745f289047b42ebc493fe609eac",
     "master": "learn/capture/out/g3-sub/poster.png"
   },
   "run": {
-    "wallSeconds": 73.392,
-    "meanFrameMs": 197.4,
-    "slowdown": 5.92,
-    "notesPlayed": 3
+    "wallSeconds": 73.319,
+    "meanFrameMs": 197.2,
+    "slowdown": 5.91,
+    "notesPlayed": 4
   },
   "validation": {
     "status": "passed",
@@ -132,6 +139,31 @@
         "detail": ""
       },
       {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "11.333 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-21.8 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -2.0 dBTP"
+      },
+      {
         "check": "no blank frames",
         "passed": true,
         "detail": "0 blank"
@@ -139,7 +171,7 @@
       {
         "check": "no frozen run longer than 2.6 s",
         "passed": true,
-        "detail": "longest unchanged run 1.23 s"
+        "detail": "longest unchanged run 1.17 s"
       },
       {
         "check": "webm frames = master",

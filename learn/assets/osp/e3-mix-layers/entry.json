@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.e3-mix-layers",
   "title": "Balance, mute and solo layers",
-  "scenarioDigest": "sha256:c354cd28a4692fb979c062964b864f6c03cc0f0a54a3879317ae97d2c1fc3531",
+  "scenarioDigest": "sha256:24bb63989ffcc808f4b816332ad074d81a4ab4184759adf489f2f02ce4302024",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -28,16 +28,16 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     },
     {
-      "id": "tutorial:voice",
-      "file": "Tutorial Voice A3.wav",
-      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-      "bytes": 1440104
+      "id": "gen:Saw C4.wav",
+      "file": "Saw C4.wav",
+      "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+      "bytes": 864044
     }
   ],
   "disclosures": [
@@ -65,16 +65,23 @@
       "webm": {
         "path": "e3-mix-layers/e3-mix-layers.webm",
         "codec": "vp9",
-        "bytes": 430210,
-        "sha256": "3a04a69ba622790c2092b1a62c0268397bd65f9150731e15fce05666db6184fa"
+        "bytes": 615872,
+        "sha256": "67e725a5ad06ae88b09e08a2f41f5cc2114f4f497dc1b881911ce523460e1e6e"
       },
       "mp4": {
         "path": "e3-mix-layers/e3-mix-layers.mp4",
         "codec": "h264",
-        "bytes": 580281,
-        "sha256": "911852a52c0c9573f962e887d032f9ddaafefdce99129fec4e75da316d7013cd"
+        "bytes": 731601,
+        "sha256": "ec93ec66eb9d940e9a81ed9462ce209e8a4617c3c242079e8c54312dd68acc93"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -15.9,
+    "truePeak": -3.7,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "level-b": 0.0,
@@ -90,14 +97,14 @@
   },
   "poster": {
     "path": "e3-mix-layers/poster.webp",
-    "frame": 261,
-    "sha256": "b3a1ef27c6fc9ff73535ac4cfa1af70b366dd876c61b8f6bceff05aaa84f4909",
+    "frame": 256,
+    "sha256": "56660bfd00d932e76bfb9be6002990e1c5389d5736736cffbe67b9be1d0d9528",
     "master": "learn/capture/out/e3-mix-layers/poster.png"
   },
   "run": {
-    "wallSeconds": 73.761,
-    "meanFrameMs": 227.1,
-    "slowdown": 6.81,
+    "wallSeconds": 70.974,
+    "meanFrameMs": 221.5,
+    "slowdown": 6.64,
     "notesPlayed": 1
   },
   "validation": {
@@ -137,6 +144,31 @@
         "detail": ""
       },
       {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "9.367 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-37.1 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-15.9 LUFS, true peak -3.7 dBTP"
+      },
+      {
         "check": "no blank frames",
         "passed": true,
         "detail": "0 blank"
@@ -144,7 +176,7 @@
       {
         "check": "no frozen run longer than 2.5 s",
         "passed": true,
-        "detail": "longest unchanged run 0.07 s"
+        "detail": "longest unchanged run 0.03 s"
       },
       {
         "check": "webm frames = master",

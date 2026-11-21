@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.i7-filter",
   "title": "Shape the tone with FILTER",
-  "scenarioDigest": "sha256:65daba1be9e71f9a11952f5fed2e88f77a1c90bdb9165b65c7c83523148a935a",
+  "scenarioDigest": "sha256:24a1800cee0190da7c0bdd6ec54fb4177e324200338a3621810951112d801f97",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -26,10 +26,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "gen:Saw C4.wav",
+      "file": "Saw C4.wav",
+      "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+      "bytes": 864044
     }
   ],
   "disclosures": [
@@ -57,16 +57,23 @@
       "webm": {
         "path": "i7-filter/i7-filter.webm",
         "codec": "vp9",
-        "bytes": 627666,
-        "sha256": "539e6e846e5ba0fe875cb8290a987170eb319afb5a911c5373de45b0399d0d75"
+        "bytes": 897839,
+        "sha256": "9f5277bf883aacc300b168328521ccaeaaeafac5879be7f11105e44bf434aa2e"
       },
       "mp4": {
         "path": "i7-filter/i7-filter.mp4",
         "codec": "h264",
-        "bytes": 613219,
-        "sha256": "6c01b4281fc3faeaf51cbfd76ad91506afe901ec432a7226e3b4ef52dc4ecaa6"
+        "bytes": 968673,
+        "sha256": "69e45f46a918caed7418493fe0eb2b5617c4fd0ae8705c279d7255a85a8b3802"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -1.9,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "filter": 0.0,
@@ -82,15 +89,15 @@
   },
   "poster": {
     "path": "i7-filter/poster.webp",
-    "frame": 295,
-    "sha256": "4fd8203bc5e4e14489ddf4aebfe9ea8a350518028ea0715685452e0e05edbdcc",
+    "frame": 299,
+    "sha256": "54b33bd8a9ad05099826e2d7432e3d4aa19081fbd7b1c91815f163069e128df5",
     "master": "learn/capture/out/i7-filter/poster.png"
   },
   "run": {
-    "wallSeconds": 92.809,
-    "meanFrameMs": 254.0,
-    "slowdown": 7.62,
-    "notesPlayed": 2
+    "wallSeconds": 95.378,
+    "meanFrameMs": 259.6,
+    "slowdown": 7.79,
+    "notesPlayed": 4
   },
   "validation": {
     "status": "passed",
@@ -127,6 +134,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "10.833 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-27.9 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -1.9 dBTP"
       },
       {
         "check": "no blank frames",

@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.g1-arp-basics",
   "title": "Arpeggiate held notes",
-  "scenarioDigest": "sha256:1374978b5f095b5c213f53440d4aeee99a35a4efd1d72071b66ef56fa1a0a7cc",
+  "scenarioDigest": "sha256:99c89d2a53e8cf5d7e434ef104a75d563a9b0de1814de174916632403fdecebd",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -27,10 +27,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:pluck",
-      "file": "Tutorial Pluck A3.wav",
-      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-      "bytes": 230504
+      "id": "gen:Pluck C4.wav",
+      "file": "Pluck C4.wav",
+      "sha256": "bd3442fca622cc1b17b2252b1d5229c5a2be79b901de039158b275fede7417dc",
+      "bytes": 172844
     }
   ],
   "disclosures": [
@@ -58,16 +58,23 @@
       "webm": {
         "path": "g1-arp-basics/g1-arp-basics.webm",
         "codec": "vp9",
-        "bytes": 785249,
-        "sha256": "fb6b6b0f9c137340657000f07e45721e7621fb4e86ba6d0b69a2812208abfacf"
+        "bytes": 845988,
+        "sha256": "b6ff17b429c4d4e5a36bc89639ca8013ae5a768b5a27cc5403bb3ba8ca07726a"
       },
       "mp4": {
         "path": "g1-arp-basics/g1-arp-basics.mp4",
         "codec": "h264",
-        "bytes": 696288,
-        "sha256": "2b8bc1fb560c69de7d3757702f743d1b6923084c9018c61ee6ed394768f86992"
+        "bytes": 782887,
+        "sha256": "78ccdbec00f88484307f9d24950090fdf3d65dc7fe6bc8648caf3481552182fb"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -4.2,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "open-arp": 0.0,
@@ -85,15 +92,15 @@
   },
   "poster": {
     "path": "g1-arp-basics/poster.webp",
-    "frame": 390,
-    "sha256": "2553db535b7803c9411534e2b8b28731e0d062d4b956f99ba8c010ccc5bb1aa2",
+    "frame": 376,
+    "sha256": "6127d661839a59b85541bd6515799e2caa7eaba6feff7db90d817779df7e47ec",
     "master": "learn/capture/out/g1-arp-basics/poster.png"
   },
   "run": {
-    "wallSeconds": 94.586,
-    "meanFrameMs": 217.6,
-    "slowdown": 6.53,
-    "notesPlayed": 62
+    "wallSeconds": 83.476,
+    "meanFrameMs": 191.7,
+    "slowdown": 5.75,
+    "notesPlayed": 63
   },
   "validation": {
     "status": "passed",
@@ -130,6 +137,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "13.467 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-41.9 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -4.2 dBTP"
       },
       {
         "check": "no blank frames",

@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.h3-key-dna",
   "title": "Vary the sound from key to key (KEY DNA)",
-  "scenarioDigest": "sha256:87802eff5f3078f8872c1b198be128bed83326b3480fc2a5acb567183c622382",
+  "scenarioDigest": "sha256:b524868cfb485db60e10e59cbd4ff0919c7d54e783721901e254b364e3a94e01",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -29,10 +29,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     }
   ],
   "disclosures": [],
@@ -58,16 +58,23 @@
       "webm": {
         "path": "h3-key-dna/h3-key-dna.webm",
         "codec": "vp9",
-        "bytes": 378410,
-        "sha256": "dc3902451366595d58b3ccfc2200925a445099522a7da43c3625730317fab82e"
+        "bytes": 412657,
+        "sha256": "706c6d36c51418205ac0d0787db1cb8f97943e37f252709ff0ff991d7ac536a0"
       },
       "mp4": {
         "path": "h3-key-dna/h3-key-dna.mp4",
         "codec": "h264",
-        "bytes": 389315,
-        "sha256": "bb8736ff2d9f44194fc61b0f78719e078d5561151537483c1627ea7417822e7d"
+        "bytes": 458401,
+        "sha256": "13e58e2057d97e7db53c1702eb5ef55241467bd4ec751df874d2c1328ffec9a8"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -5.5,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "open": 0.0,
@@ -90,9 +97,9 @@
     "master": "learn/capture/out/h3-key-dna/poster.png"
   },
   "run": {
-    "wallSeconds": 104.557,
-    "meanFrameMs": 203.5,
-    "slowdown": 6.11,
+    "wallSeconds": 96.633,
+    "meanFrameMs": 187.3,
+    "slowdown": 5.62,
     "notesPlayed": 3
   },
   "validation": {
@@ -130,6 +137,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "15.233 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-35.9 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -5.5 dBTP"
       },
       {
         "check": "no blank frames",

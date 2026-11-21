@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.i4-modulation",
   "title": "Make FILTER move with an LFO",
-  "scenarioDigest": "sha256:81340b94363c4c69e8fe4159f1ce993486e82cf78e7aff732cf06c3d6d41b516",
+  "scenarioDigest": "sha256:dcb723b5e57803fc2ad77d15cdc6e67f71e60072f33d2b1936f96f5898da75d9",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -28,10 +28,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "gen:Saw C4.wav",
+      "file": "Saw C4.wav",
+      "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+      "bytes": 864044
     }
   ],
   "disclosures": [
@@ -59,16 +59,23 @@
       "webm": {
         "path": "i4-modulation/i4-modulation.webm",
         "codec": "vp9",
-        "bytes": 596054,
-        "sha256": "dfdc571eb4e128e68251252d8eabf433dafc32ac3653366d02b870868405b9d0"
+        "bytes": 796178,
+        "sha256": "feae2977869ad8bc2fc876ed3093186fd1f3755f9af5d1cea2da01553c4ac5fb"
       },
       "mp4": {
         "path": "i4-modulation/i4-modulation.mp4",
         "codec": "h264",
-        "bytes": 547482,
-        "sha256": "57e69159c3f03b7565b2fd96b3a6320a704bff8f0482aa0285a4d06d851b1a2f"
+        "bytes": 744643,
+        "sha256": "02f4da36adadca685f350e6dc82ff273a469162ec87449546b79cc013b910c9b"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -9.5,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "lfo-tab": 0.0,
@@ -83,13 +90,13 @@
   "poster": {
     "path": "i4-modulation/poster.webp",
     "frame": 273,
-    "sha256": "88f8e693b153e8908f46cf70dfcdf5a1c0cddaec0cd6b87fed492d4ebf78477a",
+    "sha256": "3e8a8b22c8dd5e1fde706486cd5537e111d289beecae411ece9d1c04f4862b0c",
     "master": "learn/capture/out/i4-modulation/poster.png"
   },
   "run": {
-    "wallSeconds": 70.081,
-    "meanFrameMs": 218.8,
-    "slowdown": 6.56,
+    "wallSeconds": 71.023,
+    "meanFrameMs": 222.0,
+    "slowdown": 6.66,
     "notesPlayed": 1
   },
   "validation": {
@@ -127,6 +134,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "9.267 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-31.9 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -9.5 dBTP"
       },
       {
         "check": "no blank frames",

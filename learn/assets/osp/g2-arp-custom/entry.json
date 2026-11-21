@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.g2-arp-custom",
   "title": "Use a custom pattern",
-  "scenarioDigest": "sha256:1305cce12ae5f2b97de61379ab97ffdf29fa4ec867dc13568fe8f915341b9caa",
+  "scenarioDigest": "sha256:56ec12e5eb1f4217234afaacfe9e81cfcb823b3002cd0aa7cbecf48c03f61074",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -24,10 +24,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:pluck",
-      "file": "Tutorial Pluck A3.wav",
-      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-      "bytes": 230504
+      "id": "gen:Pluck C4.wav",
+      "file": "Pluck C4.wav",
+      "sha256": "bd3442fca622cc1b17b2252b1d5229c5a2be79b901de039158b275fede7417dc",
+      "bytes": 172844
     }
   ],
   "disclosures": [
@@ -56,16 +56,23 @@
       "webm": {
         "path": "g2-arp-custom/g2-arp-custom.webm",
         "codec": "vp9",
-        "bytes": 396371,
-        "sha256": "05b369393a3e80eef3e88425d154953249550711293d2feb0e6164083675ba38"
+        "bytes": 437605,
+        "sha256": "1dc29c08d409a4bb6ec4abe55a2874554054a3d8173974f1b2b7f5da6d2af2cc"
       },
       "mp4": {
         "path": "g2-arp-custom/g2-arp-custom.mp4",
         "codec": "h264",
-        "bytes": 342568,
-        "sha256": "0c277a88c834a31a9032e5ec669842d5d01ef91e178c0304edbad5daa4cab99e"
+        "bytes": 407689,
+        "sha256": "42e99fe712717464e8db14c7dea5db8329f7ae3921c6000821c59b8920017649"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -5.8,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "pattern": 0.0,
@@ -77,14 +84,14 @@
   },
   "poster": {
     "path": "g2-arp-custom/poster.webp",
-    "frame": 185,
-    "sha256": "ed3dfbd9dbcb19ea750616c45fb60a9708ba2f76cdad2f5ddd5144d1334eaae6",
+    "frame": 168,
+    "sha256": "19362a11f88bd0804e6ae302f192e36cbba0093488a442fa118843f8be2e5d6f",
     "master": "learn/capture/out/g2-arp-custom/poster.png"
   },
   "run": {
-    "wallSeconds": 49.793,
-    "meanFrameMs": 239.4,
-    "slowdown": 7.18,
+    "wallSeconds": 46.677,
+    "meanFrameMs": 224.7,
+    "slowdown": 6.74,
     "notesPlayed": 46
   },
   "validation": {
@@ -122,6 +129,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "6.333 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-39.0 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -5.8 dBTP"
       },
       {
         "check": "no blank frames",

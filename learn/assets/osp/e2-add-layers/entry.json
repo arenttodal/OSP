@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.e2-add-layers",
   "title": "Add a second and third sound",
-  "scenarioDigest": "sha256:5da299b073bc604db65e87bb686a689296f39e9a3cd0af5108d0719a62a5d1a2",
+  "scenarioDigest": "sha256:0c152e2844c49cf25eebab4737da76eb41eb0815a7cb0d69921a714f27f3b384",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -26,22 +26,22 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     },
     {
-      "id": "tutorial:voice",
-      "file": "Tutorial Voice A3.wav",
-      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-      "bytes": 1440104
+      "id": "gen:Saw C4.wav",
+      "file": "Saw C4.wav",
+      "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+      "bytes": 864044
     },
     {
-      "id": "tutorial:pluck",
-      "file": "Tutorial Pluck A3.wav",
-      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-      "bytes": 230504
+      "id": "gen:Pluck C4.wav",
+      "file": "Pluck C4.wav",
+      "sha256": "bd3442fca622cc1b17b2252b1d5229c5a2be79b901de039158b275fede7417dc",
+      "bytes": 172844
     }
   ],
   "disclosures": [
@@ -51,7 +51,7 @@
     "width": 2896,
     "height": 2100,
     "fps": 30,
-    "frames": 269,
+    "frames": 267,
     "crop": [
       0,
       0,
@@ -63,22 +63,29 @@
     "width": 1600,
     "height": 1160,
     "fps": 30,
-    "frames": 269,
-    "duration": 8.967,
+    "frames": 267,
+    "duration": 8.9,
     "files": {
       "webm": {
         "path": "e2-add-layers/e2-add-layers.webm",
         "codec": "vp9",
-        "bytes": 607644,
-        "sha256": "9096d5e0e551d1a5a638ad6f4fc5d2acec9ddf1c3024685950369cbcd65115ef"
+        "bytes": 614756,
+        "sha256": "a37619b348c969e0f0f69a74019a10b04bd2f033d5489ac5afe7756114bddeaa"
       },
       "mp4": {
         "path": "e2-add-layers/e2-add-layers.mp4",
         "codec": "h264",
-        "bytes": 711950,
-        "sha256": "c337e9796c00f81a1b2a3d4b2d4b73928b02cd734ed07c77cf5b25d74771556c"
+        "bytes": 734804,
+        "sha256": "3d204f14e2c5f49715f8a474a5fa8331c1b5f6f1bb87008c9c5aa0a5bccf5f79"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -7.0,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "add-b": 0.0,
@@ -92,14 +99,14 @@
   },
   "poster": {
     "path": "e2-add-layers/poster.webp",
-    "frame": 267,
-    "sha256": "d61736cc5d06cc2dc658faff74fb43d6b47f6bcfdb91e30c164844edb5a58916",
+    "frame": 242,
+    "sha256": "bacbb9c566ac8b45d4ec61a2cad850eeab437b099c849e4156a5f26c52623914",
     "master": "learn/capture/out/e2-add-layers/poster.png"
   },
   "run": {
-    "wallSeconds": 48.706,
-    "meanFrameMs": 162.5,
-    "slowdown": 4.88,
+    "wallSeconds": 44.988,
+    "meanFrameMs": 153.1,
+    "slowdown": 4.59,
     "notesPlayed": 1
   },
   "validation": {
@@ -121,7 +128,7 @@
       {
         "check": "master frame count = frames.json",
         "passed": true,
-        "detail": "269 / 269"
+        "detail": "267 / 267"
       },
       {
         "check": "every editor size fits the canvas",
@@ -139,6 +146,31 @@
         "detail": ""
       },
       {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "8.900 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-32.5 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -7.0 dBTP"
+      },
+      {
         "check": "no blank frames",
         "passed": true,
         "detail": "0 blank"
@@ -146,12 +178,12 @@
       {
         "check": "no frozen run longer than 2.5 s",
         "passed": true,
-        "detail": "longest unchanged run 1.23 s"
+        "detail": "longest unchanged run 1.20 s"
       },
       {
         "check": "webm frames = master",
         "passed": true,
-        "detail": "269"
+        "detail": "267"
       },
       {
         "check": "webm size",
@@ -161,7 +193,7 @@
       {
         "check": "mp4 frames = master",
         "passed": true,
-        "detail": "269"
+        "detail": "267"
       },
       {
         "check": "mp4 size",
@@ -171,7 +203,7 @@
       {
         "check": "duration 6-15 s (one clip) or declared",
         "passed": true,
-        "detail": "8.97 s"
+        "detail": "8.90 s"
       },
       {
         "check": "poster not blank",

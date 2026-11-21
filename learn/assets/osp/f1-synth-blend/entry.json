@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.f1-synth-blend",
   "title": "Blend in SYNTH",
-  "scenarioDigest": "sha256:c92c89b18c1f86c0b8e7cf4dc4bc742872c70024c4771c5983f56cdaa07cb62a",
+  "scenarioDigest": "sha256:bb220d3e5fc97fcb1b48fd217fc47e7acca4cbe65a0cf9b8c8e2e62e0e48da87",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -22,10 +22,10 @@
   "targets": [],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "gen:Sine C4.wav",
+      "file": "Sine C4.wav",
+      "sha256": "94160af389d34f194a4a2edf870e95a36e8bb1f320ae05578b48844d3e3a27bd",
+      "bytes": 864044
     }
   ],
   "disclosures": [
@@ -53,16 +53,23 @@
       "webm": {
         "path": "f1-synth-blend/f1-synth-blend.webm",
         "codec": "vp9",
-        "bytes": 242596,
-        "sha256": "9e47f6d1dc9ce3aa60ef2f91cbf4fa6536963ef4c32811393ed13e598efe1206"
+        "bytes": 421828,
+        "sha256": "c68950f4b3dacd4f08a17f25097384020d2841eac77dd825d0382531e56b3ca9"
       },
       "mp4": {
         "path": "f1-synth-blend/f1-synth-blend.mp4",
         "codec": "h264",
-        "bytes": 279115,
-        "sha256": "3a3c17ad662246f4433c425c65d7fd284d40ebf2e185ae5ba66854e2c2c37c9f"
+        "bytes": 462170,
+        "sha256": "a7520e46f69f4e910c81f4722fbc7df77c644a34d78a03a20d97ab02b8390a2a"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -12.9,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "open-synth": 0.0,
@@ -81,13 +88,13 @@
   "poster": {
     "path": "f1-synth-blend/poster.webp",
     "frame": 300,
-    "sha256": "2bd876b227b0bacc0ad71da492f1c5b5f38ae9635df51129b80165d7208f15e9",
+    "sha256": "738686d7fe9c7ae1593b64258525ad11088130d0257ad42a9d023df071f23c6a",
     "master": "learn/capture/out/f1-synth-blend/poster.png"
   },
   "run": {
-    "wallSeconds": 78.842,
-    "meanFrameMs": 214.3,
-    "slowdown": 6.43,
+    "wallSeconds": 81.931,
+    "meanFrameMs": 222.8,
+    "slowdown": 6.68,
     "notesPlayed": 1
   },
   "validation": {
@@ -125,6 +132,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "11.000 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-33.2 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -12.9 dBTP"
       },
       {
         "check": "no blank frames",

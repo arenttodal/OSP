@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.j2-midi-learn",
   "title": "Control a knob from a MIDI controller",
-  "scenarioDigest": "sha256:14a5a7966121a44b81cfd4840e1d4b976563e36057515801b4fce5ae36004456",
+  "scenarioDigest": "sha256:662a9c13002935ebb9932e3a20d4d2eb3d8a43c74d6d1c5c5ff39325b0981b9c",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -24,10 +24,10 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "gen:Saw C4.wav",
+      "file": "Saw C4.wav",
+      "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+      "bytes": 864044
     }
   ],
   "disclosures": [
@@ -56,16 +56,23 @@
       "webm": {
         "path": "j2-midi-learn/j2-midi-learn.webm",
         "codec": "vp9",
-        "bytes": 403692,
-        "sha256": "a8e66ed8fe48369fdc8a1328d0de1d898745341f879330ace562e218c39a9167"
+        "bytes": 572131,
+        "sha256": "f13bb33e9555f0f644422e36ff619b2d3b46c6da849bb495c990eb0618b29ca3"
       },
       "mp4": {
         "path": "j2-midi-learn/j2-midi-learn.mp4",
         "codec": "h264",
-        "bytes": 318598,
-        "sha256": "754b00b45c7448fc397cd6b2a6d331cba967fc89f8a22ada8f41bf376e2c6ab2"
+        "bytes": 462060,
+        "sha256": "29eabcba719d623f111d55ec3b5b80cfd2cb92aaedfcf22d083f629768991ebf"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -6.5,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "right-click": 0.0,
@@ -79,14 +86,14 @@
   },
   "poster": {
     "path": "j2-midi-learn/poster.webp",
-    "frame": 213,
-    "sha256": "f35159a9244453b0b88e15b0223013cd8f633eca053a6f9fa19ddf288a8402a7",
+    "frame": 205,
+    "sha256": "4a322407b6a0e1775b7f6e2785a91878a1aa8a366c2f1a97d0676ebb5ee66f9b",
     "master": "learn/capture/out/j2-midi-learn/poster.png"
   },
   "run": {
-    "wallSeconds": 69.345,
-    "meanFrameMs": 269.3,
-    "slowdown": 8.08,
+    "wallSeconds": 69.479,
+    "meanFrameMs": 271.2,
+    "slowdown": 8.14,
     "notesPlayed": 1
   },
   "validation": {
@@ -126,6 +133,31 @@
         "detail": ""
       },
       {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "7.833 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-32.0 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -6.5 dBTP"
+      },
+      {
         "check": "no blank frames",
         "passed": true,
         "detail": "0 blank"
@@ -133,7 +165,7 @@
       {
         "check": "no frozen run longer than 2.5 s",
         "passed": true,
-        "detail": "longest unchanged run 0.03 s"
+        "detail": "longest unchanged run 0.07 s"
       },
       {
         "check": "webm frames = master",

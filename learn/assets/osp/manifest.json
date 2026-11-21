@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets",
   "product": "osp",
   "productCommit": "6ef3376",
-  "studioCommit": "f720d05",
+  "studioCommit": "9170a44",
   "scenes": [
     {
       "schemaVersion": 1,
@@ -287,16 +287,23 @@
           "webm": {
             "path": "b-phrase-map-notes/b-phrase-map-notes.webm",
             "codec": "vp9",
-            "bytes": 478108,
-            "sha256": "5333b7881f7f252d7097d75d8ab6e65f2a4f85e9ce7263123d47324f3c5974a8"
+            "bytes": 570164,
+            "sha256": "9c4d09341b1b9672f827002fbb9cdae522e9dab5d880138e50f0ce43f0dbc99b"
           },
           "mp4": {
             "path": "b-phrase-map-notes/b-phrase-map-notes.mp4",
             "codec": "h264",
-            "bytes": 491277,
-            "sha256": "d4741062e1398526e4ae3a792849ed8d8e5caf3d292a86abb853533d4172fda7"
+            "bytes": 598711,
+            "sha256": "514d11dab552ff868fab1a09b4e63218c2135a6cfc11e35870a1667bb5569034"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -8.6,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "drop-phrase": 0.0,
@@ -312,14 +319,14 @@
       },
       "poster": {
         "path": "b-phrase-map-notes/poster.webp",
-        "frame": 396,
-        "sha256": "5ebaa04a0da43a73725675069f3d46a37c6ac0266edc88a1045bd88ddb9a4dbb",
+        "frame": 397,
+        "sha256": "c08a7acbe5e28ecac3d834c1a95ad34a60c9b05b82a50701d76cd36f2dc6d32a",
         "master": "learn/capture/out/b-phrase-map-notes/poster.png"
       },
       "run": {
-        "wallSeconds": 76.09700000000001,
-        "meanFrameMs": 165.1,
-        "slowdown": 4.95,
+        "wallSeconds": 76.645,
+        "meanFrameMs": 166.7,
+        "slowdown": 5.0,
         "notesPlayed": 4
       },
       "validation": {
@@ -357,6 +364,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "14.167 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-33.9 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -8.6 dBTP"
           },
           {
             "check": "no blank frames",
@@ -466,16 +498,23 @@
           "webm": {
             "path": "c1-record-input/c1-record-input.webm",
             "codec": "vp9",
-            "bytes": 426832,
-            "sha256": "43a5f7c1b3814ed6591be4001f90b4a890229edeb8ba87871e559ff314318f8f"
+            "bytes": 505207,
+            "sha256": "f1ec6737e6d22777e23d14f01d3efaa9f28239ca7f7dc0b034491a5e49d401e4"
           },
           "mp4": {
             "path": "c1-record-input/c1-record-input.mp4",
             "codec": "h264",
-            "bytes": 509586,
-            "sha256": "2a95b07d4f54b579f87a3a3f78a75036d55552be74a1a46f8facf6c3dc170204"
+            "bytes": 604472,
+            "sha256": "17e9b3520b59eaca244befbc474c6aa4ff589acced96dd270451e2e56d6acfd6"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -8.9,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open-record": 0.0,
@@ -491,14 +530,14 @@
       },
       "poster": {
         "path": "c1-record-input/poster.webp",
-        "frame": 497,
-        "sha256": "0b7e02335939e327b689de82bfceb699f8aa42280ec35b0a14caf2844639979c",
+        "frame": 471,
+        "sha256": "f739a900a8e082cd3be05f9e0ddf2480b402503625f3bb8ad93e84b0698fa6eb",
         "master": "learn/capture/out/c1-record-input/poster.png"
       },
       "run": {
-        "wallSeconds": 84.75,
-        "meanFrameMs": 158.0,
-        "slowdown": 4.74,
+        "wallSeconds": 80.95100000000001,
+        "meanFrameMs": 150.6,
+        "slowdown": 4.52,
         "notesPlayed": 4
       },
       "validation": {
@@ -536,6 +575,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "16.633 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-33.8 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -8.9 dBTP"
           },
           {
             "check": "no blank frames",
@@ -591,7 +655,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.c2-grab-last",
       "title": "Grab what you just played",
-      "scenarioDigest": "sha256:747381694aa8941b6b0eb370eb7585c6bd2b4c62a04485c41cb6de6d9b5e4e71",
+      "scenarioDigest": "sha256:468c973aac6404a72b87b12989da96a8e54607c891f7ae166d0780036cb72a49",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -613,10 +677,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         },
         {
           "id": "input:phrase-d4",
@@ -651,16 +715,23 @@
           "webm": {
             "path": "c2-grab-last/c2-grab-last.webm",
             "codec": "vp9",
-            "bytes": 421757,
-            "sha256": "2c370a03b6ce402014f0455894c4df702a8b4981fad6f674320035c5f56b2f55"
+            "bytes": 488556,
+            "sha256": "bb4e8151650053485ef6bc4421582ed9a4e74fb5b6cf940e8da876acddf9c4e9"
           },
           "mp4": {
             "path": "c2-grab-last/c2-grab-last.mp4",
             "codec": "h264",
-            "bytes": 599463,
-            "sha256": "c5a85e1b4ef5689fd456dcadeef120ab3d810b813b10187fe907907471c56f34"
+            "bytes": 685693,
+            "sha256": "780e8d2e8b051d087d22d9637ef4b9057d21e1214177ab2c7b1446e6e6486e2d"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -8.6,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open-capture": 0.0,
@@ -674,14 +745,14 @@
       },
       "poster": {
         "path": "c2-grab-last/poster.webp",
-        "frame": 329,
-        "sha256": "a7af7aba3a148569a6ce9bffac628f2c452dfaf7a55a1ac6f9afb6107c0db188",
+        "frame": 339,
+        "sha256": "48f8fea842ea73322a96c7aaddeb784c7dfdd26e3d2be3e0e84e109c251f1559",
         "master": "learn/capture/out/c2-grab-last/poster.png"
       },
       "run": {
-        "wallSeconds": 76.46600000000001,
-        "meanFrameMs": 203.2,
-        "slowdown": 6.1,
+        "wallSeconds": 70.693,
+        "meanFrameMs": 187.8,
+        "slowdown": 5.64,
         "notesPlayed": 4
       },
       "validation": {
@@ -719,6 +790,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "11.367 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-34.1 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -8.6 dBTP"
           },
           {
             "check": "no blank frames",
@@ -774,7 +870,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.d1-arp-per-source",
       "title": "Give each layer its own arpeggio",
-      "scenarioDigest": "sha256:b88c98900e6650d5b6278f638854d62310b3ff3e65453d58260aecfd9b48060f",
+      "scenarioDigest": "sha256:e97e7d5d888cece91d5ba64813018ed35a0fbc4b0055266023995ae2a8bf4fc8",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -797,26 +893,26 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "gen:Pluck C4.wav",
+          "file": "Pluck C4.wav",
+          "sha256": "bd3442fca622cc1b17b2252b1d5229c5a2be79b901de039158b275fede7417dc",
+          "bytes": 172844
         },
         {
-          "id": "tutorial:voice",
-          "file": "Tutorial Voice A3.wav",
-          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-          "bytes": 1440104
+          "id": "gen:Saw C4.wav",
+          "file": "Saw C4.wav",
+          "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+          "bytes": 864044
         },
         {
-          "id": "tutorial:pluck",
-          "file": "Tutorial Pluck A3.wav",
-          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-          "bytes": 230504
+          "id": "gen:Sine C4.wav",
+          "file": "Sine C4.wav",
+          "sha256": "94160af389d34f194a4a2edf870e95a36e8bb1f320ae05578b48844d3e3a27bd",
+          "bytes": 864044
         }
       ],
       "disclosures": [
-        "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+        "The held chord (Cmaj7: C4 E4 G4 B4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
       ],
       "source": {
         "width": 2896,
@@ -840,16 +936,23 @@
           "webm": {
             "path": "d1-arp-per-source/d1-arp-per-source.webm",
             "codec": "vp9",
-            "bytes": 1030948,
-            "sha256": "b6a792017d6930ee5ee8aa8310cbc29ebdc123e6d65fe0257bbdd6a8f4a052c3"
+            "bytes": 1107238,
+            "sha256": "4ad67d1ad12a89eabe1d3827982162ea6483bcd32605509fa74a8a97c6d7e257"
           },
           "mp4": {
             "path": "d1-arp-per-source/d1-arp-per-source.mp4",
             "codec": "h264",
-            "bytes": 1085569,
-            "sha256": "9c5c4c944fd705d42a686aa5fb3147cba3bf43ea42e78f664cb6b826ebf35953"
+            "bytes": 1181389,
+            "sha256": "5f348a9435ee3e2ab897bb790192ca701611177875db56dcb2ba11a9d74edc89"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -5.5,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "linked": 0.0,
@@ -867,14 +970,14 @@
       },
       "poster": {
         "path": "d1-arp-per-source/poster.webp",
-        "frame": 328,
-        "sha256": "0379b670727796df0d4ddb455861a8189814a613c11a867d522eaf16b842ab33",
+        "frame": 330,
+        "sha256": "8f0b5d877fe3c0e98b800c05eb818c1d7931e83a58e9ddd03f767697ca265bc9",
         "master": "learn/capture/out/d1-arp-per-source/poster.png"
       },
       "run": {
-        "wallSeconds": 96.388,
-        "meanFrameMs": 241.1,
-        "slowdown": 7.23,
+        "wallSeconds": 87.95,
+        "meanFrameMs": 222.8,
+        "slowdown": 6.68,
         "notesPlayed": 128
       },
       "validation": {
@@ -914,6 +1017,31 @@
             "detail": ""
           },
           {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "11.867 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-34.6 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -5.5 dBTP"
+          },
+          {
             "check": "no blank frames",
             "passed": true,
             "detail": "0 blank"
@@ -921,7 +1049,7 @@
           {
             "check": "no frozen run longer than 3.2 s",
             "passed": true,
-            "detail": "longest unchanged run 0.03 s"
+            "detail": "longest unchanged run 0.07 s"
           },
           {
             "check": "webm frames = master",
@@ -1184,7 +1312,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.d3-satellite",
       "title": "Move each layer in the stereo field",
-      "scenarioDigest": "sha256:d9a8e2b3ae962860cb5dea488bdf40aeeaf4013d46d9fdefa22f064d52fb1c1c",
+      "scenarioDigest": "sha256:f39d0078f3b0bbadb5102fe9cddd1ebfebe752d88bcec98de20efea7c3b7296e",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -1205,26 +1333,26 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "gen:Saw C4.wav",
+          "file": "Saw C4.wav",
+          "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+          "bytes": 864044
         },
         {
-          "id": "tutorial:voice",
-          "file": "Tutorial Voice A3.wav",
-          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-          "bytes": 1440104
+          "id": "gen:Sine C4.wav",
+          "file": "Sine C4.wav",
+          "sha256": "94160af389d34f194a4a2edf870e95a36e8bb1f320ae05578b48844d3e3a27bd",
+          "bytes": 864044
         },
         {
-          "id": "tutorial:pluck",
-          "file": "Tutorial Pluck A3.wav",
-          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-          "bytes": 230504
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         }
       ],
       "disclosures": [
-        "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+        "The held chord (Cmaj7: C4 E4 G4 B4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
       ],
       "source": {
         "width": 2896,
@@ -1248,16 +1376,23 @@
           "webm": {
             "path": "d3-satellite/d3-satellite.webm",
             "codec": "vp9",
-            "bytes": 1180929,
-            "sha256": "58e3c40e4a223d89fc3888642bfda6987c99fbb80b63669a14a13facae901a3f"
+            "bytes": 1626861,
+            "sha256": "6f11a118a4b5de02d9af2f2fab3c953eeeef7920f4127c5f97a37abfff869c02"
           },
           "mp4": {
             "path": "d3-satellite/d3-satellite.mp4",
             "codec": "h264",
-            "bytes": 1072456,
-            "sha256": "4d40ccda0e942c3476db3ce13a26d97979576ed36052d9c0d653c16d6dc68181"
+            "bytes": 1570730,
+            "sha256": "f0684be0f2ba21b5d02cca674d8a12803fe3f17cb143184fbc0140ccb0ca36a0"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -4.8,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open-satellite": 0.0,
@@ -1273,14 +1408,14 @@
       },
       "poster": {
         "path": "d3-satellite/poster.webp",
-        "frame": 363,
-        "sha256": "58513ad2db094c90efc639ccc4c3b8de7274ad22a550ee618bb4af56bdb63619",
+        "frame": 370,
+        "sha256": "0f6c769237c085b5f856d41c15c5136acac57d2dfa44d906c9044b521bbb21c6",
         "master": "learn/capture/out/d3-satellite/poster.png"
       },
       "run": {
-        "wallSeconds": 94.48400000000001,
-        "meanFrameMs": 221.7,
-        "slowdown": 6.65,
+        "wallSeconds": 103.035,
+        "meanFrameMs": 243.0,
+        "slowdown": 7.29,
         "notesPlayed": 4
       },
       "validation": {
@@ -1318,6 +1453,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "12.867 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-26.6 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -4.8 dBTP"
           },
           {
             "check": "no blank frames",
@@ -1373,7 +1533,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.e1-save-preset",
       "title": "Save the sound as a preset",
-      "scenarioDigest": "sha256:3f6288dd0b6939df69951886f6d4d3195e5c6a4ff63f105ad3a040be086cbcb3",
+      "scenarioDigest": "sha256:b7ea689711378940190b3baac9e039efff8ee8cc89478390c96e0493a3c75cfa",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -1398,10 +1558,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         }
       ],
       "disclosures": [],
@@ -1427,17 +1587,18 @@
           "webm": {
             "path": "e1-save-preset/e1-save-preset.webm",
             "codec": "vp9",
-            "bytes": 337355,
-            "sha256": "7fc5fd44309f5dc3b59ae82fa0a30451dff4bc89688f1975b640a0923045a9dd"
+            "bytes": 327620,
+            "sha256": "98f2d7943ff2b5c85e2afef25513af9b84402f6f3234fbee0ca03e93724c4afe"
           },
           "mp4": {
             "path": "e1-save-preset/e1-save-preset.mp4",
             "codec": "h264",
-            "bytes": 401844,
-            "sha256": "78bbb0d2f13adf1ea96b0bc3310f37d16c9906f03d90d2b55ac43685f1310cad"
+            "bytes": 400729,
+            "sha256": "59cad4ccde6e767e28250edff7b10fc886044f20a6e035a4446cc792e8d4d81e"
           }
         }
       },
+      "audio": null,
       "marks": {
         "open-library": 0.0,
         "save": 2.767,
@@ -1451,13 +1612,13 @@
       "poster": {
         "path": "e1-save-preset/poster.webp",
         "frame": 261,
-        "sha256": "87bb0f43edd5b5d5ee3c1bb3ab8dba59af30ad882baefc924c331be5bf16f44c",
+        "sha256": "e2233d4f05c62785002e08323e31fd320053b967dc01868dc2e82c3c69ec7373",
         "master": "learn/capture/out/e1-save-preset/poster.png"
       },
       "run": {
-        "wallSeconds": 64.738,
-        "meanFrameMs": 200.7,
-        "slowdown": 6.02,
+        "wallSeconds": 62.584,
+        "meanFrameMs": 192.4,
+        "slowdown": 5.77,
         "notesPlayed": 0
       },
       "validation": {
@@ -1493,6 +1654,11 @@
           },
           {
             "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no notes played: clip stays silent",
             "passed": true,
             "detail": ""
           },
@@ -1550,7 +1716,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.e2-add-layers",
       "title": "Add a second and third sound",
-      "scenarioDigest": "sha256:5da299b073bc604db65e87bb686a689296f39e9a3cd0af5108d0719a62a5d1a2",
+      "scenarioDigest": "sha256:0c152e2844c49cf25eebab4737da76eb41eb0815a7cb0d69921a714f27f3b384",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -1573,22 +1739,22 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         },
         {
-          "id": "tutorial:voice",
-          "file": "Tutorial Voice A3.wav",
-          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-          "bytes": 1440104
+          "id": "gen:Saw C4.wav",
+          "file": "Saw C4.wav",
+          "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+          "bytes": 864044
         },
         {
-          "id": "tutorial:pluck",
-          "file": "Tutorial Pluck A3.wav",
-          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-          "bytes": 230504
+          "id": "gen:Pluck C4.wav",
+          "file": "Pluck C4.wav",
+          "sha256": "bd3442fca622cc1b17b2252b1d5229c5a2be79b901de039158b275fede7417dc",
+          "bytes": 172844
         }
       ],
       "disclosures": [
@@ -1598,7 +1764,7 @@
         "width": 2896,
         "height": 2100,
         "fps": 30,
-        "frames": 269,
+        "frames": 267,
         "crop": [
           0,
           0,
@@ -1610,22 +1776,29 @@
         "width": 1600,
         "height": 1160,
         "fps": 30,
-        "frames": 269,
-        "duration": 8.967,
+        "frames": 267,
+        "duration": 8.9,
         "files": {
           "webm": {
             "path": "e2-add-layers/e2-add-layers.webm",
             "codec": "vp9",
-            "bytes": 607644,
-            "sha256": "9096d5e0e551d1a5a638ad6f4fc5d2acec9ddf1c3024685950369cbcd65115ef"
+            "bytes": 614756,
+            "sha256": "a37619b348c969e0f0f69a74019a10b04bd2f033d5489ac5afe7756114bddeaa"
           },
           "mp4": {
             "path": "e2-add-layers/e2-add-layers.mp4",
             "codec": "h264",
-            "bytes": 711950,
-            "sha256": "c337e9796c00f81a1b2a3d4b2d4b73928b02cd734ed07c77cf5b25d74771556c"
+            "bytes": 734804,
+            "sha256": "3d204f14e2c5f49715f8a474a5fa8331c1b5f6f1bb87008c9c5aa0a5bccf5f79"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -7.0,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "add-b": 0.0,
@@ -1639,14 +1812,14 @@
       },
       "poster": {
         "path": "e2-add-layers/poster.webp",
-        "frame": 267,
-        "sha256": "d61736cc5d06cc2dc658faff74fb43d6b47f6bcfdb91e30c164844edb5a58916",
+        "frame": 242,
+        "sha256": "bacbb9c566ac8b45d4ec61a2cad850eeab437b099c849e4156a5f26c52623914",
         "master": "learn/capture/out/e2-add-layers/poster.png"
       },
       "run": {
-        "wallSeconds": 48.706,
-        "meanFrameMs": 162.5,
-        "slowdown": 4.88,
+        "wallSeconds": 44.988,
+        "meanFrameMs": 153.1,
+        "slowdown": 4.59,
         "notesPlayed": 1
       },
       "validation": {
@@ -1668,7 +1841,7 @@
           {
             "check": "master frame count = frames.json",
             "passed": true,
-            "detail": "269 / 269"
+            "detail": "267 / 267"
           },
           {
             "check": "every editor size fits the canvas",
@@ -1686,6 +1859,31 @@
             "detail": ""
           },
           {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "8.900 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-32.5 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -7.0 dBTP"
+          },
+          {
             "check": "no blank frames",
             "passed": true,
             "detail": "0 blank"
@@ -1693,12 +1891,12 @@
           {
             "check": "no frozen run longer than 2.5 s",
             "passed": true,
-            "detail": "longest unchanged run 1.23 s"
+            "detail": "longest unchanged run 1.20 s"
           },
           {
             "check": "webm frames = master",
             "passed": true,
-            "detail": "269"
+            "detail": "267"
           },
           {
             "check": "webm size",
@@ -1708,7 +1906,7 @@
           {
             "check": "mp4 frames = master",
             "passed": true,
-            "detail": "269"
+            "detail": "267"
           },
           {
             "check": "mp4 size",
@@ -1718,7 +1916,7 @@
           {
             "check": "duration 6-15 s (one clip) or declared",
             "passed": true,
-            "detail": "8.97 s"
+            "detail": "8.90 s"
           },
           {
             "check": "poster not blank",
@@ -1739,7 +1937,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.e3-mix-layers",
       "title": "Balance, mute and solo layers",
-      "scenarioDigest": "sha256:c354cd28a4692fb979c062964b864f6c03cc0f0a54a3879317ae97d2c1fc3531",
+      "scenarioDigest": "sha256:24bb63989ffcc808f4b816332ad074d81a4ab4184759adf489f2f02ce4302024",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -1764,16 +1962,16 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         },
         {
-          "id": "tutorial:voice",
-          "file": "Tutorial Voice A3.wav",
-          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-          "bytes": 1440104
+          "id": "gen:Saw C4.wav",
+          "file": "Saw C4.wav",
+          "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+          "bytes": 864044
         }
       ],
       "disclosures": [
@@ -1801,16 +1999,23 @@
           "webm": {
             "path": "e3-mix-layers/e3-mix-layers.webm",
             "codec": "vp9",
-            "bytes": 430210,
-            "sha256": "3a04a69ba622790c2092b1a62c0268397bd65f9150731e15fce05666db6184fa"
+            "bytes": 615872,
+            "sha256": "67e725a5ad06ae88b09e08a2f41f5cc2114f4f497dc1b881911ce523460e1e6e"
           },
           "mp4": {
             "path": "e3-mix-layers/e3-mix-layers.mp4",
             "codec": "h264",
-            "bytes": 580281,
-            "sha256": "911852a52c0c9573f962e887d032f9ddaafefdce99129fec4e75da316d7013cd"
+            "bytes": 731601,
+            "sha256": "ec93ec66eb9d940e9a81ed9462ce209e8a4617c3c242079e8c54312dd68acc93"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -15.9,
+        "truePeak": -3.7,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "level-b": 0.0,
@@ -1826,14 +2031,14 @@
       },
       "poster": {
         "path": "e3-mix-layers/poster.webp",
-        "frame": 261,
-        "sha256": "b3a1ef27c6fc9ff73535ac4cfa1af70b366dd876c61b8f6bceff05aaa84f4909",
+        "frame": 256,
+        "sha256": "56660bfd00d932e76bfb9be6002990e1c5389d5736736cffbe67b9be1d0d9528",
         "master": "learn/capture/out/e3-mix-layers/poster.png"
       },
       "run": {
-        "wallSeconds": 73.761,
-        "meanFrameMs": 227.1,
-        "slowdown": 6.81,
+        "wallSeconds": 70.974,
+        "meanFrameMs": 221.5,
+        "slowdown": 6.64,
         "notesPlayed": 1
       },
       "validation": {
@@ -1873,6 +2078,31 @@
             "detail": ""
           },
           {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "9.367 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-37.1 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-15.9 LUFS, true peak -3.7 dBTP"
+          },
+          {
             "check": "no blank frames",
             "passed": true,
             "detail": "0 blank"
@@ -1880,7 +2110,7 @@
           {
             "check": "no frozen run longer than 2.5 s",
             "passed": true,
-            "detail": "longest unchanged run 0.07 s"
+            "detail": "longest unchanged run 0.03 s"
           },
           {
             "check": "webm frames = master",
@@ -1926,7 +2156,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.e4-starting-state",
       "title": "Load a starting state",
-      "scenarioDigest": "sha256:8bd4f04f056d0637196978ccc1ce9a32f61a43b5df04824a1cae95af20b2db7d",
+      "scenarioDigest": "sha256:030561158105282c95c4a20d101d33c0abdd18688e1a735ec2a377703f131fbe",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -1950,10 +2180,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         }
       ],
       "disclosures": [],
@@ -1961,7 +2191,7 @@
         "width": 2896,
         "height": 2100,
         "fps": 30,
-        "frames": 320,
+        "frames": 318,
         "crop": [
           12,
           0,
@@ -1973,22 +2203,29 @@
         "width": 1600,
         "height": 1170,
         "fps": 30,
-        "frames": 320,
-        "duration": 10.667,
+        "frames": 318,
+        "duration": 10.6,
         "files": {
           "webm": {
             "path": "e4-starting-state/e4-starting-state.webm",
             "codec": "vp9",
-            "bytes": 531991,
-            "sha256": "34a89fa6da2c4bf6b6723899e0da13ba94c1da3cb5621851632fe3981b139e87"
+            "bytes": 536955,
+            "sha256": "cd3032d6873d6f53ec76863b220bc1288cc75d1cd6a1606469ff147991439885"
           },
           "mp4": {
             "path": "e4-starting-state/e4-starting-state.mp4",
             "codec": "h264",
-            "bytes": 533217,
-            "sha256": "fc7f7d85f7ff7ba8835ea9f9168d9ec11c91814bb74373f83068952ecc5fc59e"
+            "bytes": 578855,
+            "sha256": "8f649767cabc30d5572f7fd7a931060e2e2bdb49b373cefd36bc418612ee3b5a"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -9.9,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open-library": 0.0,
@@ -2002,14 +2239,14 @@
       },
       "poster": {
         "path": "e4-starting-state/poster.webp",
-        "frame": 307,
-        "sha256": "1fc08a0e29edab0eea1017563f44b620a40ab713c4b9896d78e5db2245223b28",
+        "frame": 288,
+        "sha256": "dae1970d5f7abed93ec177605867f3503f69e76e08f6ed4c1a11f6f143979744",
         "master": "learn/capture/out/e4-starting-state/poster.png"
       },
       "run": {
-        "wallSeconds": 56.121,
-        "meanFrameMs": 158.4,
-        "slowdown": 4.75,
+        "wallSeconds": 54.196,
+        "meanFrameMs": 152.2,
+        "slowdown": 4.56,
         "notesPlayed": 1
       },
       "validation": {
@@ -2031,7 +2268,7 @@
           {
             "check": "master frame count = frames.json",
             "passed": true,
-            "detail": "320 / 320"
+            "detail": "318 / 318"
           },
           {
             "check": "every editor size fits the canvas",
@@ -2049,6 +2286,31 @@
             "detail": ""
           },
           {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "10.600 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-29.6 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -9.9 dBTP"
+          },
+          {
             "check": "no blank frames",
             "passed": true,
             "detail": "0 blank"
@@ -2061,7 +2323,7 @@
           {
             "check": "webm frames = master",
             "passed": true,
-            "detail": "320"
+            "detail": "318"
           },
           {
             "check": "webm size",
@@ -2071,7 +2333,7 @@
           {
             "check": "mp4 frames = master",
             "passed": true,
-            "detail": "320"
+            "detail": "318"
           },
           {
             "check": "mp4 size",
@@ -2081,7 +2343,7 @@
           {
             "check": "duration 6-15 s (one clip) or declared",
             "passed": true,
-            "detail": "10.67 s"
+            "detail": "10.60 s"
           },
           {
             "check": "poster not blank",
@@ -2102,7 +2364,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.e5-export-instrument",
       "title": "Export a portable instrument",
-      "scenarioDigest": "sha256:fdae8b3deb8c97f7c4158bd7af9dbbd8e5143cafd8855ef3ae852f3b0ab90899",
+      "scenarioDigest": "sha256:9e6bf6faf723a86faddc9ff1cec223e754966593070f60549e6555afb8fcadd9",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -2125,10 +2387,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         }
       ],
       "disclosures": [
@@ -2156,17 +2418,18 @@
           "webm": {
             "path": "e5-export-instrument/e5-export-instrument.webm",
             "codec": "vp9",
-            "bytes": 291117,
-            "sha256": "cc2955c4d2d8788176c8c8c1ef635bda2adfd305c67a44430f9fdc767184d580"
+            "bytes": 280478,
+            "sha256": "014dc629f071be75e403d1cffacc9b9b141c9cfc48c6f243b1243465cac2b540"
           },
           "mp4": {
             "path": "e5-export-instrument/e5-export-instrument.mp4",
             "codec": "h264",
-            "bytes": 212802,
-            "sha256": "98eeb19b9bd2393982724759ab00948ddefdc26c4c3a9b82e534c62c2691e9b7"
+            "bytes": 212377,
+            "sha256": "a0520463b21309c60cfe6c4f9aabe8fe63418c189c9e2b9409b0e0a2f47ef915"
           }
         }
       },
+      "audio": null,
       "marks": {
         "open-menu": 0.0,
         "export": 3.367
@@ -2178,13 +2441,13 @@
       "poster": {
         "path": "e5-export-instrument/poster.webp",
         "frame": 171,
-        "sha256": "a8010c27ae8d15d484517b8376ba0b3ca7cd9e9c26f320e7b6bf9a2f85ffcddb",
+        "sha256": "ae60169c3f9ba7edec76c9506e7ee99b2e9423f68c794e091fdb04a2af9632c2",
         "master": "learn/capture/out/e5-export-instrument/poster.png"
       },
       "run": {
-        "wallSeconds": 39.042,
-        "meanFrameMs": 173.2,
-        "slowdown": 5.2,
+        "wallSeconds": 37.456,
+        "meanFrameMs": 165.7,
+        "slowdown": 4.97,
         "notesPlayed": 0
       },
       "validation": {
@@ -2220,6 +2483,11 @@
           },
           {
             "check": "encoder exit (libx264)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "no notes played: clip stays silent",
             "passed": true,
             "detail": ""
           },
@@ -2277,7 +2545,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.f1-synth-blend",
       "title": "Blend in SYNTH",
-      "scenarioDigest": "sha256:c92c89b18c1f86c0b8e7cf4dc4bc742872c70024c4771c5983f56cdaa07cb62a",
+      "scenarioDigest": "sha256:bb220d3e5fc97fcb1b48fd217fc47e7acca4cbe65a0cf9b8c8e2e62e0e48da87",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -2296,10 +2564,10 @@
       "targets": [],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "gen:Sine C4.wav",
+          "file": "Sine C4.wav",
+          "sha256": "94160af389d34f194a4a2edf870e95a36e8bb1f320ae05578b48844d3e3a27bd",
+          "bytes": 864044
         }
       ],
       "disclosures": [
@@ -2327,16 +2595,23 @@
           "webm": {
             "path": "f1-synth-blend/f1-synth-blend.webm",
             "codec": "vp9",
-            "bytes": 242596,
-            "sha256": "9e47f6d1dc9ce3aa60ef2f91cbf4fa6536963ef4c32811393ed13e598efe1206"
+            "bytes": 421828,
+            "sha256": "c68950f4b3dacd4f08a17f25097384020d2841eac77dd825d0382531e56b3ca9"
           },
           "mp4": {
             "path": "f1-synth-blend/f1-synth-blend.mp4",
             "codec": "h264",
-            "bytes": 279115,
-            "sha256": "3a3c17ad662246f4433c425c65d7fd284d40ebf2e185ae5ba66854e2c2c37c9f"
+            "bytes": 462170,
+            "sha256": "a7520e46f69f4e910c81f4722fbc7df77c644a34d78a03a20d97ab02b8390a2a"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -12.9,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open-synth": 0.0,
@@ -2355,13 +2630,13 @@
       "poster": {
         "path": "f1-synth-blend/poster.webp",
         "frame": 300,
-        "sha256": "2bd876b227b0bacc0ad71da492f1c5b5f38ae9635df51129b80165d7208f15e9",
+        "sha256": "738686d7fe9c7ae1593b64258525ad11088130d0257ad42a9d023df071f23c6a",
         "master": "learn/capture/out/f1-synth-blend/poster.png"
       },
       "run": {
-        "wallSeconds": 78.842,
-        "meanFrameMs": 214.3,
-        "slowdown": 6.43,
+        "wallSeconds": 81.931,
+        "meanFrameMs": 222.8,
+        "slowdown": 6.68,
         "notesPlayed": 1
       },
       "validation": {
@@ -2399,6 +2674,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "11.000 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-33.2 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -12.9 dBTP"
           },
           {
             "check": "no blank frames",
@@ -2454,7 +2754,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.f2-synth-imprint",
       "title": "Colour SYNTH with IMPRINT",
-      "scenarioDigest": "sha256:742b94ff4d0f183a6d60fea26455b475caf848405e4fae30a0513a3ed489f235",
+      "scenarioDigest": "sha256:6d4607e539fdd8d5e98238a5d4f1a628c3adef27e85d5a2a33731adba1b03164",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -2473,10 +2773,10 @@
       "targets": [],
       "fixtures": [
         {
-          "id": "tutorial:voice",
-          "file": "Tutorial Voice A3.wav",
-          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-          "bytes": 1440104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         }
       ],
       "disclosures": [
@@ -2504,16 +2804,23 @@
           "webm": {
             "path": "f2-synth-imprint/f2-synth-imprint.webm",
             "codec": "vp9",
-            "bytes": 235677,
-            "sha256": "99b976c8b93888f2548beaeb2692d427e69e9edd2c1884c376f4b3677e7ecaea"
+            "bytes": 407754,
+            "sha256": "c94f0b1b2dd63bad0790a9b2d7983254807ac505716f623ae5286db78332d303"
           },
           "mp4": {
             "path": "f2-synth-imprint/f2-synth-imprint.mp4",
             "codec": "h264",
-            "bytes": 289623,
-            "sha256": "4288039dc6402c40ab91997278e34a16e7a759aac2a90285ac907b22a62fe0cb"
+            "bytes": 448729,
+            "sha256": "44498c1f1e23542dc132b2f3393b5d23b7432258be1b560cd2e933f3878237b1"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -8.0,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open-synth": 0.0,
@@ -2530,13 +2837,13 @@
       "poster": {
         "path": "f2-synth-imprint/poster.webp",
         "frame": 279,
-        "sha256": "cd207c35e77ee16e3ab836673c8d43bcfe09b3dc2eb98c0e6f593efc57da0e6e",
+        "sha256": "c29292c93e6c7db7d5ae6a4f9f3ed702a91d3f47cafc876986892c6e1796a492",
         "master": "learn/capture/out/f2-synth-imprint/poster.png"
       },
       "run": {
-        "wallSeconds": 76.434,
-        "meanFrameMs": 214.2,
-        "slowdown": 6.43,
+        "wallSeconds": 73.22,
+        "meanFrameMs": 207.0,
+        "slowdown": 6.21,
         "notesPlayed": 1
       },
       "validation": {
@@ -2574,6 +2881,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "10.300 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-34.0 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -8.0 dBTP"
           },
           {
             "check": "no blank frames",
@@ -2629,7 +2961,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.g1-arp-basics",
       "title": "Arpeggiate held notes",
-      "scenarioDigest": "sha256:1374978b5f095b5c213f53440d4aeee99a35a4efd1d72071b66ef56fa1a0a7cc",
+      "scenarioDigest": "sha256:99c89d2a53e8cf5d7e434ef104a75d563a9b0de1814de174916632403fdecebd",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -2653,10 +2985,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:pluck",
-          "file": "Tutorial Pluck A3.wav",
-          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-          "bytes": 230504
+          "id": "gen:Pluck C4.wav",
+          "file": "Pluck C4.wav",
+          "sha256": "bd3442fca622cc1b17b2252b1d5229c5a2be79b901de039158b275fede7417dc",
+          "bytes": 172844
         }
       ],
       "disclosures": [
@@ -2684,16 +3016,23 @@
           "webm": {
             "path": "g1-arp-basics/g1-arp-basics.webm",
             "codec": "vp9",
-            "bytes": 785249,
-            "sha256": "fb6b6b0f9c137340657000f07e45721e7621fb4e86ba6d0b69a2812208abfacf"
+            "bytes": 845988,
+            "sha256": "b6ff17b429c4d4e5a36bc89639ca8013ae5a768b5a27cc5403bb3ba8ca07726a"
           },
           "mp4": {
             "path": "g1-arp-basics/g1-arp-basics.mp4",
             "codec": "h264",
-            "bytes": 696288,
-            "sha256": "2b8bc1fb560c69de7d3757702f743d1b6923084c9018c61ee6ed394768f86992"
+            "bytes": 782887,
+            "sha256": "78ccdbec00f88484307f9d24950090fdf3d65dc7fe6bc8648caf3481552182fb"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -4.2,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open-arp": 0.0,
@@ -2711,15 +3050,15 @@
       },
       "poster": {
         "path": "g1-arp-basics/poster.webp",
-        "frame": 390,
-        "sha256": "2553db535b7803c9411534e2b8b28731e0d062d4b956f99ba8c010ccc5bb1aa2",
+        "frame": 376,
+        "sha256": "6127d661839a59b85541bd6515799e2caa7eaba6feff7db90d817779df7e47ec",
         "master": "learn/capture/out/g1-arp-basics/poster.png"
       },
       "run": {
-        "wallSeconds": 94.586,
-        "meanFrameMs": 217.6,
-        "slowdown": 6.53,
-        "notesPlayed": 62
+        "wallSeconds": 83.476,
+        "meanFrameMs": 191.7,
+        "slowdown": 5.75,
+        "notesPlayed": 63
       },
       "validation": {
         "status": "passed",
@@ -2756,6 +3095,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "13.467 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-41.9 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -4.2 dBTP"
           },
           {
             "check": "no blank frames",
@@ -2811,7 +3175,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.g2-arp-custom",
       "title": "Use a custom pattern",
-      "scenarioDigest": "sha256:1305cce12ae5f2b97de61379ab97ffdf29fa4ec867dc13568fe8f915341b9caa",
+      "scenarioDigest": "sha256:56ec12e5eb1f4217234afaacfe9e81cfcb823b3002cd0aa7cbecf48c03f61074",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -2832,10 +3196,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:pluck",
-          "file": "Tutorial Pluck A3.wav",
-          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-          "bytes": 230504
+          "id": "gen:Pluck C4.wav",
+          "file": "Pluck C4.wav",
+          "sha256": "bd3442fca622cc1b17b2252b1d5229c5a2be79b901de039158b275fede7417dc",
+          "bytes": 172844
         }
       ],
       "disclosures": [
@@ -2864,16 +3228,23 @@
           "webm": {
             "path": "g2-arp-custom/g2-arp-custom.webm",
             "codec": "vp9",
-            "bytes": 396371,
-            "sha256": "05b369393a3e80eef3e88425d154953249550711293d2feb0e6164083675ba38"
+            "bytes": 437605,
+            "sha256": "1dc29c08d409a4bb6ec4abe55a2874554054a3d8173974f1b2b7f5da6d2af2cc"
           },
           "mp4": {
             "path": "g2-arp-custom/g2-arp-custom.mp4",
             "codec": "h264",
-            "bytes": 342568,
-            "sha256": "0c277a88c834a31a9032e5ec669842d5d01ef91e178c0304edbad5daa4cab99e"
+            "bytes": 407689,
+            "sha256": "42e99fe712717464e8db14c7dea5db8329f7ae3921c6000821c59b8920017649"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -5.8,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "pattern": 0.0,
@@ -2885,14 +3256,14 @@
       },
       "poster": {
         "path": "g2-arp-custom/poster.webp",
-        "frame": 185,
-        "sha256": "ed3dfbd9dbcb19ea750616c45fb60a9708ba2f76cdad2f5ddd5144d1334eaae6",
+        "frame": 168,
+        "sha256": "19362a11f88bd0804e6ae302f192e36cbba0093488a442fa118843f8be2e5d6f",
         "master": "learn/capture/out/g2-arp-custom/poster.png"
       },
       "run": {
-        "wallSeconds": 49.793,
-        "meanFrameMs": 239.4,
-        "slowdown": 7.18,
+        "wallSeconds": 46.677,
+        "meanFrameMs": 224.7,
+        "slowdown": 6.74,
         "notesPlayed": 46
       },
       "validation": {
@@ -2930,6 +3301,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "6.333 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-39.0 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -5.8 dBTP"
           },
           {
             "check": "no blank frames",
@@ -2985,7 +3381,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.g3-sub",
       "title": "Add SUB under your keys",
-      "scenarioDigest": "sha256:136652ae743e12a377a8533c30310980f7673967456ba5f47abbbf11ea837930",
+      "scenarioDigest": "sha256:0c63d6754a8974a5b36ddb2c59065c25da184bbfcc8e7d71a399c3b530bf7828",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -3009,10 +3405,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         }
       ],
       "disclosures": [
@@ -3040,16 +3436,23 @@
           "webm": {
             "path": "g3-sub/g3-sub.webm",
             "codec": "vp9",
-            "bytes": 644268,
-            "sha256": "809d87d82b9ba8f182956d0e8e2ab727f1305f9ccd9260806098435cfc145608"
+            "bytes": 725215,
+            "sha256": "f418d1d04764a035a8c39a3317e6d04be0ddbba8df3edcee9cc15eee6199a720"
           },
           "mp4": {
             "path": "g3-sub/g3-sub.mp4",
             "codec": "h264",
-            "bytes": 610143,
-            "sha256": "41883ccca928133b90a804749e7626da5b95e5ebfc025ecd29380941ee55a04e"
+            "bytes": 765494,
+            "sha256": "5dc1349140ccbb0462d35ddcff46cd5625fcff183d04d977f9321851be409e05"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -2.0,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open-sub": 0.0,
@@ -3067,15 +3470,15 @@
       },
       "poster": {
         "path": "g3-sub/poster.webp",
-        "frame": 312,
-        "sha256": "e3dfb50da79e6e8ad4514d80c19ba20eec2db6acf5a9d6f1d14ee7d92a2747a7",
+        "frame": 327,
+        "sha256": "89b3e280aa5a95c9eef25bb58cc12a1fcb8f8745f289047b42ebc493fe609eac",
         "master": "learn/capture/out/g3-sub/poster.png"
       },
       "run": {
-        "wallSeconds": 73.392,
-        "meanFrameMs": 197.4,
-        "slowdown": 5.92,
-        "notesPlayed": 3
+        "wallSeconds": 73.319,
+        "meanFrameMs": 197.2,
+        "slowdown": 5.91,
+        "notesPlayed": 4
       },
       "validation": {
         "status": "passed",
@@ -3114,6 +3517,31 @@
             "detail": ""
           },
           {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "11.333 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-21.8 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -2.0 dBTP"
+          },
+          {
             "check": "no blank frames",
             "passed": true,
             "detail": "0 blank"
@@ -3121,7 +3549,7 @@
           {
             "check": "no frozen run longer than 2.6 s",
             "passed": true,
-            "detail": "longest unchanged run 1.23 s"
+            "detail": "longest unchanged run 1.17 s"
           },
           {
             "check": "webm frames = master",
@@ -3167,7 +3595,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.h1-oneshot-granular",
       "title": "Switch between One Shot and Granular",
-      "scenarioDigest": "sha256:c61c3c17de6f85c707cc9fd7579afc56103345e45597be3ff751fd0240d7dfbc",
+      "scenarioDigest": "sha256:4100ea4919b078535be0ba675b5fdb4edfe099474a673628201389eb2f4bbd39",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -3195,10 +3623,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Freeze.wav",
+          "file": "Prophet-6 Freeze.wav",
+          "sha256": "bef2a38a2718a297649612a87fc27b9629571c6fabe99c639348deae2b4c57c9",
+          "bytes": 3384060
         }
       ],
       "disclosures": [],
@@ -3224,16 +3652,23 @@
           "webm": {
             "path": "h1-oneshot-granular/h1-oneshot-granular.webm",
             "codec": "vp9",
-            "bytes": 448433,
-            "sha256": "c992e0a20b3fe7d0c1b9005f77b6519d963337c0b99bb427ac27598766c1e667"
+            "bytes": 428961,
+            "sha256": "b70e68e3b42f2d8203d51844c55a42dd6a486593d2ae438fd844f6d95dbb5f63"
           },
           "mp4": {
             "path": "h1-oneshot-granular/h1-oneshot-granular.mp4",
             "codec": "h264",
-            "bytes": 459384,
-            "sha256": "e45eb5f897b0fc030649a2ec822c6cf1b1895e683fc0ab9788c63788d27448c3"
+            "bytes": 477086,
+            "sha256": "c961f2be4cca95d1c7b763db9876ebc28e80ca6d2d30d92dc7172dfb2a90a30d"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -17.4,
+        "truePeak": -1.5,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "oneshot-play": 0.0,
@@ -3250,13 +3685,13 @@
       "poster": {
         "path": "h1-oneshot-granular/poster.webp",
         "frame": 274,
-        "sha256": "74acbc73ca6b5f2fbac6098b7a3d63ccbfc718cc3c2a1009d436044c596f69ca",
+        "sha256": "a5ea4a94514652628fc327e20fd0fefc40187df1fa3be517912ac22fb25374c1",
         "master": "learn/capture/out/h1-oneshot-granular/poster.png"
       },
       "run": {
-        "wallSeconds": 66.506,
-        "meanFrameMs": 200.6,
-        "slowdown": 6.02,
+        "wallSeconds": 70.252,
+        "meanFrameMs": 209.7,
+        "slowdown": 6.29,
         "notesPlayed": 2
       },
       "validation": {
@@ -3294,6 +3729,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "10.133 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-36.9 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-17.4 LUFS, true peak -1.5 dBTP"
           },
           {
             "check": "no blank frames",
@@ -3349,7 +3809,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.h2-grains",
       "title": "Shape the grains",
-      "scenarioDigest": "sha256:235f0f41d57d3d71117472185eb177a411ee5719eda2b88203f3524fc647b1b8",
+      "scenarioDigest": "sha256:426d3750ea8d423022b4aa0d10fa157f63262946d1bbf48c89f1b463477027ff",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -3374,10 +3834,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         }
       ],
       "disclosures": [
@@ -3405,16 +3865,23 @@
           "webm": {
             "path": "h2-grains/h2-grains.webm",
             "codec": "vp9",
-            "bytes": 337052,
-            "sha256": "f0d3f73c7d83a16531e543a7faefeada73bd4e493e1ae1b2238291b69e588841"
+            "bytes": 431678,
+            "sha256": "1d0cdb062417858e11ff714bf9d26a1d16a765ce8e1ef521ecb28cea3f5b2760"
           },
           "mp4": {
             "path": "h2-grains/h2-grains.mp4",
             "codec": "h264",
-            "bytes": 362519,
-            "sha256": "df1cb0983d82a514e2080b46f1db0eadca8dbf6ca23d0b1199032b5da5066e96"
+            "bytes": 543560,
+            "sha256": "120968317ee7cd078b90ad5b4b1c856c84fa743585fa79a5fefd0afcc53890fb"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -7.7,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "reveal": 0.0,
@@ -3430,14 +3897,14 @@
       },
       "poster": {
         "path": "h2-grains/poster.webp",
-        "frame": 306,
-        "sha256": "3b2eef5e9e0e7063484141da27400f2474b6fadf49af27bb975672c4a3add6c0",
+        "frame": 316,
+        "sha256": "3dafc159cd4d9f8dc497bb2e192fde380c90ab8ac4a2ab67b44e95b0ad97fdfa",
         "master": "learn/capture/out/h2-grains/poster.png"
       },
       "run": {
-        "wallSeconds": 77.014,
-        "meanFrameMs": 206.9,
-        "slowdown": 6.21,
+        "wallSeconds": 78.361,
+        "meanFrameMs": 209.6,
+        "slowdown": 6.29,
         "notesPlayed": 1
       },
       "validation": {
@@ -3477,6 +3944,31 @@
             "detail": ""
           },
           {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "10.900 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-34.6 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -7.7 dBTP"
+          },
+          {
             "check": "no blank frames",
             "passed": true,
             "detail": "0 blank"
@@ -3484,7 +3976,7 @@
           {
             "check": "no frozen run longer than 2.5 s",
             "passed": true,
-            "detail": "longest unchanged run 0.40 s"
+            "detail": "longest unchanged run 0.53 s"
           },
           {
             "check": "webm frames = master",
@@ -3530,7 +4022,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.h3-key-dna",
       "title": "Vary the sound from key to key (KEY DNA)",
-      "scenarioDigest": "sha256:87802eff5f3078f8872c1b198be128bed83326b3480fc2a5acb567183c622382",
+      "scenarioDigest": "sha256:b524868cfb485db60e10e59cbd4ff0919c7d54e783721901e254b364e3a94e01",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -3556,10 +4048,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         }
       ],
       "disclosures": [],
@@ -3585,16 +4077,23 @@
           "webm": {
             "path": "h3-key-dna/h3-key-dna.webm",
             "codec": "vp9",
-            "bytes": 378410,
-            "sha256": "dc3902451366595d58b3ccfc2200925a445099522a7da43c3625730317fab82e"
+            "bytes": 412657,
+            "sha256": "706c6d36c51418205ac0d0787db1cb8f97943e37f252709ff0ff991d7ac536a0"
           },
           "mp4": {
             "path": "h3-key-dna/h3-key-dna.mp4",
             "codec": "h264",
-            "bytes": 389315,
-            "sha256": "bb8736ff2d9f44194fc61b0f78719e078d5561151537483c1627ea7417822e7d"
+            "bytes": 458401,
+            "sha256": "13e58e2057d97e7db53c1702eb5ef55241467bd4ec751df874d2c1328ffec9a8"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -5.5,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open": 0.0,
@@ -3617,9 +4116,9 @@
         "master": "learn/capture/out/h3-key-dna/poster.png"
       },
       "run": {
-        "wallSeconds": 104.557,
-        "meanFrameMs": 203.5,
-        "slowdown": 6.11,
+        "wallSeconds": 96.633,
+        "meanFrameMs": 187.3,
+        "slowdown": 5.62,
         "notesPlayed": 3
       },
       "validation": {
@@ -3657,6 +4156,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "15.233 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-35.9 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -5.5 dBTP"
           },
           {
             "check": "no blank frames",
@@ -3712,7 +4236,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.i1-reimagined",
       "title": "Reimagine a sound",
-      "scenarioDigest": "sha256:325ef573acceda11c90e49b48513f6ec0d2c845d397fe90ba6a050e12b607c08",
+      "scenarioDigest": "sha256:1965b2a685c19a49fe3bad6f2c06ece6cd4e55a9723c7fd4e1c6812a07574ecf",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -3737,10 +4261,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         }
       ],
       "disclosures": [
@@ -3768,16 +4292,23 @@
           "webm": {
             "path": "i1-reimagined/i1-reimagined.webm",
             "codec": "vp9",
-            "bytes": 306126,
-            "sha256": "22143447af9ef7958ea8beb0cc609cab30f99cdd8384dc64c273058771f1a01f"
+            "bytes": 390670,
+            "sha256": "c4e372038e0bed550a68efa5d655afe16d563bc5dadc3198e0b0001243175cab"
           },
           "mp4": {
             "path": "i1-reimagined/i1-reimagined.mp4",
             "codec": "h264",
-            "bytes": 252010,
-            "sha256": "076f4902dc18950671d36d7e14a7d444ef59e399fcf1bd723f5e1757738e7690"
+            "bytes": 373299,
+            "sha256": "4a41b501fe9f18aa2e8a0d78a41561dc1018ac87043e61a36c44122217408205"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -10.8,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open-modes": 0.0,
@@ -3791,14 +4322,14 @@
       },
       "poster": {
         "path": "i1-reimagined/poster.webp",
-        "frame": 224,
-        "sha256": "9d8f15759d4c846b6b3bc5c9271d4ec02649f85cf0b98c24e6fba50c68c79fef",
+        "frame": 221,
+        "sha256": "fe190f7f6dd26dad683b108d14572c28b44777a4e623018e8334787b7ff99357",
         "master": "learn/capture/out/i1-reimagined/poster.png"
       },
       "run": {
-        "wallSeconds": 71.287,
-        "meanFrameMs": 261.6,
-        "slowdown": 7.85,
+        "wallSeconds": 70.45700000000001,
+        "meanFrameMs": 256.7,
+        "slowdown": 7.7,
         "notesPlayed": 1
       },
       "validation": {
@@ -3836,6 +4367,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "8.100 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-33.6 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -10.8 dBTP"
           },
           {
             "check": "no blank frames",
@@ -3891,7 +4447,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.i2-movement",
       "title": "Add MOVEMENT",
-      "scenarioDigest": "sha256:4ab4670d34866bb58895f414225815e75da6d10e63b55dcb1af138af98eb62b0",
+      "scenarioDigest": "sha256:802d92051aee77a89aed83c003883039ee1ab4d0b2fc91169a2a80631146f299",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -3915,10 +4471,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:voice",
-          "file": "Tutorial Voice A3.wav",
-          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-          "bytes": 1440104
+          "id": "gen:Saw C4.wav",
+          "file": "Saw C4.wav",
+          "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+          "bytes": 864044
         }
       ],
       "disclosures": [
@@ -3928,7 +4484,7 @@
         "width": 2896,
         "height": 2100,
         "fps": 30,
-        "frames": 241,
+        "frames": 242,
         "crop": [
           72,
           916,
@@ -3940,27 +4496,34 @@
         "width": 1600,
         "height": 790,
         "fps": 30,
-        "frames": 241,
-        "duration": 8.033,
+        "frames": 242,
+        "duration": 8.067,
         "files": {
           "webm": {
             "path": "i2-movement/i2-movement.webm",
             "codec": "vp9",
-            "bytes": 181737,
-            "sha256": "462e8b6838818aa0cf0003e5d82ee83e32176bdd04f9cb2c59db1fd99e5e57eb"
+            "bytes": 381148,
+            "sha256": "aaa1790fc989be5a867436d50a0801bb247c4acf5c57e24bc0d4515808769c54"
           },
           "mp4": {
             "path": "i2-movement/i2-movement.mp4",
             "codec": "h264",
-            "bytes": 177612,
-            "sha256": "6cd16bf9e4c14f31730d9797edce2045c446d0e1600188424f5e703b221d40ef"
+            "bytes": 349140,
+            "sha256": "ec3841e1868341f8f2f200c5abf0736b0cfabf441573097be85bd5ad9ecce32e"
           }
         }
       },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -9.4,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
+      },
       "marks": {
         "open-movement": 0.0,
-        "choose-mode": 2.233,
-        "amount": 4.533
+        "choose-mode": 2.267,
+        "amount": 4.567
       },
       "steps": {
         "open-movement": "i2-movement/steps/open-movement.webp",
@@ -3969,14 +4532,14 @@
       },
       "poster": {
         "path": "i2-movement/poster.webp",
-        "frame": 215,
-        "sha256": "269a353f4f0f5e35f038050a1e03083db9cef4ea2a5dfd373c898995af0b273d",
+        "frame": 229,
+        "sha256": "7306ab2bd61092d17d75ceb3ad7b5ca947cdd29f5b0722107d866211badb571c",
         "master": "learn/capture/out/i2-movement/poster.png"
       },
       "run": {
-        "wallSeconds": 64.226,
-        "meanFrameMs": 229.7,
-        "slowdown": 6.89,
+        "wallSeconds": 61.165,
+        "meanFrameMs": 220.8,
+        "slowdown": 6.62,
         "notesPlayed": 1
       },
       "validation": {
@@ -3998,7 +4561,7 @@
           {
             "check": "master frame count = frames.json",
             "passed": true,
-            "detail": "241 / 241"
+            "detail": "242 / 242"
           },
           {
             "check": "every editor size fits the canvas",
@@ -4016,6 +4579,31 @@
             "detail": ""
           },
           {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "8.067 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-33.5 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -9.4 dBTP"
+          },
+          {
             "check": "no blank frames",
             "passed": true,
             "detail": "0 blank"
@@ -4023,12 +4611,12 @@
           {
             "check": "no frozen run longer than 2.6 s",
             "passed": true,
-            "detail": "longest unchanged run 0.53 s"
+            "detail": "longest unchanged run 0.07 s"
           },
           {
             "check": "webm frames = master",
             "passed": true,
-            "detail": "241"
+            "detail": "242"
           },
           {
             "check": "webm size",
@@ -4038,7 +4626,7 @@
           {
             "check": "mp4 frames = master",
             "passed": true,
-            "detail": "241"
+            "detail": "242"
           },
           {
             "check": "mp4 size",
@@ -4048,7 +4636,7 @@
           {
             "check": "duration 6-15 s (one clip) or declared",
             "passed": true,
-            "detail": "8.03 s"
+            "detail": "8.07 s"
           },
           {
             "check": "poster not blank",
@@ -4069,7 +4657,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.i3-shaper",
       "title": "Use a SHAPER pattern",
-      "scenarioDigest": "sha256:437df472060a52e4725b3f510eca3f2ea7da2686615dac17144e9d1c866601f8",
+      "scenarioDigest": "sha256:ffa177157125452b40fce4e8817499da188833131c43cfcfaf233c7f744fba9f",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -4088,10 +4676,10 @@
       "targets": [],
       "fixtures": [
         {
-          "id": "tutorial:voice",
-          "file": "Tutorial Voice A3.wav",
-          "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-          "bytes": 1440104
+          "id": "gen:Saw C4.wav",
+          "file": "Saw C4.wav",
+          "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+          "bytes": 864044
         }
       ],
       "disclosures": [
@@ -4101,7 +4689,7 @@
         "width": 2896,
         "height": 2100,
         "fps": 30,
-        "frames": 310,
+        "frames": 311,
         "crop": [
           72,
           860,
@@ -4113,28 +4701,35 @@
         "width": 1600,
         "height": 1070,
         "fps": 30,
-        "frames": 310,
-        "duration": 10.333,
+        "frames": 311,
+        "duration": 10.367,
         "files": {
           "webm": {
             "path": "i3-shaper/i3-shaper.webm",
             "codec": "vp9",
-            "bytes": 346978,
-            "sha256": "8b466f3d9d5a700a22b4aa23d5b53322cff4bdc5db55bcda709ce0dd758e177a"
+            "bytes": 612337,
+            "sha256": "42e60798306d7d0af2319011c2a550f435e3528041f76e2d31b3de7b49763f83"
           },
           "mp4": {
             "path": "i3-shaper/i3-shaper.mp4",
             "codec": "h264",
-            "bytes": 414615,
-            "sha256": "9bfa8930285f85725c908f585d13c4e16557a67e069147666f88a3b3d05e4989"
+            "bytes": 640567,
+            "sha256": "6db544f57c8483414810327b071ff91ed5a95dbabdd25b4e849bde98c61ef0e5"
           }
         }
       },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -8.9,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
+      },
       "marks": {
         "open-movement": 0.0,
-        "shaper": 2.033,
-        "pattern": 4.333,
-        "depth": 6.633
+        "shaper": 2.067,
+        "pattern": 4.367,
+        "depth": 6.667
       },
       "steps": {
         "open-movement": "i3-shaper/steps/open-movement.webp",
@@ -4144,14 +4739,14 @@
       },
       "poster": {
         "path": "i3-shaper/poster.webp",
-        "frame": 288,
-        "sha256": "738167476f5d08b7eee759a802cbb5131c7fe1e40405dccf7e4aa4f2831c5cf0",
+        "frame": 301,
+        "sha256": "69809ad0c1244b3b72cf08217355e2a396edc4f3a6892a79980626a24185c872",
         "master": "learn/capture/out/i3-shaper/poster.png"
       },
       "run": {
-        "wallSeconds": 78.507,
-        "meanFrameMs": 221.8,
-        "slowdown": 6.65,
+        "wallSeconds": 78.45400000000001,
+        "meanFrameMs": 225.0,
+        "slowdown": 6.75,
         "notesPlayed": 1
       },
       "validation": {
@@ -4173,7 +4768,7 @@
           {
             "check": "master frame count = frames.json",
             "passed": true,
-            "detail": "310 / 310"
+            "detail": "311 / 311"
           },
           {
             "check": "every editor size fits the canvas",
@@ -4191,6 +4786,31 @@
             "detail": ""
           },
           {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "10.367 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-34.4 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -8.9 dBTP"
+          },
+          {
             "check": "no blank frames",
             "passed": true,
             "detail": "0 blank"
@@ -4203,7 +4823,7 @@
           {
             "check": "webm frames = master",
             "passed": true,
-            "detail": "310"
+            "detail": "311"
           },
           {
             "check": "webm size",
@@ -4213,7 +4833,7 @@
           {
             "check": "mp4 frames = master",
             "passed": true,
-            "detail": "310"
+            "detail": "311"
           },
           {
             "check": "mp4 size",
@@ -4223,7 +4843,7 @@
           {
             "check": "duration 6-15 s (one clip) or declared",
             "passed": true,
-            "detail": "10.33 s"
+            "detail": "10.37 s"
           },
           {
             "check": "poster not blank",
@@ -4244,7 +4864,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.i4-modulation",
       "title": "Make FILTER move with an LFO",
-      "scenarioDigest": "sha256:81340b94363c4c69e8fe4159f1ce993486e82cf78e7aff732cf06c3d6d41b516",
+      "scenarioDigest": "sha256:dcb723b5e57803fc2ad77d15cdc6e67f71e60072f33d2b1936f96f5898da75d9",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -4269,10 +4889,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "gen:Saw C4.wav",
+          "file": "Saw C4.wav",
+          "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+          "bytes": 864044
         }
       ],
       "disclosures": [
@@ -4300,16 +4920,23 @@
           "webm": {
             "path": "i4-modulation/i4-modulation.webm",
             "codec": "vp9",
-            "bytes": 596054,
-            "sha256": "dfdc571eb4e128e68251252d8eabf433dafc32ac3653366d02b870868405b9d0"
+            "bytes": 796178,
+            "sha256": "feae2977869ad8bc2fc876ed3093186fd1f3755f9af5d1cea2da01553c4ac5fb"
           },
           "mp4": {
             "path": "i4-modulation/i4-modulation.mp4",
             "codec": "h264",
-            "bytes": 547482,
-            "sha256": "57e69159c3f03b7565b2fd96b3a6320a704bff8f0482aa0285a4d06d851b1a2f"
+            "bytes": 744643,
+            "sha256": "02f4da36adadca685f350e6dc82ff273a469162ec87449546b79cc013b910c9b"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -9.5,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "lfo-tab": 0.0,
@@ -4324,13 +4951,13 @@
       "poster": {
         "path": "i4-modulation/poster.webp",
         "frame": 273,
-        "sha256": "88f8e693b153e8908f46cf70dfcdf5a1c0cddaec0cd6b87fed492d4ebf78477a",
+        "sha256": "3e8a8b22c8dd5e1fde706486cd5537e111d289beecae411ece9d1c04f4862b0c",
         "master": "learn/capture/out/i4-modulation/poster.png"
       },
       "run": {
-        "wallSeconds": 70.081,
-        "meanFrameMs": 218.8,
-        "slowdown": 6.56,
+        "wallSeconds": 71.023,
+        "meanFrameMs": 222.0,
+        "slowdown": 6.66,
         "notesPlayed": 1
       },
       "validation": {
@@ -4368,6 +4995,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "9.267 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-31.9 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -9.5 dBTP"
           },
           {
             "check": "no blank frames",
@@ -4423,7 +5075,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.i5-user-macro",
       "title": "Assign a USER macro",
-      "scenarioDigest": "sha256:4eb8fc9b69b8c391f90fd59912bbf9b1b75e09106bb1325ec581de2dced7984f",
+      "scenarioDigest": "sha256:0042cd95ca03c75541f314e57eae46c022f396a91b09359733c8470640237e9c",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -4448,10 +5100,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:pluck",
-          "file": "Tutorial Pluck A3.wav",
-          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-          "bytes": 230504
+          "id": "file:Prophet-6 Pad.aif",
+          "file": "Prophet-6 Pad.aif",
+          "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+          "bytes": 1772370
         }
       ],
       "disclosures": [
@@ -4479,16 +5131,23 @@
           "webm": {
             "path": "i5-user-macro/i5-user-macro.webm",
             "codec": "vp9",
-            "bytes": 416370,
-            "sha256": "e297513f4a3e0675bdf98dd614d37240fdd37f6b2b74f06fc6985f86df59e095"
+            "bytes": 563653,
+            "sha256": "2a65adb2e952b6de0dd8148187ec9a8c6d4050eb5934140168353f1147672829"
           },
           "mp4": {
             "path": "i5-user-macro/i5-user-macro.mp4",
             "codec": "h264",
-            "bytes": 424004,
-            "sha256": "5d42b749b1c0abd6f8b260bdcd8273a87507f5ab0c64341024c50b8328babadf"
+            "bytes": 604838,
+            "sha256": "01693c99497b1d20a76a13d292a9ccaeb3cd33e52ef2dd303a3a821741a73adb"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -10.4,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "user-bank": 0.0,
@@ -4504,14 +5163,14 @@
       },
       "poster": {
         "path": "i5-user-macro/poster.webp",
-        "frame": 306,
-        "sha256": "e78dd9ccf1f25978d8325f9a3f6f88743d6332f503fe61a35ac7b8e7732ea432",
+        "frame": 313,
+        "sha256": "6274868d2f2b3d9b293475d77219365b28381e6a8884d57fd4a5f379a64036e9",
         "master": "learn/capture/out/i5-user-macro/poster.png"
       },
       "run": {
-        "wallSeconds": 67.111,
-        "meanFrameMs": 181.0,
-        "slowdown": 5.43,
+        "wallSeconds": 77.214,
+        "meanFrameMs": 205.1,
+        "slowdown": 6.15,
         "notesPlayed": 1
       },
       "validation": {
@@ -4549,6 +5208,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "11.200 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-31.8 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -10.4 dBTP"
           },
           {
             "check": "no blank frames",
@@ -4604,7 +5288,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.i6-echo-space",
       "title": "Add ECHO and SPACE",
-      "scenarioDigest": "sha256:69328ad479dab64063a4ad3f8bcf97eeb83e2c473a16ebaea938015041d877d6",
+      "scenarioDigest": "sha256:e9fda09882a9a7984916cc0891350c52a5a4dd7dfbc6058381579f4026898d64",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -4628,10 +5312,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:pluck",
-          "file": "Tutorial Pluck A3.wav",
-          "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-          "bytes": 230504
+          "id": "gen:Pluck C4.wav",
+          "file": "Pluck C4.wav",
+          "sha256": "bd3442fca622cc1b17b2252b1d5229c5a2be79b901de039158b275fede7417dc",
+          "bytes": 172844
         }
       ],
       "disclosures": [],
@@ -4657,16 +5341,23 @@
           "webm": {
             "path": "i6-echo-space/i6-echo-space.webm",
             "codec": "vp9",
-            "bytes": 363802,
-            "sha256": "fe5050f350377ee884fe4a495677d34d8a54b44fdfdfecba240b390df5884216"
+            "bytes": 422683,
+            "sha256": "3bfdf5f9858bc6ed41a9b577f23ef5e10ad753abe9542ebd66f30991f2109ec0"
           },
           "mp4": {
             "path": "i6-echo-space/i6-echo-space.mp4",
             "codec": "h264",
-            "bytes": 369937,
-            "sha256": "c5dd7e9156777bacc6d3e62822d720746c9b28294e098e46537d304b6f1d6f51"
+            "bytes": 425493,
+            "sha256": "b6cda7811b454854b0b45c1f374a1577bc1be5b95cf53466efd00ea35e1ae85d"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.2,
+        "truePeak": -1.7,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "echo": 0.0,
@@ -4683,13 +5374,13 @@
       "poster": {
         "path": "i6-echo-space/poster.webp",
         "frame": 334,
-        "sha256": "5d98697382d1b15f9feb7955c99d12858ef0d75f42d7ee4e1be395aad2bc3c2e",
+        "sha256": "fde0a55ba786c16a15297e86161b5676d1b4519c7377fadc98eccb2a4c958205",
         "master": "learn/capture/out/i6-echo-space/poster.png"
       },
       "run": {
-        "wallSeconds": 73.666,
-        "meanFrameMs": 187.1,
-        "slowdown": 5.61,
+        "wallSeconds": 69.675,
+        "meanFrameMs": 176.8,
+        "slowdown": 5.3,
         "notesPlayed": 2
       },
       "validation": {
@@ -4729,6 +5420,31 @@
             "detail": ""
           },
           {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "12.133 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-41.8 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.2 LUFS, true peak -1.7 dBTP"
+          },
+          {
             "check": "no blank frames",
             "passed": true,
             "detail": "0 blank"
@@ -4736,7 +5452,7 @@
           {
             "check": "no frozen run longer than 2.6 s",
             "passed": true,
-            "detail": "longest unchanged run 0.97 s"
+            "detail": "longest unchanged run 1.33 s"
           },
           {
             "check": "webm frames = master",
@@ -4782,7 +5498,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.i7-filter",
       "title": "Shape the tone with FILTER",
-      "scenarioDigest": "sha256:65daba1be9e71f9a11952f5fed2e88f77a1c90bdb9165b65c7c83523148a935a",
+      "scenarioDigest": "sha256:24a1800cee0190da7c0bdd6ec54fb4177e324200338a3621810951112d801f97",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -4805,10 +5521,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "gen:Saw C4.wav",
+          "file": "Saw C4.wav",
+          "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+          "bytes": 864044
         }
       ],
       "disclosures": [
@@ -4836,16 +5552,23 @@
           "webm": {
             "path": "i7-filter/i7-filter.webm",
             "codec": "vp9",
-            "bytes": 627666,
-            "sha256": "539e6e846e5ba0fe875cb8290a987170eb319afb5a911c5373de45b0399d0d75"
+            "bytes": 897839,
+            "sha256": "9f5277bf883aacc300b168328521ccaeaaeafac5879be7f11105e44bf434aa2e"
           },
           "mp4": {
             "path": "i7-filter/i7-filter.mp4",
             "codec": "h264",
-            "bytes": 613219,
-            "sha256": "6c01b4281fc3faeaf51cbfd76ad91506afe901ec432a7226e3b4ef52dc4ecaa6"
+            "bytes": 968673,
+            "sha256": "69e45f46a918caed7418493fe0eb2b5617c4fd0ae8705c279d7255a85a8b3802"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -1.9,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "filter": 0.0,
@@ -4861,15 +5584,15 @@
       },
       "poster": {
         "path": "i7-filter/poster.webp",
-        "frame": 295,
-        "sha256": "4fd8203bc5e4e14489ddf4aebfe9ea8a350518028ea0715685452e0e05edbdcc",
+        "frame": 299,
+        "sha256": "54b33bd8a9ad05099826e2d7432e3d4aa19081fbd7b1c91815f163069e128df5",
         "master": "learn/capture/out/i7-filter/poster.png"
       },
       "run": {
-        "wallSeconds": 92.809,
-        "meanFrameMs": 254.0,
-        "slowdown": 7.62,
-        "notesPlayed": 2
+        "wallSeconds": 95.378,
+        "meanFrameMs": 259.6,
+        "slowdown": 7.79,
+        "notesPlayed": 4
       },
       "validation": {
         "status": "passed",
@@ -4906,6 +5629,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "10.833 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-27.9 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -1.9 dBTP"
           },
           {
             "check": "no blank frames",
@@ -4961,7 +5709,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.j1-vibrato",
       "title": "Add vibrato with the mod wheel",
-      "scenarioDigest": "sha256:b5ef5c1c37e8e3b4fc5e1328d9a17c74a5327f4f89d23a6b22bacc65b0f42822",
+      "scenarioDigest": "sha256:ef3cfbcb5be0da2a1de9bd1941a5f0e4f18cfa58b60dfb2f14636d1165f1be5f",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -4985,10 +5733,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "gen:Sine C4.wav",
+          "file": "Sine C4.wav",
+          "sha256": "94160af389d34f194a4a2edf870e95a36e8bb1f320ae05578b48844d3e3a27bd",
+          "bytes": 864044
         }
       ],
       "disclosures": [
@@ -5016,16 +5764,23 @@
           "webm": {
             "path": "j1-vibrato/j1-vibrato.webm",
             "codec": "vp9",
-            "bytes": 525200,
-            "sha256": "ba4e65612674c724c879fe428020a398041ec4430c0848403fac11df3dd3bca8"
+            "bytes": 566559,
+            "sha256": "cb16cff9892a919d8a4433ba14f9513bfd2239dfd2ce9a8116d48c30c13f17b7"
           },
           "mp4": {
             "path": "j1-vibrato/j1-vibrato.mp4",
             "codec": "h264",
-            "bytes": 511919,
-            "sha256": "e861739046e9a61f2e1374ede91995c2ecb00743281d174d033b80bab49d745c"
+            "bytes": 597615,
+            "sha256": "e271dd8e6b6ea8df71bf5fc2b5a48bd857f96a24c6f80b27cd0bbede3e02d7d3"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.0,
+        "truePeak": -14.0,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "open-mod": 0.0,
@@ -5039,14 +5794,14 @@
       },
       "poster": {
         "path": "j1-vibrato/poster.webp",
-        "frame": 284,
-        "sha256": "2875e6b5bb4068b46d9a858415511a58673d5dbba6e24f7d80fc9e21862f1326",
+        "frame": 265,
+        "sha256": "3aca808f7c52cdb2a407f71d2b8275e99d23d5aed926b8f813fcc0f7e0d0472f",
         "master": "learn/capture/out/j1-vibrato/poster.png"
       },
       "run": {
-        "wallSeconds": 60.278,
-        "meanFrameMs": 190.7,
-        "slowdown": 5.72,
+        "wallSeconds": 61.809000000000005,
+        "meanFrameMs": 196.8,
+        "slowdown": 5.9,
         "notesPlayed": 1
       },
       "validation": {
@@ -5084,6 +5839,31 @@
             "check": "encoder exit (libx264)",
             "passed": true,
             "detail": ""
+          },
+          {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "9.767 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-33.8 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.0 LUFS, true peak -14.0 dBTP"
           },
           {
             "check": "no blank frames",
@@ -5139,7 +5919,7 @@
       "kind": "andor.learn.assets.entry",
       "scenario": "osp.scene.j2-midi-learn",
       "title": "Control a knob from a MIDI controller",
-      "scenarioDigest": "sha256:14a5a7966121a44b81cfd4840e1d4b976563e36057515801b4fce5ae36004456",
+      "scenarioDigest": "sha256:662a9c13002935ebb9932e3a20d4d2eb3d8a43c74d6d1c5c5ff39325b0981b9c",
       "product": "osp",
       "productCommit": "6ef3376",
       "environment": {
@@ -5160,10 +5940,10 @@
       ],
       "fixtures": [
         {
-          "id": "tutorial:bowed",
-          "file": "Tutorial Bowed Note C3.wav",
-          "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-          "bytes": 648104
+          "id": "gen:Saw C4.wav",
+          "file": "Saw C4.wav",
+          "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+          "bytes": 864044
         }
       ],
       "disclosures": [
@@ -5192,16 +5972,23 @@
           "webm": {
             "path": "j2-midi-learn/j2-midi-learn.webm",
             "codec": "vp9",
-            "bytes": 403692,
-            "sha256": "a8e66ed8fe48369fdc8a1328d0de1d898745341f879330ace562e218c39a9167"
+            "bytes": 572131,
+            "sha256": "f13bb33e9555f0f644422e36ff619b2d3b46c6da849bb495c990eb0618b29ca3"
           },
           "mp4": {
             "path": "j2-midi-learn/j2-midi-learn.mp4",
             "codec": "h264",
-            "bytes": 318598,
-            "sha256": "754b00b45c7448fc397cd6b2a6d331cba967fc89f8a22ada8f41bf376e2c6ab2"
+            "bytes": 462060,
+            "sha256": "29eabcba719d623f111d55ec3b5b80cfd2cb92aaedfcf22d083f629768991ebf"
           }
         }
+      },
+      "audio": {
+        "source": "the instrument's output during the filmed frames",
+        "loudness": -16.1,
+        "truePeak": -6.5,
+        "webm": "opus 96k",
+        "mp4": "aac 128k"
       },
       "marks": {
         "right-click": 0.0,
@@ -5215,14 +6002,14 @@
       },
       "poster": {
         "path": "j2-midi-learn/poster.webp",
-        "frame": 213,
-        "sha256": "f35159a9244453b0b88e15b0223013cd8f633eca053a6f9fa19ddf288a8402a7",
+        "frame": 205,
+        "sha256": "4a322407b6a0e1775b7f6e2785a91878a1aa8a366c2f1a97d0676ebb5ee66f9b",
         "master": "learn/capture/out/j2-midi-learn/poster.png"
       },
       "run": {
-        "wallSeconds": 69.345,
-        "meanFrameMs": 269.3,
-        "slowdown": 8.08,
+        "wallSeconds": 69.479,
+        "meanFrameMs": 271.2,
+        "slowdown": 8.14,
         "notesPlayed": 1
       },
       "validation": {
@@ -5262,6 +6049,31 @@
             "detail": ""
           },
           {
+            "check": "audio length = video length",
+            "passed": true,
+            "detail": "7.833 s"
+          },
+          {
+            "check": "audio is not silent",
+            "passed": true,
+            "detail": "-32.0 LUFS before levelling"
+          },
+          {
+            "check": "soundtrack muxed (webm)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "soundtrack muxed (mp4)",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+            "passed": true,
+            "detail": "-16.1 LUFS, true peak -6.5 dBTP"
+          },
+          {
             "check": "no blank frames",
             "passed": true,
             "detail": "0 blank"
@@ -5269,7 +6081,7 @@
           {
             "check": "no frozen run longer than 2.5 s",
             "passed": true,
-            "detail": "longest unchanged run 0.03 s"
+            "detail": "longest unchanged run 0.07 s"
           },
           {
             "check": "webm frames = master",

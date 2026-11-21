@@ -57,16 +57,23 @@
       "webm": {
         "path": "c1-record-input/c1-record-input.webm",
         "codec": "vp9",
-        "bytes": 426832,
-        "sha256": "43a5f7c1b3814ed6591be4001f90b4a890229edeb8ba87871e559ff314318f8f"
+        "bytes": 505207,
+        "sha256": "f1ec6737e6d22777e23d14f01d3efaa9f28239ca7f7dc0b034491a5e49d401e4"
       },
       "mp4": {
         "path": "c1-record-input/c1-record-input.mp4",
         "codec": "h264",
-        "bytes": 509586,
-        "sha256": "2a95b07d4f54b579f87a3a3f78a75036d55552be74a1a46f8facf6c3dc170204"
+        "bytes": 604472,
+        "sha256": "17e9b3520b59eaca244befbc474c6aa4ff589acced96dd270451e2e56d6acfd6"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.0,
+    "truePeak": -8.9,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "open-record": 0.0,
@@ -82,14 +89,14 @@
   },
   "poster": {
     "path": "c1-record-input/poster.webp",
-    "frame": 497,
-    "sha256": "0b7e02335939e327b689de82bfceb699f8aa42280ec35b0a14caf2844639979c",
+    "frame": 471,
+    "sha256": "f739a900a8e082cd3be05f9e0ddf2480b402503625f3bb8ad93e84b0698fa6eb",
     "master": "learn/capture/out/c1-record-input/poster.png"
   },
   "run": {
-    "wallSeconds": 84.75,
-    "meanFrameMs": 158.0,
-    "slowdown": 4.74,
+    "wallSeconds": 80.95100000000001,
+    "meanFrameMs": 150.6,
+    "slowdown": 4.52,
     "notesPlayed": 4
   },
   "validation": {
@@ -127,6 +134,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "16.633 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-33.8 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.0 LUFS, true peak -8.9 dBTP"
       },
       {
         "check": "no blank frames",

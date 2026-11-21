@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.i3-shaper",
   "title": "Use a SHAPER pattern",
-  "scenarioDigest": "sha256:437df472060a52e4725b3f510eca3f2ea7da2686615dac17144e9d1c866601f8",
+  "scenarioDigest": "sha256:ffa177157125452b40fce4e8817499da188833131c43cfcfaf233c7f744fba9f",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -22,10 +22,10 @@
   "targets": [],
   "fixtures": [
     {
-      "id": "tutorial:voice",
-      "file": "Tutorial Voice A3.wav",
-      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-      "bytes": 1440104
+      "id": "gen:Saw C4.wav",
+      "file": "Saw C4.wav",
+      "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+      "bytes": 864044
     }
   ],
   "disclosures": [
@@ -35,7 +35,7 @@
     "width": 2896,
     "height": 2100,
     "fps": 30,
-    "frames": 310,
+    "frames": 311,
     "crop": [
       72,
       860,
@@ -47,28 +47,35 @@
     "width": 1600,
     "height": 1070,
     "fps": 30,
-    "frames": 310,
-    "duration": 10.333,
+    "frames": 311,
+    "duration": 10.367,
     "files": {
       "webm": {
         "path": "i3-shaper/i3-shaper.webm",
         "codec": "vp9",
-        "bytes": 346978,
-        "sha256": "8b466f3d9d5a700a22b4aa23d5b53322cff4bdc5db55bcda709ce0dd758e177a"
+        "bytes": 612337,
+        "sha256": "42e60798306d7d0af2319011c2a550f435e3528041f76e2d31b3de7b49763f83"
       },
       "mp4": {
         "path": "i3-shaper/i3-shaper.mp4",
         "codec": "h264",
-        "bytes": 414615,
-        "sha256": "9bfa8930285f85725c908f585d13c4e16557a67e069147666f88a3b3d05e4989"
+        "bytes": 640567,
+        "sha256": "6db544f57c8483414810327b071ff91ed5a95dbabdd25b4e849bde98c61ef0e5"
       }
     }
   },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -8.9,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
+  },
   "marks": {
     "open-movement": 0.0,
-    "shaper": 2.033,
-    "pattern": 4.333,
-    "depth": 6.633
+    "shaper": 2.067,
+    "pattern": 4.367,
+    "depth": 6.667
   },
   "steps": {
     "open-movement": "i3-shaper/steps/open-movement.webp",
@@ -78,14 +85,14 @@
   },
   "poster": {
     "path": "i3-shaper/poster.webp",
-    "frame": 288,
-    "sha256": "738167476f5d08b7eee759a802cbb5131c7fe1e40405dccf7e4aa4f2831c5cf0",
+    "frame": 301,
+    "sha256": "69809ad0c1244b3b72cf08217355e2a396edc4f3a6892a79980626a24185c872",
     "master": "learn/capture/out/i3-shaper/poster.png"
   },
   "run": {
-    "wallSeconds": 78.507,
-    "meanFrameMs": 221.8,
-    "slowdown": 6.65,
+    "wallSeconds": 78.45400000000001,
+    "meanFrameMs": 225.0,
+    "slowdown": 6.75,
     "notesPlayed": 1
   },
   "validation": {
@@ -107,7 +114,7 @@
       {
         "check": "master frame count = frames.json",
         "passed": true,
-        "detail": "310 / 310"
+        "detail": "311 / 311"
       },
       {
         "check": "every editor size fits the canvas",
@@ -125,6 +132,31 @@
         "detail": ""
       },
       {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "10.367 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-34.4 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -8.9 dBTP"
+      },
+      {
         "check": "no blank frames",
         "passed": true,
         "detail": "0 blank"
@@ -137,7 +169,7 @@
       {
         "check": "webm frames = master",
         "passed": true,
-        "detail": "310"
+        "detail": "311"
       },
       {
         "check": "webm size",
@@ -147,7 +179,7 @@
       {
         "check": "mp4 frames = master",
         "passed": true,
-        "detail": "310"
+        "detail": "311"
       },
       {
         "check": "mp4 size",
@@ -157,7 +189,7 @@
       {
         "check": "duration 6-15 s (one clip) or declared",
         "passed": true,
-        "detail": "10.33 s"
+        "detail": "10.37 s"
       },
       {
         "check": "poster not blank",

@@ -3,7 +3,7 @@
   "kind": "andor.learn.assets.entry",
   "scenario": "osp.scene.d3-satellite",
   "title": "Move each layer in the stereo field",
-  "scenarioDigest": "sha256:d9a8e2b3ae962860cb5dea488bdf40aeeaf4013d46d9fdefa22f064d52fb1c1c",
+  "scenarioDigest": "sha256:f39d0078f3b0bbadb5102fe9cddd1ebfebe752d88bcec98de20efea7c3b7296e",
   "product": "osp",
   "productCommit": "6ef3376",
   "environment": {
@@ -24,26 +24,26 @@
   ],
   "fixtures": [
     {
-      "id": "tutorial:bowed",
-      "file": "Tutorial Bowed Note C3.wav",
-      "sha256": "8f857b2573da357c3c3830aa3d8c9e04251cd1932421a144eb956e16032126d1",
-      "bytes": 648104
+      "id": "gen:Saw C4.wav",
+      "file": "Saw C4.wav",
+      "sha256": "070fdf19ef6721abf7a25525598f5b9dafe9b0c16739856e6e808e0c2ddf7cb6",
+      "bytes": 864044
     },
     {
-      "id": "tutorial:voice",
-      "file": "Tutorial Voice A3.wav",
-      "sha256": "6dcbb65d5144dedc9e93eec311d5073b78c5275888b20b6a00f4979c219dc4b5",
-      "bytes": 1440104
+      "id": "gen:Sine C4.wav",
+      "file": "Sine C4.wav",
+      "sha256": "94160af389d34f194a4a2edf870e95a36e8bb1f320ae05578b48844d3e3a27bd",
+      "bytes": 864044
     },
     {
-      "id": "tutorial:pluck",
-      "file": "Tutorial Pluck A3.wav",
-      "sha256": "15df7b312f57617d006932838e83d7694ad87ca733c5ad99b947e2b76e61d8cb",
-      "bytes": 230504
+      "id": "file:Prophet-6 Pad.aif",
+      "file": "Prophet-6 Pad.aif",
+      "sha256": "20c1a3fe17a8a0418e6fff7aabfcbb391f5c4d3906ee03aa971cd118c36a0294",
+      "bytes": 1772370
     }
   ],
   "disclosures": [
-    "The held chord (C3 G3 C4 E4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
+    "The held chord (Cmaj7: C4 E4 G4 B4) is sent as MIDI by the runner, as a keyboard would; the on-screen keys light as they do for a MIDI keyboard."
   ],
   "source": {
     "width": 2896,
@@ -67,16 +67,23 @@
       "webm": {
         "path": "d3-satellite/d3-satellite.webm",
         "codec": "vp9",
-        "bytes": 1180929,
-        "sha256": "58e3c40e4a223d89fc3888642bfda6987c99fbb80b63669a14a13facae901a3f"
+        "bytes": 1626861,
+        "sha256": "6f11a118a4b5de02d9af2f2fab3c953eeeef7920f4127c5f97a37abfff869c02"
       },
       "mp4": {
         "path": "d3-satellite/d3-satellite.mp4",
         "codec": "h264",
-        "bytes": 1072456,
-        "sha256": "4d40ccda0e942c3476db3ce13a26d97979576ed36052d9c0d653c16d6dc68181"
+        "bytes": 1570730,
+        "sha256": "f0684be0f2ba21b5d02cca674d8a12803fe3f17cb143184fbc0140ccb0ca36a0"
       }
     }
+  },
+  "audio": {
+    "source": "the instrument's output during the filmed frames",
+    "loudness": -16.1,
+    "truePeak": -4.8,
+    "webm": "opus 96k",
+    "mp4": "aac 128k"
   },
   "marks": {
     "open-satellite": 0.0,
@@ -92,14 +99,14 @@
   },
   "poster": {
     "path": "d3-satellite/poster.webp",
-    "frame": 363,
-    "sha256": "58513ad2db094c90efc639ccc4c3b8de7274ad22a550ee618bb4af56bdb63619",
+    "frame": 370,
+    "sha256": "0f6c769237c085b5f856d41c15c5136acac57d2dfa44d906c9044b521bbb21c6",
     "master": "learn/capture/out/d3-satellite/poster.png"
   },
   "run": {
-    "wallSeconds": 94.48400000000001,
-    "meanFrameMs": 221.7,
-    "slowdown": 6.65,
+    "wallSeconds": 103.035,
+    "meanFrameMs": 243.0,
+    "slowdown": 7.29,
     "notesPlayed": 4
   },
   "validation": {
@@ -137,6 +144,31 @@
         "check": "encoder exit (libx264)",
         "passed": true,
         "detail": ""
+      },
+      {
+        "check": "audio length = video length",
+        "passed": true,
+        "detail": "12.867 s"
+      },
+      {
+        "check": "audio is not silent",
+        "passed": true,
+        "detail": "-26.6 LUFS before levelling"
+      },
+      {
+        "check": "soundtrack muxed (webm)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "soundtrack muxed (mp4)",
+        "passed": true,
+        "detail": ""
+      },
+      {
+        "check": "audio levelled to -16.0 LUFS (\u00b11.5)",
+        "passed": true,
+        "detail": "-16.1 LUFS, true peak -4.8 dBTP"
       },
       {
         "check": "no blank frames",
