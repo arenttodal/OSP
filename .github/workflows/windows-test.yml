@@ -26,8 +26,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash packaging/factory-packs/fetch.sh
 
+      - name: SQLite (vcpkg, static: the plug-in carries no extra DLL)
+        run: |
+          "$(cygpath -u "$VCPKG_INSTALLATION_ROOT")/vcpkg.exe" install sqlite3:x64-windows-static-md
+
       - name: Configure
-        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DOSP_BUILD_PLUGIN=ON
+        run: |
+          vcpkg_root=$(cygpath -m "$VCPKG_INSTALLATION_ROOT")
+          cmake -B build -G "Visual Studio 17 2022" -A x64 -DOSP_BUILD_PLUGIN=ON \
+            "-DCMAKE_TOOLCHAIN_FILE=$vcpkg_root/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
 
       - name: Build
         run: cmake --build build --config Release --parallel
