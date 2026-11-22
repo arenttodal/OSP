@@ -19,6 +19,7 @@
 #include "ShapingPopups.h"
 #include "LearnController.h"
 #include "UserMacroController.h"
+#include "PerformanceComponents.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -148,7 +149,17 @@ public:
     void setArpExpanded (bool open);
     bool isArpExpanded() const noexcept { return arpShown; }
     /** The instrument's height in reference pixels (taller while the arpeggiator's editor shows). */
-    float instrumentHeight() const noexcept { return frame::instrumentHeight (arpShown, rackShift(), sourceTrim()); }
+    float instrumentHeight() const noexcept { return frame::instrumentHeight (arpShown && ! performanceOn, performanceOn ? 0.0f : rackShift(), sourceTrim()); }
+    /** PERFORMANCE MODE R1 (shared with the shell): the sources' pictures, the chosen macros and
+        the keyboard; every editing area hidden, never changed (on return each is as it was). A
+        view only: the sound and the parameters never change. */
+    void setPerformance (bool on);
+    bool performanceShown() const noexcept { return performanceOn; }
+    performance::ModeKey& performanceKey() noexcept { return modeKey; }
+    performance::MacroFlap& performanceFlap() noexcept { return macroFlap; }
+    juce::StringArray performanceMacrosShown() const { return shownPerformanceMacros; }
+    void togglePerformancePicker();
+    performance::MacroPicker* performancePicker() const noexcept;
     /** LINK / REVERSE / LOOP / FOLLOW sit in each card's display (as ANDOR ANALOG's): with three
         cards the row they had under the knobs is gone, the cards that much shorter and
         everything under them that much higher (EngineCard::footTrim); with one or two they had
@@ -315,6 +326,16 @@ private:
         return createRackModule (kind, ospProcessor);
     } };
     RoutingKey routingKey;
+    performance::ModeKey modeKey;
+    performance::MacroFlap macroFlap;
+    bool performanceOn = false;
+    juce::StringArray shownPerformanceMacros;
+    /** Edit Mode's visibility of what Performance hides, restored on return. */
+    std::vector<std::pair<juce::Component::SafePointer<juce::Component>, bool>> editVisibility;
+    performance::Catalog performanceCatalog() const;
+    performance::AssignedFn performanceAssigned() const;
+    std::vector<std::pair<const frame::MacroKnob*, int>> performanceKnobs() const;
+    void layoutPerformance();
     std::unique_ptr<juce::Component> routingView;
     bool routingOpen = false;
     float rackShift() const noexcept { return racks.height() > 0.0f ? racks.height() + design::layout::rackGap : 0.0f; }

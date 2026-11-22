@@ -91,6 +91,14 @@ public:
     int chosen() const noexcept { return chosenMacro; }
     /** A control's right-click menu: Assign to Macro, and its assignments' range and removal. */
     void addMenuItems (juce::PopupMenu& menu, const juce::String& parameterId);
+    /** Whether USER macro `macro` controls something now (Performance Mode shows only those). */
+    bool isAssigned (int macro) const { return hooks.activeCount != nullptr && hooks.activeCount (host, macro) > 0; }
+    /** USER macro `macro`'s display name (its default "MACRO N" when unnamed). */
+    juce::String displayName (int macro) const
+    {
+        auto n = hooks.name != nullptr ? hooks.name (host, macro) : juce::String();
+        return n.isNotEmpty() ? n : "MACRO " + juce::String (macro + 1);
+    }
     juce::String menuName (int macro) const;
     juce::String title (int macro) const;
     juce::Colour colour (int macro) const;

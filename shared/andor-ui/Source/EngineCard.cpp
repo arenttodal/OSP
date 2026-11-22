@@ -804,7 +804,7 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
             const bool major = std::abs (std::fmod (t + 1.0e-9, step)) < 1.0e-6;
             g.setColour (colour::wellGrid.withAlpha (major ? 0.95f : 0.45f));
             g.fillRect (juce::Rectangle<float> (x, inner.getY(), 1.0f, inner.getHeight()));
-            if (major && labelFits && getWidth() > 240)
+            if (major && labelFits && getWidth() > 240 && ! pictureOnly)
             {
                 g.setColour (colour::wellText);
                 g.drawText (secondsText (t, step), juce::Rectangle<float> (x - 40.0f, bounds.getY() + 5.0f, 80.0f, 18.0f), juce::Justification::centred, false);
@@ -992,7 +992,7 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     }
 
     // The loop region (One Shot + LOOP): a slim bracket along the bottom.
-    if (! view.granular && view.loop && instrument->model != nullptr && instrument->model->original.continuation.canSustain
+    if (! view.granular && ! pictureOnly && view.loop && instrument->model != nullptr && instrument->model->original.continuation.canSustain
         && instrument->model->original.source != nullptr)
     {
         const auto& cont = instrument->model->original.continuation;
@@ -1006,7 +1006,7 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     }
 
     // START: a fine accent line from a small flag at the top to a dot at the foot.
-    if (! view.granular)
+    if (! view.granular && ! pictureOnly)
     {
         const float x = std::clamp (xAtSeconds (startSeconds(), plot), plot.getX(), plot.getRight());
         g.setColour (juce::Colour (0x8c000000));
@@ -3145,6 +3145,7 @@ void EngineCard::setPerformance (bool on)
             if (child != &sourceDisplay)
                 editVisibility.emplace_back (child, child->isVisible());
         sourceDisplay.getInterceptsMouseClicks (editDisplayClicks, editDisplayChildClicks);
+        sourceDisplay.setPictureOnly (true);
         performance = true;
         hideForPerformance();
         sourceDisplay.setInterceptsMouseClicks (false, false);
@@ -3158,6 +3159,7 @@ void EngineCard::setPerformance (bool on)
                 child->setVisible (visible);
         editVisibility.clear();
         sourceDisplay.setInterceptsMouseClicks (editDisplayClicks, editDisplayChildClicks);
+        sourceDisplay.setPictureOnly (false);
         setInterceptsMouseClicks (true, true);
     }
     resized();

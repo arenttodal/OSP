@@ -80,6 +80,8 @@ public:
     void setBottomInset (int pixels);
     /** The ruler's labels keep clear of this many pixels at the top-right (a control sits there). */
     void setRulerReserve (int pixels);
+    /** Performance Mode: the picture alone - no time labels, START marker or loop bracket. */
+    void setPictureOnly (bool only) { if (pictureOnly != only) { pictureOnly = only; cacheDirty = true; repaint(); } }
     /** ... and of this many at the top-left (the modifiers' row in the well). */
     void setRulerLeftReserve (int pixels);
     /** A short display: the granular strip floats over the waveform on a translucent band of this height. */
@@ -139,6 +141,7 @@ private:
     std::vector<Dot> grains, heads;
     juce::String dropLabel;
     int bottomInset = 0, overlayBand = 0, rulerReserve = 0, rulerLeftReserve = 0;
+    bool pictureOnly = false;
     juce::Image cache;
     bool cacheDirty = true;
     juce::Image backdrop;

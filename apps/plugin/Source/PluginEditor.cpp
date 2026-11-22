@@ -491,6 +491,11 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     routingKey.setClickingTogglesState (false);
     routingKey.onClick = [this] { setSourceViewShown (! routingOpen); };
     content.addAndMakeVisible (routingKey);
+    // PERFORMANCE MODE: its key after FX ROUTING; the macro housing's flap (shown while performing).
+    modeKey.onClick = [this] { setPerformance (! performanceOn); };
+    content.addAndMakeVisible (modeKey);
+    macroFlap.onClick = [this] { togglePerformancePicker(); };
+    content.addChildComponent (macroFlap);
     addAndMakeVisible (content);
     overflow.onScroll = [this] { resized(); };
     layoutInstrument();
@@ -505,6 +510,9 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
         openPopup (advancedPopup);
     createLearn();   // (nothing is shown until the musician asks)
     timerCallback();
+    // The view this instance was left in (its session, else this computer's last choice).
+    if (ospProcessor.performanceView().performance)
+        setPerformance (true);
     startTimerHz (30);   // grains and read heads move at the display rate
 }
 
@@ -912,8 +920,8 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
         return;
     }
     if (routingView != nullptr)
-        routingView->setVisible (routingOpen);
-    if (routingOpen && routingView != nullptr)
+        routingView->setVisible (routingOpen && ! performanceOn);
+    if (routingOpen && ! performanceOn && routingView != nullptr)
     {
         // The routing view in the cards' place (the sound is the same either way).
         for (auto& card : cards)
@@ -930,7 +938,9 @@ void OspAudioProcessorEditor::layoutSources (bool animate)
     const int slots = ospProcessor.slotCount();
     for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
     {
-        occupied[static_cast<std::size_t> (l)] = l < slots;
+        // (Performance: only the layers that play - an empty slot kept for a new sound is an
+        // editing invitation, no column)
+        occupied[static_cast<std::size_t> (l)] = l < slots && (! performanceOn || ospProcessor.isLayerOccupied (l));
         count += occupied[static_cast<std::size_t> (l)] ? 1 : 0;
     }
     const bool countChanged = count != shownCount;
@@ -1712,6 +1722,12 @@ void OspAudioProcessorEditor::paintInstrument (juce::Graphics& g)
     // (The housing keeps its height; what the arpeggiator and the racks add is room under it, as
     // the shell's editor draws it.)
     // (the macros shown: CORE's or the USER bank's - their lights follow the knobs on screen)
+    if (performanceOn)
+    {
+        const auto shown = performanceKnobs();
+        frame::paint (g, content, frame::Identity {}, false, macros, 0.0f, sourceTrim(), design::height - sourceTrim(), &shown);
+        return;
+    }
     const auto& shownRow = userMacroController != nullptr ? userMacroController->paintedRow() : macros;
     frame::paint (g, content, frame::Identity {}, arpShown, shownRow, rackShift(), sourceTrim(), design::height - sourceTrim());
 }
@@ -1926,10 +1942,13 @@ void OspAudioProcessorEditor::layoutInstrument()
     parts.arpControl = &arpButton;
     parts.utilityActions = &utilityKeys;
     parts.headerMix = &headerMix;
-    parts.rack = &racks;
-    parts.rackShift = rackShift();
+    if (! performanceOn)   // (Performance: the racks hidden, nothing pushed down)
+    {
+        parts.rack = &racks;
+        parts.rackShift = rackShift();
+    }
     parts.sourceTrim = sourceTrim();
-    frame::place (parts, arpShown);
+    frame::place (parts, arpShown && ! performanceOn);
     if (userMacroController != nullptr)
         userMacroController->place();   // (USER in CORE's places, the tabs on the panel's edge)
     {
@@ -1937,14 +1956,19 @@ void OspAudioProcessorEditor::layoutInstrument()
         // group of keys); MIX moved right by as much, narrower by as much (it centres itself).
         const auto save = savePresetButton.getBounds();
         routingKey.setBounds (save.withX (save.getRight() + 8));
+        // The Edit / Performance key: the group's last key (Performance: FX ROUTING hidden, the
+        // pencil right after SAVE - no gap); MIX after it.
+        modeKey.setBounds ((performanceOn ? save : routingKey.getBounds()).translated (save.getWidth() + 8, 0));
         const auto mix = headerMix.getBounds();
-        if (const int shift = routingKey.getRight() + 15 - mix.getX(); shift > 0)
+        if (const int shift = modeKey.getRight() + 15 - mix.getX(); shift > 0)
             headerMix.setBounds (mix.withTrimmedLeft (shift));
     }
 
     modOverlay.setBounds (content.getLocalBounds());
     sourceArea = frame::sourceArea (sourceTrim());
     layoutSources (false);
+    if (performanceOn)
+        layoutPerformance();
 }
 
 void OspAudioProcessorEditor::updateStatus()
@@ -2133,6 +2157,183 @@ void OspAudioProcessorEditor::timerCallback()
         wheelInUse = wheelInUse || (route.route.source == mod::Source::modWheel && route.state == mod::RouteState::active);
     modWheel.setInUse (wheelInUse);
     tickLearn();
+    if (performanceOn)
+    {
+        // A lesson shows the editing controls: Learn always runs in Edit Mode.
+        if (learn != nullptr && learn->isActive())
+            setPerformance (false);
+        // A USER macro assigned or cleared: the strip follows (never an inert knob).
+        else if (performance::visible (ospProcessor.performanceView(), performanceCatalog(), performanceAssigned()) != shownPerformanceMacros)
+        {
+            layoutPerformance();
+            content.repaint();
+        }
+    }
+}
+
+//==============================================================================
+// PERFORMANCE MODE R1 (the shell's, with OSP's own parts)
+
+performance::Catalog OspAudioProcessorEditor::performanceCatalog() const
+{
+    performance::Catalog c;
+    std::array<int, frame::macroCount> column {};
+    for (int i = 0; i < frame::macroCount; ++i)
+        column[static_cast<std::size_t> (i)] = i;
+    std::sort (column.begin(), column.end(), [] (int a, int b) { return frame::macroCentreX (a) < frame::macroCentreX (b); });
+    const auto specs = frame::ospMacroSpecs();
+    for (const int i : column)
+        c.core.add (specs[static_cast<std::size_t> (i)].parameterId);
+    c.userSlots = userMacroController != nullptr ? frame::macroCount : 0;
+    return c;
+}
+
+performance::AssignedFn OspAudioProcessorEditor::performanceAssigned() const
+{
+    auto* controller = userMacroController.get();
+    return [controller] (int slot) { return controller != nullptr && controller->isAssigned (slot); };
+}
+
+std::vector<std::pair<const frame::MacroKnob*, int>> OspAudioProcessorEditor::performanceKnobs() const
+{
+    std::vector<std::pair<const frame::MacroKnob*, int>> out;
+    const auto specs = frame::ospMacroSpecs();
+    for (const auto& id : shownPerformanceMacros)
+    {
+        if (const int slot = performance::userSlotOf (id); slot >= 0)
+        {
+            if (userMacroController != nullptr && slot < frame::macroCount)
+                out.emplace_back (&userMacroController->row()[static_cast<std::size_t> (slot)], slot);
+            continue;
+        }
+        for (std::size_t i = 0; i < specs.size(); ++i)
+            if (specs[i].parameterId == id)
+                out.emplace_back (&macros[i], static_cast<int> (i));
+    }
+    return out;
+}
+
+void OspAudioProcessorEditor::setPerformance (bool on)
+{
+    if (on == performanceOn)
+        return;
+    if (on)
+    {
+        // Transient tools close safely (nothing is changed or lost); what Performance hides keeps
+        // its Edit Mode visibility, restored on return.
+        closePopup();
+        closeAnchoredPopover();
+        if (userMacroController != nullptr)
+            userMacroController->cancelAssign();
+        editVisibility.clear();
+        auto keep = [this] (juce::Component* c) {
+            if (c != nullptr)
+                editVisibility.emplace_back (c, c->isVisible());
+        };
+        for (juce::Component* c : { static_cast<juce::Component*> (&modPanel), static_cast<juce::Component*> (&arpButton), static_cast<juce::Component*> (&arpPanel),
+                                    static_cast<juce::Component*> (&racks), static_cast<juce::Component*> (&utilityKeys), static_cast<juce::Component*> (&routingKey),
+                                    static_cast<juce::Component*> (&headerMix) })
+            keep (c);
+        for (auto& m : macros)
+        {
+            keep (&m.slider);
+            keep (m.label.get());
+        }
+        if (userMacroController != nullptr)
+        {
+            keep (userMacroController->tab());
+            for (int i = 0; i < frame::macroCount; ++i)
+            {
+                keep (&userMacroController->row()[static_cast<std::size_t> (i)].slider);
+                keep (userMacroController->row()[static_cast<std::size_t> (i)].label.get());
+                keep (userMacroController->lens (i));
+            }
+        }
+    }
+    performanceOn = on;
+    modeKey.setPerformance (on);
+    for (auto& card : cards)
+        card->setPerformance (on);
+    if (! on)
+    {
+        for (auto& [c, visible] : editVisibility)
+            if (c != nullptr)
+                c->setVisible (visible);
+        editVisibility.clear();
+        macroFlap.setVisible (false);
+        shownPerformanceMacros.clear();
+    }
+    shownCount = -1;
+    layoutInstrument();
+    applyWindowShape (true);
+    positionPopup();
+    content.repaint();
+    // This instance keeps it (its session), and this computer remembers it.
+    auto view = ospProcessor.performanceView();
+    view.performance = on;
+    ospProcessor.setPerformanceView (view);
+}
+
+void OspAudioProcessorEditor::layoutPerformance()
+{
+    for (auto& [c, visible] : editVisibility)
+        if (c != nullptr)
+            c->setVisible (false);
+    // The strip: the chosen macros (core and USER mixed, in the musician's order) across the panel.
+    shownPerformanceMacros = performance::visible (ospProcessor.performanceView(), performanceCatalog(), performanceAssigned());
+    const auto places = frame::performanceMacroPlaces (shownPerformanceMacros.size(), sourceTrim());
+    const auto knobs = performanceKnobs();
+    for (std::size_t k = 0; k < knobs.size() && k < places.size(); ++k)
+    {
+        auto& m = const_cast<frame::MacroKnob&> (*knobs[k].first);
+        if (m.label != nullptr)
+        {
+            m.label->setBounds (places[k].first);
+            m.label->setVisible (true);
+        }
+        m.slider.setBounds (places[k].second);
+        m.slider.setVisible (true);
+    }
+    // The flap on the housing's top edge, upper right (inside the panel: nothing moves for it).
+    const auto panel = design::layout::macroPanel.translated (0.0f, -sourceTrim());
+    macroFlap.setBounds (juce::Rectangle<float> (panel.getRight() - 24.0f - 46.0f, panel.getY(), 46.0f, 24.0f).toNearestInt());
+    macroFlap.setVisible (true);
+    macroFlap.toFront (false);
+}
+
+performance::MacroPicker* OspAudioProcessorEditor::performancePicker() const noexcept
+{
+    return popupIndex == anchoredPopup ? dynamic_cast<performance::MacroPicker*> (popup.get()) : nullptr;
+}
+
+void OspAudioProcessorEditor::togglePerformancePicker()
+{
+    if (anchoredPopoverOpenFrom (macroFlap))
+    {
+        closeAnchoredPopover();
+        return;
+    }
+    const auto catalog = performanceCatalog();
+    const auto assigned = performanceAssigned();
+    const auto specs = frame::ospMacroSpecs();
+    std::vector<performance::PickerEntry> entries;
+    for (const auto& id : catalog.core)
+        for (const auto& spec : specs)
+            if (spec.parameterId == id)
+                entries.push_back ({ id, spec.name, false, true });
+    for (int slot = 0; slot < catalog.userSlots; ++slot)
+        entries.push_back ({ performance::userId (slot), userMacroController->displayName (slot), true, assigned (slot) });
+    const auto view = ospProcessor.performanceView();
+    auto picker = std::make_unique<performance::MacroPicker> (entries, performance::selection (view, catalog, assigned), performance::defaultSelection (catalog, assigned));
+    picker->onChange = [this] (const juce::StringArray& chosen, bool reset) {
+        auto v = ospProcessor.performanceView();
+        v.customised = ! reset;
+        v.macros = reset ? juce::StringArray() : chosen;
+        ospProcessor.setPerformanceView (v);
+        layoutPerformance();
+        content.repaint();
+    };
+    openAnchoredPopover (std::move (picker), macroFlap);
 }
 
 } // namespace osp::plugin

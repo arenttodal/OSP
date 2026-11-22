@@ -604,7 +604,9 @@ void ShellEditor::layoutInstrument()
         const int step = last.getWidth() + gap;
         if (shell.showsSourceView() && ! shell.headerMixShown())
         {
-            modeKey.setBounds (last);
+            // (Performance: FX ROUTING is hidden - the pencil takes its place, right after SAVE,
+            // so the keys stay one group with no gap)
+            modeKey.setBounds (performanceOn ? last.translated (-step, 0) : last);
             sourceViewButton.setBounds (last.translated (-step, 0));
             savePresetButton.setBounds (savePresetButton.getBounds().translated (-step, 0));
             presetBar.setBounds (presetBar.getBounds().withRight (savePresetButton.getX() - gap));
@@ -3045,12 +3047,16 @@ void ShellEditor::setPerformance (bool on)
             showMacroBank (bankShown);
         }
         else
+        {
             for (auto& m : macros)
             {
                 m.slider.setVisible (true);
                 if (m.label != nullptr)
                     m.label->setVisible (true);
             }
+            for (auto& [macro, lamp] : macroLamps)
+                lamp->setVisible (true);
+        }
         shownPerformanceMacros.clear();
     }
     shownCount = -1;
@@ -3117,10 +3123,9 @@ void ShellEditor::layoutPerformance()
     macroFlap.setBounds (juce::Rectangle<float> (panel.getRight() - 24.0f - 46.0f, panel.getY(), 46.0f, 24.0f).toNearestInt());
     macroFlap.setVisible (true);
     macroFlap.toFront (false);
-    placeMacroLamps();   // (MORPH's lamp follows its name, shown with it)
+    // MORPH's lamp (an editing switch): hidden while performing (the bank's own rule brings it back).
     for (auto& [macro, lamp] : macroLamps)
-        if (auto* label = macros[static_cast<std::size_t> (macro)].label.get())
-            lamp->setVisible (label->isVisible());
+        lamp->setVisible (false);
 }
 
 performance::MacroPicker* ShellEditor::performancePicker() const noexcept

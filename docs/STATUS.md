@@ -23,8 +23,19 @@
 >   on return each is as it was); a stand-in-only hybrid leaves no column; Learn always runs in
 >   Edit Mode (an active lesson leaves Performance); the strip follows USER assignments. Other
 >   shell products: unchanged.
-> - **NEXT:** OSP editor integration (Gate 7: same model, key, cards, strip, flap, picker in
->   `PluginEditor`), Gate 6/9/10 QA (scales, multiple instances, DAW - owner), screenshots matrix.
+> - **Gate 7 OSP (done):** `OspAudioProcessorEditor` uses the same model, key, picture cards,
+>   strip, flap and picker: the gauge key after FX ROUTING (Performance: FX ROUTING and MIX hidden,
+>   the pencil right after SAVE - no gap); only layers with a sound get a column (none: the drop
+>   invitation); everything Performance hides keeps its Edit visibility and gets it back; an
+>   active lesson returns to Edit. The cards' displays show the picture alone
+>   (`SourceDisplay::setPictureOnly`: no time labels, START marker or loop bracket).
+> - **Owner feedback applied:** the pencil takes FX ROUTING's place (no gap); MORPH's lamp hidden
+>   while performing.
+> - Tests: OSP `[plugin][performance]` (key, 1/2/3 sources as pictures, strip, flap inside the
+>   housing, picker, Edit restored, every parameter unchanged), screenshots
+>   `[screenshots-performance]` (empty, 1, 2, 3 sources, picker); shell and ANALOG as before.
+> - **NEXT:** QA at 150 % / 200 %, the 8-macro and mixed-USER captures, multiple instances in a
+>   DAW and toggling while playing (owner tests).
 
 > **22 Nov 2026, rack cells three knobs wide (shared, opt-in):** `rackui::Slot::threeKnobs` (3 x 104
 > + 2 x 7 px; dense 3 x 89 + 2 x 5) for a product's own wide cell - ANDOR ANALOG's KONTAKT
