@@ -1,5 +1,19 @@
 # Status
 
+> **22 Nov 2026, the owner's three presets (Analog Dreamscape, Bukkehorn Tape, Arp - Sixteen Pulses):**
+> - **Remove did nothing (fixed):** `removeLayer` refused without a word while any sound was still
+>   being prepared (a later stage, another layer's load): the layers above move down, and a result
+>   still to come is addressed to a layer index. It now waits for that, says "Removing B when its
+>   preparation finishes...", then removes; a new sound loaded into that layer meanwhile cancels it.
+>   Test: "plugin: Remove while a sound is still being prepared happens once it is ready".
+> - **Not bugs, the presets as saved** (reproduced headless with the owner's files and stand-in
+>   sounds): Analog Dreamscape (state 4) has A/B MIX at A (`ab.blend` 0), so B is silent; Bukkehorn
+>   Tape has A's LEVEL at -48 dB, the bottom of the knob, which is silence. Both since 11 Oct.
+> - **Arp - Sixteen Pulses:** route 6 is LFO 2 (Random, 7.46 Hz) -> START A at 100 % from START 0,
+>   so every arp note starts somewhere random (about half at the very beginning). Since 14 Nov the
+>   card's START follows each note, so it jumped with every note. Owner's choice: START shows the
+>   knob, with the reachable range as a band (next commit).
+>
 > **21 Nov 2026, Windows test build (owner's request):** `.github/workflows/windows-test.yml`
 > builds ANDOR OSP with MSVC (VST3 + standalone, x64), packages an Inno Setup installer
 > (`packaging/windows/osp.iss`: the VST3 to Common Files\VST3, the standalone with its factory

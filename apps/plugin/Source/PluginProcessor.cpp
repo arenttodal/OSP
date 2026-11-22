@@ -2894,8 +2894,18 @@ void OspAudioProcessor::applyLayer (int layer, const LayerSnapshot& snapshot)
 bool OspAudioProcessor::removeLayer (int layer)
 {
     const bool keptEmpty = isKeptEmptySlot (layer);
-    if (layer < 0 || layer >= numLayers || pendingLoads.load() > 0 || ! (isLayerOccupied (layer) || keptEmpty))
+    if (layer < 0 || layer >= numLayers || ! (isLayerOccupied (layer) || keptEmpty))
         return false;
+    if (pendingLoads.load() > 0)
+    {
+        // A result still to come is addressed to a layer index, and removing moves the layers
+        // above down: it would land on the wrong one. So the removal waits for it (it used to
+        // be refused without a word, which read as "Remove does nothing").
+        deferredRemoval = std::make_pair (layer, layers[static_cast<std::size_t> (layer)].latestLoadId.load());
+        showMessage ("Removing " + layerName (layer) + juce::String::fromUTF8 (" when its preparation finishes\xe2\x80\xa6"));
+        return true;
+    }
+    deferredRemoval.reset();
     const int slots = slotCount();
     // Three -> two: the two that stay keep their balance (their shares, renormalised, as
     // the equal-power blend), never a reset to the middle.
@@ -3559,6 +3569,16 @@ void OspAudioProcessor::timerCallback()
             // Playable as soon as the first stage is in (spec §62); later stages refine it.
             layer.state = LoadState::ready;
         }
+    }
+
+    // A removal asked for while sounds were being prepared, now that nothing is pending (not
+    // when a new sound went into that layer meanwhile).
+    if (idle && deferredRemoval)
+    {
+        const auto [layer, loadId] = *deferredRemoval;
+        deferredRemoval.reset();
+        if (layers[static_cast<std::size_t> (layer)].latestLoadId.load() == loadId)
+            removeLayer (layer);
     }
 
     {

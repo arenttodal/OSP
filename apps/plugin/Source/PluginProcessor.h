@@ -377,7 +377,10 @@ public:
         layer are reported, not loaded. Returns how many were loaded. */
     int addLayers (const juce::Array<juce::File>& files, int firstLayer = -1);
     /** Removes a layer's sound; the layers above move down (complete state: sound, root,
-        mode, granular and layer controls). Not while sounds are loading. Restorable once. */
+        mode, granular and layer controls). Restorable once. While any sound is still being
+        prepared (a later stage, another layer's load) the layers cannot move, so the removal
+        waits for that and then happens (the message says so); a new sound loaded into the
+        layer meanwhile cancels it. Returns false only when there is nothing to remove. */
     bool removeLayer (int layer);
     /** A new sound for an occupied layer: its root goes back to automatic, its controls stay
         (several files make one multi-sample sound). Voices already playing finish on the old one. */
@@ -757,6 +760,9 @@ private:
         LayerSnapshot snapshot;
     };
     std::unique_ptr<RemovedLayer> removedLayer;
+    /** A removal asked for while sounds were being prepared: the layer, and its newest load
+        then (message thread; carried out by timerCallback once nothing is pending). */
+    std::optional<std::pair<int, std::uint64_t>> deferredRemoval;
     std::atomic<int> keptSlotCount { 0 };   ///< message thread writes, the audio thread reads (engine mix slots)
     void applyParameters (bool force) noexcept;
 public:

@@ -8178,6 +8178,58 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "PackAuthoringTests.inc"
 #include "PresetNavigationTests.inc"
 #include "MenuVisualShots.inc"
+TEST_CASE ("plugin: Remove while a sound is still being prepared happens once it is ready", "[plugin][layers]")
+{
+    // The owner's report: "Remove source B" did nothing. Removing moves the layers above down,
+    // so it cannot happen while a result addressed to a layer is still to come - it was refused
+    // without a word. It now waits for that, says so, and then removes.
+    TempDir tmp;
+    const auto a = writeSource (tmp.dir, "one.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    const auto b = writeSource (tmp.dir, "two.wav", testsignals::vowel (midiToHz (60), 2.0, 48000.0, 4));
+    const auto c = writeSource (tmp.dir, "three.wav", testsignals::vowel (midiToHz (64), 2.0, 48000.0, 5));
+    const auto d = writeSource (tmp.dir, "four.wav", testsignals::saw (midiToHz (62), 2.0, 48000.0));
+
+    SECTION ("asked while A is loading: B goes when it is done")
+    {
+        OspAudioProcessor p;
+        p.addLayers ({ a, b });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        REQUIRE (p.occupiedLayerCount() == 2);
+        p.replaceLayer ({ c }, 0);   // something is being prepared again
+        REQUIRE (p.removeLayer (1));
+        CHECK (p.isLayerOccupied (1));   // not yet
+        CHECK (p.statusMessage().startsWith ("Removing B when its preparation finishes"));
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        CHECK (p.occupiedLayerCount() == 1);
+        CHECK (juce::String (p.currentInstrument (0)->filename) == "three.wav");
+        CHECK (p.statusMessage().startsWith ("Removed layer B"));
+    }
+    SECTION ("a new sound loaded into B meanwhile cancels it")
+    {
+        OspAudioProcessor p;
+        p.addLayers ({ a, b });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        p.replaceLayer ({ c }, 0);
+        REQUIRE (p.removeLayer (1));
+        p.replaceLayer ({ d }, 1);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        CHECK (p.occupiedLayerCount() == 2);
+        CHECK (juce::String (p.currentInstrument (1)->filename) == "four.wav");
+    }
+    SECTION ("nothing to remove: refused")
+    {
+        OspAudioProcessor p;
+        p.addLayers ({ a });
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        CHECK_FALSE (p.removeLayer (2));
+    }
+}
+
 #include "CustomPatternR2Tests.inc"
 #include "DampenDefaultTests.inc"
 #include "RackModulationTests.inc"
