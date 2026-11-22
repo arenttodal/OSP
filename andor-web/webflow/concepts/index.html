@@ -118,8 +118,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .rm .stage img { position: absolute; inset: 8% 10%; width: 80%; height: 84%; object-fit: contain; opacity: 0; transition: opacity .5s ease }
 .rm .stage img.on { opacity: 1 }
 /* C06 layers loop */
-.layers .frame { position: relative; aspect-ratio: 1448 / 986; margin-top: 48px }
-.layers .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .6s ease; border-radius: 12px; filter: drop-shadow(0 24px 40px rgba(0,0,0,.16)) }
+.layers .frame { position: relative; aspect-ratio: 2000 / 1450; margin-top: 48px }  /* the tallest capture; all three share one width */
+.layers .frame img { position: absolute; left: 0; top: 0; width: 100%; height: auto; opacity: 0; transition: opacity .6s ease; border-radius: 12px; filter: drop-shadow(0 24px 40px rgba(0,0,0,.16)) }
 .layers .frame img.on { opacity: 1 }
 .chips { display: flex; gap: 8px; margin-top: 28px; justify-content: center } .chips span { padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; color: var(--ink-3); box-shadow: inset 0 0 0 1px var(--line); transition: all .3s }
 .chips span.on { background: var(--ink); color: var(--paper); box-shadow: none }
