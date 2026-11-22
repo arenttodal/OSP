@@ -1,0 +1,376 @@
+{
+ "hero-desktop": {
+  "widths": [
+   1280,
+   1920,
+   2560,
+   3840
+  ],
+  "ratio": 0.5625,
+  "source": "ANDOR_visual-assets_2026-11-21/01_H01_front-facing-hero/C_website/andor-osp_H01-C_plate_desktop_3840x2160.jpg"
+ },
+ "hero-phone": {
+  "widths": [
+   640,
+   860,
+   1290
+  ],
+  "ratio": 2.16744,
+  "source": "ANDOR_visual-assets_2026-11-21/01_H01_front-facing-hero/C_website/andor-osp_H01-C_plate_phone_1290x2796.jpg"
+ },
+ "theatre-wordmark": {
+  "widths": [
+   960,
+   1280,
+   1920
+  ],
+  "ratio": 0.5625,
+  "source": "ANDOR_visual-assets_2026-11-21/01_H01_front-facing-hero/A_dark-theatre/andor-osp_H01-A_wordmark_1920x1080.jpg"
+ },
+ "theatre-clean": {
+  "widths": [
+   960,
+   1280,
+   1920
+  ],
+  "ratio": 0.5625,
+  "source": "ANDOR_visual-assets_2026-11-21/01_H01_front-facing-hero/A_dark-theatre/andor-osp_H01-A_clean_1920x1080.jpg"
+ },
+ "gallery-ivory": {
+  "widths": [
+   960,
+   1280,
+   1920
+  ],
+  "ratio": 0.5625,
+  "source": "ANDOR_visual-assets_2026-11-21/01_H01_front-facing-hero/B_ivory-gallery/andor-osp_H01-B_clean_1920x1080.jpg"
+ },
+ "editor-beta-3l": {
+  "widths": [
+   1080,
+   1600,
+   2400,
+   2896
+  ],
+  "ratio": 0.68094,
+  "source": "../../../../../../home/user/OSP/andor-web/assets/source/captures/osp-0.9.0-beta.1/cur-hero-3L@2x.png"
+ },
+ "detail-m01-cine": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 1.0,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-macro-knobs_cinematic.webp"
+ },
+ "detail-m01-sharp": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 1.0,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-macro-knobs_sharp.webp"
+ },
+ "detail-m02-cine": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.66667,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-source-controls_cinematic.webp"
+ },
+ "detail-m02-sharp": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.66667,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-source-controls_sharp.webp"
+ },
+ "detail-m03-cine": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.66667,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-waveform-display_cinematic.webp"
+ },
+ "detail-m03-sharp": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.66667,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-waveform-display_sharp.webp"
+ },
+ "detail-m04-cine": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.66667,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-keyboard_cinematic.webp"
+ },
+ "detail-m04-sharp": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.66667,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-keyboard_sharp.webp"
+ },
+ "detail-m05-cine": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.66667,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-timber-corner_cinematic.webp"
+ },
+ "detail-m05-sharp": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.66667,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-timber-corner_sharp.webp"
+ },
+ "detail-m06-cine": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.66667,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-touch-strips_cinematic.webp"
+ },
+ "detail-m06-sharp": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.66667,
+  "source": "ANDOR_visual-assets_2026-11-21/07_website-asset-kit_v1/01_framer_upload/andor-osp_detail-touch-strips_sharp.webp"
+ },
+ "osp-empty": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.75,
+  "source": "andor-web/assets/optimized"
+ },
+ "osp-hero-1l": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400,
+   3200
+  ],
+  "ratio": 0.75,
+  "source": "andor-web/assets/optimized"
+ },
+ "osp-hero-2l": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.75,
+  "source": "andor-web/assets/optimized"
+ },
+ "osp-hero-3l": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.75,
+  "source": "andor-web/assets/optimized"
+ },
+ "osp-reimagined-mosaic": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.75,
+  "source": "andor-web/assets/optimized"
+ },
+ "dd-reimagined-kaleidoscope": {
+  "widths": [
+   600,
+   798
+  ],
+  "ratio": 0.69925,
+  "source": "andor-web/assets/optimized"
+ },
+ "dd-reimagined-tape-frame": {
+  "widths": [
+   600,
+   798
+  ],
+  "ratio": 0.69925,
+  "source": "andor-web/assets/optimized"
+ },
+ "dd-reimagined-toybox": {
+  "widths": [
+   600,
+   798
+  ],
+  "ratio": 0.69925,
+  "source": "andor-web/assets/optimized"
+ },
+ "dd-reimagined-mosaic": {
+  "widths": [
+   600,
+   798
+  ],
+  "ratio": 0.69925,
+  "source": "andor-web/assets/optimized"
+ },
+ "dd-reimagined-mirage": {
+  "widths": [
+   600,
+   798
+  ],
+  "ratio": 0.69925,
+  "source": "andor-web/assets/optimized"
+ },
+ "feat-notemap": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.38083,
+  "source": "andor-web/assets/optimized"
+ },
+ "feat-capture": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.38083,
+  "source": "andor-web/assets/optimized"
+ },
+ "feat-keydna": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.63583,
+  "source": "andor-web/assets/optimized"
+ },
+ "syn-card-sample": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.38083,
+  "source": "andor-web/assets/optimized"
+ },
+ "syn-card-analog": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.38083,
+  "source": "andor-web/assets/optimized"
+ },
+ "syn-card-imprint": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.38083,
+  "source": "andor-web/assets/optimized"
+ },
+ "syn-card-motion": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.38083,
+  "source": "andor-web/assets/optimized"
+ },
+ "gran-card": {
+  "widths": [
+   720,
+   1080,
+   1600,
+   2400
+  ],
+  "ratio": 0.38083,
+  "source": "andor-web/assets/optimized"
+ },
+ "det-mod": {
+  "widths": [
+   600,
+   900,
+   1350
+  ],
+  "ratio": 0.45778,
+  "source": "andor-web/assets/optimized"
+ },
+ "film:D2_TRACK": {
+  "ratio": 0.5625
+ },
+ "film:R01_CUT-R4": {
+  "ratio": 0.5625
+ },
+ "film:R01_CUT-R4-type-t1": {
+  "ratio": 0.5625
+ },
+ "film:R02_DIM-R4-loop": {
+  "ratio": 0.5625
+ },
+ "film:R03_GLIDE-edit-15s5": {
+  "ratio": 0.5625
+ },
+ "film:R04_WIN16": {
+  "ratio": 0.5625
+ }
+}
