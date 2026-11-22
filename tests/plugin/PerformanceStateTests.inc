@@ -184,6 +184,35 @@ TEST_CASE ("Performance Mode (OSP): one key; 1, 2 or 3 sources become pictures; 
         CHECK (children);   // (its knobs still play)
     }
     CHECK_FALSE (ui->sourceViewToggle().isVisible());
+    // The ARP key stays: its light switches the arpeggiator (a click anywhere on it); nothing opens.
+    {
+        auto& arp = ui->arpControl();
+        REQUIRE (arp.isVisible());
+        CHECK (arp.isLightsOnly());
+        const bool was = arp.isOn();
+        const auto pos = arp.chevronArea().getCentre();
+        auto click = [&] {
+            arp.mouseDown (juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), pos, juce::ModifierKeys(), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                             &arp, &arp, juce::Time::getCurrentTime(), pos, juce::Time::getCurrentTime(), 1, false));
+        };
+        click();
+        CHECK (arp.isOn() != was);
+        CHECK (ui->instrumentHeight() <= editHeight);
+        click();
+        CHECK (arp.isOn() == was);
+        // SUB the same (its row): on and off, its popover never opening.
+        const bool subWas = arp.isSecondRowOn();
+        const auto sub = arp.secondRowArea().getCentre();
+        auto clickSub = [&] {
+            arp.mouseDown (juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), sub, juce::ModifierKeys(), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                             &arp, &arp, juce::Time::getCurrentTime(), sub, juce::Time::getCurrentTime(), 1, false));
+        };
+        clickSub();
+        CHECK (arp.isSecondRowOn() != subWas);
+        CHECK_FALSE (ui->arpInlinePanel().isVisible());
+        clickSub();
+        CHECK (arp.isSecondRowOn() == subWas);
+    }
     // OSP's six core macros, in the panel's order (LIFE ... ECHO, SPACE).
     CHECK (ui->performanceMacrosShown().size() == 6);
     const auto panel = osp::plugin::design::layout::macroPanel.translated (0.0f, -ui->sourceTrim()).toNearestInt();

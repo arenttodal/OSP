@@ -3027,6 +3027,8 @@ void ShellEditor::setPerformance (bool on)
     }
     performanceOn = on;
     modeKey.setPerformance (on);
+    // The ARP (and its companion's) lights stay playable while performing; nothing opens.
+    arpButton.setLightsOnly (on);
     for (auto& card : cards)
         card->setPerformance (on);
     if (! on)
@@ -3075,12 +3077,13 @@ void ShellEditor::setPerformance (bool on)
 
 void ShellEditor::layoutPerformance()
 {
-    // Hidden, never changed: the modulation panel, the macro banks' tabs, the arpeggiator, the
-    // racks, the AUX strip, the source view's key, the keyboard's utility keys.
+    // Hidden, never changed: the modulation panel, the macro banks' tabs, the arpeggiator's
+    // editor, the racks, the AUX strip, the source view's key, the keyboard's utility keys. The
+    // ARP / SUB key stays: its lights switch them on and off, nothing opens (lights only).
     modPanel.setVisible (false);
     if (bankTab != nullptr)
         bankTab->setVisible (false);
-    arpButton.setVisible (false);
+    arpButton.setVisible (true);
     arpPanel.setVisible (false);
     if (shell.showsRack())
         rack.setVisible (false);

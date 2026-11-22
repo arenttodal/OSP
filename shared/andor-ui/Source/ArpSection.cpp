@@ -118,6 +118,18 @@ void ArpControl::setSecondRow (const juce::String& name, const juce::String& ena
     repaint();
 }
 
+void ArpControl::setLightsOnly (bool only)
+{
+    if (lightsOnly == only)
+        return;
+    lightsOnly = only;
+    hover = 0;
+    setTooltip (only ? (hasSecondRow() ? "Switches the arpeggiator and " + secondName + " on and off" : juce::String ("Switches the arpeggiator on and off"))
+                     : hasSecondRow() ? "Each light switches its instrument on and off; click a row for its settings"
+                                      : "The light switches the arpeggiator on and off; click the card for its settings");
+    repaint();
+}
+
 void ArpControl::setSecondRowOpen (bool open)
 {
     if (secondOpen != open)
@@ -141,6 +153,8 @@ juce::Rectangle<float> ArpControl::secondLightArea() const
 
 int ArpControl::hoverAt (juce::Point<float> at) const
 {
+    if (lightsOnly)   // (each row is its light)
+        return hasSecondRow() && secondRowArea().contains (at) ? 3 : 1;
     if (! hasSecondRow())
         return lightArea().contains (at) ? 1 : 2;
     if (secondRowArea().contains (at))
@@ -203,7 +217,8 @@ void ArpControl::paint (juce::Graphics& g)
             g.setColour (colour::text.withAlpha (on ? 0.95f : 0.8f));
             g.drawText (name, juce::Rectangle<float> (light.getRight() + 2.0f, light.getY(), chevronBox.getX() - light.getRight() - 2.0f, light.getHeight()),
                         juce::Justification::centredLeft, false);
-            chevron (g, chevronBox.getCentre(), 4.0f, 2.6f, open, rowHovered ? colour::text : colour::text.withAlpha (0.75f), 1.5f);
+            if (! lightsOnly)   // (Performance: nothing to open)
+                chevron (g, chevronBox.getCentre(), 4.0f, 2.6f, open, rowHovered ? colour::text : colour::text.withAlpha (0.75f), 1.5f);
         };
         row (lightArea(), chevronArea(), "ARP", enabled, expanded, hover == 1, hover == 2, "led-arp-on", "led-arp-off");
         const auto lower = secondRowArea();
@@ -258,7 +273,8 @@ void ArpControl::paint (juce::Graphics& g)
     g.setFont (fonts::make (18.0f, fonts::Weight::semibold, 0.04f));
     g.setColour (colour::text.withAlpha (enabled ? 0.95f : 0.8f));
     g.drawText ("ARP", juce::Rectangle<float> (top.getRight() + 3.0f, top.getY(), 50.0f, top.getHeight()), juce::Justification::centredLeft, false);
-    chevron (g, chevronArea().getCentre(), 4.5f, 3.0f, expanded, hover == 2 ? colour::text : colour::text.withAlpha (0.75f), 1.6f);
+    if (! lightsOnly)
+        chevron (g, chevronArea().getCentre(), 4.5f, 3.0f, expanded, hover == 2 ? colour::text : colour::text.withAlpha (0.75f), 1.6f);
 
     // The inset: pattern and rate.
     const auto inset = juce::Rectangle<float> (r.getX() + 7.0f, r.getY() + 0.53f * r.getHeight(), r.getWidth() - 14.0f, 0.35f * r.getHeight());
@@ -310,6 +326,18 @@ void ArpControl::toggleEnabled()
 
 void ArpControl::mouseDown (const juce::MouseEvent& e)
 {
+    if (lightsOnly)
+    {
+        // Performance: a row's whole face is its switch; nothing opens.
+        if (hoverAt (e.position) == 3)
+        {
+            if (secondAttachment != nullptr)
+                secondAttachment->setValueAsCompleteGesture (secondEnabled ? 0.0f : 1.0f);
+        }
+        else
+            toggleEnabled();
+        return;
+    }
     if (const int at = hoverAt (e.position); at >= 3)
     {
         if (at == 3 && secondAttachment != nullptr)

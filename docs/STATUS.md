@@ -18,7 +18,9 @@
 >   the end of the header's keys; `EngineCard::setPerformance` (the picture at the dark well's Edit
 >   Mode height and, owner feedback, the card's knob row under it as Edit Mode shows it, still
 >   playable - `performanceFoot` / `performanceTrim`; badge, keys, modifiers and well tools hidden;
->   every part's visibility restored on return); the frame's macro strip
+>   every part's visibility restored on return); the ARP / SUB key stays with its lights only (owner feedback: a
+>   click on a row switches it; no chevrons, no settings - `ArpControl::setLightsOnly`, in both
+>   editors); the frame's macro strip
 >   (`frame::performanceMacroPlaces`, `frame::paint`'s Performance lights, no envelope divider);
 >   the editor hides the modulation panel, CORE/USER tabs, the arpeggiator, racks, AUX strip, the
 >   routing key and the utility keys without changing them (the window shrinks by what was open;

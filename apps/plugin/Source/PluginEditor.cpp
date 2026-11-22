@@ -2230,7 +2230,7 @@ void OspAudioProcessorEditor::setPerformance (bool on)
             if (c != nullptr)
                 editVisibility.emplace_back (c, c->isVisible());
         };
-        for (juce::Component* c : { static_cast<juce::Component*> (&modPanel), static_cast<juce::Component*> (&arpButton), static_cast<juce::Component*> (&arpPanel),
+        for (juce::Component* c : { static_cast<juce::Component*> (&modPanel), static_cast<juce::Component*> (&arpPanel),
                                     static_cast<juce::Component*> (&racks), static_cast<juce::Component*> (&utilityKeys), static_cast<juce::Component*> (&routingKey),
                                     static_cast<juce::Component*> (&headerMix) })
             keep (c);
@@ -2252,6 +2252,8 @@ void OspAudioProcessorEditor::setPerformance (bool on)
     }
     performanceOn = on;
     modeKey.setPerformance (on);
+    // The ARP key stays while performing: its light switches the arpeggiator, nothing opens.
+    arpButton.setLightsOnly (on);
     for (auto& card : cards)
         card->setPerformance (on);
     if (! on)

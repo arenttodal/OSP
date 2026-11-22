@@ -56,6 +56,12 @@ public:
     juce::Rectangle<float> secondLightArea() const;
     juce::Rectangle<float> secondRowArea() const;
 
+    /** Performance Mode: the lights alone - a click anywhere on a row switches its instrument
+        on or off; no chevrons, nothing opens (onToggleEditor and onSecondRow are never called).
+        Off: as before. */
+    void setLightsOnly (bool lightsOnly);
+    bool isLightsOnly() const noexcept { return lightsOnly; }
+
     juce::Rectangle<float> lightArea() const;
     juce::Rectangle<float> chevronArea() const;
     /** The inset's text, "UP · 1/8". */
@@ -72,7 +78,7 @@ private:
     int hover = 0;   ///< 1 the light, 2 the rest of the card (stacked: of the upper row), 3 the lower light, 4 the rest of the lower row
     juce::String secondName;
     std::unique_ptr<juce::ParameterAttachment> secondAttachment;
-    bool secondEnabled = false, secondOpen = false;
+    bool secondEnabled = false, secondOpen = false, lightsOnly = false;
     void paintLight (juce::Graphics&, juce::Point<float> centre, bool on, bool hovered, const char* onPiece, const char* offPiece);
     int hoverAt (juce::Point<float>) const;
 };
