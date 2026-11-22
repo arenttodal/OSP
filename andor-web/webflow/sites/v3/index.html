@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANDOR OSP · Monument</title>
+<meta name="description" content="Instant. Alive. Yours, transformed. ANDOR OSP plays the sound you recorded.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="../kit/kit.css">
+<style>
+/* V3 "Monument": editorial, one idea per screen, monumental type, angled close-ups. */
+body { background: #000; color: var(--moon) }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 40; height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--gut); background: rgba(10,10,12,.72); backdrop-filter: saturate(1.6) blur(18px); font-size: 13px }
+.nav .wm { font-weight: 800; letter-spacing: .22em; text-decoration: none } .nav nav { display: flex; gap: 26px } .nav nav a { text-decoration: none; opacity: .78 }
+.nav .btn { height: 30px; padding: 0 14px; font-size: 12.5px; background: var(--moon); color: var(--ink) }
+.blk { padding: clamp(110px, 13vw, 190px) 0 } .ivory { background: var(--ivory); color: var(--ink) } .ivory .lead { color: var(--ink-2) }
+.c { text-align: center } .c .lead { margin-left: auto; margin-right: auto }
+.huge { font-size: clamp(4rem, 12vw, 11rem); line-height: .9 }
+/* hero */
+.hero { padding: 120px 0 0; text-align: center; overflow: hidden }
+.hero .eyebrow { font-weight: 650; font-size: 18px; color: var(--moon-2); margin-bottom: 14px } .hero h1 { font-size: clamp(3rem, 7.4vw, 7rem); max-width: 11em; margin: 0 auto }
+.hero .lead { margin: 26px auto 0; font-size: clamp(1.1rem, 1.6vw, 1.35rem) } .hero .row { display: flex; gap: 18px; justify-content: center; align-items: center; margin-top: 34px; flex-wrap: wrap }
+.hero .row .tlink { color: #f0a074 } .hero .shot { margin: 40px auto 0; max-width: 1500px; -webkit-mask-image: radial-gradient(ellipse 62% 64% at 50% 52%, #000 48%, transparent 100%); mask-image: radial-gradient(ellipse 62% 64% at 50% 52%, #000 48%, transparent 100%) }
+/* numbers */
+.nums { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--line-d); border-bottom: 1px solid var(--line-d) }
+.nums div { padding: 34px 18px; border-left: 1px solid var(--line-d) } .nums div:first-child { border-left: 0 }
+.nums b { display: block; font-weight: 780; letter-spacing: -.04em; font-size: clamp(2.6rem, 4.6vw, 4.4rem); line-height: 1 } .nums span { display: block; margin-top: 10px; color: var(--moon-2); font-size: 15px }
+/* chapters */
+.chap .num { font-weight: 650; color: var(--accent); font-size: 15px; letter-spacing: .1em } .chap h2 { margin-top: 16px }
+.chap .lead { margin-top: 26px; font-size: clamp(1.15rem, 1.7vw, 1.45rem) }
+.chap .media { margin-top: 72px }
+.chap .clip { aspect-ratio: 1.6; max-width: 1080px; margin: 0 auto; box-shadow: 0 40px 120px rgba(0,0,0,.35) }
+.alive { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 72px }
+.alive .tile { background: #fff; border-radius: 28px; padding: 34px; display: flex; flex-direction: column; gap: 22px; text-align: left }
+.alive .tile h3 { font-size: clamp(1.4rem, 2vw, 1.9rem) } .alive .tile p { color: var(--ink-2) } .alive .tile img { width: 72%; margin: auto auto 0 } .alive .tile .clip { aspect-ratio: 1.6; margin-top: auto } .alive .tile .clip.crop { aspect-ratio: 1.38; background: #f4f1ec } .clip.crop video { object-fit: cover; object-position: 0 50% }
+/* reimagined row */
+.rmrow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 72px }
+.rmc { background: #111114; border-radius: 22px; padding: 18px 14px 20px; text-align: left; transition: background .3s }
+.rmc img { width: 100%; aspect-ratio: 1.3; object-fit: contain } .rmc b { display: block; margin-top: 12px; font-weight: 700; font-size: 17px } .rmc p { margin-top: 6px; font-size: 13.5px; color: var(--moon-2); line-height: 1.45 }
+/* close-ups */
+.closeups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 72px }
+.cu { border-radius: 28px; overflow: hidden; background: #111114; position: relative } .cu img { width: 100%; aspect-ratio: 16/9; object-fit: cover }
+.cu .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 60px 28px 26px; background: linear-gradient(transparent, rgba(0,0,0,.78)) } .cu .cap b { font-weight: 720; font-size: 22px; letter-spacing: -.02em } .cu .cap p { color: rgba(242,239,233,.78); font-size: 15px; margin-top: 6px; max-width: 30em }
+/* features grid */
+.fgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 64px }
+.fg { background: #fff; border-radius: 24px; padding: 30px; min-height: 210px; display: flex; flex-direction: column; justify-content: space-between }
+.fg big { font-weight: 780; letter-spacing: -.04em; font-size: 46px; line-height: 1; color: var(--ink) } .fg b { font-weight: 700; font-size: 18px } .fg p { color: var(--ink-2); font-size: 15px; margin-top: 6px }
+.fg.dark { background: var(--ink); color: var(--moon) } .fg.dark big { color: var(--moon) } .fg.dark p { color: var(--moon-2) }
+/* specs */
+.specs { display: grid; grid-template-columns: 220px 1fr; border-top: 1px solid var(--line); margin-top: 56px }
+.specs dt, .specs dd { padding: 26px 0; border-bottom: 1px solid var(--line) } .specs dt { font-weight: 700 } .specs dd { color: var(--ink-2) } .specs dd b { color: var(--ink); font-weight: 600 }
+/* finale */
+.fin { text-align: center; padding: clamp(110px, 13vw, 180px) 0; overflow: hidden }
+.fin .wl { max-width: 520px; margin: 36px auto 0; justify-content: center } .fin .wl input[type=email] { background: #1b1b1f; color: var(--moon) } .fin .btn { background: var(--moon); color: var(--ink) }
+.fin img { margin: 70px auto 0; max-width: 1200px; -webkit-mask-image: linear-gradient(#000 60%, transparent); mask-image: linear-gradient(#000 60%, transparent) }
+.foot { background: #000; color: var(--moon-3); padding: 30px var(--gut) 50px; font-size: 13px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px; border-top: 1px solid #1c1c20 } .foot a { margin-left: 18px; text-decoration: none }
+@media (max-width: 900px) { .nav nav { display: none } .nums { grid-template-columns: repeat(2, minmax(0, 1fr)) } .nums div:nth-child(odd) { border-left: 0 } .nums div { border-top: 1px solid var(--line-d) }
+  .alive, .closeups { grid-template-columns: minmax(0, 1fr) } .rmrow { grid-template-columns: repeat(2, minmax(0, 1fr)) } .fgrid { grid-template-columns: minmax(0, 1fr) } .specs { grid-template-columns: minmax(0, 1fr) } .specs dt { padding-bottom: 4px; border-bottom: 0 } .specs dd { padding-top: 4px } }
+</style></head>
+<body>
+<header class="nav"><a class="wm" href="#top">ANDOR OSP</a><nav><a href="#instant">Instant</a><a href="#alive">Alive</a><a href="#yours">Yours, transformed</a><a href="#specs">Tech specs</a></nav><a class="btn" href="#waitlist">Join the waitlist</a></header>
+
+<section class="hero" id="top">
+  <div class="wrap">
+    <p class="eyebrow">ANDOR OSP</p>
+    <h1 class="d">Play the sound you recorded.</h1>
+    <p class="lead" style="color:var(--moon-2)">One recording becomes an instrument across every key. Performed, not replayed.</p>
+    <div class="row"><a class="btn" href="#waitlist">Join the waitlist</a><a class="tlink" href="#instant">Watch it play ›</a></div>
+  </div>
+  <img class="shot" src="../m/mock-solo-three-1920.webp" srcset="../m/mock-solo-three-1200.webp 1200w, ../m/mock-solo-three-1920.webp 1920w" sizes="100vw" alt="ANDOR OSP on a display, three sounds loaded" width="1920" height="1080">
+</section>
+
+<section class="blk" style="padding-top:40px">
+  <div class="wrap nums">
+    <div><b>1</b><span>recording is enough</span></div><div><b>3</b><span>sounds in one instrument</span></div><div><b>5</b><span>REIMAGINED engines</span></div>
+    <div><b>6</b><span>macros, each a full panel</span></div><div><b>18</b><span>arp patterns, per sound</span></div><div><b>16</b><span>modulation routes</span></div>
+  </div>
+</section>
+
+<section class="blk ivory chap c" id="instant">
+  <div class="wrap">
+    <p class="num">01</p><h2 class="d huge">Instant.</h2>
+    <p class="lead">One file is enough. The root is found for you, the analysis runs in the background, and you are playing before it finishes. No key-mapping. No loop points.</p>
+    <div class="media clip"><video data-clip muted loop playsinline preload="none" poster="../m/learn/a-load-and-play-poster.webp"><source src="../m/learn/a-load-and-play.webm" type="video/webm"><source src="../m/learn/a-load-and-play.mp4" type="video/mp4"></video><button class="snd" data-sound aria-pressed="false"><span class="n">Sound off</span><span class="y">Sound on</span></button></div>
+  </div>
+</section>
+
+<section class="blk ivory chap c" id="alive" style="padding-top:0">
+  <div class="wrap">
+    <p class="num">02</p><h2 class="d huge">Alive.</h2>
+    <p class="lead">Every note is performed, not replayed. Hold it as long as you like and you will never hear a loop.</p>
+    <div class="alive">
+      <div class="tile"><h3 class="d">No two notes alike.</h3><p>LIFE varies level, brightness, body, attack, micro-pitch and stereo together, the way a player varies them. Calibrated on real repeated takes.</p><img src="../m/panel-life-1100.webp" alt="The LIFE panel" loading="lazy"></div>
+      <div class="tile"><h3 class="d">Sustain that never loops.</h3><p>The recording's own steady part, walked through matched loops that never repeat back to back. Let go and the note ends the way the recording did.</p>
+        <div class="clip crop"><video data-clip muted loop playsinline preload="none" poster="../m/learn/p1-pedal-loop-pingpong-poster.webp"><source src="../m/learn/p1-pedal-loop-pingpong.webm" type="video/webm"><source src="../m/learn/p1-pedal-loop-pingpong.mp4" type="video/mp4"></video></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="blk chap c" id="yours">
+  <div class="wrap">
+    <p class="num">03</p><h2 class="d huge">Yours,<br>transformed.</h2>
+    <p class="lead" style="color:var(--moon-2)">Go from faithful to far away, and it still sounds like yours. One REIMAGINED knob per sound, five places to take it.</p>
+    <div class="rmrow">
+      <div class="rmc"><img src="../m/panel-rm-kaleidoscope-640.webp" alt="" loading="lazy"><b>Kaleidoscope</b><p>Sympathetic resonance, wandering formants.</p></div>
+      <div class="rmc"><img src="../m/panel-rm-tape-frame-640.webp" alt="" loading="lazy"><b>Tape Frame</b><p>A finite piece of tape, worn a little more each pass.</p></div>
+      <div class="rmc"><img src="../m/panel-rm-toybox-640.webp" alt="" loading="lazy"><b>Toybox</b><p>A tiny digital memory turning back and forth.</p></div>
+      <div class="rmc"><img src="../m/panel-rm-mosaic-640.webp" alt="" loading="lazy"><b>Mosaic</b><p>Rebuilt from its harmonic fingerprint.</p></div>
+      <div class="rmc"><img src="../m/panel-rm-mirage-640.webp" alt="" loading="lazy"><b>Mirage</b><p>Early-digital weight, a driven 4-pole filter.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="blk c" style="padding-top:0">
+  <div class="wrap">
+    <h2 class="d d1">A closer look.</h2>
+    <div class="closeups">
+      <div class="cu"><img src="../m/mock-solo-space-1920.webp" alt="SPACE, close up" loading="lazy"><div class="cap"><b>SPACE</b><p>Rooms, halls, plates and springs; ABYSS to freeze it; VINTAGE for early digital; BLOOM for echoes that become reverb.</p></div></div>
+      <div class="cu"><img src="../m/mock-solo-capture-1920.webp" alt="Live capture, close up" loading="lazy"><div class="cap"><b>Live capture</b><p>GRAB the last 10 to 60 seconds after you played it.</p></div></div>
+      <div class="cu"><img src="../m/mock-solo-notemap-1920.webp" alt="Note Atlas, close up" loading="lazy"><div class="cap"><b>Note Atlas</b><p>One phrase, every note on its own key, editable.</p></div></div>
+      <div class="cu"><img src="../m/mock-solo-keydna-1920.webp" alt="KEY DNA, close up" loading="lazy"><div class="cap"><b>KEY DNA</b><p>Grain behaviour drawn across the keyboard.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="blk ivory c">
+  <div class="wrap">
+    <h2 class="d d1">Built to be played.</h2>
+    <p class="lead" style="margin-top:20px">The details a player notices in the first minute, and keeps noticing.</p>
+    <div class="fgrid" style="text-align:left">
+      <div class="fg"><big>±48</big><div><b>MPE</b><p>Per-note bend of ±48 semitones, pressure and slide. Aftertouch, mod wheel, CC macros.</p></div></div>
+      <div class="fg dark"><big>3</big><div><b>Dynamics that change the sound</b><p>Velocity moves the transient, brightness, bite and body. SOFT, LINEAR or HARD.</p></div></div>
+      <div class="fg"><big>2</big><div><b>Pitch characters</b><p>TAPE: faster and brighter going up. NATURAL: keeps the recording's speed and movement.</p></div></div>
+      <div class="fg"><big>16</big><div><b>Modulation routes</b><p>Two LFOs with custom shapes, two envelopes, the mod wheel. Drag onto any knob.</p></div></div>
+      <div class="fg"><big>=</big><div><b>Renders identically</b><p>Every variation comes from stored seeds. A bounce today is the bounce next year.</p></div></div>
+      <div class="fg dark"><big>0</big><div><b>Accounts, clouds, uploads</b><p>Offline and private. Your audio never leaves your machine.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="blk ivory" id="specs" style="padding-top:0">
+  <div class="wrap">
+    <h2 class="d d2">Tech specs</h2>
+    <dl class="specs">
+      <dt>Sources</dt><dd><b>WAV, AIFF, FLAC.</b> Mono or stereo, 44.1 to 96 kHz. Folders sorted into pitches, velocity layers and round robins automatically.</dd>
+      <dt>Layers</dt><dd><b>Up to three sounds,</b> each with its own mode (One Shot or Granular), REIMAGINED, EQ, DAMPEN, SYNTH blend and arpeggiator.</dd>
+      <dt>Capture</dt><dd><b>RECORD</b> up to a minute; <b>GRAB</b> the last 10, 20, 30 or 60 s. Mic or interface (standalone), DAW track via sidechain.</dd>
+      <dt>Macros</dt><dd>LIFE, DRIVE, FILTER, MOVEMENT, ECHO, SPACE, each with its own panel.</dd>
+      <dt>Arpeggiators</dt><dd><b>Three,</b> one per sound or linked. 18 patterns, custom steps, STRUM, SATELLITE, host sync.</dd>
+      <dt>Formats</dt><dd>AU, VST3 and Standalone. <b>macOS</b> (Apple Silicon and Intel) at release. Windows not announced yet.</dd>
+      <dt>Interface</dt><dd>Scales 80 to 200 %. Undo and redo for sound changes, not only knobs.</dd>
+    </dl>
+  </div>
+</section>
+
+<section class="fin" id="waitlist">
+  <div class="wrap"><h2 class="d d1">Be first to play it.</h2><p class="lead c" style="margin:18px auto 0;color:var(--moon-2)">One email when ANDOR OSP is ready. Nothing else.</p>
+    <form class="wl" data-waitlist="https://assets.mailerlite.com/jsonp/161928/forms/204835943155238722/subscribe" novalidate>
+      <input type="email" name="fields[email]" placeholder="Your email" aria-label="Email" required><input class="hp" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="btn" type="submit">Join the waitlist</button><p class="msg" aria-live="polite" style="text-align:center"></p></form></div>
+</section>
+<footer class="foot"><span>© ANDOR</span><span><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></span></footer>
+<script src="../kit/kit.js"></script>
+</body></html>
