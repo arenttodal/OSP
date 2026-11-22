@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANDOR OSP · Five sites</title><meta name="robots" content="noindex">
+<link rel="stylesheet" href="kit/kit.css">
+<style>
+body { background: var(--ivory) }
+.top { padding: 72px 0 40px } .top h1 { font-size: clamp(2.6rem, 5vw, 4.4rem) } .top p { margin-top: 18px }
+.rules { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px } .rules span { padding: 7px 12px; border-radius: 999px; background: #fff; font-size: 13.5px; font-weight: 600; color: var(--ink-2); box-shadow: 0 1px 0 var(--line) }
+.site { display: grid; grid-template-columns: 1.25fr .75fr; gap: 44px; align-items: center; padding: 48px 0; border-top: 1px solid var(--line) }
+.shots { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px } .shots img { border-radius: 12px; box-shadow: 0 20px 50px rgba(23,23,26,.16); width: 100% } .shots img:last-child { align-self: end }
+.site .no { font-weight: 650; color: var(--accent); letter-spacing: .14em; font-size: 12.5px } .site h2 { margin-top: 8px; font-size: clamp(2rem, 3vw, 2.8rem) }
+.site .ref { color: var(--ink-3); font-size: 14px; margin-top: 6px } .site p.lead { margin-top: 16px; font-size: 16.5px }
+.site ul { list-style: none; margin-top: 16px; display: grid; gap: 6px } .site li { font-size: 15px; color: var(--ink-2); padding-left: 18px; position: relative } .site li::before { content: ""; position: absolute; left: 0; top: .65em; width: 8px; height: 1.5px; background: var(--accent) }
+.site .btn { margin-top: 22px }
+.foot { padding: 40px 0 70px; color: var(--ink-3); font-size: 14px; border-top: 1px solid var(--line) }
+@media (max-width: 900px) { .site { grid-template-columns: minmax(0, 1fr); gap: 24px } }
+</style></head>
+<body>
+<div class="wrap">
+  <header class="top"><p class="label acc">ANDOR OSP · For review</p><h1 class="d">Five sites.<br><span class="mute">Pick what to keep.</span></h1>
+    <p class="lead">Five complete directions for the same product, built from the real 0.9.0 beta: captures, ANDOR Learn recordings with the instrument's own sound, and the renders. Each one is a whole site, not a section board. Mix and match freely: sections can move between them.</p>
+    <div class="rules"><span>Inter Tight Bold</span><span>Native scrolling, nothing pinned</span><span>No smoothing, no bounces</span><span>Real GUI, real recordings</span><span>No DAW behind main images</span><span>Claims checked against the beta</span></div></header>
+
+  <section class="site">
+    <div class="shots"><img src="thumbs/v1-0.webp" alt="Signal, hero"><img src="thumbs/v1-1.webp" alt="Signal, in action"></div>
+    <div><p class="no">01</p><h2 class="d">Signal</h2><p class="ref">After Teletone Audio (NORA, Lunaverb)</p>
+      <p class="lead">Dark and cinematic after the approved ivory hero. Sound first: two-line headlines, one paragraph that names the controls.</p>
+      <ul><li>The tipping hero</li><li>See it in action: the five steps on Learn recordings, with sound</li><li>Six macro panels, REIMAGINED, three-sound loop</li><li>A Listen list of the instrument's own output</li></ul>
+      <a class="btn" href="v1/index.html">Open Signal</a></div>
+  </section>
+
+  <section class="site">
+    <div class="shots"><img src="thumbs/v2-0.webp" alt="Studio, hero"><img src="thumbs/v2-1.webp" alt="Studio, how it works"></div>
+    <div><p class="no">02</p><h2 class="d">Studio</h2><p class="ref">After XLN Audio Life</p>
+      <p class="lead">Light, friendly and confident. The software itself is the hero; centred headlines with one accented phrase.</p>
+      <ul><li>Three numbered steps, each with its clip</li><li>"Not a sampler you program": LIFE, sustain, REIMAGINED, IMPRINT</li><li>Sample anything: file, input, after the fact, phrase</li><li>A closer look in six playing tabs</li></ul>
+      <a class="btn" href="v2/index.html">Open Studio</a></div>
+  </section>
+
+  <section class="site">
+    <div class="shots"><img src="thumbs/v3-0.webp" alt="Monument, hero"><img src="thumbs/v3-1.webp" alt="Monument, Instant"></div>
+    <div><p class="no">03</p><h2 class="d">Monument</h2><p class="ref">Apple-style editorial</p>
+      <p class="lead">One idea per screen, monumental type, the three approved pillars as chapters: Instant. Alive. Yours, transformed.</p>
+      <ul><li>Hard numbers: 1 · 3 · 5 · 6 · 18 · 16</li><li>Angled close-ups from the mockup studio</li><li>"Built to be played" grid</li><li>Tech specs table</li></ul>
+      <a class="btn" href="v3/index.html">Open Monument</a></div>
+  </section>
+
+  <section class="site">
+    <div class="shots"><img src="thumbs/v4-0.webp" alt="Workbench, hero"><img src="thumbs/v4-1.webp" alt="Workbench, compare"></div>
+    <div><p class="no">04</p><h2 class="d">Workbench</h2><p class="ref">After Native Instruments Kontakt</p>
+      <p class="lead">For the seasoned producer. Graphite and technical: the real editor with hover points as the hero, then depth.</p>
+      <ul><li>Anatomy: per layer vs across the instrument</li><li>An honest approach-by-approach comparison</li><li>Engine room: eight recordings playing in turn</li><li>SPACE engines, workflow and trust</li></ul>
+      <a class="btn" href="v4/index.html">Open Workbench</a></div>
+  </section>
+
+  <section class="site">
+    <div class="shots"><img src="thumbs/v5-0.webp" alt="Story, hero"><img src="thumbs/v5-1.webp" alt="Story, stories"></div>
+    <div><p class="no">05</p><h2 class="d">Story</h2><p class="ref">Narrative, from the five use cases</p>
+      <p class="lead">"From a voice memo to an instrument in seconds." Five real stories told beside their recordings.</p>
+      <ul><li>The voice memo · the one perfect note · grab what just happened</li><li>A hybrid patch in a minute · the instrument that travels</li><li>Three promises</li><li>Seven things, one instrument</li></ul>
+      <a class="btn" href="v5/index.html">Open Story</a></div>
+  </section>
+</div>
+<footer class="foot"><div class="wrap">Every waitlist form posts to the real MailerLite form (double opt-in still to switch on there). Tested in Chromium at desktop and phone sizes; Safari and real devices still to check.</div></footer>
+</body></html>
