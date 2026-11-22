@@ -32,7 +32,7 @@ body { background: var(--paper) }
 .story h2 { margin-top: 14px } .story .lead { margin-top: 22px; font-size: clamp(1.08rem, 1.5vw, 1.28rem); line-height: 1.6 }
 .story .lead b { color: var(--ink); font-weight: 650 }
 .story .clip { aspect-ratio: var(--ar, 1.6); box-shadow: 0 40px 100px rgba(40,46,44,.25) }
-.story .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px } .story .pair .clip { --ar: 1.25 }
+.story .pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px } .story .pair .clip { --ar: 2.42 }
 .steps-mini { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 26px } .steps-mini span { padding: 7px 12px; border-radius: 999px; background: var(--paper-2); font-size: 13.5px; font-weight: 600; color: var(--ink-2) }
 .patch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 26px } .patch div { background: #fff; border-radius: 12px; padding: 12px 14px; font-size: 14px; color: var(--ink-2) } .patch b { display: block; color: var(--ink); font-size: 16px }
 .libshot { border-radius: 14px; box-shadow: 0 40px 100px rgba(40,46,44,.25) }
