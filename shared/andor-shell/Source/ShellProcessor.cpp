@@ -1863,21 +1863,44 @@ bool ShellProcessor::restorePreviousState()
 std::vector<InstrumentHost::PresetEntry> ShellProcessor::presetList() const
 {
     std::vector<PresetEntry> list;
-    auto files = presetFolder().findChildFiles (juce::File::findFiles, true, "*" + productInfo().presetExtension);
-    files.sort();
-    // The factory set first, then the musician's own (the quick menu shows them under their
-    // own headings, and the arrows walk the same order).
+    const auto files = presetFolder().findChildFiles (juce::File::findFiles, true, "*" + productInfo().presetExtension);
+    // The factory set first, then the musician's own (USER: everything outside Factory). Each in
+    // its folders as the musician arranged them: the folder (relative, '/'-separated, empty at the
+    // top) rides in the context ("origin:user|folder:Packs/Vol. 1"), the quick menu shows each
+    // folder as a submenu, and the arrows walk the same order - a folder's subfolders first, then
+    // its own presets, all by name.
+    struct Item
+    {
+        juce::File file;
+        juce::StringArray folders;
+    };
     for (const bool factory : { true, false })
+    {
+        const auto root = factory ? factoryPresetFolder() : presetFolder();
+        std::vector<Item> items;
         for (const auto& f : files)
+            if (isFactoryPreset (f) == factory)
+                items.push_back ({ f, juce::StringArray::fromTokens (f.getParentDirectory().getRelativePathFrom (root).replaceCharacter ('\\', '/'), "/", "") });
+        for (auto& item : items)
+            item.folders.removeString (".");
+        std::sort (items.begin(), items.end(), [] (const Item& a, const Item& b) {
+            const int n = std::min (a.folders.size(), b.folders.size());
+            for (int i = 0; i < n; ++i)
+                if (const int c = a.folders[i].compareNatural (b.folders[i]); c != 0)
+                    return c < 0;
+            if (a.folders.size() != b.folders.size())
+                return a.folders.size() > b.folders.size();   // (subfolders before the folder's own presets)
+            return a.file.getFileNameWithoutExtension().compareNatural (b.file.getFileNameWithoutExtension()) < 0;
+        });
+        for (const auto& item : items)
         {
-            if (isFactoryPreset (f) != factory)
-                continue;
             PresetEntry e;
-            e.name = f.getFileNameWithoutExtension();
-            e.file = f;
-            e.context = factory ? "origin:factory" : "origin:user";
+            e.name = item.file.getFileNameWithoutExtension();
+            e.file = item.file;
+            e.context = juce::String (factory ? "origin:factory" : "origin:user") + "|folder:" + item.folders.joinIntoString ("/");
             list.push_back (e);
         }
+    }
     return list;
 }
 

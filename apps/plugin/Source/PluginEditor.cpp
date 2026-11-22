@@ -232,6 +232,7 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     };
     content.addAndMakeVisible (presetBar);
     savePresetButton.onClick = [this] { saveInstrument(); };
+    savePresetButton.onSaveAs = [this] { choosePresetFile (true, false); };
     content.addAndMakeVisible (savePresetButton);
     content.addAndMakeVisible (volume);
     menuButton.setTooltip ("Instrument, sources, content, preferences, support");
@@ -1519,13 +1520,19 @@ void OspAudioProcessorEditor::saveInstrument()
     // collections stay). A starting state, a factory or pack preset, or a new patch: Save As.
     if (ospProcessor.canSaveInPlace())
     {
+        // Asked first (unless the musician said not to for this patch); right-click SAVE: Save As.
         const auto file = ospProcessor.currentPresetFile();
-        const bool ok = ospProcessor.savePreset (file);
-        ospProcessor.showMessage (ok ? "Saved " + file.getFileNameWithoutExtension() : "Could not save " + file.getFileName());
-        if (ok)
-            learnAction ("preset.saved", "osp.header.save");
-        presetBar.refresh();
-        timerCallback();
+        juce::Component::SafePointer<OspAudioProcessorEditor> safe (this);
+        presetsave::confirmThenSave (*this, ospProcessor.fxUserFolder(), file, [safe, file] {
+            if (safe == nullptr)
+                return;
+            const bool ok = safe->ospProcessor.savePreset (file);
+            safe->ospProcessor.showMessage (ok ? "Saved " + file.getFileNameWithoutExtension() : "Could not save " + file.getFileName());
+            if (ok)
+                safe->learnAction ("preset.saved", "osp.header.save");
+            safe->presetBar.refresh();
+            safe->timerCallback();
+        });
         return;
     }
     choosePresetFile (true, false);

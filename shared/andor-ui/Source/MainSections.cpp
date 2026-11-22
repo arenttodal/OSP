@@ -11,6 +11,9 @@
 
 #include "engine/InstrumentEngine.h"
 
+#include <algorithm>
+#include <map>
+
 #include <cmath>
 
 namespace osp::plugin
@@ -875,7 +878,71 @@ juce::PopupMenu PresetBar::presetMenu()
         menu.addSeparator();
         // A host that tells its factory presets from the musician's own (context "origin:...")
         // gets the two headings; otherwise one "Presets" list, as before.
-        const auto origin = [] (const InstrumentHost::PresetEntry& e) { return e.context.fromFirstOccurrenceOf ("origin:", false, false); };
+        const auto origin = [] (const InstrumentHost::PresetEntry& e) {
+            return e.context.fromFirstOccurrenceOf ("origin:", false, false).upToFirstOccurrenceOf ("|", false, false);
+        };
+        // A host that also says where each preset lives ("|folder:a/b"): FACTORY and USER as
+        // submenus, each folder a submenu of its own (its subfolders first, then its presets),
+        // the presets as the musician arranged them on disk.
+        const bool foldered = std::any_of (list.begin(), list.end(), [] (const auto& e) { return e.context.contains ("|folder:"); });
+        if (foldered)
+        {
+            const auto folderOf = [] (const InstrumentHost::PresetEntry& e) {
+                return juce::StringArray::fromTokens (e.context.fromFirstOccurrenceOf ("|folder:", false, false), "/", "");
+            };
+            std::function<juce::PopupMenu (const std::vector<InstrumentHost::PresetEntry>&, int)> tree;
+            tree = [&] (const std::vector<InstrumentHost::PresetEntry>& entries, int depth) {
+                juce::PopupMenu m;
+                juce::StringArray order;
+                std::map<juce::String, std::vector<InstrumentHost::PresetEntry>> groups;
+                std::vector<InstrumentHost::PresetEntry> loose;
+                for (const auto& e : entries)
+                {
+                    const auto parts = folderOf (e);
+                    if (parts.size() > depth)
+                    {
+                        order.addIfNotAlreadyThere (parts[depth]);
+                        groups[parts[depth]].push_back (e);
+                    }
+                    else
+                        loose.push_back (e);
+                }
+                for (const auto& name : order)
+                {
+                    const auto& inside = groups[name];
+                    const bool holdsCurrent = std::any_of (inside.begin(), inside.end(), [&] (const auto& e) { return e.name == current; });
+                    m.addSubMenu (name, tree (inside, depth + 1), true, menuicons::make (Kind::blank), holdsCurrent);
+                }
+                if (! order.isEmpty() && ! loose.empty())
+                    m.addSeparator();
+                for (const auto& entry : loose)
+                {
+                    juce::PopupMenu::Item item (entry.name);
+                    item.setTicked (entry.name == current).setAction ([safe, entry, opened] {
+                        if (safe == nullptr)
+                            return;
+                        safe->processor.openPresetEntry (entry);
+                        opened();
+                    });
+                    m.addItem (std::move (item));
+                }
+                return m;
+            };
+            saveState();
+            menu.addSectionHeader ("Presets");
+            for (const auto* which : { "factory", "user" })
+            {
+                std::vector<InstrumentHost::PresetEntry> entries;
+                for (const auto& e : list)
+                    if (! e.startingState && origin (e) == which)
+                        entries.push_back (e);
+                if (entries.empty())
+                    continue;
+                const bool holdsCurrent = std::any_of (entries.begin(), entries.end(), [&] (const auto& e) { return e.name == current; });
+                menu.addSubMenu (juce::String (which) == "factory" ? "Factory" : "User", tree (entries, 0), true, menuicons::make (Kind::blank), holdsCurrent);
+            }
+            return menu;
+        }
         bool hasFactory = false, hasUser = false;
         for (const auto& entry : list)
         {
@@ -1047,9 +1114,114 @@ juce::PopupMenu PresetBar::presetMenu()
 
 SavePresetButton::SavePresetButton() : juce::Button ("Save preset")
 {
-    setTooltip ("Save preset");
+    setTooltip ("Save preset (right-click: Save As...)");
     setTitle ("Save preset");
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
+void SavePresetButton::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu())
+    {
+        if (onSaveAs != nullptr)
+            onSaveAs();
+        return;   // (never pressed: a right-click is not SAVE)
+    }
+    juce::Button::mouseDown (e);
+}
+
+void SavePresetButton::mouseUp (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu())
+        return;
+    juce::Button::mouseUp (e);
+}
+
+namespace presetsave
+{
+    namespace
+    {
+        juce::File listFile (const juce::File& settingsFolder) { return settingsFolder.getChildFile ("Save warnings.txt"); }
+
+        juce::StringArray silenced (const juce::File& settingsFolder)
+        {
+            juce::StringArray lines;
+            if (settingsFolder != juce::File())
+                listFile (settingsFolder).readLines (lines);
+            lines.removeEmptyStrings();
+            return lines;
+        }
+
+        std::function<std::pair<bool, bool> (const juce::File&)>& testingAnswer()
+        {
+            static std::function<std::pair<bool, bool> (const juce::File&)> answer;
+            return answer;
+        }
+
+        /** "Save over ...?" with its tick box, which the window owns (it goes with the window). */
+        class SaveOverWindow final : public juce::AlertWindow
+        {
+        public:
+            SaveOverWindow (const juce::String& name, juce::Component* parent)
+                : juce::AlertWindow ("Save over \"" + name + "\"?", "This replaces the saved patch with what you hear now. (Right-click SAVE for Save As.)",
+                                     juce::MessageBoxIconType::NoIcon, parent)
+            {
+                dontWarn.setSize (300, 24);
+                addCustomComponent (&dontWarn);
+                addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+                addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+            }
+            juce::ToggleButton dontWarn { "Don't warn me again for this patch" };
+        };
+    }
+
+    bool warns (const juce::File& settingsFolder, const juce::File& preset)
+    {
+        return ! silenced (settingsFolder).contains (preset.getFullPathName());
+    }
+
+    void stopWarning (const juce::File& settingsFolder, const juce::File& preset)
+    {
+        if (settingsFolder == juce::File() || ! warns (settingsFolder, preset))
+            return;
+        auto lines = silenced (settingsFolder);
+        lines.add (preset.getFullPathName());
+        if (settingsFolder.createDirectory())
+            listFile (settingsFolder).replaceWithText (lines.joinIntoString ("\n") + "\n");
+    }
+
+    void setAnswerForTesting (std::function<std::pair<bool, bool> (const juce::File&)> answer)
+    {
+        testingAnswer() = std::move (answer);
+    }
+
+    void confirmThenSave (juce::Component& parent, const juce::File& settingsFolder, const juce::File& preset, std::function<void()> save)
+    {
+        if (! warns (settingsFolder, preset))
+        {
+            save();
+            return;
+        }
+        if (const auto& answer = testingAnswer(); answer != nullptr)
+        {
+            const auto [yes, quiet] = answer (preset);
+            if (yes && quiet)
+                stopWarning (settingsFolder, preset);
+            if (yes)
+                save();
+            return;
+        }
+        auto* window = new SaveOverWindow (preset.getFileNameWithoutExtension(), &parent);
+        juce::Component::SafePointer<juce::Component> safe (&parent);
+        juce::Component::SafePointer<SaveOverWindow> asked (window);
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, asked, settingsFolder, preset, save = std::move (save)] (int result) {
+            if (result != 1 || safe == nullptr)
+                return;
+            if (asked != nullptr && asked->dontWarn.getToggleState())
+                stopWarning (settingsFolder, preset);
+            save();
+        }), true);
+    }
 }
 
 void SavePresetButton::paintButton (juce::Graphics& g, bool highlighted, bool down)

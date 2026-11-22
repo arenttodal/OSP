@@ -170,16 +170,36 @@ private:
 /** The large three-layer mix (opened from MIX in the header). */
 std::unique_ptr<MiniPanel> createMixPopup (InstrumentHost& processor);
 
-/** SAVE: the cassette key right of the preset bar (saves the patch as a preset). */
+/** SAVE: the cassette key right of the preset bar (saves the patch as a preset). A click saves
+    over the open preset (asking first: presetsave::confirmThenSave); a right-click is SAVE AS. */
 class SavePresetButton final : public juce::Button, public skin::KeyFace
 {
 public:
     SavePresetButton();
+    /** The right-click (or Ctrl-click): SAVE AS... */
+    std::function<void()> onSaveAs;
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
     void buttonStateChanged() override { skin::repaintKey (*this); }
     skin::KeyRole keyRole() const override { return skin::KeyRole::preset; }
     skin::KeyState keyState() const override { return isDown() ? skin::KeyState::pressed : isOver() ? skin::KeyState::hover : skin::KeyState::normal; }
 };
+
+/** SAVE over the open preset: the warning first, and the musician's "don't warn me again for
+    this patch" (kept per preset file, in `settingsFolder`'s "Save warnings.txt"). */
+namespace presetsave
+{
+    /** Whether SAVE asks before writing over `preset`. */
+    bool warns (const juce::File& settingsFolder, const juce::File& preset);
+    /** "Don't warn me again for this patch". */
+    void stopWarning (const juce::File& settingsFolder, const juce::File& preset);
+    /** Asks "Save over <name>?" (Save / Cancel, and the tick box), unless told not to for this
+        preset, then runs `save`; Cancel saves nothing. Asynchronous (message thread). */
+    void confirmThenSave (juce::Component& parent, const juce::File& settingsFolder, const juce::File& preset, std::function<void()> save);
+    /** Tests: answers the question instead of a window ({ save?, don't ask again? }). */
+    void setAnswerForTesting (std::function<std::pair<bool, bool> (const juce::File&)> answer);
+}
 
 /** ‹  PRESET NAME  ♡  › : the factory starting states, then the user's presets. */
 class PresetBar final : public juce::Component, public skin::KeyFace

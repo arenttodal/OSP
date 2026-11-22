@@ -175,12 +175,50 @@ TEST_CASE ("menus: SAVE updates a writable user preset; otherwise (new patch, st
     tuneB->setValueNotifyingHost (tuneB->convertTo0to1 (7.0f));
     auto* key = rig.saveKey();
     REQUIRE (key != nullptr);
+    // SAVE asks first ("Save over ...?"): Cancel writes nothing.
+    const auto settings = rig.p.fxUserFolder();
+    osp::plugin::presetsave::stopWarning (settings, juce::File());   // (the folder exists)
+    int asked = 0;
+    osp::plugin::presetsave::setAnswerForTesting ([&] (const juce::File&) { ++asked; return std::pair<bool, bool> { false, false }; });
+    key->onClick();
+    CHECK (asked == 1);
+    {
+        OspAudioProcessor fresh;
+        REQUIRE (fresh.loadPreset (file));
+        CHECK (fresh.parameterValue ("layerB.tune") != Catch::Approx (7.0f).margin (1.0e-3));
+    }
+    // Save (and "Don't warn me again for this patch"): written; the next SAVE asks nothing.
+    osp::plugin::presetsave::setAnswerForTesting ([&] (const juce::File&) { ++asked; return std::pair<bool, bool> { true, true }; });
     key->onClick();   // (the SAVE key, as a click does)
+    CHECK (asked == 2);
     {
         OspAudioProcessor fresh;
         REQUIRE (fresh.loadPreset (file));
         CHECK (fresh.parameterValue ("layerB.tune") == Catch::Approx (7.0f).margin (1.0e-3));
     }
+    CHECK_FALSE (osp::plugin::presetsave::warns (settings, file));
+    tuneB->setValueNotifyingHost (tuneB->convertTo0to1 (5.0f));
+    key->onClick();
+    CHECK (asked == 2);   // (not asked again for this patch)
+    {
+        OspAudioProcessor fresh;
+        REQUIRE (fresh.loadPreset (file));
+        CHECK (fresh.parameterValue ("layerB.tune") == Catch::Approx (5.0f).margin (1.0e-3));
+    }
+    osp::plugin::presetsave::setAnswerForTesting (nullptr);
+    // A right-click on SAVE is SAVE AS (never a save in place).
+    auto* saveButton = dynamic_cast<osp::plugin::SavePresetButton*> (key);
+    REQUIRE (saveButton != nullptr);
+    bool saveAs = false;
+    auto oldSaveAs = saveButton->onSaveAs;
+    saveButton->onSaveAs = [&] { saveAs = true; };
+    const auto rightClick = juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), {}, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier), 1.0f,
+                                              juce::MouseInputSource::defaultOrientation, juce::MouseInputSource::defaultRotation, juce::MouseInputSource::defaultTiltX,
+                                              juce::MouseInputSource::defaultTiltY, saveButton, saveButton, juce::Time::getCurrentTime(), {}, juce::Time::getCurrentTime(), 1, false);
+    saveButton->mouseDown (rightClick);
+    saveButton->mouseUp (rightClick);
+    CHECK (saveAs);
+    saveButton->onSaveAs = oldSaveAs;
     // After a starting state is applied, SAVE no longer means that preset.
     rig.p.setCurrentProgram (0);
     CHECK_FALSE (rig.p.canSaveInPlace());

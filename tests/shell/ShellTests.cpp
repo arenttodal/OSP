@@ -591,25 +591,29 @@ TEST_CASE ("shell: SAVE updates only the musician's own preset; factory presets 
     for (int i = 0; i < static_cast<int> (list.size()); ++i)
     {
         const auto& e = list[static_cast<std::size_t> (i)];
-        CHECK (e.context == (p.isFactoryPreset (e.file) ? "origin:factory" : "origin:user"));
+        CHECK (e.context.upToFirstOccurrenceOf ("|", false, false) == (p.isFactoryPreset (e.file) ? "origin:factory" : "origin:user"));   // (then "|folder:..."))
         if (e.file == factoryFile) factoryAt = i;
         if (e.file == mine) mineAt = i;
     }
     REQUIRE (factoryAt >= 0);
     REQUIRE (mineAt >= 0);
     CHECK (factoryAt < mineAt);
-    // The quick menu: "Factory", then "Your presets"; no "Save starting state" without a handler.
+    // The quick menu: Factory, then User (submenus); no "Save starting state" without a handler.
     {
         std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
         auto* ui = dynamic_cast<ShellEditor*> (editor.get());
         REQUIRE (ui != nullptr);
         auto& bar = dynamic_cast<osp::plugin::PresetBar&> (ui->presetBarComponent());
-        juce::StringArray headers, texts;
+        juce::StringArray headers, texts, submenus;
         const auto presets = bar.presetMenu();   // (kept: the iterator holds a reference)
         for (juce::PopupMenu::MenuItemIterator it (presets); it.next();)
+        {
             (it.getItem().isSectionHeader ? headers : texts).add (it.getItem().text);
-        CHECK (headers.indexOf ("Factory") >= 0);
-        CHECK (headers.indexOf ("Factory") < headers.indexOf ("Your presets"));
+            if (it.getItem().subMenu != nullptr)
+                submenus.add (it.getItem().text);
+        }
+        CHECK (submenus.indexOf ("Factory") >= 0);
+        CHECK (submenus.indexOf ("Factory") < submenus.indexOf ("User"));
         for (const auto& t : texts)
             CHECK_FALSE (t.startsWithIgnoreCase ("Save starting state"));
         // The main menu: SAVE and Save As, Undo / Redo with their shortcuts.
@@ -628,6 +632,44 @@ TEST_CASE ("shell: SAVE updates only the musician's own preset; factory presets 
         CHECK (save);
         CHECK (saveAs);
         CHECK (undoShortcut);
+        // The SAVE key: over the musician's own preset it asks first; "Don't warn me again for
+        // this patch" is kept; a right-click is Save As.
+        osp::plugin::SavePresetButton* key = nullptr;
+        std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+            for (auto* child : c.getChildren())
+            {
+                if (auto* b = dynamic_cast<osp::plugin::SavePresetButton*> (child))
+                    key = b;
+                walk (*child);
+            }
+        };
+        walk (*ui);
+        REQUIRE (key != nullptr);
+        REQUIRE (p.loadPreset (mine));
+        const auto settings = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile (andor::shell::productInfo().presetFolder);
+        const auto listBefore = settings.getChildFile ("Save warnings.txt").loadFileAsString();
+        int asked = 0;
+        osp::plugin::presetsave::setAnswerForTesting ([&] (const juce::File& f) { ++asked; CHECK (f == mine); return std::pair<bool, bool> { false, false }; });
+        const auto before = mine.getLastModificationTime();
+        key->onClick();
+        CHECK (asked == 1);
+        CHECK (mine.getLastModificationTime() == before);   // (Cancel: nothing written)
+        osp::plugin::presetsave::setAnswerForTesting ([&] (const juce::File&) { ++asked; return std::pair<bool, bool> { true, true }; });
+        key->onClick();
+        CHECK (asked == 2);
+        CHECK_FALSE (osp::plugin::presetsave::warns (settings, mine));
+        key->onClick();
+        CHECK (asked == 2);   // (not asked again for this patch)
+        osp::plugin::presetsave::setAnswerForTesting (nullptr);
+        settings.getChildFile ("Save warnings.txt").replaceWithText (listBefore);   // (the musician's own list, as it was)
+        bool saveAsAsked = false;
+        key->onSaveAs = [&] { saveAsAsked = true; };
+        const auto rightClick = juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), {}, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier), 1.0f,
+                                                  juce::MouseInputSource::defaultOrientation, juce::MouseInputSource::defaultRotation, juce::MouseInputSource::defaultTiltX,
+                                                  juce::MouseInputSource::defaultTiltY, key, key, juce::Time::getCurrentTime(), {}, juce::Time::getCurrentTime(), 1, false);
+        key->mouseDown (rightClick);
+        key->mouseUp (rightClick);
+        CHECK (saveAsAsked);
     }
     factoryFile.deleteFile();
     mine.deleteFile();

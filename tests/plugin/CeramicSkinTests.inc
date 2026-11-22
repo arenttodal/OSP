@@ -462,5 +462,5 @@ TEST_CASE ("plugin: the GUI's texts are clean UTF-8 (no mis-encoded ellipses); S
     find (*editor);
     REQUIRE (save != nullptr);
     CHECK (save->isVisible());
-    CHECK (save->getTooltip() == "Save preset");
+    CHECK (save->getTooltip() == "Save preset (right-click: Save As...)");
 }

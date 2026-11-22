@@ -185,6 +185,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     presetBar.onChange = [this] { timerCallback(); };
     content.addAndMakeVisible (presetBar);
     savePresetButton.onClick = [this] { saveInstrument(); };
+    savePresetButton.onSaveAs = [this] { choosePresetFile (true); };
     content.addAndMakeVisible (savePresetButton);
     content.addAndMakeVisible (volume);
     menuButton.setTooltip ("Sounds, presets, undo");
@@ -200,7 +201,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         // The modifiers: in the display's top-left (a product's choice, and reference parity:
         // ANDOR OSP's) or under the knobs; a generator's cards are set again with its extensions.
         card->setModifiersInWell (shell.modifiersInWell());
-        card->setFootTrimmed (sourceTrim() > 0.0f);
+        card->setFootTrimmed (cardTrim() > 0.0f);   // (the cards' own row: never the AUX strip's room)
         card->onFocus = [this] (int l) {
             shell.setEditLayer (l);
             updateFocus();
@@ -678,7 +679,7 @@ void ShellEditor::layoutSources()
     {
         shownTrim = trim;
         for (auto& card : cards)
-            card->setFootTrimmed (trim > 0.0f);
+            card->setFootTrimmed (cardTrim() > 0.0f);   // (not `trim`: the AUX strip moves what is under the cards, never the cards' row)
         shownCount = -1;
         layoutInstrument();
         if (! shapingWindow)   // (else the caller shapes it, once)
@@ -1124,11 +1125,19 @@ void ShellEditor::saveInstrument()
         choosePresetFile (true);
         return;
     }
+    // SAVE writes over the open preset: asked first (unless the musician said not to for this
+    // patch); a right-click on SAVE is Save As.
     const auto file = shell.currentPresetFile();
-    const bool ok = shell.savePreset (file);
-    modOverlay.showStatusNotice (ok ? "Saved " + file.getFileNameWithoutExtension() : "Could not save " + file.getFileName());
-    presetBar.refresh();
-    timerCallback();
+    const auto settings = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile (shell.product().presetFolder);
+    juce::Component::SafePointer<ShellEditor> safe (this);
+    presetsave::confirmThenSave (*this, settings, file, [safe, file] {
+        if (safe == nullptr)
+            return;
+        const bool ok = safe->shell.savePreset (file);
+        safe->modOverlay.showStatusNotice (ok ? "Saved " + file.getFileNameWithoutExtension() : "Could not save " + file.getFileName());
+        safe->presetBar.refresh();
+        safe->timerCallback();
+    });
 }
 
 void ShellEditor::choosePresetFile (bool save)
@@ -1884,7 +1893,7 @@ void ShellEditor::refreshCardExtensions()
         if (product.cardModifiersShown != nullptr)
             card.setModifiersShown (product.cardModifiersShown (l, shell));
         card.setModifiersInWell (shell.modifiersInWell());
-        card.setFootTrimmed (sourceTrim() > 0.0f);
+        card.setFootTrimmed (cardTrim() > 0.0f);
         if (shell.modifiersInWell() && product.cardModifiersApplicable != nullptr)
             card.setModifiersApplicable (product.cardModifiersApplicable (l, shell));
         if (product.wellOverlay != nullptr)
