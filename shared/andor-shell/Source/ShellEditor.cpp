@@ -482,7 +482,7 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         if (performanceOn)
         {
             const auto shown = performanceKnobs();
-            frame::paint (g, content, shell.product().identity, false, macros, 0.0f, sourceTrim(), design::height - cardTrim(), &shown);
+            frame::paint (g, content, shell.product().identity, false, macros, 0.0f, sourceTrim(), design::height - sourceTrim(), &shown);
         }
         else
             frame::paint (g, content, shell.product().identity, arpShown, bankShown == 1 ? userRow : macros, rackShift(), sourceTrim(), design::height - cardTrim());
@@ -622,7 +622,7 @@ void ShellEditor::layoutInstrument()
     placeMacroLamps();
     placeUserMacros();
     modOverlay.setBounds (content.getLocalBounds());
-    sourceArea = frame::sourceArea (cardTrim());   // (the cards keep their place: only what is under them moves)
+    sourceArea = frame::sourceArea (performanceOn ? sourceTrim() : cardTrim());   // (the cards keep their place: only what is under them moves)
     shownCount = -1;
     layoutSources();
     if (auxStrip != nullptr)

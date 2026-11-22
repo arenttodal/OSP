@@ -164,7 +164,12 @@ public:
         cards the row they had under the knobs is gone, the cards that much shorter and
         everything under them that much higher (EngineCard::footTrim); with one or two they had
         no row of their own (they sat beside the knobs), so nothing moves. */
-    float sourceTrim() const noexcept { return cardTrim; }
+    float sourceTrim() const noexcept
+    {
+        // (Performance: the cards shorter by as much as their header and knobs took, so the
+        // pictures keep the wells' Edit height)
+        return performanceOn ? EngineCard::performanceTrim (ospProcessor.slotCount() >= 3) : cardTrim;
+    }
 
     /** The FX library's rack (shared with ANDOR ANALOG; the routing view opens it): below the
         source area, the window growing by its height, as ANALOG's. Nothing shows - and nothing

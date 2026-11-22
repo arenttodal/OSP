@@ -152,6 +152,7 @@ TEST_CASE ("Performance Mode (OSP): one key; 1, 2 or 3 sources become pictures; 
     for (auto* param : p.getParameters())
         before.add (juce::String (param->getValue(), 9));
     const float editHeight = ui->instrumentHeight();
+    const int editWell = ui->engineCard (0).display().getHeight();
     auto& key = ui->performanceKey();
     CHECK (key.isVisible());
     CHECK (key.getTitle() == "Enter Performance Mode");
@@ -162,6 +163,8 @@ TEST_CASE ("Performance Mode (OSP): one key; 1, 2 or 3 sources become pictures; 
     CHECK (ui->instrumentHeight() <= editHeight);
     CHECK (ui->engineCard (0).inPerformance());
     CHECK (ui->engineCard (0).isVisible());
+    // The picture keeps the dark well's Edit Mode height (the card is shorter instead).
+    CHECK (std::abs (ui->engineCard (0).display().getHeight() - editWell) <= 1);
     CHECK_FALSE (ui->sourceViewToggle().isVisible());
     // OSP's six core macros, in the panel's order (LIFE ... ECHO, SPACE).
     CHECK (ui->performanceMacrosShown().size() == 6);
@@ -189,6 +192,15 @@ TEST_CASE ("Performance Mode (OSP): one key; 1, 2 or 3 sources become pictures; 
     for (int l = 0; l < 3; ++l)
         pictures += ui->engineCard (l).isVisible() && ui->engineCard (l).inPerformance() ? 1 : 0;
     CHECK (pictures == 3);
+    {
+        // Three cards: the same in both modes.
+        const int perfWell = ui->engineCard (0).display().getHeight();
+        ui->setPerformance (false);
+        ui->refreshNow();
+        CHECK (std::abs (ui->engineCard (0).display().getHeight() - perfWell) <= 1);
+        ui->setPerformance (true);
+        ui->refreshNow();
+    }
     // Back to Edit: as it was.
     key.onClick();
     ui->refreshNow();

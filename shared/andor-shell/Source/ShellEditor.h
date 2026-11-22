@@ -146,7 +146,12 @@ public:
     bool shapingWindow = false;
     /** How far everything under the cards moves up: the cards' trim, less the AUX strip's room
         while it is shown (negative: down). */
-    float sourceTrim() const noexcept { return cardTrim() - (performanceOn ? 0.0f : auxShift()); }
+    float sourceTrim() const noexcept
+    {
+        // (Performance: the cards shorter by as much as their header and knobs took, so the
+        // pictures keep the wells' Edit height; no AUX strip)
+        return performanceOn ? osp::plugin::EngineCard::performanceTrim (threeEngines() || shell.slotCount() >= 3) : cardTrim() - auxShift();
+    }
     /** The product's AUX strip (ShellProduct::auxStrip): shown or hidden (a view change only;
         the window grows or shrinks by its room). */
     void setAuxStripShown (bool shown);

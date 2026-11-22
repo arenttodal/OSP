@@ -557,6 +557,11 @@ public:
         the parameters and what the card plays never change. */
     void setPerformance (bool performance);
     bool inPerformance() const noexcept { return performance; }
+    /** How much shorter a card is in Performance Mode, so its picture keeps the dark well's
+        Edit Mode height exactly (the well: the card less 267 px with three cards, 206 with one or
+        two, the foot's trim given back; in Performance: the card less 16 px above and below).
+        `triple`: the Edit layout's three narrow cards. Everything under the cards moves up. */
+    static constexpr float performanceTrim (bool triple) noexcept { return (triple ? 267.0f : 206.0f) - 32.0f; }
     /** Tests: modifier `index`'s key (0 LINK .. 3 FOLLOW), or nullptr. */
     ModifierButton* modifierKey (int index) const noexcept { return index >= 0 && index < 4 ? modifiers[static_cast<std::size_t> (index)].get() : nullptr; }
     /** Controls revealed in the well by the pointer (ProductInfo::wellOverlay); null: none.
