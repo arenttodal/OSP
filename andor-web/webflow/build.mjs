@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds the ANDOR OSP landing page for Webflow.
 //
-//   node webflow/build.mjs --media <base URL> [--waitlist <MailerLite form endpoint>] [--out webflow/dist]
+//   node webflow/build.mjs --media <base URL> [--waitlist <MailerLite form endpoint>] [--out webflow/dist] [--preview]
 //
 // <x-img name=… sizes=… alt=…> and <x-film id=… mode=… alt=…> in src/page.html are expanded from media.json
 // into responsive <picture> markup; {{M}} becomes the media base URL (Cloudflare R2). Output:
@@ -24,6 +24,7 @@ const MEDIA = arg("--media", "media").replace(/\/$/, "");
 const WAITLIST = arg("--waitlist", "");
 const OUT = arg("--out", join(HERE, "dist"));
 const VERSION = "1";
+const PREVIEW = process.argv.includes("--preview"); // a hosted preview: the Webflow size limit only warns
 const manifest = JSON.parse(readFileSync(join(HERE, "media.json"), "utf8"));
 const LIMIT = 50000; // Webflow's character limit for one Code Embed and for each custom-code field
 mkdirSync(OUT, { recursive: true });
@@ -92,4 +93,5 @@ const sizes = { "webflow-head.html": head.length, "webflow-embed.html": embed.le
 let ok = true;
 for (const [k, n] of Object.entries(sizes)) { const fits = n <= LIMIT; ok &&= fits || k === "webflow-single-embed.html"; console.log(`${k.padEnd(28)} ${String(n).padStart(6)} chars ${fits ? "OK" : "OVER " + LIMIT}`); }
 console.log(`andor.min.css ${css.length} B, andor.min.js ${js.length} B, media ${MEDIA}`);
-if (!ok) process.exit(1);
+if (!ok && PREVIEW) console.warn("over the Webflow limit: fine for a preview; for Webflow, serve the media from a short custom domain");
+else if (!ok) process.exit(1);

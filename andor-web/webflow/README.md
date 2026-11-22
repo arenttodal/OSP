@@ -39,6 +39,18 @@
   - R2 enabled in that account;
   - a `CLOUDFLARE_API_TOKEN` with *Workers R2 Storage: Edit* on that account.
 - **For production traffic:** connect a custom domain to the bucket. Cloudflare rate-limits `r2.dev` URLs. Then rebuild with `--media https://<domain>/osp/v1`.
+  A short domain is also needed for the Webflow size limit: with the long `r2.dev` address the embed is about 52k characters, over the 50k limit.
+- **Published (22 Nov):** bucket `andor-media` on the owner's personal account, public URL `https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1` (332 files, 57 MB).
+
+**Hosted preview** (for dialling in the design before it goes into Webflow):
+- URL: `https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/preview/index.html`.
+- Republish after a change:
+  ```bash
+  node webflow/build.mjs --preview --media https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1 --waitlist https://assets.mailerlite.com/jsonp/161928/forms/204835943155238722/subscribe --out /tmp/andor-dist
+  python3 webflow/tools/publish_preview.py 70ed9685de2dd41af4f0f46fceead417 andor-media /tmp/andor-dist
+  ```
+- `--preview` lets the build finish when a snippet is over the Webflow limit (it warns instead).
+- **Why not `andor-learn.pages.dev/osp/`:** that address is the live OSP Learn guide, built by Pages from `learn/site` on `feature/learn-capture-studio` (Evenant account). Publishing the landing page there would replace the guide. A direct upload to a preview branch of that project was refused from the cloud session (its proxy replaces Pages' short-lived upload token).
 
 ## Build
 
