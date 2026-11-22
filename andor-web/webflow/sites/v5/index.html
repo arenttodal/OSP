@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANDOR OSP · Story</title>
+<meta name="description" content="From a voice memo to an instrument in seconds. Five stories of one recording becoming an instrument.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="../kit/kit.css">
+<style>
+/* V5 "Story": narrative; five real use cases told beside their recordings; warm ivory and ink. */
+:root { --paper: #f2ede6; --paper-2: #e8e1d7 }
+body { background: var(--paper) }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 40; display: flex; align-items: center; justify-content: space-between; padding: 18px var(--gut); color: var(--ink); transition: background .3s }
+.nav.solid { background: rgba(242,237,230,.88); backdrop-filter: blur(14px) } .nav.dark { color: var(--moon) } .nav.dark.solid { background: rgba(14,14,16,.82) }
+.nav .wm { font-weight: 800; letter-spacing: .22em; font-size: 15px; text-decoration: none } .nav .btn { height: 40px; padding: 0 18px; font-size: 14px } .nav.dark .btn { background: var(--moon); color: var(--ink) }
+/* hero (approved plate, tipping toward you) */
+.hero { position: relative; height: 100svh; min-height: 640px; overflow: hidden; background: var(--sand); color: #23251f }
+.hero .media { position: absolute; top: 6vh; left: 0; right: 0; bottom: -6vh }
+.hero .media::before { content: ""; position: absolute; left: 0; right: 0; top: -6vh; height: 8vh; background: linear-gradient(var(--sand), rgba(220,216,211,0)); z-index: 1 }
+.hero .copy { position: relative; z-index: 2; display: grid; justify-items: center; text-align: center; padding: max(96px, 11vh) var(--gut) 0 }
+.hero .copy .label { color: #6f6b62 } .hero h1 { margin-top: 1.6vh; font-size: clamp(2.3rem, min(4.8vw, 6.2vh), 6rem); max-width: 13em }
+.hero .sub { margin-top: 2.2vh; font-size: clamp(.95rem, 2.1vh, 1.3rem); color: #4d4b45; max-width: 44em } .hero .cta { margin-top: 2.6vh; display: flex; gap: 14px 22px; justify-content: center; align-items: center; flex-wrap: wrap }
+@media (max-aspect-ratio: 4/5) { .hero .media { top: 0; bottom: 0 } .hero .media::before { display: none } .hero .copy { position: absolute; inset: 0; align-content: start; padding-top: clamp(104px, 13vh, 150px) } .hero .cta { position: absolute; left: 0; right: 0; bottom: max(64px, 9vh); margin: 0 } }
+/* opening line */
+.open { padding: clamp(110px, 13vw, 180px) 0 clamp(70px, 8vw, 110px) }
+.open p { font-weight: 720; letter-spacing: -.03em; line-height: 1.12; font-size: clamp(1.8rem, 3.6vw, 3.4rem); max-width: 22em; text-wrap: balance }
+.open p span { color: var(--ink-3) }
+/* stories */
+.story { padding: clamp(70px, 8vw, 120px) 0; border-top: 1px solid var(--line) }
+.story .grid { display: grid; grid-template-columns: .85fr 1.15fr; gap: 64px; align-items: center }
+.story.flip .grid { grid-template-columns: 1.15fr .85fr } .story.flip .txt { order: 2 }
+.story .no { font-weight: 650; font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent) }
+.story h2 { margin-top: 14px } .story .lead { margin-top: 22px; font-size: clamp(1.08rem, 1.5vw, 1.28rem); line-height: 1.6 }
+.story .lead b { color: var(--ink); font-weight: 650 }
+.story .clip { aspect-ratio: var(--ar, 1.6); box-shadow: 0 40px 100px rgba(40,46,44,.25) }
+.story .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px } .story .pair .clip { --ar: 1.25 }
+.steps-mini { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 26px } .steps-mini span { padding: 7px 12px; border-radius: 999px; background: var(--paper-2); font-size: 13.5px; font-weight: 600; color: var(--ink-2) }
+.patch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 26px } .patch div { background: #fff; border-radius: 12px; padding: 12px 14px; font-size: 14px; color: var(--ink-2) } .patch b { display: block; color: var(--ink); font-size: 16px }
+.libshot { border-radius: 14px; box-shadow: 0 40px 100px rgba(40,46,44,.25) }
+/* promises */
+.prom { padding: clamp(110px, 13vw, 170px) 0 }
+.prom .row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 64px; border-top: 1px solid var(--line-d) }
+.prom .row3 div { padding: 34px 30px 0 0 } .prom .row3 b { font-weight: 780; letter-spacing: -.035em; font-size: clamp(2rem, 3.4vw, 3rem); display: block } .prom .row3 p { color: var(--moon-2); margin-top: 14px }
+/* combination */
+.combo { padding: clamp(110px, 13vw, 170px) 0 }
+.combo ol { list-style: none; margin-top: 56px; counter-reset: c; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 56px }
+.combo li { counter-increment: c; display: grid; grid-template-columns: 54px 1fr; gap: 10px; padding: 22px 0; border-top: 1px solid var(--line); font-size: 18px; color: var(--ink-2) }
+.combo li::before { content: counter(c, decimal-leading-zero); font-weight: 650; color: var(--accent); font-size: 14px; padding-top: 3px } .combo li b { color: var(--ink); font-weight: 650 }
+.combo .note { margin-top: 26px; color: var(--ink-3); font-size: 14px }
+/* close */
+.close3 { padding: clamp(110px, 13vw, 170px) 0; text-align: center }
+.close3 .wl { max-width: 520px; margin: 34px auto 0; justify-content: center } .close3 .wl input[type=email] { background: var(--night-3); color: var(--moon) } .close3 .btn { background: var(--moon); color: var(--ink) } .close3 .msg { text-align: center }
+.close3 .small { margin-top: 26px; color: var(--moon-3); font-size: 14px }
+.foot { background: var(--night); color: var(--moon-3); padding: 30px var(--gut) 54px; font-size: 13px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px; border-top: 1px solid var(--line-d) } .foot a { margin-left: 18px; text-decoration: none }
+@media (max-width: 900px) { .story .grid, .story.flip .grid { grid-template-columns: minmax(0, 1fr); gap: 34px } .story.flip .txt { order: 0 } .prom .row3 { grid-template-columns: minmax(0, 1fr) } .combo ol { grid-template-columns: minmax(0, 1fr) } .patch { grid-template-columns: minmax(0, 1fr) } }
+</style></head>
+<body>
+<header class="nav" data-nav><a class="wm" href="#top">ANDOR OSP</a><a class="btn" href="#waitlist">Join the waitlist</a></header>
+
+<section class="hero" id="top">
+  <div class="media" data-rise data-frames="24" data-base="../m/rise/rise-" data-copy=".copy">
+    <div class="rise__bg"><img src="../m/rise/rise-backdrop.webp" alt="" width="1600" height="900"></div>
+    <div class="rise__light" aria-hidden="true"><i></i><i></i></div>
+    <canvas class="rise__inst" aria-label="The ANDOR OSP instrument"></canvas>
+    <picture class="rise__phone"><source media="(max-aspect-ratio: 4/5)" type="image/webp" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-860.webp 860w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-1290.webp 1290w" sizes="100vw"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""></picture>
+  </div>
+  <div class="copy">
+    <p class="label">ANDOR OSP · One Shot Performer</p>
+    <h1 class="d">From a voice memo<br>to an instrument in seconds.</h1>
+    <p class="sub">Your sound, played: alive, sustained, reimagined.</p>
+    <div class="cta"><a class="btn" href="#waitlist">Join the waitlist</a><a class="tlink" href="#s1">Read the stories</a></div>
+  </div>
+</section>
+
+<section class="open">
+  <div class="wrap"><p>Somewhere on your phone is a sound you love. <span>A hum on a walk. One perfect note. Something you played once and never again.</span> ANDOR OSP turns it into an instrument you can play across every key, and it stays yours.</p></div>
+</section>
+
+<section class="story" id="s1">
+  <div class="wrap grid">
+    <div class="txt"><p class="no">Story 01</p><h2 class="d d2">The voice memo.</h2>
+      <p class="lead">You hum a phrase into your phone on a walk. At home it is already waiting in the <b>Inbox</b>, which watches your Voice Memos, Dropbox or iCloud folder. <b>MAP NOTES</b> splits it into its notes, each on its own key. Add <b>LIFE</b>, hold a chord, and the sustain never loops.</p>
+      <div class="steps-mini"><span>Inbox</span><span>MAP NOTES</span><span>LIFE</span><span>Continuation</span></div></div>
+    <div class="clip"><video data-clip muted loop playsinline preload="none" poster="../m/learn/b-phrase-map-notes-poster.webp"><source src="../m/learn/b-phrase-map-notes.webm" type="video/webm"><source src="../m/learn/b-phrase-map-notes.mp4" type="video/mp4"></video><button class="snd" data-sound aria-pressed="false"><span class="n">Sound off</span><span class="y">Sound on</span></button></div>
+  </div>
+</section>
+
+<section class="story flip">
+  <div class="wrap grid">
+    <div class="txt"><p class="no">Story 02</p><h2 class="d d2">The one perfect note.</h2>
+      <p class="lead">One bowed note becomes a whole-keyboard instrument. <b>TAPE FRAME</b> gives it a faded-film version of itself. <b>IMPRINT</b> underneath adds a synth body that still sounds like the instrument, and holds after the bow has stopped.</p>
+      <div class="steps-mini"><span>REIMAGINED · TAPE FRAME</span><span>SYNTH</span><span>IMPRINT</span></div></div>
+    <div class="pair">
+      <div class="clip"><video data-clip muted loop playsinline preload="none" poster="../m/learn/i1-reimagined-poster.webp"><source src="../m/learn/i1-reimagined.webm" type="video/webm"><source src="../m/learn/i1-reimagined.mp4" type="video/mp4"></video></div>
+      <div class="clip"><video data-clip muted loop playsinline preload="none" poster="../m/learn/f2-synth-imprint-poster.webp"><source src="../m/learn/f2-synth-imprint.webm" type="video/webm"><source src="../m/learn/f2-synth-imprint.mp4" type="video/mp4"></video></div>
+    </div>
+  </div>
+</section>
+
+<section class="story">
+  <div class="wrap grid">
+    <div class="txt"><p class="no">Story 03</p><h2 class="d d2">Grab what just happened.</h2>
+      <p class="lead">You improvised something great on your guitar, and you weren't recording. <b>GRAB LAST 30 s</b>, and it is already an instrument: trimmed, chopped into its notes and mapped across the keys.</p>
+      <div class="steps-mini"><span>GRAB LAST 10 · 20 · 30 · 60 s</span><span>Sidechain or input</span></div></div>
+    <div class="clip"><video data-clip muted loop playsinline preload="none" poster="../m/learn/c2-grab-last-poster.webp"><source src="../m/learn/c2-grab-last.webm" type="video/webm"><source src="../m/learn/c2-grab-last.mp4" type="video/mp4"></video></div>
+  </div>
+</section>
+
+<section class="story flip">
+  <div class="wrap grid">
+    <div class="txt"><p class="no">Story 04</p><h2 class="d d2">A hybrid patch in a minute.</h2>
+      <p class="lead">Three sounds, one instrument. A vocal vowel on A. An old synth note on B, in Granular with <b>KEY DNA</b>. A pluck through <b>MOSAIC</b> on C. The arpeggiator on B only, <b>ABYSS</b> on the space.</p>
+      <div class="patch"><div><b>A</b>Vocal vowel</div><div><b>B</b>Granular + KEY DNA, arp</div><div><b>C</b>Pluck through MOSAIC</div></div></div>
+    <div class="clip" style="--ar:1.47"><video data-clip muted loop playsinline preload="none" poster="../m/learn/granular-3card-poster.webp"><source src="../m/learn/granular-3card.webm" type="video/webm"><source src="../m/learn/granular-3card.mp4" type="video/mp4"></video></div>
+  </div>
+</section>
+
+<section class="story">
+  <div class="wrap grid">
+    <div class="txt"><p class="no">Story 05</p><h2 class="d d2">The instrument that travels.</h2>
+      <p class="lead">Save it as a preset, or start from a <b>starting state</b>. When it is done, export an <b>.ospinstrument</b>: the recordings, their analysis and every setting in one file, sounding the same on another computer. And every sound you ever dropped in stays in the <b>Library</b>, tagged and searchable.</p>
+      <div class="steps-mini"><span>Presets</span><span>Starting states</span><span>.ospinstrument</span><span>Library</span></div></div>
+    <div class="clip" style="--ar:1.66"><video data-clip muted loop playsinline preload="none" poster="../m/learn/e5-export-instrument-poster.webp"><source src="../m/learn/e5-export-instrument.webm" type="video/webm"><source src="../m/learn/e5-export-instrument.mp4" type="video/mp4"></video></div>
+  </div>
+</section>
+
+<section class="prom on-night">
+  <div class="wrap"><h2 class="d d1">Three promises.</h2>
+    <div class="row3">
+      <div><b>Instant.</b><p>One file is enough. Drop it and play within moments. No key-mapping, no loop points.</p></div>
+      <div><b>Alive.</b><p>Every note performed, not replayed. Hold notes forever without hearing a loop.</p></div>
+      <div><b>Yours, transformed.</b><p>From faithful to far away, while the sound stays recognisably yours.</p></div>
+    </div></div>
+</section>
+
+<section class="combo">
+  <div class="wrap"><h2 class="d d1">Seven things.<br><span class="mute">One instrument.</span></h2>
+    <ol>
+      <li><span><b>One file, instantly</b> an instrument across the keyboard</span></li>
+      <li><span><b>Loop-free sustain</b> that continues the recording itself</span></li>
+      <li><span><b>Calibrated per-note performance</b> with LIFE</span></li>
+      <li><span><b>Phrase to mapped notes,</b> including GRAB after the fact</span></li>
+      <li><span><b>Five transformations</b> that keep the sound's identity</span></li>
+      <li><span><b>An analog oscillator imprinted</b> with the recording's own spectral body, per note</span></li>
+      <li><span><b>Offline, private and deterministic,</b> every render the same</span></li>
+    </ol>
+    <p class="note">As far as we know, no single instrument combines all seven.</p></div>
+</section>
+
+<section class="close3 on-night" id="waitlist">
+  <div class="wrap"><h2 class="d d1">Your next instrument<br><span class="mute">is already on your phone.</span></h2>
+    <form class="wl" data-waitlist="https://assets.mailerlite.com/jsonp/161928/forms/204835943155238722/subscribe" novalidate>
+      <input type="email" name="fields[email]" placeholder="Your email" aria-label="Email" required><input class="hp" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="btn" type="submit">Join the waitlist</button><p class="msg" aria-live="polite"></p></form>
+    <p class="small">AU · VST3 · Standalone · macOS at release</p></div>
+</section>
+<footer class="foot"><span>© ANDOR</span><span><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></span></footer>
+<script src="../kit/kit.js"></script>
+</body></html>
