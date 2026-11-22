@@ -6,8 +6,9 @@
 > settings folder); a right-click (or Ctrl-click) on the SAVE key opens Save As. Factory, pack
 > and new patches go to Save As as before. Shell: the cards' row under the knobs follows the
 > cards alone (an AUX strip no longer brings it back). Shell presets carry their folder
-> ("origin:user|folder:a/b"): a host that says where its presets live gets PRESETS as Factory and
-> User submenus, each folder a submenu of its own (OSP, which groups its presets in the
+> ("origin:user|folder:a/b"): a host that says where its presets live gets its factory set by
+> CATEGORIES (its folders) right in the menu and the musician's own in one User submenu, each
+> folder a submenu of its own (OSP, which groups its presets in the
 > Library's collections, is unchanged). Tests in both (`[plugin][menus][save]`, `[shell][presets]`).
 
 > **21 Nov 2026, the layer EQ editor and parameters for a product's own bus (branch

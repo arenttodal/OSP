@@ -598,7 +598,8 @@ TEST_CASE ("shell: SAVE updates only the musician's own preset; factory presets 
     REQUIRE (factoryAt >= 0);
     REQUIRE (mineAt >= 0);
     CHECK (factoryAt < mineAt);
-    // The quick menu: Factory, then User (submenus); no "Save starting state" without a handler.
+    // The quick menu: the factory set under CATEGORIES, then User (a submenu); no "Save starting
+    // state" without a handler.
     {
         std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
         auto* ui = dynamic_cast<ShellEditor*> (editor.get());
@@ -612,8 +613,9 @@ TEST_CASE ("shell: SAVE updates only the musician's own preset; factory presets 
             if (it.getItem().subMenu != nullptr)
                 submenus.add (it.getItem().text);
         }
-        CHECK (submenus.indexOf ("Factory") >= 0);
-        CHECK (submenus.indexOf ("Factory") < submenus.indexOf ("User"));
+        CHECK (headers.indexOf ("Categories") >= 0);
+        CHECK (texts.indexOf ("ZZ Test Factory") >= 0);   // (a factory preset outside a category folder: right under CATEGORIES)
+        CHECK (submenus.contains ("User"));
         for (const auto& t : texts)
             CHECK_FALSE (t.startsWithIgnoreCase ("Save starting state"));
         // The main menu: SAVE and Save As, Undo / Redo with their shortcuts.

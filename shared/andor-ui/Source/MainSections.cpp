@@ -857,10 +857,13 @@ juce::PopupMenu PresetBar::presetMenu()
             menuicons::addItem (menu, Kind::previous, "Previous patch", true, [safe, opened] { if (safe != nullptr) safe->processor.restorePreviousState(), opened(); });
             menu.addSeparator();
         }
-        auto plain = [&] (const juce::String& text, bool ticked, std::function<void()> action, Kind kind = Kind::blank) {
+        auto plainIn = [] (juce::PopupMenu& m, const juce::String& text, bool ticked, std::function<void()> action, Kind kind = Kind::blank) {
             juce::PopupMenu::Item item (text);
             item.setTicked (ticked).setImage (menuicons::make (kind)).setAction (std::move (action));
-            menu.addItem (std::move (item));
+            m.addItem (std::move (item));
+        };
+        auto plain = [&] (const juce::String& text, bool ticked, std::function<void()> action, Kind kind = Kind::blank) {
+            plainIn (menu, text, ticked, std::move (action), kind);
         };
         auto saveState = [&] {
             if (onSaveStartingState == nullptr)
@@ -881,18 +884,18 @@ juce::PopupMenu PresetBar::presetMenu()
         const auto origin = [] (const InstrumentHost::PresetEntry& e) {
             return e.context.fromFirstOccurrenceOf ("origin:", false, false).upToFirstOccurrenceOf ("|", false, false);
         };
-        // A host that also says where each preset lives ("|folder:a/b"): FACTORY and USER as
-        // submenus, each folder a submenu of its own (its subfolders first, then its presets),
-        // the presets as the musician arranged them on disk.
+        // A host that also says where each preset lives ("|folder:a/b"): the factory set by its
+        // categories (its folders) right in the menu, as ANDOR OSP lists them; the musician's own
+        // in one User submenu, each of their folders a submenu (its subfolders first, then its
+        // presets), as they arranged them on disk.
         const bool foldered = std::any_of (list.begin(), list.end(), [] (const auto& e) { return e.context.contains ("|folder:"); });
         if (foldered)
         {
             const auto folderOf = [] (const InstrumentHost::PresetEntry& e) {
                 return juce::StringArray::fromTokens (e.context.fromFirstOccurrenceOf ("|folder:", false, false), "/", "");
             };
-            std::function<juce::PopupMenu (const std::vector<InstrumentHost::PresetEntry>&, int)> tree;
-            tree = [&] (const std::vector<InstrumentHost::PresetEntry>& entries, int depth) {
-                juce::PopupMenu m;
+            std::function<void (juce::PopupMenu&, const std::vector<InstrumentHost::PresetEntry>&, int)> fill;
+            fill = [&] (juce::PopupMenu& m, const std::vector<InstrumentHost::PresetEntry>& entries, int depth) {
                 juce::StringArray order;
                 std::map<juce::String, std::vector<InstrumentHost::PresetEntry>> groups;
                 std::vector<InstrumentHost::PresetEntry> loose;
@@ -911,35 +914,37 @@ juce::PopupMenu PresetBar::presetMenu()
                 {
                     const auto& inside = groups[name];
                     const bool holdsCurrent = std::any_of (inside.begin(), inside.end(), [&] (const auto& e) { return e.name == current; });
-                    m.addSubMenu (name, tree (inside, depth + 1), true, menuicons::make (Kind::blank), holdsCurrent);
+                    juce::PopupMenu sub;
+                    fill (sub, inside, depth + 1);
+                    m.addSubMenu (name, sub, true, menuicons::make (Kind::blank), holdsCurrent);
                 }
                 if (! order.isEmpty() && ! loose.empty())
                     m.addSeparator();
                 for (const auto& entry : loose)
-                {
-                    juce::PopupMenu::Item item (entry.name);
-                    item.setTicked (entry.name == current).setAction ([safe, entry, opened] {
+                    plainIn (m, entry.name, entry.name == current, [safe, entry, opened] {
                         if (safe == nullptr)
                             return;
                         safe->processor.openPresetEntry (entry);
                         opened();
                     });
-                    m.addItem (std::move (item));
-                }
-                return m;
             };
+            std::vector<InstrumentHost::PresetEntry> factory, user;
+            for (const auto& e : list)
+                if (! e.startingState)
+                    (origin (e) == "factory" ? factory : user).push_back (e);
             saveState();
-            menu.addSectionHeader ("Presets");
-            for (const auto* which : { "factory", "user" })
+            if (! factory.empty())
             {
-                std::vector<InstrumentHost::PresetEntry> entries;
-                for (const auto& e : list)
-                    if (! e.startingState && origin (e) == which)
-                        entries.push_back (e);
-                if (entries.empty())
-                    continue;
-                const bool holdsCurrent = std::any_of (entries.begin(), entries.end(), [&] (const auto& e) { return e.name == current; });
-                menu.addSubMenu (juce::String (which) == "factory" ? "Factory" : "User", tree (entries, 0), true, menuicons::make (Kind::blank), holdsCurrent);
+                menu.addSectionHeader ("Categories");
+                fill (menu, factory, 0);
+            }
+            if (! user.empty())
+            {
+                menu.addSeparator();
+                const bool holdsCurrent = std::any_of (user.begin(), user.end(), [&] (const auto& e) { return e.name == current; });
+                juce::PopupMenu sub;
+                fill (sub, user, 0);
+                menu.addSubMenu ("User", sub, true, menuicons::make (Kind::blank), holdsCurrent);
             }
             return menu;
         }
