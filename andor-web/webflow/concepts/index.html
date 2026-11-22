@@ -284,11 +284,11 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
 <section class="sec night look" data-cycle data-dur="5000">
   <div class="wrap">
     <h2 class="d d2" style="text-align:center">A closer look.</h2>
-    <div class="tabs"><button class="on">Live capture<i class="bar"></i></button><button>Note Map<i class="bar"></i></button><button>KEY DNA<i class="bar"></i></button><button>Granular<i class="bar"></i></button><button>Arpeggiator<i class="bar"></i></button></div>
+    <div class="tabs"><button class="on">Live capture<i class="bar"></i></button><button>Note Map<i class="bar"></i></button><button>KEY DNA<i class="bar"></i></button><button data-dur="8000">Granular<i class="bar"></i></button><button data-dur="12900">Arpeggiator<i class="bar"></i></button></div>
     <div class="pane on"><div><h3 class="d d3">Capture after the fact.</h3><p class="lead" style="margin-top:16px">Each card takes its own input: a mic, an interface, or a DAW track over sidechain. Record up to a minute, or pull the last 10, 20, 30 or 60 seconds from the buffer. Notes are found and mapped on the spot.</p></div><img src="m/mock-solo-capture-1920.webp" alt="The capture page"></div>
     <div class="pane"><div><h3 class="d d3">One take. A multisample.</h3><p class="lead" style="margin-top:16px">Note Atlas splits a played phrase into its notes and maps each to its own key, keeping the real note-to-note character of the performance.</p></div><img src="m/mock-solo-notemap-1920.webp" alt="Note Map"></div>
     <div class="pane"><div><h3 class="d d3">Every key its own grain.</h3><p class="lead" style="margin-top:16px">Draw curves across the keyboard for POS, SIZE, DENS, SPREAD, TUNE, SCATTER and PAN, with depth and variation. The texture changes with register.</p></div><img src="m/mock-solo-keydna-1920.webp" alt="KEY DNA"></div>
-    <div class="pane"><div><h3 class="d d3">Any source, a grain cloud.</h3><p class="lead" style="margin-top:16px">Per layer: POS, SIZE from 20 to 400 ms, DENS from 4 to 40 grains a second, SPREAD, SCATTER, PAN and three window shapes.</p></div><img src="m/editor-granular-2000.webp" alt="Granular mode"></div>
+    <div class="pane"><div><h3 class="d d3">Any source, a grain cloud.</h3><p class="lead" style="margin-top:16px">Per layer: POS, SIZE from 20 to 400 ms, DENS from 4 to 40 grains a second, SPREAD, SCATTER, PAN and three window shapes.</p></div><video class="clip" muted loop playsinline autoplay preload="none" poster="m/learn/granular-3card-poster.webp" aria-label="Card B in Granular: POS and then SPREAD turned while a chord plays"><source src="m/learn/granular-3card.webm" type="video/webm"><source src="m/learn/granular-3card.mp4" type="video/mp4"></video></div>
     <div class="pane"><div><h3 class="d d3">Three arps. Fully independent.</h3><p class="lead" style="margin-top:16px">One arpeggiator per sound, each with its own on/off, rate, pattern, octaves, gate and swing, or link all three. 18 patterns plus custom step patterns, STRUM for chord steps, host sync, and SATELLITE to send each layer on its own path through the stereo field.</p></div><video class="clip" muted loop playsinline autoplay preload="none" poster="m/learn/d3-satellite-poster.webp" aria-label="SATELLITE moving a layer in the stereo field"><source src="m/learn/d3-satellite.webm" type="video/webm"><source src="m/learn/d3-satellite.mp4" type="video/mp4"></video></div>
   </div>
 </section>
@@ -359,21 +359,22 @@ document.querySelectorAll("[data-type]").forEach((b) => b.addEventListener("clic
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // cycles: steps/tabs/modes advance while the section is on screen; a click jumps and holds for one cycle
 function cycle(sec, items, show) {
-  const dur = +sec.dataset.dur; sec.style.setProperty("--dur", dur + "ms");
+  const base = +sec.dataset.dur;
   let i = 0, timer = null, visible = false;
+  const durOf = (k) => +(items[k].dataset.dur || base);
   const go = (k) => { i = (k + items.length) % items.length; show(i);
-    items.forEach((el, j) => { el.classList.toggle("on", j === i); const bar = el.querySelector(".bar"); if (bar) { bar.style.animation = "none"; bar.offsetWidth; bar.style.animation = ""; } }); };
-  const run = () => { clearInterval(timer); if (visible && !reduce) timer = setInterval(() => go(i + 1), dur); };
+    items.forEach((el, j) => { el.classList.toggle("on", j === i); el.style.setProperty("--dur", durOf(j) + "ms"); const bar = el.querySelector(".bar"); if (bar) { bar.style.animation = "none"; bar.offsetWidth; bar.style.animation = ""; } }); };
+  const run = () => { clearTimeout(timer); if (visible && !reduce) timer = setTimeout(() => { go(i + 1); run(); }, durOf(i)); };
   items.forEach((el, j) => el.addEventListener("click", () => { go(j); run(); }));
   new IntersectionObserver(([e]) => { visible = e.isIntersecting; sec.classList.toggle("paused", !visible); run(); }, { threshold: 0.35 }).observe(sec);
-  sec.addEventListener("mouseenter", () => { clearInterval(timer); sec.classList.add("paused"); });
+  sec.addEventListener("mouseenter", () => { clearTimeout(timer); sec.classList.add("paused"); });
   sec.addEventListener("mouseleave", () => { sec.classList.remove("paused"); run(); });
   go(0);
 }
 document.querySelectorAll("[data-cycle]").forEach((sec) => {
   if (sec.classList.contains("cycle")) { const imgs = sec.querySelectorAll(".frame img"); cycle(sec, [...sec.querySelectorAll(".step")], (i) => imgs.forEach((im, j) => im.classList.toggle("on", j === i))); }
   else if (sec.classList.contains("rm")) { const imgs = sec.querySelectorAll(".stage img"); cycle(sec, [...sec.querySelectorAll("li")], (i) => imgs.forEach((im, j) => im.classList.toggle("on", j === i))); }
-  else if (sec.classList.contains("look")) { const panes = sec.querySelectorAll(".pane"); cycle(sec, [...sec.querySelectorAll(".tabs button")], (i) => panes.forEach((p, j) => p.classList.toggle("on", j === i))); }
+  else if (sec.classList.contains("look")) { const panes = sec.querySelectorAll(".pane"); cycle(sec, [...sec.querySelectorAll(".tabs button")], (i) => panes.forEach((p, j) => { p.classList.toggle("on", j === i); const v = p.querySelector("video"); if (v) { if (j === i) { v.currentTime = 0; v.play().catch(() => {}); } else v.pause(); } })); }
 });
 // C02: the Learn clips in order; a step ends when its clip ends; the bar follows the clip's time
 document.querySelectorAll("[data-seq]").forEach((sec) => {

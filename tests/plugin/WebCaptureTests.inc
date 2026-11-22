@@ -2,6 +2,7 @@
 // 1x, 2x and 3x so every product image on the site is a genuine capture of the current build.
 // Nothing here changes the plugin.
 //   OSP_WEB_CAPTURE=<dir> xvfb-run -a build-plugin/apps/plugin/osp_plugin_tests "[web-capture]"
+// With OSP_WEB_FILM=<dir> as well, it films the granular clip instead (PNG frames at 30 fps + film.wav).
 // Optional OSP_WEB_SOURCES="<a.wav>;<b.wav>;<c.wav>" replaces the deterministic stand-in sources
 // with real recordings (the approved demo sources), so the same shots can be re-taken for launch.
 // Included after RefinementShotsTests.inc (its helpers: writeSource, TempDir, ScopedLook).
@@ -125,6 +126,79 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         p.releaseResources();
     };
     const std::vector<int> chord { 48, 55, 60, 64, 71 };   // C3 G3 C4 E4 B4: an open Cmaj7
+
+    // Website film (OSP_WEB_FILM=<dir>): three cards with B in Granular, a chord held, B's POS then
+    // SPREAD turned smoothly; one PNG per frame at 30 fps plus the instrument's own audio (film.wav).
+    if (const char* filmDir = std::getenv ("OSP_WEB_FILM"))
+    {
+        const juce::File fdir (filmDir);
+        fdir.createDirectory();
+        OspAudioProcessor p;
+        std::unique_ptr<juce::AudioProcessorEditor> e (p.createEditorIfNeeded());
+        auto* ui = dynamic_cast<Editor*> (e.get());
+        REQUIRE (ui != nullptr);
+        juce::Array<juce::File> list;
+        for (int i = 0; i < 3; ++i)
+            list.add (src[static_cast<std::size_t> (i)]);
+        p.addLayers (list);
+        REQUIRE (p.waitForLoads (30000));
+        p.pollLoads();
+        e->setSize (1448, juce::roundToInt (ui->instrumentHeight()));
+        voiced (p);
+        set (p, "reimagined", 24.0f);
+        set (p, Host::layerParameterId (1, "sourceMode"), 1.0f);
+        set (p, Host::synthesizeId (2), 45.0f);
+        set (p, Host::synthParameterId (2, "mode"), 1.0f);
+        set (p, Host::synthParameterId (2, "imprint"), 80.0f);
+        set (p, "layerB.granular.size", 160.0f);
+        set (p, "layerB.granular.density", 26.0f);
+        ui->refreshNow();
+        ui->engineCard (1).showGranularControls (true, true);
+        const double sr = 48000.0;
+        const int block = 400, perFrame = 1600;                  // 30 fps
+        p.prepareToPlay (sr, block);
+        const int frames = 240;                                  // 8 s
+        juce::AudioBuffer<float> all (2, frames * perFrame);
+        juce::AudioBuffer<float> buf (2, block);
+        auto ease = [] (double t) { t = juce::jlimit (0.0, 1.0, t); return t * t * (3.0 - 2.0 * t); };
+        auto lerp = [&] (double a, double b, double t0, double t1, double t) { return a + (b - a) * ease ((t - t0) / (t1 - t0)); };
+        for (int f = 0; f < frames; ++f)
+        {
+            const double t = f / 30.0;
+            const double pos = t < 1.2 ? 18.0 : lerp (18.0, 78.0, 1.2, 3.8, t);
+            const double spread = t < 4.4 ? 20.0 : lerp (20.0, 85.0, 4.4, 7.0, t);
+            set (p, "layerB.granular.position", static_cast<float> (pos));
+            set (p, "layerB.granular.spread", static_cast<float> (spread));
+            for (int k = 0; k < perFrame / block; ++k)
+            {
+                juce::MidiBuffer midi;
+                if (f == 0 && k == 0)
+                    for (const int n : chord)
+                        midi.addEvent (juce::MidiMessage::noteOn (1, n, static_cast<juce::uint8> (96)), 0);
+                buf.clear();
+                p.processBlock (buf, midi);
+                for (int ch = 0; ch < 2; ++ch)
+                    all.copyFrom (ch, f * perFrame + k * block, buf, ch, 0, block);
+            }
+            if (f == 0)
+                for (const int n : chord)
+                    p.keyboardState.noteOn (1, n, 0.75f);
+            ui->refreshNow();
+            ui->refreshNow();
+            save (e->createComponentSnapshot (e->getLocalBounds(), true, 1.25f), "film-" + juce::String (f).paddedLeft ('0', 4) + ".png");
+        }
+        // the film is written by save() into OSP_WEB_CAPTURE's dir; move it next to the audio
+        for (auto& fl : out.findChildFiles (juce::File::findFiles, false, "film-*.png"))
+            fl.moveFileTo (fdir.getChildFile (fl.getFileName()));
+        fdir.getChildFile ("film.wav").deleteFile();
+        std::unique_ptr<juce::OutputStream> os (fdir.getChildFile ("film.wav").createOutputStream());
+        std::unique_ptr<juce::AudioFormatWriter> w (juce::WavAudioFormat().createWriterFor (os.get(), sr, 2, 24, {}, 0));
+        REQUIRE (w != nullptr);
+        os.release();
+        w->writeFromAudioSampleBuffer (all, 0, all.getNumSamples());
+        p.releaseResources();
+        return;
+    }
 
     // 01 The hero: the instrument as a player meets it, at 1, 2 and 3 layers (3x for print-sharp crops).
     shoot ({ 1, { 1448, 0 }, { 1.0f, 2.0f, 3.0f }, chord }, [&] (OspAudioProcessor& p, Editor&) {
