@@ -1,6 +1,7 @@
 #include "research/PedalReimaginedLab.h"
 
 #include "analysis/Analyzer.h"
+#include "core/PathText.h"
 #include "engine/InstrumentBuilder.h"
 #include "engine/InstrumentEngine.h"
 #include "io/AudioFileIO.h"
@@ -206,7 +207,7 @@ PedalReimaginedResult runPedalReimaginedLab (const std::vector<PedalLabSource>& 
             md << "| " << name << " | " << fixed (m.heldDb) << " | " << fixed (m.clickDb) << " | " << fixed (m.riseDb) << " | " << fixed (m.quietDb) << " | "
                << fixed (m.pedalUpStepDb) << " | " << fixed (m.endDb) << " | " << fixed (m.peakDb) << (m.finite ? "" : " NOT FINITE") << " |\n";
             if (writeAudio)
-                writeWav (audio, outDir / source.name / (name + ".wav"));
+                writeWav (audio, outDir / osp::pathFromUtf8 (source.name) / osp::pathFromUtf8 (name + ".wav"));
         };
         for (const auto pedal : { PedalLoopMode::forward, PedalLoopMode::pingPong })
             row (std::string ("A-off-") + pedalName (pedal), ReimaginedMode::kaleidoscope, 0.0, pedal);

@@ -4,6 +4,7 @@
 // one record, and a sound is found by its bytes - never by a file that merely has its name.
 
 #include "audio/utility/TestSignals.h"
+#include "core/PathText.h"
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
 #include "library/SoundImport.h"
@@ -44,7 +45,7 @@ namespace
         }
         std::filesystem::path wav (const std::string& name, double hz = 220.0, int channels = 2, double seconds = 0.5)
         {
-            const auto path = samples / name;
+            const auto path = samples / osp::pathFromUtf8 (name);
             std::filesystem::create_directories (path.parent_path());
             std::string error;
             REQUIRE (io::writeAudioFile (path, testsignals::sine (hz, seconds, 48000.0, 0.4, channels), io::SampleFormat::pcm24, error));

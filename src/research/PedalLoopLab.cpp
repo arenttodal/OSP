@@ -2,6 +2,7 @@
 
 #include "analysis/Analyzer.h"
 #include "audio/utility/TestSignals.h"
+#include "core/PathText.h"
 #include "core/Prng.h"
 #include "engine/InstrumentBuilder.h"
 #include "engine/InstrumentEngine.h"
@@ -401,7 +402,7 @@ PedalLabResult runPedalLoopLab (const std::vector<PedalLabSource>& sources, cons
                << fixed (m.lastSecondDb) << " | " << r.voicesLeft << " |\n";
             if (writeAudio)
             {
-                const auto dir = outDir / src.name;
+                const auto dir = outDir / osp::pathFromUtf8 (src.name);
                 std::filesystem::create_directories (dir);
                 std::string error;
                 io::writeAudioFile (dir / (renderName + ".wav"), r.audio, io::SampleFormat::pcm24, error);

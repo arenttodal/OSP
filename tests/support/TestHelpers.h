@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/AudioData.h"
+#include "core/PathText.h"
 #include "model/AnalysisData.h"
 
 #include <filesystem>
@@ -19,7 +20,7 @@ public:
     TempDir& operator= (const TempDir&) = delete;
 
     const std::filesystem::path& path() const noexcept { return dir; }
-    std::filesystem::path operator/ (const std::string& name) const { return dir / name; }
+    std::filesystem::path operator/ (const std::string& name) const { return dir / osp::pathFromUtf8 (name); }
 
 private:
     std::filesystem::path dir;

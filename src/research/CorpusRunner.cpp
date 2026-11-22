@@ -54,7 +54,7 @@ namespace
     void processFile (FileRecord& record, const CorpusRunOptions& options)
     {
         const auto& entry = *record.entry;
-        const auto sourcePath = options.corpusDir / entry.relativePath;
+        const auto sourcePath = options.corpusDir / osp::pathFromUtf8 (entry.relativePath);
         const auto folder = entry.folderName();
 
         auto source = loadAndAnalyse (sourcePath);
@@ -70,7 +70,7 @@ namespace
         record.status = "analysed";
 
         std::string error;
-        if (! io::writeAnalysis (options.reportsDir / folder / "analysis.json", source.analysis, error))
+        if (! io::writeAnalysis (options.reportsDir / osp::pathFromUtf8 (folder) / "analysis.json", source.analysis, error))
             record.error = error;
 
         record.root = chooseRoot (&source.analysis, std::nullopt);
@@ -105,7 +105,7 @@ namespace
                     const auto base = renderBaseName (fixtureName, engine);
                     if (options.writeAudio)
                     {
-                        const auto wav = options.rendersDir / folder / (base + ".wav");
+                        const auto wav = options.rendersDir / osp::pathFromUtf8 (folder) / osp::pathFromUtf8 (base + ".wav");
                         if (io::writeAudioFile (wav, output.audio, io::SampleFormat::float32, error))
                             render.wavPath = osp::utf8Of (wav);
                         else
@@ -124,7 +124,7 @@ namespace
                     json::set (metricsJson, "normaliseLevel", config.playback.normaliseLevel);
                     json::set (metricsJson, "startSeconds", json::number (preparation.startSeconds, 4));
                     json::set (metricsJson, "playbackGainDb", json::number (preparation.gainDb, 2));
-                    json::writeFile (options.reportsDir / folder / (base + ".metrics.json"), metricsJson, error);
+                    json::writeFile (options.reportsDir / osp::pathFromUtf8 (folder) / osp::pathFromUtf8 (base + ".metrics.json"), metricsJson, error);
 
                     render.status = metrics.status();
                     render.durationSeconds = metrics.durationSeconds;

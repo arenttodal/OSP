@@ -12,6 +12,11 @@
 >   `std::filesystem` string is the ANSI code page, so a user folder or a sample named with
 >   any letter outside ASCII was garbled (and SQLite, which takes UTF-8 names, could not open
 >   the catalog). All `.string()` / string-to-path conversions in the product go through them.
+>   Checked by the compiler, not by eye: built against a header that deletes `path`'s
+>   constructor from `std::string` / `std::string_view`, nothing in the product converts
+>   implicitly (the Inbox's size and date check did, so a file named outside ASCII stayed
+>   "detected" for ever). Left narrow on purpose: the research renderer's command line and
+>   test paths from environment variables (both arrive in the ANSI code page on Windows).
 >
 > **21 Nov 2026, rack modulation steps 3-5 (`docs/research/rack-modulation.md`):**
 > - **Every rack and effect control can be modulated:** the SPACE, ECHO and MOVEMENT racks

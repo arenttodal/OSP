@@ -575,7 +575,7 @@ LoadResult loadInstrumentAtlas (const AtlasLoadRequest& request, SampleStore& st
             {
                 std::vector<std::filesystem::path> search;
                 for (const auto& f : request.searchFolders)
-                    search.emplace_back (f);
+                    search.push_back (osp::pathFromUtf8 (f));
                 if (auto resolved = io::resolveSource (src, osp::pathFromUtf8 (request.atlasFolder), search))
                 {
                     found = resolved->path;

@@ -332,12 +332,12 @@ BackupResult exportBackup (Catalog& catalog, const BackupPlaces& places, const s
         }
         auto& job = jobs[static_cast<std::size_t> (i)];
         std::string why;
-        if (! copyVerified (job.from, partial / job.to, job.sha256, why))
+        if (! copyVerified (job.from, partial / osp::pathFromUtf8 (job.to), job.sha256, why))
         {
             result.error = why;
             return result;
         }
-        const auto bytes = static_cast<std::int64_t> (std::filesystem::file_size (partial / job.to, ec));
+        const auto bytes = static_cast<std::int64_t> (std::filesystem::file_size (partial / osp::pathFromUtf8 (job.to), ec));
         files.push_back ({ job.to, bytes, job.sha256 });
         result.bytes += bytes;
         if (job.to.rfind ("store/", 0) == 0)
@@ -525,7 +525,7 @@ RestoreReport restoreBackup (Catalog& catalog, const BackupPlaces& places, const
                                               std::tuple { std::string ("templates/"), m->templatesRoot, places.templatesDir },
                                               std::tuple { std::string ("packs/"), m->packsRoot, places.packsDir } })
             if (f.path.rfind (top, 0) == 0)
-                rest = f.path.substr (top.size()), oldRoot = from, newRoot = to;
+                rest = f.path.substr (top.size()), oldRoot = osp::pathFromUtf8 (from), newRoot = to;
         if (rest.empty())
             continue;
         target = newRoot / osp::pathFromUtf8 (rest);

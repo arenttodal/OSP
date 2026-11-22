@@ -137,8 +137,9 @@ InboxPass reconcileInbox (Catalog& catalog, const std::vector<std::filesystem::p
                 ++pass.waiting;
                 continue;
             }
-            const auto size = static_cast<std::int64_t> (std::filesystem::file_size (path, ec));
-            const auto time = modified (path);
+            const auto file = osp::pathFromUtf8 (path);
+            const auto size = static_cast<std::int64_t> (std::filesystem::file_size (file, ec));
+            const auto time = modified (file);
             const bool changed = isNew || size != item.size || time != item.mtime;
             if (item.state == "importing")
                 item.state = "ready";   // a crash or a closed host left it half done: the copy is checked again on import

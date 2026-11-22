@@ -149,7 +149,7 @@ TEST_CASE ("library scan: fast index, deep analysis, incremental rescans, correc
     REQUIRE (p.catalog->setScanFileRejected (loopFile.path, true));
     CHECK (p.catalog->scanFiles (*rootId).size() == 3);
     CHECK (p.catalog->scanFiles (*rootId, {}, true).size() == 4);
-    CHECK (std::filesystem::exists (loopFile.path));
+    CHECK (std::filesystem::exists (osp::pathFromUtf8 (loopFile.path)));
     // A file removed from the folder: its candidate goes.
     std::filesystem::remove (p.files / "damaged.wav");
     summary = scanFolder (*p.catalog, root, {}, control, progress);

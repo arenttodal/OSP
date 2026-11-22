@@ -130,7 +130,7 @@ std::vector<GeneratedSignal> writeTestSignalSet (const std::filesystem::path& di
     for (auto& item : items)
     {
         ts::applyFades (item.audio, 0.005, 0.02);
-        if (! io::writeAudioFile (dir / item.name, item.audio, item.format, error))
+        if (! io::writeAudioFile (dir / osp::pathFromUtf8 (item.name), item.audio, item.format, error))
             return {};
         out.push_back ({ item.name, item.hz, true });
     }

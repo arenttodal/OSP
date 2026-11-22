@@ -198,7 +198,7 @@ BakeoffSummary runBakeoff (const BakeoffPlan& plan, const std::filesystem::path&
     for (const auto& src : plan.sources)
     {
         const auto path = osp::pathFromUtf8 (src.path).is_absolute() ? osp::pathFromUtf8 (src.path)
-                                                                          : plan.corpusRoot / src.path;
+                                                                          : plan.corpusRoot / osp::pathFromUtf8 (src.path);
         auto source = loadAndAnalyse (path);
         if (! source.ok)
         {

@@ -3227,7 +3227,7 @@ namespace
                 // Checked by its bytes (never by its name), on the Library thread.
                 safe->processor.libraryService().request<bool> (
                     [m, path] (library::Catalog& c) {
-                        const auto hex = io::sha256OfFile (path);
+                        const auto hex = io::sha256OfFile (osp::pathFromUtf8 (path));
                         return hex && "sha256:" + *hex == m.hash && c.addLocation (m.hash, path, "original");
                     },
                     [safe, m] (bool ok) {

@@ -3,6 +3,7 @@
 // duplicates, damaged and hostile backups, external files) and the analysis cache.
 
 #include "LabelledSet.h"
+#include "core/PathText.h"
 #include "io/AudioFileIO.h"
 #include "io/ContentHash.h"
 #include "library/Archive.h"
@@ -282,7 +283,7 @@ TEST_CASE ("library packs: export a collection, install it elsewhere, update kee
     CHECK (findStored (b.store, hexOf (kick.contentHash)));
     const auto packPreset = b.catalog->assetForPackKey ("com.example.warm", presetId);
     REQUIRE (packPreset);
-    const auto presetFile = std::filesystem::path (b.catalog->preset (*packPreset)->file);
+    const auto presetFile = osp::pathFromUtf8 (b.catalog->preset (*packPreset)->file);
     CHECK (presetFile.parent_path() == b.packs / "com.example.warm" / "Presets");
     CHECK (std::filesystem::exists (presetFile));
     CHECK (b.catalog->preset (*packPreset)->soundHashes.size() == 2);
@@ -582,7 +583,7 @@ TEST_CASE ("library packs: a publisher's factory export installs from the plugin
     const auto packHymn = user.catalog->assetForPackKey ("com.evenant.osp.core", hymn);
     REQUIRE (packHymn);
     CHECK (user.catalog->asset (*packHymn)->origin == Origin::factory);
-    CHECK (std::filesystem::path (user.catalog->preset (*packHymn)->file).parent_path() == user.factory / "com.evenant.osp.core" / "Presets");
+    CHECK (osp::pathFromUtf8 (user.catalog->preset (*packHymn)->file).parent_path() == user.factory / "com.evenant.osp.core" / "Presets");
     // The user's own preset and sound are untouched, and nothing went into their folders.
     CHECK (user.catalog->asset (myPreset)->origin == Origin::user);
     CHECK (user.catalog->asset (mine.assetId)->origin == Origin::user);
@@ -627,7 +628,7 @@ TEST_CASE ("library packs: factory content comes only with OSP - a file the user
         const auto installed = user.catalog->assetForPackKey ("com.evenant.osp.core", hymn);
         REQUIRE (installed);
         CHECK (user.catalog->asset (*installed)->origin == Origin::pack);
-        CHECK (std::filesystem::path (user.catalog->preset (*installed)->file).parent_path() == user.packs / "com.evenant.osp.core" / "Presets");
+        CHECK (osp::pathFromUtf8 (user.catalog->preset (*installed)->file).parent_path() == user.packs / "com.evenant.osp.core" / "Presets");
         bool noted = false;
         for (const auto& n : r.notes)
             noted = noted || n.find ("ordinary pack") != std::string::npos;
@@ -740,9 +741,9 @@ TEST_CASE ("library backup: a whole Library backed up and restored on another ma
     // Presets live where this machine keeps them, and still find their sounds in the store.
     const auto preset = b.catalog->preset (presetId);
     REQUIRE (preset);
-    CHECK (std::filesystem::path (preset->file) == b.presets / "Night Drive.osppreset");
-    CHECK (fileText (preset->file) == fileText (a.presets / "Night Drive.osppreset"));
-    CHECK (std::filesystem::path (b.catalog->preset (templateId)->file) == b.templates / "Blank Two.ospstate");
+    CHECK (osp::pathFromUtf8 (preset->file) == b.presets / "Night Drive.osppreset");
+    CHECK (fileText (osp::pathFromUtf8 (preset->file)) == fileText (a.presets / "Night Drive.osppreset"));
+    CHECK (osp::pathFromUtf8 (b.catalog->preset (templateId)->file) == b.templates / "Blank Two.ospstate");
     for (const auto& h : preset->soundHashes)
         CHECK (resolveSound (*b.catalog, b.store, h).where == "store");
     CHECK (fileText (b.favourites).find ("Night Drive") != std::string::npos);
@@ -817,7 +818,7 @@ TEST_CASE ("library backup: restoring into a Library in use keeps what is newer 
     CHECK (r.filesBeside == 1);
     CHECK (fileText (c.presets / "Song.osppreset") == unrelated);   // never overwritten
     CHECK (std::filesystem::exists (c.presets / "Song (restored).osppreset"));
-    CHECK (std::filesystem::path (c.catalog->preset (presetId)->file) == c.presets / "Song (restored).osppreset");
+    CHECK (osp::pathFromUtf8 (c.catalog->preset (presetId)->file) == c.presets / "Song (restored).osppreset");
     CHECK (fileText (bSong) == mine);
 }
 

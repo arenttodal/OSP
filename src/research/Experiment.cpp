@@ -427,7 +427,7 @@ ExperimentSummary runExperiment (const std::filesystem::path& planFile, const st
                 setPaths.push_back (item.toString().toStdString());
         const auto rel = json::has (s, "path") ? json::getString (s, "path") : (setPaths.empty() ? std::string() : setPaths.front());
         const auto sectionId = json::getString (s, "id", rel);
-        const auto path = osp::pathFromUtf8 (rel).is_absolute() ? osp::pathFromUtf8 (rel) : corpusRoot / rel;
+        const auto path = osp::pathFromUtf8 (rel).is_absolute() ? osp::pathFromUtf8 (rel) : corpusRoot / osp::pathFromUtf8 (rel);
         auto source = loadAndAnalyse (path);
         if (! source.ok)
         {
@@ -457,7 +457,7 @@ ExperimentSummary runExperiment (const std::filesystem::path& planFile, const st
                 return;
             for (const auto& item : setPaths)
             {
-                const auto full = osp::pathFromUtf8 (item).is_absolute() ? osp::pathFromUtf8 (item) : corpusRoot / item;
+                const auto full = osp::pathFromUtf8 (item).is_absolute() ? osp::pathFromUtf8 (item) : corpusRoot / osp::pathFromUtf8 (item);
                 auto loaded = loadAndAnalyse (full);
                 if (loaded.ok)
                     setSources.push_back (std::move (loaded));

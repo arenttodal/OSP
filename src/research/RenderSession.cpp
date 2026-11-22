@@ -1,6 +1,7 @@
 #include "research/RenderSession.h"
 
 #include "audio/sampler/BaselineSampler.h"
+#include "core/PathText.h"
 #include "core/PitchMath.h"
 #include "engine/InstrumentBuilder.h"
 #include "engine/InstrumentEngine.h"
@@ -298,7 +299,7 @@ RenderOutput renderWithEngine (const AudioData& source, const AnalysisData& anal
     for (std::size_t l = 1; l < layers.size(); ++l)
         if (! config.layerSources[l].empty())
         {
-            auto loaded = loadAndAnalyse (config.layerSources[l]);
+            auto loaded = loadAndAnalyse (osp::pathFromUtf8 (config.layerSources[l]));
             if (! loaded.ok)
                 continue;   // an unreadable layer stays empty (the render goes on)
             InstrumentBuildOptions layerOptions = options;

@@ -63,7 +63,7 @@ namespace
 
     std::filesystem::path folderFor (const PackPlaces& places, const PackManifest& m)
     {
-        return (m.factory ? places.factoryDir : places.packsDir) / m.id;
+        return (m.factory ? places.factoryDir : places.packsDir) / osp::pathFromUtf8 (m.id);
     }
 
     /** Checks the archive against its manifest (every listed file there, at its size). */
@@ -344,7 +344,7 @@ PackResult installPack (Catalog& catalog, const std::filesystem::path& file, con
     if (source == PackSource::user)
     {
         std::error_code exists;
-        if (std::filesystem::exists (places.factoryDir / result.manifest.id, exists))
+        if (std::filesystem::exists (places.factoryDir / osp::pathFromUtf8 (result.manifest.id), exists))
         {
             result.ok = false;
             result.error = "its id (" + result.manifest.id + ") is OSP's own factory content; a pack from a file cannot replace it";
@@ -560,7 +560,7 @@ PackResult removePack (Catalog& catalog, const std::string& packId, const PackPl
         }
     }
     std::error_code ec;
-    for (const auto& folder : { places.packsDir / packId, places.factoryDir / packId })
+    for (const auto& folder : { places.packsDir / osp::pathFromUtf8 (packId), places.factoryDir / osp::pathFromUtf8 (packId) })
         if (std::filesystem::is_directory (folder, ec) && moveToTrash != nullptr && ! moveToTrash (folder))
             std::filesystem::remove_all (folder, ec);
     catalog.removePackRecord (packId);
