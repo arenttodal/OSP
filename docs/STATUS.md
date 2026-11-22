@@ -11,11 +11,9 @@
 >   Tape has A's LEVEL at -48 dB, the bottom of the knob, which is silence. Both since 11 Oct.
 > - **Arp - Sixteen Pulses:** route 6 is LFO 2 (Random, 7.46 Hz) -> START A at 100 % from START 0,
 >   so every arp note starts somewhere random (about half at the very beginning). Since 14 Nov the
->   card's START followed each note, so it jumped with every note. Owner's choice, done: START
->   shows the knob, and where its routes can take it is a faint band (a bipolar source both ways,
->   a unipolar one towards the depth's sign, clamped); the read heads still show where notes play.
->   The engine no longer publishes START per voice. Test: "effective values: START shows the knob
->   and its routes' reach as a band, never note by note".
+>   card's START follows each note, so it jumps with every note. Tried and reverted at the owner's
+>   request (22 Nov): START as the knob with its routes' reach as a band. START follows each note,
+>   as since 14 Nov.
 > - **Remove on click (owner's choice):** the card menu's "Remove source B" removes at once (no
 >   confirming sub-menu, which read as "nothing happens"); the message says it can be restored.
 >

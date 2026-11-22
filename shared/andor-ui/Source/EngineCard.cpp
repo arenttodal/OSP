@@ -2,7 +2,6 @@
 #include "Binding.h"
 
 #include "Design.h"
-#include "ModulationPanel.h"
 
 #include "core/PitchMath.h"
 
@@ -525,19 +524,14 @@ float SourceDisplay::xAtFraction (double fraction, juce::Rectangle<float> plot) 
 
 double SourceDisplay::startSeconds() const
 {
-    return startSecondsAt (view.start);
-}
-
-double SourceDisplay::startSecondsAt (double fraction) const
-{
     if (instrument == nullptr || instrument->durationSeconds <= 0.0)
         return 0.0;
     const double begin = instrument->startSeconds, end = instrument->durationSeconds;
     if (! view.reverse)
-        return begin + fraction * (end - begin);
+        return begin + view.start * (end - begin);
     const double trailing = instrument->analysis.envelope.trailingSilenceSeconds;
     const double soundEnd = std::clamp (end - trailing, begin, end);
-    return soundEnd - fraction * (soundEnd - begin);
+    return soundEnd - view.start * (soundEnd - begin);
 }
 
 void SourceDisplay::paintGenerated (juce::Graphics& g)
@@ -1014,14 +1008,6 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
     // START: a fine accent line from a small flag at the top to a dot at the foot.
     if (! view.granular)
     {
-        // Where START's routes can take it: a faint band behind the line (no route: none).
-        if (view.startRange && view.startHi > view.startLo)
-        {
-            const float a = std::clamp (xAtSeconds (startSecondsAt (view.startLo), plot), plot.getX(), plot.getRight());
-            const float b = std::clamp (xAtSeconds (startSecondsAt (view.startHi), plot), plot.getX(), plot.getRight());
-            g.setColour (colour::accent.withAlpha (0.12f));
-            g.fillRect (juce::Rectangle<float> (std::min (a, b), plot.getY(), std::abs (b - a), plot.getHeight()));
-        }
         const float x = std::clamp (xAtSeconds (startSeconds(), plot), plot.getX(), plot.getRight());
         g.setColour (juce::Colour (0x8c000000));
         if (view.reverse)
@@ -3270,8 +3256,7 @@ void EngineCard::refresh()
         repaint (sourceDisplay.getBounds());
     }
 
-    // START is the knob (the engine no longer publishes it note by note); its routes' reach is
-    // the band (refreshGrains).
+    // (what plays: START as the newest note took it, when the engine publishes it)
     refreshGrains (InstrumentHost::shownValue (processor.apvts(), InstrumentHost::layerParameterId (layerIndex, "start")));
 }
 
@@ -3283,24 +3268,6 @@ void EngineCard::refreshGrains (float startPercent)
     SourceDisplay::View view;
     view.granular = value ("sourceMode") >= 0.5f;
     view.start = 0.01f * startPercent;
-    {
-        // START's routes, summed as the knob halos read them: a bipolar source both ways, a
-        // unipolar one (an envelope, the wheel, VEL ...) only towards the depth's sign.
-        const auto dest = static_cast<mod::Dest> (static_cast<int> (mod::Dest::startA) + std::clamp (layerIndex, 0, 2));
-        const double span = mod::destInfo (dest).span;
-        double lo = 0.0, hi = 0.0;
-        for (const auto& r : processor.modulationRoutes())
-            if (r.state == mod::RouteState::active && ! r.isDepth() && r.route.dest == dest)
-            {
-                const double d = r.route.depth * span;
-                const bool bipolar = modui::isBipolar (processor, mod::sourceIndex (r.route.source));
-                lo += bipolar ? -std::abs (d) : std::min (0.0, d);
-                hi += bipolar ? std::abs (d) : std::max (0.0, d);
-                view.startRange = true;
-            }
-        view.startLo = std::clamp (view.start + static_cast<float> (lo), 0.0f, 1.0f);
-        view.startHi = std::clamp (view.start + static_cast<float> (hi), 0.0f, 1.0f);
-    }
     view.position = std::clamp (0.01f * (value ("granular.position") + startPercent), 0.0f, 1.0f);
     view.spread = 0.01f * value ("granular.spread");
     view.loop = value ("loop") >= 0.5f;

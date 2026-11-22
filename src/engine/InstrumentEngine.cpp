@@ -1068,10 +1068,10 @@ void InstrumentEngine::publishVoiceEffective() noexcept
             effective.publish (first + 1, static_cast<float> (100.0 * std::clamp (config.granular[i].spread + newest->grainSpreadModulation(), 0.0, 1.0)));
         else
             effective.clear (first + 1);
-        // START is not published note by note: a fast route (a random LFO on START under the
-        // arpeggiator) made the knob and the card's START strobe with every note. The card draws
-        // the knob and the routes' reach as a band; the read heads show where notes play.
-        effective.clear (first + 2);
+        if (newest != nullptr && c.has (layerDest (mod::Dest::startA)))
+            effective.publish (first + 2, static_cast<float> (100.0 * std::clamp (config.layer[i].start + newest->startModulation(), 0.0, 1.0)));
+        else
+            effective.clear (first + 2);
     }
 }
 

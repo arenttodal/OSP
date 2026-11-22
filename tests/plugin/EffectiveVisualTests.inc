@@ -174,7 +174,7 @@ TEST_CASE ("effective values: MOVEMENT SHAPER draws the depth that plays - modul
     CHECK (pictureChanges >= 6);
 }
 
-TEST_CASE ("effective values: per voice - layer A's grain POSITION as the newest note plays it, START stays the knob; released, the knobs", "[plugin][effective][voice]")
+TEST_CASE ("effective values: per voice - layer A's grain POSITION and START as the newest note plays them; released, the knobs", "[plugin][effective][voice]")
 {
     TempDir tmp;
     const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
@@ -197,9 +197,8 @@ TEST_CASE ("effective values: per voice - layer A's grain POSITION as the newest
     osp::plugin::InstrumentHost::EffectiveValue v;
     REQUIRE (p.effectiveValue (position, v));
     CHECK (v.value == Approx (50.0f).margin (0.5));   // 20 % + the wheel's 30 %
-    // START is not published note by note any more (a random LFO on START under the arpeggiator
-    // made it strobe): the card draws the knob and its routes' reach as a band.
-    CHECK_FALSE (p.effectiveValue (start, v));
+    REQUIRE (p.effectiveValue (start, v));
+    CHECK (v.value >= 10.0f);   // (taken at note on: as far as the wheel had glided then)
     CHECK (p.parameters.getParameter (position)->convertFrom0to1 (p.parameters.getParameter (position)->getValue()) == Approx (20.0f));
     // Released and silent: no note of its own - the knobs are drawn.
     juce::AudioBuffer<float> buffer (2, 256);
@@ -265,60 +264,4 @@ TEST_CASE ("effective values: per voice - a note held, its grain POSITION is pub
     INFO (knobReads.load() << " of " << reads.load() << " reads fell back to the knob");
     CHECK (reads.load() >= 2000);
     CHECK (knobReads.load() == 0);
-}
-
-TEST_CASE ("effective values: START shows the knob and its routes' reach as a band, never note by note", "[plugin][effective][voice]")
-{
-    // The owner's Arp - Sixteen Pulses: LFO 2 (Random) -> START A at 100 % from START 0, under the
-    // arpeggiator. Each note starts somewhere else (about half at the very beginning), and the
-    // card's START followed every note: it strobed. It now stays on the knob; the band shows
-    // where the routes can take it (a bipolar LFO both ways, clamped to the sound).
-    TempDir tmp;
-    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
-    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
-    const auto a = writeSource (tmp.dir, "first.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
-    OspAudioProcessor p;
-    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
-    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
-    REQUIRE (ui != nullptr);
-    p.loadFile (a, 0);
-    REQUIRE (p.waitForLoads (30000));
-    p.pollLoads();
-    editor->setSize (1448, juce::roundToInt (ui->instrumentHeight()));
-    const auto start = OspAudioProcessor::layerParameterId (0, "start");
-    p.setParameterValue (start, 30.0f);
-    ui->refreshNow();
-    CHECK_FALSE (ui->engineCard (0).display().currentView().startRange);   // no route: no band
-    p.setParameterValue (OspAudioProcessor::modLfoId (1, "shape"), 5.0f);   // LFO 2: Random
-    p.setParameterValue (OspAudioProcessor::modLfoId (1, "rate"), 7.5f);
-    REQUIRE (p.assignModulation (mod::Source::lfo2, mod::Dest::startA, 50.0f).slot >= 0);
-    p.prepareToPlay (48000.0, 256);
-    juce::AudioBuffer<float> buffer (2, 256);
-    std::set<int> shown;
-    for (int i = 0; i < 300; ++i)
-    {
-        juce::MidiBuffer midi;
-        if (i % 6 == 0)
-        {
-            midi.addEvent (juce::MidiMessage::allNotesOff (1), 0);
-            midi.addEvent (juce::MidiMessage::noteOn (1, 57, static_cast<juce::uint8> (100)), 1);
-        }
-        buffer.clear();
-        p.processBlock (buffer, midi);
-        ui->refreshNow();
-        shown.insert (juce::roundToInt (1000.0f * ui->engineCard (0).display().currentView().start));
-    }
-    CHECK (shown == std::set<int> { 300 });   // the knob, every time
-    const auto& view = ui->engineCard (0).display().currentView();
-    CHECK (view.startRange);
-    CHECK (view.startLo == Approx (0.0f).margin (1.0e-4));   // 30 % - 50 %, clamped
-    CHECK (view.startHi == Approx (0.8f).margin (1.0e-4));   // 30 % + 50 %
-    if (const char* shot = std::getenv ("OSP_START_BAND_SHOT"))   // a picture on demand
-    {
-        const auto image = ui->engineCard (0).createComponentSnapshot (ui->engineCard (0).getLocalBounds(), true, 2.0f);
-        juce::FileOutputStream out { juce::File (shot) };
-        out.setPosition (0);
-        out.truncate();
-        juce::PNGImageFormat().writeImageToStream (image, out);
-    }
 }
