@@ -22,7 +22,7 @@ img { display: block; max-width: 100%; height: auto }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer }
 .wrap { max-width: var(--max); margin: 0 auto; padding: 0 32px }
 .d { font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-track); line-height: .98 }
-.d1 { font-size: clamp(3rem, 7.4vw, 6.6rem) } .d2 { font-size: clamp(2.4rem, 5.2vw, 4.6rem) } .d3 { font-size: clamp(1.7rem, 3vw, 2.6rem) }
+.d1 { font-size: clamp(3rem, 6vw, 5.6rem) } .d2 { font-size: clamp(2.4rem, 5.2vw, 4.6rem) } .d3 { font-size: clamp(1.7rem, 3vw, 2.6rem) }
 .mute { color: var(--ink-3) } .night .mute { color: #6f6d69 }
 .lead { font-size: clamp(1.05rem, 1.5vw, 1.25rem); color: var(--ink-2); max-width: 36em } .night .lead { color: var(--on-night-2) }
 .caps { font-weight: 650; letter-spacing: .02em }
@@ -39,12 +39,12 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .toolbar .sp { flex: 1 }
 /* C01 hero */
 .hero { padding: 120px 0 110px; overflow: hidden }
-.hero .wrap { display: grid; grid-template-columns: 0.9fr 1.3fr; gap: 56px; align-items: center }
+.hero .wrap { display: grid; grid-template-columns: 1fr 1.2fr; gap: 56px; align-items: center }
 .hero .kick { font-weight: 650; font-size: 15px; letter-spacing: .02em; margin-bottom: 26px; color: var(--on-night-2) }
 .hero .d1 { margin-bottom: 26px } .hero .lead { margin-bottom: 36px }
 .hero .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap }
 .hero .fmt { margin-top: 28px; font-size: 14px; color: #8d8b86 }
-.hero .media { margin-right: -14vw } .hero .media img { border-radius: 14px }
+.hero .media { margin-right: -10vw } .feather { -webkit-mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 55%, transparent 100%); mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 55%, transparent 100%) }
 /* C02 life cycle */
 .cycle .head { display: flex; justify-content: space-between; align-items: end; gap: 40px; margin-bottom: 56px; flex-wrap: wrap }
 .cycle .frame { position: relative; aspect-ratio: 1448 / 1050; background: var(--paper-2); border-radius: var(--r); overflow: hidden }
@@ -62,7 +62,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 /* C03 instant */
 .instant .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center }
 .instant .lead b { color: var(--on-night); font-weight: 650 }
-.instant .media img { border-radius: 14px }
+
 /* C04 macro grid */
 .grid6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px }
 .mcard { background: #fff; border-radius: var(--r); padding: 26px 26px 28px; box-shadow: 0 1px 0 var(--line) }
@@ -83,7 +83,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .rm .stage img.on { opacity: 1 }
 /* C06 layers loop */
 .layers .frame { position: relative; aspect-ratio: 1448 / 986; margin-top: 48px }
-.layers .frame img { position: absolute; inset: 0; width: 100%; opacity: 0; transition: opacity .6s ease; border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.18) }
+.layers .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .6s ease; border-radius: 12px; filter: drop-shadow(0 24px 40px rgba(0,0,0,.16)) }
 .layers .frame img.on { opacity: 1 }
 .chips { display: flex; gap: 8px; margin-top: 28px; justify-content: center } .chips span { padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; color: var(--ink-3); box-shadow: inset 0 0 0 1px var(--line); transition: all .3s }
 .chips span.on { background: var(--ink); color: var(--paper); box-shadow: none }
@@ -97,7 +97,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 /* C08 daw */
 .daw .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center }
 .fmt-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px } .fmt-chips span { padding: 10px 16px; border-radius: 10px; background: #fff; font-weight: 600; font-size: 14px; box-shadow: 0 1px 0 var(--line) }
-.daw img { border-radius: 14px }
+
 /* C09 sources */
 .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 48px }
 .tile { aspect-ratio: 1.15; border-radius: 16px; background: var(--night-2); padding: 20px; display: flex; flex-direction: column; justify-content: space-between; color: var(--on-night) }
@@ -105,7 +105,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .tile b { font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-track); font-size: 22px; line-height: 1.05 } .tile small { display: block; color: #7d7b77; font-size: 13px; margin-top: 6px }
 .note { margin-top: 18px; font-size: 13px; color: var(--ink-3) }
 /* C10 explorer */
-.explore .stage { position: relative; margin-top: 48px }
+.explore { overflow-x: clip } .explore .stage { position: relative; margin-top: 48px }
 .explore .stage img { border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.4) }
 .hot { position: absolute; transform: translate(-50%, -50%); width: 22px; height: 22px; border-radius: 50%; background: rgba(217,119,74,.95); box-shadow: 0 0 0 6px rgba(217,119,74,.25) }
 .hot::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #fff }
@@ -124,7 +124,7 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
 @media (max-width: 900px) {
   .hero .wrap, .instant .wrap, .rm .wrap, .look .pane.on, .daw .wrap, .specs .wrap { grid-template-columns: 1fr }
   .hero .media { margin-right: 0 } .steps { grid-template-columns: repeat(5, 74%); overflow-x: auto; scroll-snap-type: x mandatory } .step { scroll-snap-align: start }
-  .grid6 { grid-template-columns: 1fr 1fr } .tiles { grid-template-columns: 1fr 1fr } .wrap { padding: 0 18px } .tag, .toolbar { padding-left: 18px; padding-right: 18px }
+  .grid6 { grid-template-columns: minmax(0,1fr) minmax(0,1fr) } .tiles { grid-template-columns: minmax(0,1fr) minmax(0,1fr) } .tile b { font-size: 18px } .wrap { padding: 0 18px } .tag, .toolbar { padding-left: 18px; padding-right: 18px }
   .hot .tip { width: 200px }
 }
 @media (max-width: 560px) { .grid6 { grid-template-columns: 1fr } }
@@ -150,7 +150,7 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
       <div class="row"><a class="btn" href="#c12">Join the waitlist</a><a class="btn ghost" href="#c02">See how it works</a></div>
       <p class="fmt">AU · VST3 · Standalone · macOS at release</p>
     </div>
-    <div class="media"><img src="m/mock-hero-three-dark-1920.webp" srcset="m/mock-hero-three-dark-1200.webp 1200w, m/mock-hero-three-dark-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 70vw" alt="ANDOR OSP open in a session on a display"></div>
+    <div class="media feather"><img src="m/mock-hero-three-dark-1920.webp" srcset="m/mock-hero-three-dark-1200.webp 1200w, m/mock-hero-three-dark-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 70vw" alt="ANDOR OSP open in a session on a display"></div>
   </div>
 </section>
 
@@ -182,7 +182,7 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
       <h2 class="d d2">Instant<br><span class="mute">instrument.</span></h2>
       <p class="lead" style="margin-top:28px">Use <b>LIFE</b> so no two notes play the same. Turn <b>DRIVE</b> for heat and <b>FILTER</b> to close it down. Add <b>MOVEMENT</b>, then <b>ECHO</b>. Dial in <b>SPACE</b> for depth.</p>
     </div>
-    <div class="media"><img src="m/mock-feat-space-1920.webp" srcset="m/mock-feat-space-1200.webp 1200w, m/mock-feat-space-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 50vw" alt="The SPACE panel, close up"></div>
+    <div class="media feather"><img src="m/mock-feat-space-1920.webp" srcset="m/mock-feat-space-1200.webp 1200w, m/mock-feat-space-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 50vw" alt="The SPACE panel, close up"></div>
   </div>
 </section>
 
@@ -250,7 +250,7 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
 <section class="sec daw">
   <div class="wrap">
     <div><h2 class="d d2">Standalone<br><span class="mute">or in your DAW.</span></h2><p class="lead" style="margin-top:24px">Runs as an app on its own, or inside your session as a plug-in.</p><div class="fmt-chips"><span>AU</span><span>VST3</span><span>Standalone</span><span>macOS at release</span></div></div>
-    <img src="m/mock-hero-desk-light-1920.webp" srcset="m/mock-hero-desk-light-1200.webp 1200w, m/mock-hero-desk-light-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 50vw" alt="ANDOR OSP in a session on a display">
+    <img class="feather" src="m/mock-hero-desk-light-1920.webp" srcset="m/mock-hero-desk-light-1200.webp 1200w, m/mock-hero-desk-light-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 50vw" alt="ANDOR OSP in a session on a display">
   </div>
 </section>
 

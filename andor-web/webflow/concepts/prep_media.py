@@ -8,9 +8,7 @@ CAP, MOCK, OUT = sys.argv[1:4]
 os.makedirs(OUT, exist_ok=True)
 
 def save(im, name, widths):
-    for w in widths:
-        if im.width < w * 0.9 and w != widths[0]:
-            continue
+    for w in widths:   # never upscaled: a smaller source is saved at its own size under the requested name
         r = im if im.width <= w else im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)
         r.save(os.path.join(OUT, f"{name}-{w}.webp"), "WEBP", quality=88, method=6)
 

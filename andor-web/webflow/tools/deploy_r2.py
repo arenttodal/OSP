@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Publish the Webflow page's media to a Cloudflare R2 bucket through the Cloudflare API (stdlib only).
 
-  deploy_r2.py <account id> <bucket> <media dir> [--prefix osp/v1] [--dry-run]
+  deploy_r2.py <account id> <bucket> <media dir> [--prefix osp/v1] [--cache <seconds>] [--dry-run]
 
 Needs CLOUDFLARE_API_TOKEN with 'Workers R2 Storage: Edit' on <account id>. It
 1. creates the bucket if it does not exist;
@@ -16,10 +16,11 @@ import json, mimetypes, os, sys, urllib.error, urllib.request
 ACC, BUCKET, SRC = sys.argv[1:4]
 PREFIX = sys.argv[sys.argv.index("--prefix") + 1] if "--prefix" in sys.argv else "osp/v1"
 DRY = "--dry-run" in sys.argv
+CACHE = int(sys.argv[sys.argv.index("--cache") + 1]) if "--cache" in sys.argv else None  # e.g. 300 for review pages that change
 TOKEN = os.environ["CLOUDFLARE_API_TOKEN"]
 API = f"https://api.cloudflare.com/client/v4/accounts/{ACC}/r2/buckets"
 TYPES = {".avif": "image/avif", ".webp": "image/webp", ".jpg": "image/jpeg", ".mp4": "video/mp4", ".woff2": "font/woff2",
-         ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json"}
+         ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".html": "text/html; charset=utf-8", ".png": "image/png"}
 
 
 def call(method, url, body=None, headers=None, raw=False):
@@ -72,7 +73,12 @@ for path in files:
     key = f"{PREFIX}/{rel}"
     ext = os.path.splitext(path)[1].lower()
     ctype = TYPES.get(ext) or mimetypes.guess_type(path)[0] or "application/octet-stream"
-    cache = "public, max-age=3600" if rel in ("andor.min.css", "andor.min.js", "media.json") else "public, max-age=31536000, immutable"
+    if CACHE is not None:
+        cache = f"public, max-age={CACHE}"
+    elif ext == ".html":
+        cache = "no-cache"
+    else:
+        cache = "public, max-age=3600" if rel in ("andor.min.css", "andor.min.js", "media.json") else "public, max-age=31536000, immutable"
     size = os.path.getsize(path); total += size
     if DRY:
         continue
