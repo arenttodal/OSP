@@ -42,6 +42,29 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .hero .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap }
 .hero .fmt { margin-top: 28px; font-size: 14px; color: #8d8b86 }
 .hero .media { margin-right: -10vw } .feather { -webkit-mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 55%, transparent 100%); mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 55%, transparent 100%) }
+/* C01: the original hero (H01 plate), headline in the display face */
+.ohero { position: relative; height: 100svh; min-height: 620px; overflow: hidden; background: #dcd8d3; color: #23251f }
+.ohero__media { position: absolute; top: 6vh; left: 0; right: 0; bottom: -6vh }
+.ohero__media::before { content: ""; position: absolute; left: 0; right: 0; top: -6vh; height: 8vh; background: linear-gradient(#dcd8d3, rgba(220,216,211,0)); z-index: 1 }
+.ohero__media picture { height: 100% } .ohero__media img { width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 50% 62% }
+.ohero__veil { position: absolute; inset: 0; background: radial-gradient(120% 70% at 50% 0%, rgba(207,200,191,.55), rgba(207,200,191,0) 60%); pointer-events: none }
+.ohero__copy { position: relative; z-index: 2; display: grid; justify-items: center; text-align: center; padding: max(88px, 10vh) 32px 0 }
+.ohero__label { font: 600 12px/1.2 var(--body); letter-spacing: .16em; text-transform: uppercase; color: #6f6b62 }
+.ohero__title { margin-top: 1.6vh; font-family: var(--display); font-weight: var(--display-w); font-size: clamp(2.4rem, min(5.2vw, 6.6vh), 6.4rem); line-height: .98; letter-spacing: var(--display-track); max-width: 12em }
+.ohero__sub { margin-top: 2.2vh; font-size: clamp(.95rem, 2.1vh, 1.3rem); color: #4d4b45; max-width: 46em }
+.ohero__cta { margin-top: 2.6vh; display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; justify-content: center }
+.ohero__link { font-weight: 600; font-size: .95rem; color: inherit; text-decoration: none } .ohero__link span { border-bottom: 1px solid currentColor; padding-bottom: 3px }
+.ohero__meta { position: absolute; z-index: 2; left: 32px; right: 32px; bottom: 24px; display: flex; justify-content: space-between; gap: 20px }
+.ohero__meta .ohero__label { color: rgba(239,233,222,.62) }
+@media (max-aspect-ratio: 4/5) {
+  .ohero__media { top: 0; bottom: 0 } .ohero__media::before { display: none } .ohero__media img { object-position: 50% 60% }
+  .ohero__copy { position: absolute; inset: 0; align-content: start; padding-top: clamp(104px, 13vh, 150px) }
+  .ohero__cta { position: absolute; left: 0; right: 0; bottom: max(64px, 9vh); margin: 0 }
+  .ohero__title { font-size: clamp(2.5rem, 11vw, 4.2rem) } .ohero__sub { font-size: clamp(.98rem, 4vw, 1.1rem); max-width: 22em }
+  .ohero__meta .ohero__label:last-child { display: none }
+}
+@media (max-aspect-ratio: 4/5) and (min-aspect-ratio: 9/17) { .ohero__media img { object-position: 50% 8% } }
+@media (min-aspect-ratio: 2/1) { .ohero__media img { object-position: 50% 75% } }
 /* C02 life cycle */
 .cycle .head { display: flex; justify-content: space-between; align-items: end; gap: 40px; margin-bottom: 56px; flex-wrap: wrap }
 .cycle .frame { position: relative; aspect-ratio: 1448 / 1050; background: var(--paper-2); border-radius: var(--r); overflow: hidden }
@@ -73,7 +96,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .mcard h3 { font: 700 15px/1 var(--body); letter-spacing: .08em; margin-bottom: 8px } .mcard p { font-size: 15px; color: var(--ink-2); line-height: 1.5 }
 /* C05 reimagined */
 .rm .wrap { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 64px; align-items: center }
-.rm ol { list-style: none; margin-top: 40px; border-top: 1px solid rgba(242,239,233,.14) }
+.rm li { position: relative } .rm ol { list-style: none; margin-top: 40px; border-top: 1px solid rgba(242,239,233,.14) }
 .rm li button { width: 100%; text-align: left; padding: 18px 0 18px; border-bottom: 1px solid rgba(242,239,233,.14); display: grid; grid-template-columns: 36px 1fr; position: relative }
 .rm li .n { font-size: 13px; color: #6f6d69; padding-top: 6px } .rm li .t { font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-track); font-size: 26px; color: #6f6d69; transition: color .3s }
 .rm li p { grid-column: 2; font-size: 15px; color: var(--on-night-2); max-height: 0; overflow: hidden; opacity: 0; transition: opacity .35s, max-height .35s }
@@ -141,18 +164,28 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
   <span>Display type: Inter Tight Bold</span>
 </div>
 
-<div class="tag"><b>C01</b> Hero, product first <span>Short, bold claim beside the instrument on a display. Media: mockup studio (Blender), the real editor alone on screen.</span></div>
-<section class="night hero">
-  <div class="wrap">
-    <div>
-      <div class="kick">ANDOR OSP · One Shot Performer</div>
-      <h1 class="d d1">One sound.<br><span class="mute">Every key.</span></h1>
-      <p class="lead">Drop in a single recording. Play it as an instrument, the moment it lands.</p>
-      <div class="row"><a class="btn" href="#c12">Join the waitlist</a><a class="btn ghost" href="#c02">See how it works</a></div>
-      <p class="fmt">AU · VST3 · Standalone · macOS at release</p>
-    </div>
-    <div class="media feather"><img src="m/mock-solo-three-1920.webp" srcset="m/mock-solo-three-1200.webp 1200w, m/mock-solo-three-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 70vw" alt="ANDOR OSP on a display"></div>
+<div class="tag"><b>C01</b> Hero, the original <span>The H01 instrument plate and the original centred hero, with the headline now in Inter Tight Bold.</span></div>
+<section class="ohero" aria-labelledby="oh-title">
+  <div class="ohero__media">
+    <picture>
+      <source media="(max-aspect-ratio: 4/5)" type="image/avif" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-640.avif 640w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-860.avif 860w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-1290.avif 1290w" sizes="100vw">
+      <source media="(max-aspect-ratio: 4/5)" type="image/webp" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-640.webp 640w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-860.webp 860w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-1290.webp 1290w" sizes="100vw">
+      <source type="image/avif" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1280.avif 1280w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.avif 1920w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-2560.avif 2560w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-3840.avif 3840w" sizes="100vw">
+      <img src="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.webp" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1280.webp 1280w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.webp 1920w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-2560.webp 2560w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-3840.webp 3840w" sizes="100vw"
+           alt="The ANDOR OSP instrument seen from the front on an ivory backdrop" width="3840" height="2160" fetchpriority="high" decoding="async">
+    </picture>
   </div>
+  <div class="ohero__veil"></div>
+  <div class="ohero__copy">
+    <p class="ohero__label">ANDOR OSP · One Shot Performer</p>
+    <h1 class="ohero__title" id="oh-title">One sound.<br>An entire instrument.</h1>
+    <p class="ohero__sub">Drop in a single recording. Play it as an expressive instrument, across every key.</p>
+    <div class="ohero__cta">
+      <a class="btn" href="#c12">Join the waitlist <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a class="ohero__link" href="#c02"><span>See how it works</span></a>
+    </div>
+  </div>
+  <div class="ohero__meta"><span class="ohero__label">Scroll</span><span class="ohero__label">In development · macOS · AU, VST3, Standalone</span></div>
 </section>
 
 <div class="tag" id="c02"><b>C02</b> The whole idea, in five steps <span>Real screen recordings from ANDOR Learn (captured on the beta; the last step is the per-layer arp). Plays while on screen; each step moves on when its clip ends; click to jump. Sound off by default, one button turns it on.</span></div>
