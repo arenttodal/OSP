@@ -114,6 +114,14 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
         for (const float scale : shot.scales)
             save (e->createComponentSnapshot (e->getLocalBounds(), true, scale),
                   name + "@" + juce::String (juce::roundToInt (scale)) + "x.png");
+        // An open popover on its own (transparent around it), at the shot's largest scale: the site
+        // shows the panel isolated, with no editor around it cut off at the crop.
+        if (auto* panel = ui->openPopupPanel())
+        {
+            const float s = shot.scales.back();
+            save (panel->createComponentSnapshot (panel->getLocalBounds(), true, s),
+                  name + "-panel@" + juce::String (juce::roundToInt (s)) + "x.png");
+        }
         p.releaseResources();
     };
     const std::vector<int> chord { 48, 55, 60, 64, 71 };   // C3 G3 C4 E4 B4: an open Cmaj7
@@ -189,6 +197,13 @@ TEST_CASE ("plugin: website captures (OSP_WEB_CAPTURE)", "[.][web-capture]")
     shoot ({ 1, { 1448, 0 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.openPopup (0); }, "web-06-life");
     mark = popupBounds;
     shoot ({ 1, { 1448, 0 }, { 3.0f }, chord }, [&] (OspAudioProcessor&, Editor& ui) { ui.openPopup (4); }, "web-06-space");
+    // Every macro's popover (DRIVE, FILTER, MOVEMENT, ECHO too), so the site can pair each macro with its panel.
+    for (int which : { 1, 2, 3, 5 })
+    {
+        mark = popupBounds;
+        shoot ({ 1, { 1448, 0 }, { 3.0f }, chord }, [&, which] (OspAudioProcessor&, Editor& ui) { ui.openPopup (which); },
+               "web-06-macro-" + juce::String (which));
+    }
     for (int m = 0; m < 5; ++m)
     {
         mark = popupBounds;

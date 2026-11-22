@@ -1,0 +1,102 @@
+<!doctype html>
+<!-- Screen content for the mockup studio: an original, generic DAW session with the real ANDOR OSP
+     editor floating over it. Not a copy of any DAW. Query parameters:
+       plugin=<image url>   the real editor capture        layout=window|daw|plugin
+       tone=dark|light      the DAW's own theme            scale=<plugin width in css px>
+       px, py               plugin window position (0..1)  seed=<n> clip layout -->
+<html><head><meta charset="utf-8"><style>
+:root { --bg:#16171a; --panel:#1d1f23; --line:#2a2d33; --line2:#23262b; --text:#c9cbd1; --dim:#7d828c; --accent:#d9774a; }
+body.light { --bg:#d9d8d5; --panel:#e6e5e2; --line:#c6c4bf; --line2:#cfcdc9; --text:#2a2b2e; --dim:#6f7177; }
+* { box-sizing:border-box; margin:0; padding:0 }
+html,body { width:1920px; height:1080px; overflow:hidden; background:var(--bg); font:500 11px/1 "Inter Tight", "Inter", system-ui, sans-serif; color:var(--text) }
+.app { position:absolute; inset:0; display:grid; grid-template-rows:44px 26px 1fr 190px; }
+.bar { background:var(--panel); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:18px; padding:0 16px }
+.dot { width:12px; height:12px; border-radius:50%; background:#3a3d44 } body.light .dot { background:#bdbbb6 }
+.tp { display:flex; gap:6px } .tp i { display:block; width:26px; height:22px; border-radius:5px; background:var(--line2); position:relative }
+.tp i.play::after { content:""; position:absolute; left:10px; top:6px; border-left:8px solid var(--text); border-top:5px solid transparent; border-bottom:5px solid transparent }
+.tp i.rec::after { content:""; position:absolute; left:9px; top:7px; width:8px; height:8px; border-radius:50%; background:var(--accent) }
+.tp i.stop::after { content:""; position:absolute; left:9px; top:7px; width:8px; height:8px; background:var(--dim) }
+.lcd { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:5px 10px; font-variant-numeric:tabular-nums; letter-spacing:.04em; color:var(--text) }
+.lcd b { color:var(--dim); font-weight:500; margin-right:6px }
+.ruler { display:grid; grid-template-columns:230px 1fr; background:var(--panel); border-bottom:1px solid var(--line) }
+.ruler .marks { position:relative } .ruler .marks span { position:absolute; top:8px; color:var(--dim); font-size:10px }
+.main { display:grid; grid-template-columns:230px 1fr; overflow:hidden }
+.heads { background:var(--panel); border-right:1px solid var(--line) }
+.th { height:62px; border-bottom:1px solid var(--line2); display:grid; grid-template-columns:5px 1fr auto; align-items:center; gap:10px; padding-right:10px }
+.th .c { height:100%; } .th .n { font-size:12px } .th .n small { display:block; color:var(--dim); font-size:10px; margin-top:5px }
+.th .ms { display:flex; gap:4px } .th .ms i { width:18px; height:16px; border-radius:3px; background:var(--line2); font:600 9px/16px sans-serif; text-align:center; color:var(--dim); font-style:normal }
+.lanes { position:relative; background:
+  repeating-linear-gradient(90deg, transparent 0 119px, var(--line2) 119px 120px),
+  repeating-linear-gradient(180deg, transparent 0 61px, var(--line2) 61px 62px); }
+.clip { position:absolute; height:56px; border-radius:4px; overflow:hidden; }
+.clip .t { position:absolute; left:6px; top:5px; font-size:10px; color:rgba(0,0,0,.72); font-weight:600; white-space:nowrap }
+.clip canvas { position:absolute; left:0; top:16px; width:100%; height:40px }
+.ph { position:absolute; top:0; bottom:0; width:2px; background:var(--accent); box-shadow:0 0 12px rgba(217,119,74,.6) }
+.mixer { background:var(--panel); border-top:1px solid var(--line); display:flex; gap:1px; padding:12px 12px; overflow:hidden }
+.ch { width:88px; border-right:1px solid var(--line2); display:flex; flex-direction:column; align-items:center; gap:8px; padding-top:6px }
+.ch .knob { width:26px; height:26px; border-radius:50%; border:2px solid var(--line); position:relative }
+.ch .knob::after { content:""; position:absolute; left:11px; top:2px; width:2px; height:9px; background:var(--dim) }
+.ch .fader { flex:1; width:56px; display:flex; gap:5px; justify-content:center }
+.ch .fader i { width:5px; border-radius:2px; background:linear-gradient(to top, #6f9a7d 0 60%, #c9a45a 60% 85%, #c96a4a 85%); opacity:.85; align-self:flex-end }
+.ch .fader b { width:14px; height:100%; position:relative } .ch .fader b::before { content:""; position:absolute; left:6px; top:0; bottom:0; width:2px; background:var(--line) }
+.ch .fader b::after { content:""; position:absolute; left:0; width:14px; height:24px; border-radius:3px; background:#3a3d44; top:var(--y) } body.light .ch .fader b::after { background:#b5b3ae }
+.ch span { font-size:10px; color:var(--dim) }
+.win { position:absolute; border-radius:12px; overflow:hidden; box-shadow:0 40px 120px rgba(0,0,0,.55), 0 10px 30px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.06) }
+.win .tb { height:30px; background:#2a2c31; display:flex; align-items:center; gap:8px; padding:0 12px; color:#aeb2ba; font-size:11px }
+.win .tb .dot { width:11px; height:11px } .win .tb .dot:nth-child(1){background:#e0625a} .win .tb .dot:nth-child(2){background:#e0b04a} .win .tb .dot:nth-child(3){background:#6cc46a}
+.win .tb span { margin-left:10px } .win img { display:block; width:100% }
+body.plugin .app { filter: blur(14px) brightness(.55) saturate(.8) }
+body.daw .win { display:none }
+</style></head><body>
+<div class="app">
+  <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <div class="tp" style="margin-left:24px"><i class="stop"></i><i class="play"></i><i class="rec"></i></div>
+    <div class="lcd"><b>BPM</b>92.00</div><div class="lcd"><b>SIG</b>4 / 4</div><div class="lcd"><b>POS</b>17 . 2 . 1</div>
+    <div class="lcd" style="margin-left:auto"><b>KEY</b>D minor</div><div class="lcd"><b>CPU</b>11 %</div></div>
+  <div class="ruler"><div></div><div class="marks" id="marks"></div></div>
+  <div class="main"><div class="heads" id="heads"></div><div class="lanes" id="lanes"></div></div>
+  <div class="mixer" id="mixer"></div>
+</div>
+<div class="win" id="win"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span>ANDOR OSP · 1 · Vowel Keys</span></div><img id="plug"></div>
+<script>
+const q = new URLSearchParams(location.search);
+document.body.classList.add(q.get("layout") || "window", q.get("tone") || "dark");
+let s = +(q.get("seed") || 7);
+const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+const tracks = [
+  ["ANDOR OSP", "Vowel Keys", "#d9774a", "midi"], ["ANDOR OSP", "Glass Pluck", "#c9a45a", "midi"], ["Vox", "Lead take 3", "#8fb3a2", "wave"],
+  ["Vox", "Doubles", "#8fb3a2", "wave"], ["Drums", "Kit bus", "#9aa4b5", "wave"], ["Bass", "DI", "#b98b6e", "wave"],
+  ["Strings", "Section", "#a59ac0", "midi"], ["Piano", "Room", "#c2b79a", "wave"], ["FX", "Risers", "#7f9aa8", "wave"],
+  ["Perc", "Shaker", "#a9b48a", "wave"], ["Pad", "ANDOR OSP", "#d39a7a", "midi"], ["Print", "Mix", "#8a8f99", "wave"]];
+const heads = document.getElementById("heads"), lanes = document.getElementById("lanes");
+tracks.forEach(([n, sub, c]) => heads.insertAdjacentHTML("beforeend", `<div class="th"><div class="c" style="background:${c}"></div><div class="n">${sub}<small>${n}</small></div><div class="ms"><i>M</i><i>S</i></div></div>`));
+const marks = document.getElementById("marks");
+for (let b = 0; b < 15; b++) marks.insertAdjacentHTML("beforeend", `<span style="left:${b * 120 + 4}px">${b * 4 + 1}</span>`);
+tracks.forEach(([n, sub, c, kind], i) => {
+  let x = Math.floor(rnd() * 3) * 120;
+  while (x < 1690) {
+    const w = (2 + Math.floor(rnd() * 5)) * 120 - 4;
+    if (rnd() > 0.18) {
+      const el = document.createElement("div"); el.className = "clip";
+      el.style.cssText = `left:${x + 2}px; top:${i * 62 + 3}px; width:${w}px; background:${c}`;
+      el.innerHTML = `<div class="t">${sub}</div><canvas width="${w * 2}" height="80"></canvas>`;
+      lanes.appendChild(el);
+      const g = el.querySelector("canvas").getContext("2d"); g.fillStyle = "rgba(0,0,0,.55)";
+      if (kind === "wave") { for (let k = 0; k < w * 2; k += 2) { const a = (0.25 + 0.75 * Math.abs(Math.sin(k / (14 + i * 3)) * rnd())) * 34; g.fillRect(k, 40 - a, 1.4, a * 2); } }
+      else { for (let k = 6; k < w * 2 - 20; k += 14 + Math.floor(rnd() * 30)) g.fillRect(k, 6 + Math.floor(rnd() * 10) * 6.5, 10 + rnd() * 40, 5); }
+    }
+    x += w + 4 + (rnd() > 0.7 ? 120 : 0);
+  }
+});
+lanes.insertAdjacentHTML("beforeend", `<div class="ph" style="left:${16 * 30 + 6}px"></div>`);
+const mixer = document.getElementById("mixer");
+tracks.forEach(([n, sub, c]) => { const lv = 30 + rnd() * 60;
+  mixer.insertAdjacentHTML("beforeend", `<div class="ch"><div class="knob"></div><div class="fader"><i style="height:${lv}%"></i><i style="height:${lv * 0.92}%"></i><b style="--y:${20 + rnd() * 50}%"></b></div><span>${sub.split(" ")[0]}</span></div>`); });
+const win = document.getElementById("win"), img = document.getElementById("plug");
+const W = +(q.get("scale") || 1060);
+win.style.width = W + "px";
+img.onload = () => { const h = W * img.naturalHeight / img.naturalWidth + 30;
+  win.style.left = ((1920 - W) * +(q.get("px") || 0.5)) + "px"; win.style.top = ((1080 - h) * +(q.get("py") || 0.5)) + "px"; document.title = "ready"; };
+img.src = q.get("plugin") || "";
+if (!q.get("plugin")) document.title = "ready";
+</script></body></html>

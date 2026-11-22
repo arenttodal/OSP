@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANDOR OSP · Section concepts</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;800;900&family=Manrope:wght@400;500;800&display=swap" rel="stylesheet">
+<style>
+@font-face { font-family: "ANDOR Sans"; src: url(font/inter-tight-var.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+:root {
+  --ink: #17171a; --ink-2: #4a4a50; --ink-3: #8a8a90; --paper: #f4f1ec; --paper-2: #ebe6df; --line: rgba(23,23,26,.12);
+  --night: #0e0e10; --night-2: #17171b; --night-3: #222228; --on-night: #f2efe9; --on-night-2: #a9a7a2; --accent: #d9774a;
+  --display: "ANDOR Sans", system-ui, sans-serif; --display-w: 780; --display-track: -0.035em;
+  --body: "ANDOR Sans", system-ui, sans-serif; --max: 1240px; --r: 18px;
+}
+body.type-b { --display: "Archivo", sans-serif; --display-w: 800; --display-track: -0.03em; }
+body.type-c { --display: "Manrope", sans-serif; --display-w: 800; --display-track: -0.04em; }
+* { box-sizing: border-box; margin: 0; padding: 0 }
+html { scroll-behavior: auto; -webkit-text-size-adjust: 100% }  /* native, instant scrolling: no smoothing anywhere */
+body { background: var(--paper); color: var(--ink); font: 400 17px/1.55 var(--body); -webkit-font-smoothing: antialiased }
+img { display: block; max-width: 100%; height: auto }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 32px }
+.d { font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-track); line-height: .98 }
+.d1 { font-size: clamp(3rem, 7.4vw, 6.6rem) } .d2 { font-size: clamp(2.4rem, 5.2vw, 4.6rem) } .d3 { font-size: clamp(1.7rem, 3vw, 2.6rem) }
+.mute { color: var(--ink-3) } .night .mute { color: #6f6d69 }
+.lead { font-size: clamp(1.05rem, 1.5vw, 1.25rem); color: var(--ink-2); max-width: 36em } .night .lead { color: var(--on-night-2) }
+.caps { font-weight: 650; letter-spacing: .02em }
+.night { background: var(--night); color: var(--on-night) }
+.sec { padding: clamp(80px, 11vw, 150px) 0 }
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 54px; padding: 0 26px; border-radius: 999px; background: var(--ink); color: var(--paper); font-weight: 600; font-size: 16px; text-decoration: none }
+.night .btn { background: var(--on-night); color: var(--ink) }
+.btn.ghost { background: transparent; color: inherit; box-shadow: inset 0 0 0 1.5px currentColor }
+/* review strip: names each concept so notes can point at it */
+.tag { position: sticky; top: 0; z-index: 50; display: flex; gap: 14px; align-items: center; padding: 10px 32px; font: 600 12px/1 var(--body); letter-spacing: .06em; text-transform: uppercase; background: #e3ded6; color: #5a5852; border-bottom: 1px solid var(--line) }
+.tag b { color: var(--accent) } .tag span { font-weight: 500; text-transform: none; letter-spacing: 0; color: #77746d }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 14px 32px; background: #1c1c20; color: #ddd9d2; font-size: 13px }
+.toolbar button { padding: 7px 12px; border-radius: 999px; box-shadow: inset 0 0 0 1px #45454c } .toolbar button[aria-pressed=true] { background: #f2efe9; color: #17171a }
+.toolbar .sp { flex: 1 }
+/* C01 hero */
+.hero { padding: 120px 0 110px; overflow: hidden }
+.hero .wrap { display: grid; grid-template-columns: 0.9fr 1.3fr; gap: 56px; align-items: center }
+.hero .kick { font-weight: 650; font-size: 15px; letter-spacing: .02em; margin-bottom: 26px; color: var(--on-night-2) }
+.hero .d1 { margin-bottom: 26px } .hero .lead { margin-bottom: 36px }
+.hero .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap }
+.hero .fmt { margin-top: 28px; font-size: 14px; color: #8d8b86 }
+.hero .media { margin-right: -14vw } .hero .media img { border-radius: 14px }
+/* C02 life cycle */
+.cycle .head { display: flex; justify-content: space-between; align-items: end; gap: 40px; margin-bottom: 56px; flex-wrap: wrap }
+.cycle .frame { position: relative; aspect-ratio: 1448 / 1050; background: var(--paper-2); border-radius: var(--r); overflow: hidden }
+.cycle .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .55s ease }
+.cycle .frame img.on { opacity: 1 }
+.cycle .frame img.panel { object-fit: contain; padding: 9% 22%; }
+.steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 18px }
+.step { text-align: left; padding: 18px 18px 20px; border-radius: 14px; background: #fff; box-shadow: 0 1px 0 var(--line); position: relative; overflow: hidden; min-height: 132px }
+.step .n { font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums } .step .t { font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-track); font-size: 24px; margin: 6px 0 6px }
+.step p { font-size: 14px; color: var(--ink-2); line-height: 1.45 } .step:not(.on) p { color: var(--ink-3) }
+.step .bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent) }
+.step.on { box-shadow: 0 0 0 1.5px var(--ink) } .step.on .bar { animation: fill var(--dur) linear forwards }
+.paused .step.on .bar { animation-play-state: paused }
+@keyframes fill { to { width: 100% } }
+/* C03 instant */
+.instant .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center }
+.instant .lead b { color: var(--on-night); font-weight: 650 }
+.instant .media img { border-radius: 14px }
+/* C04 macro grid */
+.grid6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px }
+.mcard { background: #fff; border-radius: var(--r); padding: 26px 26px 28px; box-shadow: 0 1px 0 var(--line) }
+.mcard .pic { aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--paper-2); border-radius: 12px; margin-bottom: 22px; padding: 14px }
+.mcard .pic img { max-height: 100%; width: auto; object-fit: contain }
+.mcard h3 { font: 700 15px/1 var(--body); letter-spacing: .08em; margin-bottom: 8px } .mcard p { font-size: 15px; color: var(--ink-2); line-height: 1.5 }
+/* C05 reimagined */
+.rm .wrap { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 64px; align-items: center }
+.rm ol { list-style: none; margin-top: 40px; border-top: 1px solid rgba(242,239,233,.14) }
+.rm li button { width: 100%; text-align: left; padding: 18px 0 18px; border-bottom: 1px solid rgba(242,239,233,.14); display: grid; grid-template-columns: 36px 1fr; position: relative }
+.rm li .n { font-size: 13px; color: #6f6d69; padding-top: 6px } .rm li .t { font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-track); font-size: 26px; color: #6f6d69; transition: color .3s }
+.rm li p { grid-column: 2; font-size: 15px; color: var(--on-night-2); max-height: 0; overflow: hidden; opacity: 0; transition: opacity .35s, max-height .35s }
+.rm li.on .t { color: var(--on-night) } .rm li.on p { max-height: 80px; opacity: 1; margin-top: 8px }
+.rm li .bar { position: absolute; left: 0; bottom: -1px; height: 2px; width: 0; background: var(--accent) } .rm li.on .bar { animation: fill var(--dur) linear forwards }
+.paused.rm li.on .bar { animation-play-state: paused }
+.rm .stage { position: relative; aspect-ratio: 1.3; border-radius: var(--r); background: radial-gradient(ellipse at 50% 40%, #2a2a30, #151518 70%) }
+.rm .stage img { position: absolute; inset: 8% 10%; width: 80%; height: 84%; object-fit: contain; opacity: 0; transition: opacity .5s ease }
+.rm .stage img.on { opacity: 1 }
+/* C06 layers loop */
+.layers .frame { position: relative; aspect-ratio: 1448 / 986; margin-top: 48px }
+.layers .frame img { position: absolute; inset: 0; width: 100%; opacity: 0; transition: opacity .6s ease; border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.18) }
+.layers .frame img.on { opacity: 1 }
+.chips { display: flex; gap: 8px; margin-top: 28px; justify-content: center } .chips span { padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; color: var(--ink-3); box-shadow: inset 0 0 0 1px var(--line); transition: all .3s }
+.chips span.on { background: var(--ink); color: var(--paper); box-shadow: none }
+/* C07 closer look */
+.tabs { display: flex; gap: 28px; justify-content: center; margin: 36px 0 44px; flex-wrap: wrap }
+.tabs button { padding: 10px 0; font-weight: 600; color: var(--on-night-2); position: relative } .tabs button.on { color: var(--on-night) }
+.tabs button .bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--accent) } .tabs button.on .bar { animation: fill var(--dur) linear forwards }
+.paused .tabs button.on .bar { animation-play-state: paused }
+.look .pane { display: none; grid-template-columns: 0.75fr 1.25fr; gap: 56px; align-items: center } .look .pane.on { display: grid; animation: fade .5s ease }
+.look .pane img { border-radius: 14px } @keyframes fade { from { opacity: 0 } }
+/* C08 daw */
+.daw .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center }
+.fmt-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px } .fmt-chips span { padding: 10px 16px; border-radius: 10px; background: #fff; font-weight: 600; font-size: 14px; box-shadow: 0 1px 0 var(--line) }
+.daw img { border-radius: 14px }
+/* C09 sources */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 48px }
+.tile { aspect-ratio: 1.15; border-radius: 16px; background: var(--night-2); padding: 20px; display: flex; flex-direction: column; justify-content: space-between; color: var(--on-night) }
+.tile .play { width: 44px; height: 44px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #5b5a57; display: grid; place-items: center; color: #6f6d69 }
+.tile b { font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-track); font-size: 22px; line-height: 1.05 } .tile small { display: block; color: #7d7b77; font-size: 13px; margin-top: 6px }
+.note { margin-top: 18px; font-size: 13px; color: var(--ink-3) }
+/* C10 explorer */
+.explore .stage { position: relative; margin-top: 48px }
+.explore .stage img { border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.4) }
+.hot { position: absolute; transform: translate(-50%, -50%); width: 22px; height: 22px; border-radius: 50%; background: rgba(217,119,74,.95); box-shadow: 0 0 0 6px rgba(217,119,74,.25) }
+.hot::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #fff }
+.hot .tip { position: absolute; left: 50%; bottom: calc(100% + 14px); transform: translateX(-50%); width: 260px; padding: 14px 16px; border-radius: 12px; background: var(--paper); color: var(--ink); font-size: 14px; line-height: 1.45; text-align: left; box-shadow: 0 20px 50px rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .2s }
+.hot .tip b { display: block; font-size: 12px; letter-spacing: .08em; margin-bottom: 4px }
+.hot:hover .tip, .hot:focus .tip, .hot.open .tip { opacity: 1 }
+/* C11 specs + faq */
+.specs .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 64px }
+.req { border-top: 1px solid var(--line); margin-top: 32px } .req div { display: grid; grid-template-columns: 160px 1fr; padding: 16px 0; border-bottom: 1px solid var(--line); font-size: 16px } .req dt { color: var(--ink-3) }
+details { border-bottom: 1px solid var(--line) } details summary { list-style: none; cursor: pointer; padding: 22px 0; font-weight: 600; font-size: 18px; display: flex; justify-content: space-between }
+details summary::after { content: "+"; font-weight: 400; font-size: 24px; line-height: .8 } details[open] summary::after { content: "–" }
+details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
+/* C12 waitlist */
+.cta { text-align: center } .cta .d2 { margin-bottom: 22px } .cta form { display: flex; gap: 10px; justify-content: center; margin-top: 36px; flex-wrap: wrap }
+.cta input { height: 54px; width: min(360px, 100%); border-radius: 999px; border: 0; padding: 0 22px; font: inherit; background: var(--night-3); color: var(--on-night) }
+@media (max-width: 900px) {
+  .hero .wrap, .instant .wrap, .rm .wrap, .look .pane.on, .daw .wrap, .specs .wrap { grid-template-columns: 1fr }
+  .hero .media { margin-right: 0 } .steps { grid-template-columns: repeat(5, 74%); overflow-x: auto; scroll-snap-type: x mandatory } .step { scroll-snap-align: start }
+  .grid6 { grid-template-columns: 1fr 1fr } .tiles { grid-template-columns: 1fr 1fr } .wrap { padding: 0 18px } .tag, .toolbar { padding-left: 18px; padding-right: 18px }
+  .hot .tip { width: 200px }
+}
+@media (max-width: 560px) { .grid6 { grid-template-columns: 1fr } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
+</style></head>
+<body>
+
+<div class="toolbar">
+  <strong>Section concepts</strong><span>· real ANDOR OSP 0.9.0-beta.1 captures · native scrolling, no smoothing, nothing pinned</span><span class="sp"></span>
+  <span>Display type</span>
+  <button data-type="" aria-pressed="true">A · Inter Tight Bold</button>
+  <button data-type="type-b" aria-pressed="false">B · Archivo ExtraBold</button>
+  <button data-type="type-c" aria-pressed="false">C · Manrope ExtraBold</button>
+</div>
+
+<div class="tag"><b>C01</b> Hero, product first <span>Short, bold claim; the instrument working inside a session. Media: mockup studio (Blender), real capture on screen.</span></div>
+<section class="night hero">
+  <div class="wrap">
+    <div>
+      <div class="kick">ANDOR OSP · One Shot Performer</div>
+      <h1 class="d d1">One sound.<br><span class="mute">Every key.</span></h1>
+      <p class="lead">Drop in a single recording. Play it as an instrument, the moment it lands.</p>
+      <div class="row"><a class="btn" href="#c12">Join the waitlist</a><a class="btn ghost" href="#c02">See how it works</a></div>
+      <p class="fmt">AU · VST3 · Standalone · macOS at release</p>
+    </div>
+    <div class="media"><img src="m/mock-hero-three-dark-1920.webp" srcset="m/mock-hero-three-dark-1200.webp 1200w, m/mock-hero-three-dark-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 70vw" alt="ANDOR OSP open in a session on a display"></div>
+  </div>
+</section>
+
+<div class="tag" id="c02"><b>C02</b> The whole idea, in five steps <span>Plays by itself while on screen, one step every 4.5 s; click a step to jump. Fades only, no movement.</span></div>
+<section class="sec cycle" data-cycle data-dur="4500">
+  <div class="wrap">
+    <div class="head"><h2 class="d d2">From one sound<br><span class="mute">to an instrument.</span></h2><p class="lead">No mapping, no zones, no preparation. Everything after the first sound is playing.</p></div>
+    <div class="frame">
+      <img class="on" src="m/editor-empty-2000.webp" alt="ANDOR OSP waiting for a sound">
+      <img src="m/editor-1L-2000.webp" alt="One sound, mapped across the keyboard">
+      <img class="panel" src="m/panel-life-1100.webp" alt="The LIFE panel">
+      <img class="panel" src="m/panel-rm-tape-frame-1100.webp" alt="REIMAGINED in Tape Frame">
+      <img src="m/editor-3L-2000.webp" alt="Three sounds as one instrument">
+    </div>
+    <div class="steps">
+      <button class="step on"><div class="n">01</div><div class="t">Load it.</div><p>Drop in one recording, or a phrase. A voice, a cello, a glass, a memo.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">02</div><div class="t">Play it.</div><p>It is across every key already, in tune, with its character intact.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">03</div><div class="t">Shape it.</div><p>Six macros. LIFE makes every note a slightly different take.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">04</div><div class="t">Morph it.</div><p>Turn REIMAGINED and the sound travels, still recognisably yours.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">05</div><div class="t">Stack it.</div><p>Add a second and a third sound. They play as one instrument.</p><i class="bar"></i></button>
+    </div>
+  </div>
+</section>
+
+<div class="tag"><b>C03</b> “Instant ___.” statement <span>A two-word headline, then one paragraph that names the controls in capitals. Big angled close-up.</span></div>
+<section class="sec night instant">
+  <div class="wrap">
+    <div>
+      <h2 class="d d2">Instant<br><span class="mute">instrument.</span></h2>
+      <p class="lead" style="margin-top:28px">Use <b>LIFE</b> so no two notes play the same. Turn <b>DRIVE</b> for heat and <b>FILTER</b> to close it down. Add <b>MOVEMENT</b>, then <b>ECHO</b>. Dial in <b>SPACE</b> for depth.</p>
+    </div>
+    <div class="media"><img src="m/mock-feat-space-1920.webp" srcset="m/mock-feat-space-1200.webp 1200w, m/mock-feat-space-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 50vw" alt="The SPACE panel, close up"></div>
+  </div>
+</section>
+
+<div class="tag"><b>C04</b> Six macros, each with its own panel <span>List and imagery aligned by construction: every card holds its macro's real panel, at one size.</span></div>
+<section class="sec">
+  <div class="wrap">
+    <h2 class="d d2">Six knobs.<br><span class="mute">Each opens up.</span></h2>
+    <div class="grid6">
+      <div class="mcard"><div class="pic"><img src="m/panel-life-640.webp" alt="LIFE panel"></div><h3>LIFE</h3><p>How differently each note is played. 50 % is natural; click the name for pitch, tone, attack and takes.</p></div>
+      <div class="mcard"><div class="pic"><img src="m/panel-drive-640.webp" alt="DRIVE panel"></div><h3>DRIVE</h3><p>Saturation from warmth to breakup: TUBE, TAPE or CRUNCH. At zero it is out of the path.</p></div>
+      <div class="mcard"><div class="pic"><img src="m/panel-filter-640.webp" alt="FILTER panel"></div><h3>FILTER</h3><p>LP24, LP12, HP12, BP12 or TILT, with resonance and its own envelope.</p></div>
+      <div class="mcard"><div class="pic"><img src="m/panel-movement-640.webp" alt="MOVEMENT panel"></div><h3>MOVEMENT</h3><p>How the sound changes over time: DRIFT, TAPE, CHORUS, PULSE or a drawn SHAPER.</p></div>
+      <div class="mcard"><div class="pic"><img src="m/panel-echo-640.webp" alt="ECHO panel"></div><h3>ECHO</h3><p>TAPE, BBD or ASCEND, where every repeat climbs an interval.</p></div>
+      <div class="mcard"><div class="pic"><img src="m/panel-space-640.webp" alt="SPACE panel"></div><h3>SPACE</h3><p>Room, hall, plate, spring and more, each with its own controls.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="tag"><b>C05</b> REIMAGINED, playing through by itself <span>Advances every 4 s while on screen; the panel fades, nothing bounces or slides. Click a mode to hold it.</span></div>
+<section class="sec night rm" data-cycle data-dur="4000">
+  <div class="wrap">
+    <div>
+      <h2 class="d d2">One knob.<br><span class="mute">Five directions.</span></h2>
+      <ol>
+        <li class="on"><button><span class="n">01</span><span class="t">Kaleidoscope</span><p>Sympathetic resonance tuned to the sound: a fluid sustain and wandering formants.</p></button><i class="bar"></i></li>
+        <li><button><span class="n">02</span><span class="t">Tape Frame</span><p>The sound laid on a piece of tape. Low notes run slower and darker; every pass wears a little.</p></button><i class="bar"></i></li>
+        <li><button><span class="n">03</span><span class="t">Toybox</span><p>A tiny digital memory whose head turns back and forth through the sound.</p></button><i class="bar"></i></li>
+        <li><button><span class="n">04</span><span class="t">Mosaic</span><p>The sound rebuilt from its harmonic fingerprint, at any pitch, travelling through the recording.</p></button><i class="bar"></i></li>
+        <li><button><span class="n">05</span><span class="t">Mirage</span><p>Early-digital weight: the sample clock follows the note into a driven, resonant filter.</p></button><i class="bar"></i></li>
+      </ol>
+    </div>
+    <div class="stage">
+      <img class="on" src="m/panel-rm-kaleidoscope-1100.webp" alt="Kaleidoscope">
+      <img src="m/panel-rm-tape-frame-1100.webp" alt="Tape Frame"><img src="m/panel-rm-toybox-1100.webp" alt="Toybox">
+      <img src="m/panel-rm-mosaic-1100.webp" alt="Mosaic"><img src="m/panel-rm-mirage-1100.webp" alt="Mirage">
+    </div>
+  </div>
+</section>
+
+<div class="tag"><b>C06</b> One, two, three sounds: a loop <span>No clicking: the editor fills from one card to three on a 2.8 s loop while on screen.</span></div>
+<section class="sec layers" data-loop data-dur="2800">
+  <div class="wrap" style="text-align:center">
+    <h2 class="d d2">Up to three sounds.<br><span class="mute">One instrument.</span></h2>
+    <div class="frame">
+      <img class="on" src="m/editor-1L-2000.webp" alt="One sound"><img src="m/editor-2L-2000.webp" alt="Two sounds"><img src="m/editor-3L-2000.webp" alt="Three sounds">
+    </div>
+    <div class="chips"><span class="on">One sound</span><span>Two</span><span>Three</span></div>
+  </div>
+</section>
+
+<div class="tag"><b>C07</b> A closer look, in tabs <span>Tabs advance by themselves while on screen (5 s); a click holds one. Angled close-ups from the mockup studio.</span></div>
+<section class="sec night look" data-cycle data-dur="5000">
+  <div class="wrap">
+    <h2 class="d d2" style="text-align:center">A closer look.</h2>
+    <div class="tabs"><button class="on">Live capture<i class="bar"></i></button><button>Note Map<i class="bar"></i></button><button>KEY DNA<i class="bar"></i></button><button>Granular<i class="bar"></i></button><button>Arpeggiator<i class="bar"></i></button></div>
+    <div class="pane on"><div><h3 class="d d3">Grab what you just played.</h3><p class="lead" style="margin-top:16px">Every card has a REC key. Record a take of up to a minute, or keep the last 10, 20, 30 or 60 seconds after the fact.</p></div><img src="m/mock-feat-capture-1920.webp" alt="The capture page"></div>
+    <div class="pane"><div><h3 class="d d3">A phrase becomes notes.</h3><p class="lead" style="margin-top:16px">Record a phrase and it is chopped into its notes and mapped for you, one per key.</p></div><img src="m/mock-feat-notemap-1920.webp" alt="Note Map"></div>
+    <div class="pane"><div><h3 class="d d3">Every key its own grain.</h3><p class="lead" style="margin-top:16px">In Granular mode, curves you draw across the keyboard give each key its own grain behaviour.</p></div><img src="m/mock-feat-keydna-1920.webp" alt="KEY DNA"></div>
+    <div class="pane"><div><h3 class="d d3">A cloud of the sound.</h3><p class="lead" style="margin-top:16px">POS, SIZE, DENS and SPREAD: the recording as grains, 20 to 400 ms long.</p></div><img src="m/editor-granular-2000.webp" alt="Granular mode"></div>
+    <div class="pane"><div><h3 class="d d3">Hold a chord. It plays.</h3><p class="lead" style="margin-top:16px">The arpeggiator plays the notes you hold as a repeating pattern, across all three sounds.</p></div><img src="m/editor-arp-2000.webp" alt="The arpeggiator"></div>
+  </div>
+</section>
+
+<div class="tag"><b>C08</b> Standalone or in your DAW <span>The formats as plain facts beside the instrument in a session.</span></div>
+<section class="sec daw">
+  <div class="wrap">
+    <div><h2 class="d d2">Standalone<br><span class="mute">or in your DAW.</span></h2><p class="lead" style="margin-top:24px">Runs as an app on its own, or inside your session as a plug-in.</p><div class="fmt-chips"><span>AU</span><span>VST3</span><span>Standalone</span><span>macOS at release</span></div></div>
+    <img src="m/mock-hero-desk-light-1920.webp" srcset="m/mock-hero-desk-light-1200.webp 1200w, m/mock-hero-desk-light-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 50vw" alt="ANDOR OSP in a session on a display">
+  </div>
+</section>
+
+<div class="tag"><b>C09</b> “Your world is an instrument.” <span>Source tiles, each to play its demo. No recordings exist yet, so the buttons are shown inactive and say so.</span></div>
+<section class="sec">
+  <div class="wrap">
+    <h2 class="d d2">Your world<br><span class="mute">is an instrument.</span></h2>
+    <div class="tiles">
+      <div class="tile"><span class="play">▶</span><div><b>A sung vowel</b><small>Voice</small></div></div>
+      <div class="tile"><span class="play">▶</span><div><b>A bowed note</b><small>Cello</small></div></div>
+      <div class="tile"><span class="play">▶</span><div><b>An old synth</b><small>Pad</small></div></div>
+      <div class="tile"><span class="play">▶</span><div><b>A phone memo</b><small>Field recording</small></div></div>
+      <div class="tile"><span class="play">▶</span><div><b>A struck glass</b><small>Kitchen</small></div></div>
+      <div class="tile"><span class="play">▶</span><div><b>A felt piano</b><small>Upright</small></div></div>
+      <div class="tile"><span class="play">▶</span><div><b>A breath</b><small>Flute</small></div></div>
+      <div class="tile"><span class="play">▶</span><div><b>A guitar harmonic</b><small>Nylon</small></div></div>
+    </div>
+    <p class="note">Sound demos: to be recorded. Nothing plays here yet, on purpose.</p>
+  </div>
+</section>
+
+<div class="tag"><b>C10</b> Explore the interface (the prototype-lite) <span>The real editor with a point on each part; hover or tap for what it does. Positions come from the editor's own layout data.</span></div>
+<section class="sec night explore">
+  <div class="wrap">
+    <h2 class="d d2" style="text-align:center">Have a look around.</h2>
+    <div class="stage" id="explore"><img src="m/editor-3L-2000.webp" alt="ANDOR OSP with three sounds"></div>
+  </div>
+</section>
+
+<div class="tag"><b>C11</b> Requirements and questions <span>A plain requirements list beside an FAQ.</span></div>
+<section class="sec specs">
+  <div class="wrap">
+    <div><h2 class="d d3">Requirements</h2><dl class="req">
+      <div><dt>System</dt><dd>macOS at release. Windows: not announced yet.</dd></div>
+      <div><dt>Formats</dt><dd>AU, VST3 and Standalone</dd></div>
+      <div><dt>Sources</dt><dd>One tonal recording is enough: WAV, AIFF, FLAC</dd></div>
+      <div><dt>Hosts</dt><dd>Host validation is still to come</dd></div>
+    </dl></div>
+    <div><h2 class="d d3">Questions</h2><div style="margin-top:20px">
+      <details><summary>What kind of sound works best?</summary><p>One tonal recording: a sung note, a bowed note, a synth, a memo. A phrase works too; Note Map splits it into notes.</p></details>
+      <details><summary>Do I need to map samples or set zones?</summary><p>No. The sound is playable across the keyboard as soon as it loads.</p></details>
+      <details><summary>Can I layer sounds?</summary><p>Up to three, played as one instrument, each with its own controls.</p></details>
+      <details><summary>When is it out?</summary><p>Join the waitlist and you will hear first.</p></details>
+    </div></div>
+  </div>
+</section>
+
+<div class="tag" id="c12"><b>C12</b> Waitlist <span>One field, one button.</span></div>
+<section class="sec night cta">
+  <div class="wrap"><h2 class="d d2">Be first to play it.</h2><p class="lead" style="margin:0 auto">One email when ANDOR OSP is ready. Nothing else.</p>
+    <form onsubmit="return false"><input type="email" placeholder="Your email" aria-label="Email"><button class="btn">Join the waitlist</button></form></div>
+</section>
+
+<script>
+// display type switch
+document.querySelectorAll("[data-type]").forEach((b) => b.addEventListener("click", () => {
+  document.body.className = b.dataset.type; document.querySelectorAll("[data-type]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+}));
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+// cycles: steps/tabs/modes advance while the section is on screen; a click jumps and holds for one cycle
+function cycle(sec, items, show) {
+  const dur = +sec.dataset.dur; sec.style.setProperty("--dur", dur + "ms");
+  let i = 0, timer = null, visible = false;
+  const go = (k) => { i = (k + items.length) % items.length; show(i);
+    items.forEach((el, j) => { el.classList.toggle("on", j === i); const bar = el.querySelector(".bar"); if (bar) { bar.style.animation = "none"; bar.offsetWidth; bar.style.animation = ""; } }); };
+  const run = () => { clearInterval(timer); if (visible && !reduce) timer = setInterval(() => go(i + 1), dur); };
+  items.forEach((el, j) => el.addEventListener("click", () => { go(j); run(); }));
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; sec.classList.toggle("paused", !visible); run(); }, { threshold: 0.35 }).observe(sec);
+  sec.addEventListener("mouseenter", () => { clearInterval(timer); sec.classList.add("paused"); });
+  sec.addEventListener("mouseleave", () => { sec.classList.remove("paused"); run(); });
+  go(0);
+}
+document.querySelectorAll("[data-cycle]").forEach((sec) => {
+  if (sec.classList.contains("cycle")) { const imgs = sec.querySelectorAll(".frame img"); cycle(sec, [...sec.querySelectorAll(".step")], (i) => imgs.forEach((im, j) => im.classList.toggle("on", j === i))); }
+  else if (sec.classList.contains("rm")) { const imgs = sec.querySelectorAll(".stage img"); cycle(sec, [...sec.querySelectorAll("li")], (i) => imgs.forEach((im, j) => im.classList.toggle("on", j === i))); }
+  else if (sec.classList.contains("look")) { const panes = sec.querySelectorAll(".pane"); cycle(sec, [...sec.querySelectorAll(".tabs button")], (i) => panes.forEach((p, j) => p.classList.toggle("on", j === i))); }
+});
+// layers loop: no controls
+document.querySelectorAll("[data-loop]").forEach((sec) => {
+  const imgs = sec.querySelectorAll(".frame img"), chips = sec.querySelectorAll(".chips span"); let i = 0, t = null;
+  const tick = () => { i = (i + 1) % imgs.length; imgs.forEach((im, j) => im.classList.toggle("on", j === i)); chips.forEach((c, j) => c.classList.toggle("on", j === i)); };
+  new IntersectionObserver(([e]) => { clearInterval(t); if (e.isIntersecting && !reduce) t = setInterval(tick, +sec.dataset.dur); }, { threshold: 0.35 }).observe(sec);
+});
+// explorer: points placed from the editor's layout (1448 x 986, the three-sound capture's bounds)
+const H = [[260, 318, "SOURCE DISPLAY", "The sound itself: its waveform, where it starts, and the grains or playheads while you play."],
+  [315, 160, "REC", "Opens the card's capture page: record a take, or grab what you just played."],
+  [403, 159, "MODE", "Sample, Synth or Granular: how this card plays its sound."],
+  [210, 510, "CARD KNOBS", "START, TUNE, PAN, LEVEL and REIMAGINED for this sound alone."],
+  [128, 754, "LIFE", "How differently each note is played. No two takes the same."],
+  [420, 754, "FILTER", "The voices' filter, with type, resonance and its own envelope."],
+  [858, 754, "SPACE", "Reverb: room, hall, plate, spring and more."],
+  [1180, 700, "ENVELOPE", "Attack, decay, sustain and release, plus LFOs and modulation."],
+  [86, 906, "PITCH · MOD", "Touch strips for bends and modulation, by hand."],
+  [1360, 880, "ARP", "Plays the notes you hold as a repeating pattern."],
+  [698, 69, "PRESETS", "Built-in states and your own, one click apart."]];
+const ex = document.getElementById("explore");
+H.forEach(([x, y, t, d]) => { const b = document.createElement("button"); b.className = "hot"; b.style.left = (x / 1448 * 100) + "%"; b.style.top = (y / 986 * 100) + "%";
+  b.setAttribute("aria-label", t); b.innerHTML = `<span class="tip"><b>${t}</b>${d}</span>`; b.addEventListener("click", () => b.classList.toggle("open")); ex.appendChild(b); });
+</script>
+</body></html>

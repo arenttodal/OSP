@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- Hero backdrops (no text): composed from the DAW session render (daw.png, from daw.html?layout=daw)
+     and placed behind the H01 instrument by composite_hero.py.   ?v=curved|float|wall|soft  &daw=<url> -->
+<html><head><meta charset="utf-8"><style>
+* { margin:0; padding:0; box-sizing:border-box }
+html,body { width:1920px; height:1080px; overflow:hidden; background:#0b0b0c }
+.stage { position:absolute; inset:0; perspective:1400px; perspective-origin:50% 42% }
+.vig { position:absolute; inset:0; pointer-events:none }
+/* curved: the session on a wide curved wall behind, slices rotated about a common centre */
+.curve { position:absolute; left:50%; top:4%; width:0; height:0; transform-style:preserve-3d; transform:translateZ(-900px) }
+.curve i { position:absolute; top:0; height:620px; background-size:2400px 620px; filter:brightness(.8) }
+/* float: fragments at depth */
+.frag { position:absolute; border-radius:10px; overflow:hidden; background-size:cover; box-shadow:0 30px 80px rgba(0,0,0,.6) }
+</style></head><body>
+<div class="stage" id="stage"></div><div class="vig" id="vig"></div>
+<script>
+const q = new URLSearchParams(location.search), v = q.get("v") || "curved", daw = q.get("daw");
+const stage = document.getElementById("stage"), vig = document.getElementById("vig");
+document.body.style.background = { curved:"#09090a", float:"#0a0a0b", wall:"#0c0b0b", soft:"#e7e6e3", warm:"#d9a679" }[v];
+if (v === "curved") {
+  const c = document.createElement("div"); c.className = "curve"; stage.appendChild(c);
+  const N = 48, W = 2400, R = 1500, arc = W / R;            // slices across 2400 px wrapped on radius 1500
+  for (let k = 0; k < N; k++) {
+    const a = -arc / 2 + (k + 0.5) * arc / N, w = W / N + 1;
+    const s = document.createElement("i");
+    s.style.cssText = `left:${-w / 2}px; width:${w}px; background-image:url(${daw}); background-position:${-k * W / N}px 0;
+      transform: rotateY(${a}rad) translateZ(${-R}px) rotateY(180deg) scaleX(-1)`;
+    c.appendChild(s);
+  }
+  c.style.transform = `translateZ(${-900 + 1500}px)`;
+  stage.style.filter = "blur(5px) saturate(.85)";
+  vig.style.background = "radial-gradient(ellipse 70% 60% at 50% 40%, transparent 30%, rgba(9,9,10,.55) 70%, #09090a 100%), linear-gradient(to bottom, transparent 55%, #09090a 82%)";
+} else if (v === "float") {
+  // fragments cut from the session: [x, y, w, h, crop-x%, crop-y%, zoom, depth(blur px), opacity, rotY]
+  const F = [[60, 120, 520, 150, 12, 6, 3.6, 7, .55, 18], [1360, 90, 480, 220, 70, 30, 3.0, 9, .5, -16], [180, 610, 420, 260, 2, 90, 3.2, 4, .65, 12],
+             [1380, 640, 470, 170, 40, 55, 3.4, 3, .7, -12], [820, 40, 300, 110, 55, 4, 4.2, 12, .35, 0], [700, 820, 520, 150, 30, 72, 3.6, 10, .4, 0]];
+  for (const [x, y, w, h, cx, cy, z, b, o, ry] of F) {
+    const d = document.createElement("div"); d.className = "frag";
+    d.style.cssText += `left:${x}px; top:${y}px; width:${w}px; height:${h}px; background-image:url(${daw}); background-size:${z * 100}% auto;
+      background-position:${cx}% ${cy}%; filter:blur(${b}px); opacity:${o}; transform:rotateY(${ry}deg)`;
+    stage.appendChild(d);
+  }
+  vig.style.background = "radial-gradient(ellipse 55% 45% at 50% 60%, rgba(217,119,74,.10), transparent 70%), radial-gradient(ellipse 80% 70% at 50% 50%, transparent 40%, rgba(10,10,11,.7) 100%)";
+} else if (v === "wall") {
+  stage.style.cssText += `background:url(${daw}) center/cover; filter: blur(16px) brightness(.42) saturate(.75); transform:scale(1.08)`;
+  vig.style.background = "radial-gradient(ellipse 50% 40% at 50% 66%, rgba(255,226,196,.18), transparent 70%), linear-gradient(to bottom, rgba(12,11,11,.2), rgba(12,11,11,.1) 40%, #0c0b0b 92%)";
+} else if (v === "soft") {
+  const orbs = [[220, 160, 380, .9], [1580, 120, 300, .7], [1700, 720, 420, .8], [120, 820, 220, .6], [980, 60, 140, .5]];
+  for (const [x, y, r, o] of orbs) {
+    const d = document.createElement("div");
+    d.style.cssText = `position:absolute; left:${x - r / 2}px; top:${y - r / 2}px; width:${r}px; height:${r}px; border-radius:50%; opacity:${o};
+      background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.95), rgba(255,255,255,.35) 35%, rgba(205,212,222,.25) 60%, rgba(190,198,210,.5) 100%);
+      box-shadow: inset -20px -30px 60px rgba(160,170,185,.35), 0 40px 80px rgba(120,125,135,.18); filter: blur(${r < 200 ? 6 : 1.5}px)`;
+    stage.appendChild(d);
+  }
+  vig.style.background = "radial-gradient(ellipse 70% 60% at 50% 45%, rgba(255,255,255,.5), transparent 70%)";
+}
+if (v === "warm") {
+  // the flat editor on a warm field with a long, hard 45° shadow (built from stacked offsets)
+  const w = 1180, el = document.createElement("img"); el.src = q.get("plugin");
+  el.style.cssText = `position:absolute; left:${(1920 - w) / 2}px; top:96px; width:${w}px; border-radius:10px; z-index:2`;
+  const sh = document.createElement("div"); sh.style.cssText = `position:absolute; left:${(1920 - w) / 2}px; top:96px; width:${w}px; height:${w * 1972 / 2896}px; z-index:1;
+    background:#c48d5f; border-radius:10px; box-shadow:${Array.from({ length: 90 }, (_, k) => `${k * 6}px ${k * 6}px 0 #c48d5f`).join(",")}`;
+  stage.append(sh, el);
+  vig.style.background = "linear-gradient(135deg, rgba(255,255,255,.08), transparent 40%)";
+  el.onload = () => { document.title = "ready"; };
+}
+const img = new Image(); img.onload = () => { if (v !== "warm") document.title = "ready"; }; img.onerror = () => { if (v !== "warm") document.title = "ready"; }; img.src = daw || "data:,";
+if (!daw && v !== "warm") document.title = "ready";
+</script></body></html>
