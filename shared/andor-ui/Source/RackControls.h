@@ -166,7 +166,8 @@ enum class Slot
     knob,
     slim,
     wide,
-    twoKnobs   ///< two knobs' width (a segmented switch with long labels: MORPH ONLY / LAYERED)
+    twoKnobs,  ///< two knobs' width (a segmented switch with long labels: MORPH ONLY / LAYERED)
+    threeKnobs ///< three knobs' width (a product's nameplate cell: ANDOR ANALOG's KONTAKT; opt-in, unused by OSP)
 };
 int slotWidth (Slot slot, bool dense) noexcept;
 inline int slotGap (bool dense) noexcept { return dense ? 5 : 7; }

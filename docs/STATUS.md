@@ -1,5 +1,9 @@
 # Status
 
+> **22 Nov 2026, rack cells three knobs wide (shared, opt-in):** `rackui::Slot::threeKnobs` (3 x 104
+> + 2 x 7 px; dense 3 x 89 + 2 x 5) for a product's own wide cell - ANDOR ANALOG's KONTAKT
+> nameplate. Nothing in ANDOR OSP uses it: OSP's racks are unchanged (pixel-identical).
+
 > **22 Nov 2026, a saved project reopens with its preset's name (OSP and the shell):** the
 > session now records which preset (or starting state) was open - name, file, starting-state file -
 > and restores it, so a reopened project shows its preset's name again and SAVE still updates it

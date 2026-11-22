@@ -518,6 +518,7 @@ int slotWidth (Slot slot, bool dense) noexcept
         case Slot::slim: return dense ? 85 : 95;
         case Slot::wide: return dense ? 100 : 119;
         case Slot::twoKnobs: return dense ? 2 * 89 + 5 : 2 * 104 + 7;
+        case Slot::threeKnobs: return dense ? 3 * 89 + 2 * 5 : 3 * 104 + 2 * 7;
         case Slot::knob: break;
     }
     return dense ? 89 : 104;
