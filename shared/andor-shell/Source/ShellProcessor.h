@@ -1,5 +1,7 @@
 #pragma once
 
+#include "PerformanceView.h"
+
 #include "AndorParameters.h"
 #include "InstrumentHost.h"
 #include "InstrumentLoader.h"
@@ -186,6 +188,12 @@ public:
     const ProductInfo::UserMacros* userMacros() const noexcept { return ! referenceParity && product().userMacros ? &*product().userMacros : nullptr; }
     /** The macro bank shown (0 CORE, 1 USER): an interface preference in Interface.xml, never
         the sound, never a preset. Message thread. */
+    /** Performance Mode (shared model, PerformanceView.h): this instance's view - its session's,
+        else the musician's last choice on this computer (Interface.xml), else Edit Mode. Setting
+        it keeps it here (the session) and as the computer's preference. A view only: never a
+        parameter or part of a preset. Message thread. */
+    osp::plugin::performance::State performanceView() const;
+    void setPerformanceView (const osp::plugin::performance::State& state);
     int macroBank() const;
     void setMacroBank (int bank);
     // SHAPER DNA: the product's (never in the parity render).
@@ -399,6 +407,7 @@ private:
 
     std::unique_ptr<Engine> engine;
     Engine::Description description;
+    mutable std::optional<osp::plugin::performance::State> performanceState;   ///< (read from Interface.xml when first asked; a session sets it)
     mutable std::optional<osp::plugin::CardWellEditor::ViewState> wellView;   ///< (read from Interface.xml when first asked)
     mutable std::optional<int> bankShown;   ///< (read from Interface.xml when first asked)
     juce::StringArray bound;

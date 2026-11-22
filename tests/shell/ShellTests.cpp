@@ -1606,3 +1606,58 @@ TEST_CASE ("shell: a saved session reopens with its preset's name (and SAVE stil
         file.deleteFile();
     }
 }
+
+//==============================================================================
+// PERFORMANCE MODE R1, Gate 1: the shell keeps the view like OSP - the instance's session,
+// else the product's Interface.xml, else Edit Mode; never in a preset; the sound untouched.
+TEST_CASE ("shell: Performance view - Interface.xml, the session per instance, presets never carry it, the sound unchanged", "[shell][performance][state]")
+{
+    namespace pv = osp::plugin::performance;
+    pv::State chosen;
+    chosen.performance = true;
+    chosen.customised = true;
+    chosen.macros = { "space", "user:1" };
+    juce::MemoryBlock before, session;
+    {
+        ShellProcessor p;
+        p.getStateInformation (before);
+        p.setPerformanceView (chosen);
+        CHECK (p.performanceView() == chosen);
+        // The sound's state is unchanged by the view (only the view's own element differs).
+        p.getStateInformation (session);
+        auto a = ShellProcessor::getXmlFromBinary (before.getData(), static_cast<int> (before.getSize()));
+        auto b = ShellProcessor::getXmlFromBinary (session.getData(), static_cast<int> (session.getSize()));
+        REQUIRE ((a != nullptr && b != nullptr));
+        a->removeChildElement (a->getChildByName ("Performance"), true);
+        b->removeChildElement (b->getChildByName ("Performance"), true);
+        CHECK (a->isEquivalentTo (b.get(), false));
+    }
+    // Another instance on this computer: the musician's last choice.
+    {
+        ShellProcessor q;
+        CHECK (q.performanceView() == chosen);
+    }
+    // The session wins over a later preference; presets carry nothing and change nothing.
+    pv::State edit;
+    {
+        ShellProcessor p;
+        p.setPerformanceView (edit);
+        p.getStateInformation (session);
+        p.setPerformanceView (chosen);
+        ShellProcessor q;
+        q.setStateInformation (session.getData(), static_cast<int> (session.getSize()));
+        CHECK (q.performanceView() == edit);
+        const auto preset = q.presetFolder().getChildFile ("AA Performance View Test" + andor::shell::productInfo().presetExtension);
+        REQUIRE (q.savePreset (preset));
+        CHECK_FALSE (preset.loadFileAsString().contains ("<Performance"));
+        ShellProcessor r;
+        r.setPerformanceView (chosen);
+        REQUIRE (r.loadPreset (preset));
+        CHECK (r.performanceView() == chosen);
+        preset.deleteFile();
+    }
+    {
+        ShellProcessor p;
+        p.setPerformanceView (edit);   // (leave this computer's preference as a new musician's)
+    }
+}

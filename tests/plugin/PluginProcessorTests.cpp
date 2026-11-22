@@ -27,6 +27,7 @@
 #include <cstring>
 #include <functional>
 #include <map>
+#include <set>
 #include <typeinfo>
 
 using Catch::Approx;
@@ -8165,6 +8166,7 @@ TEST_CASE ("plugin: full-range modulation - 100 % reaches the knob's end; older 
 #include "AtlasRefineTests.inc"
 #include "UserMacroPluginTests.inc"
 #include "LibraryPolishTests.inc"
+#include "PerformanceStateTests.inc"
 #include "PopoverMacroTests.inc"
 #include "PedalLedTests.inc"
 #include "FinalPolishTests.inc"

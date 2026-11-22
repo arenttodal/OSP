@@ -1,5 +1,7 @@
 #pragma once
 
+#include "PerformanceView.h"
+
 #include "Audition.h"
 #include "InstrumentLoader.h"
 #include "InstrumentHost.h"
@@ -452,6 +454,12 @@ public:
     /** The macro bank shown (0 CORE, 1 USER): an interface preference of this computer
         (Documents/OSP/Interface.xml, <MacroBank shown="core|user"/>), never a sound's - a preset,
         undo or a session never changes it. A new musician starts on CORE. */
+    /** Performance Mode (shared model, PerformanceView.h): this instance's view - its session's,
+        else the musician's last choice on this computer (Documents/OSP/Interface.xml), else Edit
+        Mode. Setting it keeps it here (the session) and as the computer's preference. A view only:
+        never a parameter or part of a preset. Message thread. */
+    osp::plugin::performance::State performanceView() const;
+    void setPerformanceView (const osp::plugin::performance::State& state);
     int macroBank() const;
     /** The built-in starting state the patch is now (its program index), or -1 (a preset, a user
         starting state, INIT or Reset): the Library marks its tile, never by name. */
@@ -867,6 +875,7 @@ private:
     double userMacroRate = 48000.0;
     std::uint64_t userMacroRevisionCount = 1;
     mutable std::optional<int> macroBankShown;
+    mutable std::optional<osp::plugin::performance::State> performanceState;
     LiveParam liveParameter (const juce::String& id)
     {
         LiveParam p { parameters.getRawParameterValue (id), &liveOffsets, liveOffsets.indexOf (id) };

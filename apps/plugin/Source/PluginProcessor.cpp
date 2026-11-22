@@ -3613,6 +3613,8 @@ void OspAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
         xml->setAttribute ("sessionStartingStateFile", lastStartingStateFile.getFullPathName());
         xml->setAttribute ("sessionPresetIsProgram", presetIsProgram);
         xml->setAttribute ("sessionPresetNameOverride", presetNameOverride);
+        // Performance Mode (a view, per instance): only in the session, never a preset file.
+        xml->addChildElement (performanceView().toXml().release());
         copyXmlToBinary (*xml, destData);
     }
 }
@@ -3772,6 +3774,13 @@ void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
     const auto overrideName = xml->getStringAttribute ("sessionPresetNameOverride");
     for (const char* a : { "sessionPresetName", "sessionPresetFile", "sessionStartingStateFile", "sessionPresetIsProgram", "sessionPresetNameOverride" })
         xml->removeAttribute (a);
+    // This instance's Performance Mode view (read, then taken off: never part of the parameters).
+    if (auto* view = xml->getChildByName ("Performance"))
+    {
+        if (const auto state = osp::plugin::performance::State::fromXml (view))
+            performanceState = *state;
+        xml->removeChildElement (view, true);
+    }
     applyStateXml (*xml);
     if (! known)
         return;   // (a session from before: as it always opened)
@@ -4424,6 +4433,22 @@ namespace
             return juce::File (juce::String::fromUTF8 (dir));
         return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("OSP");
     }
+}
+
+osp::plugin::performance::State OspAudioProcessor::performanceView() const
+{
+    // This instance's (its session), else the musician's last choice on this computer, else Edit.
+    if (! performanceState.has_value())
+        performanceState = osp::plugin::performance::readPreference (documentsRoot().getChildFile ("Interface.xml")).value_or (osp::plugin::performance::State {});
+    return *performanceState;
+}
+
+void OspAudioProcessor::setPerformanceView (const osp::plugin::performance::State& state)
+{
+    if (performanceState.has_value() && *performanceState == state)
+        return;
+    performanceState = state;
+    osp::plugin::performance::writePreference (documentsRoot().getChildFile ("Interface.xml"), state);
 }
 
 int OspAudioProcessor::macroBank() const

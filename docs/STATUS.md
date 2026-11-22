@@ -1,5 +1,21 @@
 # Status
 
+> **22 Nov 2026, PERFORMANCE MODE R1 - in progress (branch `claude/performance-mode`, shared with
+> ANDOR ANALOG; spec: ANALOG `docs/specs/PERFORMANCE_MODE_R1.md`):**
+> - **Gate 0 audit:** done (header keys, macro row + modulation panel, USER macro hooks, cards,
+>   Interface.xml, session vs preset, window shaping, Learn reveals).
+> - **Gate 1 shared state (done):** `PerformanceView.h/.cpp` - mode, the chosen macros by stable id
+>   (core: parameter id; USER: `user:N`), default (six core + up to two assigned USER), sanitising
+>   (known ids, once, at most eight, never empty), what the strip shows (no unassigned USER knob),
+>   XML (schema 1) and Interface.xml helpers; both processors keep it per instance (session only,
+>   never in a preset; loading a preset keeps it) and as the computer's preference. Tests
+>   `[performance]` in OSP and the shell.
+> - **Shared components (built, not yet placed):** `PerformanceComponents.h/.cpp` - the header's
+>   gauge / pencil key, the macro housing's flap, the "Performance Macros" picker (compact popover:
+>   ticks, "N of 8", up / down, Reset to Default).
+> - **NEXT:** Gate 3 simplified cards, Gate 4 macro strip, Gate 5 flap + picker in both editors,
+>   Gate 6-10 persistence QA, OSP + ANALOG integration, screenshots, DAW checks (owner).
+
 > **22 Nov 2026, rack cells three knobs wide (shared, opt-in):** `rackui::Slot::threeKnobs` (3 x 104
 > + 2 x 7 px; dense 3 x 89 + 2 x 5) for a product's own wide cell - ANDOR ANALOG's KONTAKT
 > nameplate. Nothing in ANDOR OSP uses it: OSP's racks are unchanged (pixel-identical).

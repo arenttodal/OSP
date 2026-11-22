@@ -1695,6 +1695,8 @@ void ShellProcessor::getStateInformation (juce::MemoryBlock& destData)
         // project shows its name again - the sound itself is the state above.
         xml->setAttribute ("sessionPresetName", presetDisplayName());
         xml->setAttribute ("sessionPresetFile", lastPresetFile.getFullPathName());
+        // Performance Mode (a view, per instance): only in the session, never a preset file.
+        xml->addChildElement (performanceView().toXml().release());
         copyXmlToBinary (*xml, destData);
     }
 }
@@ -1703,8 +1705,17 @@ void ShellProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
     {
+        // This instance's Performance Mode view (read, then taken off: never part of the sound).
+        std::optional<osp::plugin::performance::State> view;
+        if (auto* node = xml->getChildByName ("Performance"))
+        {
+            view = osp::plugin::performance::State::fromXml (node);
+            xml->removeChildElement (node, true);
+        }
         if (! applyStateXml (*xml))
             return;
+        if (view.has_value())
+            performanceState = *view;
         // The preset the session was saved with: its file where it still is (SAVE then updates
         // it), else only its name (shown; SAVE asks for a name). A session from before: Init.
         const auto file = xml->getStringAttribute ("sessionPresetFile");
@@ -1758,6 +1769,22 @@ void ShellProcessor::setWellViewState (const osp::plugin::CardWellEditor::ViewSt
     well->setAttribute ("section", state.section);
     interfaceFile().getParentDirectory().createDirectory();
     xml.writeTo (interfaceFile());
+}
+
+osp::plugin::performance::State ShellProcessor::performanceView() const
+{
+    // This instance's (its session), else the musician's last choice on this computer, else Edit.
+    if (! performanceState.has_value())
+        performanceState = osp::plugin::performance::readPreference (interfaceFile()).value_or (osp::plugin::performance::State {});
+    return *performanceState;
+}
+
+void ShellProcessor::setPerformanceView (const osp::plugin::performance::State& state)
+{
+    if (performanceState.has_value() && *performanceState == state)
+        return;
+    performanceState = state;
+    osp::plugin::performance::writePreference (interfaceFile(), state);
 }
 
 int ShellProcessor::macroBank() const
