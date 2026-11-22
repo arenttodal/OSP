@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANDOR OSP · Workbench</title>
+<meta name="description" content="One sample in, a finished instrument out. Loop-free sustain, per-note performance, five resynthesis engines, three arpeggiators. No mapping.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="../kit/kit.css">
+<style>
+/* V4 "Workbench": for working producers; graphite, technical, dense where it earns it. */
+:root { --g0: #111214; --g1: #17181b; --g2: #1e2023; --g3: #2a2d31; --tx: #e9e6e0; --tx2: #a5a39e; --tx3: #6d6b67; --ln: rgba(233,230,224,.1) }
+body { background: var(--g0); color: var(--tx) }
+.mono { font-variant-numeric: tabular-nums; letter-spacing: .02em }
+.nav { position: sticky; top: 0; z-index: 40; background: rgba(17,18,20,.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--ln) }
+.nav .wrap { height: 60px; display: flex; align-items: center; justify-content: space-between } .nav .wm { font-weight: 800; letter-spacing: .22em; font-size: 14px; text-decoration: none }
+.nav nav { display: flex; gap: 26px; font-size: 13.5px } .nav nav a { text-decoration: none; color: var(--tx2) } .nav .btn { height: 36px; padding: 0 16px; font-size: 13.5px; background: var(--tx); color: var(--g0) }
+.sec { padding: clamp(84px, 10vw, 140px) 0; border-top: 1px solid var(--ln) }
+.tag { font-weight: 650; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent) }
+.lead { color: var(--tx2) } .mute { color: var(--tx3) }
+.head2 { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: end; margin-bottom: 56px }
+/* hero with the explorer */
+.hero { padding: 64px 0 96px } .hero .top { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: end; margin-bottom: 48px }
+.hero h1 { font-size: clamp(2.8rem, 5.4vw, 5.2rem) } .hero .lead { font-size: 18px } .hero .row { display: flex; gap: 14px; margin-top: 28px; flex-wrap: wrap }
+.hero .btn { background: var(--tx); color: var(--g0) } .hero .btn.ghost { background: transparent; color: var(--tx) }
+.xp { position: relative; background: var(--g1); border: 1px solid var(--ln); border-radius: 22px; padding: 22px }
+.xp .bar2 { display: flex; justify-content: space-between; align-items: center; color: var(--tx3); font-size: 12.5px; margin-bottom: 16px }
+.stagex { position: relative } .stagex img { border-radius: 10px; width: 100% }
+.hot { position: absolute; transform: translate(-50%, -50%); width: 22px; height: 22px; border-radius: 50%; background: rgba(217,119,74,.95); box-shadow: 0 0 0 6px rgba(217,119,74,.22); animation: pulse 2.6s ease-in-out infinite }
+.hot::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #fff }
+@keyframes pulse { 50% { box-shadow: 0 0 0 11px rgba(217,119,74,.08) } }
+.hot .tip { position: absolute; left: 50%; bottom: calc(100% + 14px); transform: translateX(-50%); width: 270px; padding: 14px 16px; border-radius: 12px; background: var(--tx); color: var(--g0); font-size: 14px; line-height: 1.45; text-align: left; box-shadow: 0 20px 50px rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 5 }
+.hot .tip b { display: block; font-size: 11.5px; letter-spacing: .1em; margin-bottom: 4px } .hot:hover .tip, .hot:focus .tip, .hot.open .tip { opacity: 1 }
+.xpwrap { overflow-x: clip }
+/* anatomy */
+.anat { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px }
+.box { background: var(--g1); border: 1px solid var(--ln); border-radius: 20px; padding: 30px }
+.box h3 { font-weight: 720; font-size: 22px; letter-spacing: -.02em } .box .sub { color: var(--tx3); font-size: 14px; margin-top: 4px }
+.chips2 { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px } .chips2 span { padding: 8px 12px; border-radius: 8px; background: var(--g2); border: 1px solid var(--ln); font-size: 13.5px; font-weight: 600 }
+.chips2 span em { font-style: normal; color: var(--tx3); font-weight: 500; margin-left: 6px }
+.cards3 { display: flex; gap: 8px; margin-top: 22px } .cards3 div { flex: 1; border-radius: 10px; padding: 12px; font-size: 13px; color: var(--tx2); background: var(--g2); border: 1px solid var(--ln) } .cards3 b { display: block; color: var(--tx); font-size: 15px; margin-bottom: 4px }
+/* compare */
+.tbl { width: 100%; border-collapse: collapse; font-size: 14.5px } .tblw { overflow-x: auto; border: 1px solid var(--ln); border-radius: 20px }
+.tbl th, .tbl td { padding: 16px 18px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--ln) } .tbl tr:last-child td { border-bottom: 0 }
+.tbl thead th { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--tx3); font-weight: 650; background: var(--g1) }
+.tbl td:first-child { color: var(--tx); font-weight: 600; width: 22% } .tbl td { color: var(--tx2) } .tbl .osp { background: rgba(217,119,74,.08); color: var(--tx) } .tbl thead .osp { color: var(--accent) }
+/* engine room */
+.room { display: grid; grid-template-columns: 340px 1fr; gap: 28px; align-items: start }
+.list { border-top: 1px solid var(--ln) } .li { position: relative; display: block; width: 100%; text-align: left; padding: 16px 4px 16px 0; border-bottom: 1px solid var(--ln); color: var(--tx3); transition: color .25s }
+.li .bar { position: absolute; left: 0; bottom: -1px } .li b { display: block; font-weight: 700; font-size: 17px; color: inherit } .li span { font-size: 13.5px; display: block; margin-top: 3px; max-height: 0; overflow: hidden; transition: max-height .3s }
+.li.on { color: var(--tx) } .li.on span { max-height: 60px; color: var(--tx2) }
+.viewer .pane { display: none } .viewer .pane.on { display: block }
+.viewer .clip { aspect-ratio: 1.6 } .viewer .cap { margin-top: 14px; color: var(--tx2); font-size: 15px }
+/* space engines */
+.sp4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px }
+.sp { background: var(--g1); border: 1px solid var(--ln); border-radius: 20px; padding: 26px; min-height: 220px; display: flex; flex-direction: column; justify-content: space-between }
+.sp b { font-weight: 780; letter-spacing: .06em; font-size: 20px } .sp p { color: var(--tx2); font-size: 14.5px } .sp small { color: var(--tx3); font-size: 12.5px; letter-spacing: .06em }
+/* trust */
+.trust { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1px solid var(--ln); border-radius: 20px; overflow: hidden }
+.tr { padding: 30px; border-right: 1px solid var(--ln); border-bottom: 1px solid var(--ln) } .tr:nth-child(3n) { border-right: 0 } .tr:nth-last-child(-n+3) { border-bottom: 0 }
+.tr b { display: block; font-weight: 700; font-size: 17px } .tr p { color: var(--tx2); font-size: 14.5px; margin-top: 8px }
+/* close */
+.close2 { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center }
+.close2 .wl input[type=email] { background: var(--g2); color: var(--tx); border: 1px solid var(--ln) } .close2 .btn { background: var(--tx); color: var(--g0) } .close2 .wl .msg { color: var(--tx3) }
+.foot { padding: 34px 0 54px; color: var(--tx3); font-size: 13px; border-top: 1px solid var(--ln) } .foot .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px } .foot a { margin-left: 18px; text-decoration: none }
+@media (max-width: 960px) { .nav nav { display: none } .hero .top, .head2, .anat, .close2 { grid-template-columns: minmax(0, 1fr); gap: 28px } .room { grid-template-columns: minmax(0, 1fr) } .viewer { position: static; order: -1 }
+  .sp4 { grid-template-columns: repeat(2, minmax(0, 1fr)) } .trust { grid-template-columns: minmax(0, 1fr) } .tr { border-right: 0 } .tr:nth-last-child(-n+3) { border-bottom: 1px solid var(--ln) } .tr:last-child { border-bottom: 0 } .hot .tip { width: 200px } }
+</style></head>
+<body>
+<header class="nav"><div class="wrap"><a class="wm" href="#top">ANDOR OSP</a><nav><a href="#anatomy">Anatomy</a><a href="#compare">Compare</a><a href="#engines">Engine room</a><a href="#space">SPACE</a><a href="#trust">Workflow</a></nav><a class="btn" href="#waitlist">Join the waitlist</a></div></header>
+
+<section class="hero" id="top">
+  <div class="wrap">
+    <div class="top">
+      <div><p class="tag">ANDOR OSP · One Shot Performer</p><h1 class="d" style="margin-top:16px">One sample in.<br><span class="mute">A finished instrument out.</span></h1></div>
+      <div><p class="lead">Root detection, loop-free sustain, per-note performance, five resynthesis engines, a synth imprinted with your sound, three arpeggiators. Nothing to map.</p>
+        <div class="row"><a class="btn" href="#waitlist">Join the waitlist</a><a class="btn ghost" href="#engines">Open the engine room</a></div></div>
+    </div>
+    <div class="xpwrap"><div class="xp">
+      <div class="bar2"><span>ANDOR OSP 0.9.0-beta · three sounds loaded</span><span>Hover or tap a point</span></div>
+      <div class="stagex" data-hotspots='[[260,318,"SOURCE","The recording itself: waveform, start, and the playheads or grains while you play."],[315,160,"REC","Each card listens: RECORD a take, or GRAB the last 10 to 60 seconds."],[403,159,"MODE","One Shot or Granular, per card."],[210,510,"CARD","START, TUNE, PAN, LEVEL and REIMAGINED for this sound alone."],[128,754,"LIFE","Correlated per-note variation, calibrated on real repeated takes."],[420,754,"FILTER","LP24, LP12, HP12, BP12 or TILT, with resonance and its own envelope."],[858,754,"SPACE","ROOMS, ABYSS, VINTAGE and BLOOM reverb engines."],[1180,700,"MODULATION","Two LFOs, two envelopes, the mod wheel; 16 routes, dragged onto any knob."],[86,906,"PITCH · MOD","Touch strips for bends and modulation. MPE: ±48 semitones per note."],[1360,880,"ARP","Three arpeggiators, one per card, or linked."],[698,69,"PRESETS","Starting states, your presets, and portable .ospinstrument files."]]'>
+        <img src="../m/editor-3L-2000.webp" alt="ANDOR OSP with three sounds loaded" width="2000" height="1362"></div>
+    </div></div>
+  </div>
+</section>
+
+<section class="sec" id="anatomy">
+  <div class="wrap">
+    <div class="head2"><div><p class="tag">Anatomy</p><h2 class="d d2" style="margin-top:14px">Three layers deep.<br><span class="mute">One instrument wide.</span></h2></div>
+      <p class="lead">Each of up to three sounds is a complete voice with its own engine and arpeggiator. The macros, modulation and space sit across all three.</p></div>
+    <div class="anat">
+      <div class="box"><h3>Per layer</h3><p class="sub">A, B and C each carry</p>
+        <div class="cards3"><div><b>A</b>Vowel</div><div><b>B</b>Granular pad</div><div><b>C</b>Pluck + IMPRINT</div></div>
+        <div class="chips2"><span>Mode<em>One Shot · Granular</em></span><span>REIMAGINED<em>5 engines</em></span><span>EQ<em>5-band</em></span><span>DAMPEN<em>by key</em></span><span>SYNTH<em>saw · square · tri · sine</em></span><span>IMPRINT</span><span>KEY DNA</span><span>Arpeggiator</span><span>SATELLITE</span><span>Capture<em>REC / GRAB</em></span></div></div>
+      <div class="box"><h3>Across the instrument</h3><p class="sub">Shared by all three</p>
+        <div class="chips2"><span>LIFE</span><span>DRIVE<em>TUBE · TAPE · CRUNCH</em></span><span>FILTER<em>LP24 · LP12 · HP12 · BP12 · TILT</em></span><span>MOVEMENT<em>DRIFT · TAPE · CHORUS · PULSE · SHAPER</em></span><span>ECHO<em>TAPE · BBD · ASCEND</em></span><span>SPACE<em>4 engines</em></span><span>LFO ×2</span><span>ENV ×2</span><span>16 routes</span><span>MPE</span><span>Velocity<em>SOFT · LINEAR · HARD</em></span><span>Pitch<em>TAPE · NATURAL</em></span><span>Mono · legato · glide</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="compare">
+  <div class="wrap">
+    <div class="head2"><div><p class="tag">Compare approaches</p><h2 class="d d2" style="margin-top:14px">Not another sampler.<br><span class="mute">A different job.</span></h2></div>
+      <p class="lead">ANDOR OSP does one narrow thing very well: from a recording you own to an expressive instrument, with no mapping work.</p></div>
+    <div class="tblw"><table class="tbl">
+      <thead><tr><th>What you want</th><th>Stock DAW sampler</th><th>Library player</th><th>Granular synth</th><th class="osp">ANDOR OSP</th></tr></thead>
+      <tbody>
+        <tr><td>Play one recording across the keys</td><td>Root and loop set by hand</td><td>Via zone mapping</td><td>As an oscillator or source</td><td class="osp">Drop and play; root detected</td></tr>
+        <tr><td>Sustain a short note, no audible loop</td><td>Manual loop points or warping</td><td>Depends on the programming</td><td>Granular sustain changes the sound</td><td class="osp">Continuation on the recording itself, release grafting</td></tr>
+        <tr><td>Repeated notes that differ</td><td>Basic randomisation, or record round robins</td><td>Round robins the library ships</td><td>Random modulation</td><td class="osp">LIFE: correlated per-note performance; round robins from one sample</td></tr>
+        <tr><td>Velocity that changes timbre</td><td>Filter or volume mapping</td><td>If layers were recorded</td><td>Mod-matrix routing</td><td class="osp">Transient, brightness, bite and body from one sample</td></tr>
+        <tr><td>A phrase into mapped notes</td><td>Slicing by transient</td><td>Manual</td><td>Rarely</td><td class="osp">Note Atlas: pitch-aware notes on their own keys</td></tr>
+        <tr><td>Capture after the fact</td><td>Record first, then load</td><td>No</td><td>No</td><td class="osp">GRAB LAST 10 to 60 s straight into mapped notes</td></tr>
+        <tr><td>A synth layer from the sample</td><td>A separate synth</td><td>Separate</td><td>Some resynthesise</td><td class="osp">SYNTH with IMPRINT: the recording's spectral body, per note</td></tr>
+      </tbody></table></div>
+  </div>
+</section>
+
+<section class="sec" id="engines" data-cycle="7000">
+  <div class="wrap">
+    <div class="head2"><div><p class="tag">Engine room</p><h2 class="d d2" style="margin-top:14px">Every engine,<br><span class="mute">running.</span></h2></div>
+      <p class="lead">Real recordings of the beta. Each plays through, then the next. Turn the sound on to hear the instrument itself.</p></div>
+    <div class="room">
+      <div class="list">
+        <button class="li" data-item><i class="bar"></i><b>Continuation</b><span>Hold a note on the pedal; it never runs out.</span></button>
+        <button class="li" data-item><i class="bar"></i><b>Note Atlas</b><span>A phrase becomes notes on their own keys.</span></button>
+        <button class="li" data-item><i class="bar"></i><b>Live capture</b><span>GRAB what you just played.</span></button>
+        <button class="li" data-item><i class="bar"></i><b>SYNTH + IMPRINT</b><span>An oscillator wearing the recording's body.</span></button>
+        <button class="li" data-item><i class="bar"></i><b>Granular</b><span>Card B: POS, then SPREAD, under a held chord.</span></button>
+        <button class="li" data-item><i class="bar"></i><b>KEY DNA</b><span>Grain behaviour drawn across the keyboard.</span></button>
+        <button class="li" data-item><i class="bar"></i><b>Modulation</b><span>FILTER moving with an LFO.</span></button>
+        <button class="li" data-item><i class="bar"></i><b>SATELLITE</b><span>Each layer on its own path through the stereo field.</span></button>
+      </div>
+      <div class="viewer">
+        <div class="pane" data-pane><div class="clip"><video muted playsinline preload="none" poster="../m/learn/p1-pedal-loop-pingpong-poster.webp"><source src="../m/learn/p1-pedal-loop-pingpong.webm" type="video/webm"><source src="../m/learn/p1-pedal-loop-pingpong.mp4" type="video/mp4"></video><button class="snd" data-sound aria-pressed="false"><span class="n">Sound off</span><span class="y">Sound on</span></button></div><p class="cap">The steady part of the recording, walked through matched loops that never repeat back to back.</p></div>
+        <div class="pane" data-pane><div class="clip"><video muted playsinline preload="none" poster="../m/learn/b-phrase-map-notes-poster.webp"><source src="../m/learn/b-phrase-map-notes.webm" type="video/webm"><source src="../m/learn/b-phrase-map-notes.mp4" type="video/mp4"></video></div><p class="cap">Edit, split, merge, retune, add velocity layers, FILL the keyboard.</p></div>
+        <div class="pane" data-pane><div class="clip"><video muted playsinline preload="none" poster="../m/learn/c2-grab-last-poster.webp"><source src="../m/learn/c2-grab-last.webm" type="video/webm"><source src="../m/learn/c2-grab-last.mp4" type="video/mp4"></video></div><p class="cap">Mic or interface in standalone; any DAW track over the sidechain.</p></div>
+        <div class="pane" data-pane><div class="clip"><video muted playsinline preload="none" poster="../m/learn/f2-synth-imprint-poster.webp"><source src="../m/learn/f2-synth-imprint.webm" type="video/webm"><source src="../m/learn/f2-synth-imprint.mp4" type="video/mp4"></video></div><p class="cap">Resonant body, formants, bow or breath colour, laid onto a band-limited oscillator. MOTION follows it through the note.</p></div>
+        <div class="pane" data-pane><div class="clip"><video muted playsinline preload="none" poster="../m/learn/granular-3card-poster.webp"><source src="../m/learn/granular-3card.webm" type="video/webm"><source src="../m/learn/granular-3card.mp4" type="video/mp4"></video></div><p class="cap">POS, SIZE 20 to 400 ms, DENS 4 to 40 per second, SPREAD, SCATTER, PAN, three windows.</p></div>
+        <div class="pane" data-pane><div class="clip"><video muted playsinline preload="none" poster="../m/learn/h3-key-dna-poster.webp"><source src="../m/learn/h3-key-dna.webm" type="video/webm"><source src="../m/learn/h3-key-dna.mp4" type="video/mp4"></video></div><p class="cap">Drawn curves per parameter, with depth, variation and individuality.</p></div>
+        <div class="pane" data-pane><div class="clip"><video muted playsinline preload="none" poster="../m/learn/i4-modulation-poster.webp"><source src="../m/learn/i4-modulation.webm" type="video/webm"><source src="../m/learn/i4-modulation.mp4" type="video/mp4"></video></div><p class="cap">Drag a source onto any knob. Modulate a modulation's depth.</p></div>
+        <div class="pane" data-pane><div class="clip"><video muted playsinline preload="none" poster="../m/learn/d3-satellite-poster.webp"><source src="../m/learn/d3-satellite.webm" type="video/webm"><source src="../m/learn/d3-satellite.mp4" type="video/mp4"></video></div><p class="cap">Rate, depth, width, phase and offset, per layer.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="space">
+  <div class="wrap">
+    <div class="head2"><div><p class="tag">SPACE</p><h2 class="d d2" style="margin-top:14px">Four reverbs.<br><span class="mute">One knob in front.</span></h2></div><p class="lead">Turn SPACE for depth; click its name for the engine underneath.</p></div>
+    <div class="sp4">
+      <div class="sp"><small>01</small><div><b>ROOMS</b><p>Room, hall, plate and spring.</p></div></div>
+      <div class="sp"><small>02</small><div><b>ABYSS</b><p>Huge, swelling, freezable. DEEP, DARK, INVERSE, ENDLESS.</p></div></div>
+      <div class="sp"><small>03</small><div><b>VINTAGE</b><p>Early-digital hall, plate, chamber and room.</p></div></div>
+      <div class="sp"><small>04</small><div><b>BLOOM</b><p>Diffusing, tempo-synced echoes that grow into reverb.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="trust">
+  <div class="wrap">
+    <div class="head2"><div><p class="tag">Workflow</p><h2 class="d d2" style="margin-top:14px">Built for sessions<br><span class="mute">that matter.</span></h2></div></div>
+    <div class="trust">
+      <div class="tr"><b>Renders identically</b><p>All variation comes from stored seeds. The bounce you approve is the bounce you deliver.</p></div>
+      <div class="tr"><b>Projects reopen exactly</b><p>The sample, its corrections and every setting are stored with the session.</p></div>
+      <div class="tr"><b>Portable instruments</b><p>An .ospinstrument carries recordings, analysis and settings to another computer.</p></div>
+      <div class="tr"><b>Offline and private</b><p>No account, no cloud, no network. Your audio never leaves the machine.</p></div>
+      <div class="tr"><b>Undo for sound</b><p>Undo and redo cover sound changes, not only knob moves.</p></div>
+      <div class="tr"><b>Fails beautifully</b><p>Noise, no pitch, tiny or huge files: it plays as well as it can and tells you why.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="waitlist">
+  <div class="wrap close2">
+    <div><h2 class="d d2">Get on the list.</h2><p class="lead" style="margin-top:16px">AU, VST3 and Standalone for macOS (Apple Silicon and Intel) at release. Windows not announced yet. One email when it is ready.</p></div>
+    <form class="wl" data-waitlist="https://assets.mailerlite.com/jsonp/161928/forms/204835943155238722/subscribe" novalidate>
+      <input type="email" name="fields[email]" placeholder="Your email" aria-label="Email" required><input class="hp" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="btn" type="submit">Join the waitlist</button><p class="msg" aria-live="polite"></p></form>
+  </div>
+</section>
+<footer class="foot"><div class="wrap"><span>© ANDOR</span><span><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></span></div></footer>
+<script src="../kit/kit.js"></script>
+</body></html>
