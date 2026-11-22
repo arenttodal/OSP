@@ -17,6 +17,9 @@
 >   implicitly (the Inbox's size and date check did, so a file named outside ASCII stayed
 >   "detected" for ever). Left narrow on purpose: the research renderer's command line and
 >   test paths from environment variables (both arrive in the ANSI code page on Windows).
+> - **State (22 Nov):** Windows run 11 (`5f807b2`) passes all 10 test groups and uploads the
+>   installer; Linux passes all of them on the same commit. Not tried yet: a real DAW and the
+>   standalone on a Windows machine (the owner's test).
 >
 > **21 Nov 2026, rack modulation steps 3-5 (`docs/research/rack-modulation.md`):**
 > - **Every rack and effect control can be modulated:** the SPACE, ECHO and MOVEMENT racks
