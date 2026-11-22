@@ -65,6 +65,17 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 @media (max-aspect-ratio: 4/5) and (min-aspect-ratio: 9/17) { .ohero__media img { object-position: 50% 8% } }
 @media (min-aspect-ratio: 2/1) { .ohero__media img { object-position: 50% 75% } }
+.rise__bg, .rise__inst { position: absolute; inset: 0; width: 100%; height: 100% }
+.rise__bg img { width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 50% 62% }
+.rise__light { position: absolute; inset: 0; overflow: hidden; pointer-events: none; mix-blend-mode: soft-light }
+.rise__light i { position: absolute; width: 70vw; height: 70vw; border-radius: 50%; filter: blur(60px); opacity: .55 }
+.rise__light i:nth-child(1) { left: -10vw; top: -30vw; background: radial-gradient(circle, rgba(255,236,206,.95), rgba(255,236,206,0) 65%); animation: rise-drift-a 28s ease-in-out infinite alternate }
+.rise__light i:nth-child(2) { right: -20vw; top: -10vw; background: radial-gradient(circle, rgba(255,248,236,.8), rgba(255,248,236,0) 60%); animation: rise-drift-b 37s ease-in-out infinite alternate }
+@keyframes rise-drift-a { to { transform: translate(38vw, 12vw) scale(1.15) } }
+@keyframes rise-drift-b { to { transform: translate(-32vw, 8vw) scale(.9) } }
+.rise__phone { display: none }
+@media (max-aspect-ratio: 4/5) { .rise__bg, .rise__light, .rise__inst { display: none } .rise__phone { display: block; height: 100% } .rise__phone img { width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 50% 8% } }
+@media (prefers-reduced-motion: reduce) { .rise__light i { animation: none } }
 /* C02 life cycle */
 .cycle .head { display: flex; justify-content: space-between; align-items: end; gap: 40px; margin-bottom: 56px; flex-wrap: wrap }
 .cycle .frame { position: relative; aspect-ratio: 1448 / 1050; background: var(--paper-2); border-radius: var(--r); overflow: hidden }
@@ -164,15 +175,16 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
   <span>Display type: Inter Tight Bold</span>
 </div>
 
-<div class="tag"><b>C01</b> Hero, the original <span>The H01 instrument plate and the original centred hero, with the headline now in Inter Tight Bold.</span></div>
+<div class="tag"><b>C01</b> Hero, the original <span>The original centred hero. The instrument is a 36-frame render that rises from tipped back into the H01 pose as you scroll (the page scrolls normally); the backdrop moves slower than it, and a soft light drifts across it.</span></div>
 <section class="ohero" aria-labelledby="oh-title">
-  <div class="ohero__media">
-    <picture>
+  <div class="ohero__media" data-rise data-frames="36" data-base="m/rise/rise-">
+    <div class="rise__bg"><img src="m/rise/rise-backdrop.webp" alt="" width="1600" height="900"></div>
+    <div class="rise__light" aria-hidden="true"><i></i><i></i></div>
+    <canvas class="rise__inst" aria-label="The ANDOR OSP instrument rising into view"></canvas>
+    <picture class="rise__phone">
       <source media="(max-aspect-ratio: 4/5)" type="image/avif" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-640.avif 640w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-860.avif 860w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-1290.avif 1290w" sizes="100vw">
       <source media="(max-aspect-ratio: 4/5)" type="image/webp" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-640.webp 640w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-860.webp 860w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-1290.webp 1290w" sizes="100vw">
-      <source type="image/avif" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1280.avif 1280w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.avif 1920w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-2560.avif 2560w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-3840.avif 3840w" sizes="100vw">
-      <img src="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.webp" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1280.webp 1280w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.webp 1920w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-2560.webp 2560w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-3840.webp 3840w" sizes="100vw"
-           alt="The ANDOR OSP instrument seen from the front on an ivory backdrop" width="3840" height="2160" fetchpriority="high" decoding="async">
+      <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
     </picture>
   </div>
   <div class="ohero__veil"></div>
@@ -379,6 +391,26 @@ document.querySelectorAll("[data-seq]").forEach((sec) => {
   snd.addEventListener("click", () => { const on = snd.getAttribute("aria-pressed") !== "true"; snd.setAttribute("aria-pressed", on); vids.forEach((v) => (v.muted = !on)); if (on) vids[i].play().catch(() => {}); });
   new IntersectionObserver(([e]) => { visible = e.isIntersecting;
     if (visible && !reduce) { vids[i].play().catch(() => {}); cancelAnimationFrame(raf); raf = requestAnimationFrame(bar); } else { vids[i].pause(); cancelAnimationFrame(raf); } }, { threshold: 0.4 }).observe(sec);
+});
+// C01: the instrument rises with the scroll (frame = scroll position; the page is never held)
+document.querySelectorAll("[data-rise]").forEach((box) => {
+  const N = +box.dataset.frames, base = box.dataset.base, cv = box.querySelector("canvas"), ctx = cv.getContext("2d"), bg = box.querySelector(".rise__bg");
+  if (matchMedia("(max-aspect-ratio: 4/5)").matches) return;
+  const imgs = [], pad = (i) => String(i).padStart(2, "0");
+  let shown = -1, want = 0;
+  const draw = (i) => { const im = imgs[i]; if (!im || !im.complete || !im.naturalWidth) return false;
+    const r = cv.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; shown = -1; }
+    const s = Math.max(W / im.naturalWidth, H / im.naturalHeight), w = im.naturalWidth * s, h = im.naturalHeight * s;   // object-fit: cover, at 50% 62%
+    ctx.clearRect(0, 0, W, H); ctx.drawImage(im, (W - w) * 0.5, (H - h) * 0.62, w, h); shown = i; return true; };
+  const frameFor = () => { const p = Math.min(1, Math.max(0, scrollY - box.closest("section").offsetTop + innerHeight * 0) / (innerHeight * 0.55));
+    return reduce ? N - 1 : Math.round((1 - Math.pow(1 - p, 2.2)) * (N - 1)); };
+  const tick = () => { want = frameFor(); if (want !== shown) { if (!draw(want)) { for (let k = want; k >= 0; k--) if (draw(k)) break; } }
+    bg.style.transform = `translateY(${Math.min(scrollY, innerHeight) * 0.18}px)`; };
+  for (let i = 0; i < N; i++) { const im = new Image(); im.decoding = "async"; im.src = base + pad(i) + ".webp"; im.onload = () => { if (i === want || shown < 0) tick(); }; imgs.push(im); }
+  addEventListener("scroll", () => requestAnimationFrame(tick), { passive: true });
+  addEventListener("resize", () => { shown = -1; tick(); });
+  tick();
 });
 // layers loop: no controls
 document.querySelectorAll("[data-loop]").forEach((sec) => {
