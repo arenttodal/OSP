@@ -51,12 +51,17 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .cycle .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .55s ease }
 .cycle .frame img.on { opacity: 1 }
 .cycle .frame img.panel { object-fit: contain; padding: 9% 22%; }
+.cycle .screen { aspect-ratio: 16 / 10; background: #282e2c; box-shadow: 0 40px 90px rgba(23,23,26,.22) }
+.cycle .screen video { position: absolute; inset: 3%; width: 94%; height: 94%; object-fit: contain; opacity: 0; transition: opacity .45s ease }
+.cycle .screen video.on { opacity: 1 }
+.snd { position: absolute; right: 16px; bottom: 16px; z-index: 2; height: 36px; padding: 0 14px; border-radius: 999px; background: rgba(20,20,22,.72); color: #f2efe9; font-size: 13px; font-weight: 600; backdrop-filter: blur(8px) }
+.snd .on { display: none } .snd[aria-pressed=true] .on { display: inline } .snd[aria-pressed=true] .off { display: none }
 .steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 18px }
 .step { text-align: left; padding: 18px 18px 20px; border-radius: 14px; background: #fff; box-shadow: 0 1px 0 var(--line); position: relative; overflow: hidden; min-height: 132px }
 .step .n { font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums } .step .t { font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-track); font-size: 24px; margin: 6px 0 6px }
 .step p { font-size: 14px; color: var(--ink-2); line-height: 1.45 } .step:not(.on) p { color: var(--ink-3) }
 .step .bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent) }
-.step.on { box-shadow: 0 0 0 1.5px var(--ink) } .step.on .bar { animation: fill var(--dur) linear forwards }
+.step.on { box-shadow: 0 0 0 1.5px var(--ink) } .step.on .bar { animation: fill var(--dur) linear forwards } [data-seq] .step .bar { animation: none !important; transition: none }
 .paused .step.on .bar { animation-play-state: paused }
 @keyframes fill { to { width: 100% } }
 /* C03 instant */
@@ -154,23 +159,24 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
   </div>
 </section>
 
-<div class="tag" id="c02"><b>C02</b> The whole idea, in five steps <span>Plays by itself while on screen, one step every 4.5 s; click a step to jump. Fades only, no movement.</span></div>
-<section class="sec cycle" data-cycle data-dur="4500">
+<div class="tag" id="c02"><b>C02</b> The whole idea, in five steps <span>Real screen recordings from ANDOR Learn (captured on the beta). Plays while on screen; each step moves on when its clip ends; click to jump. Sound off by default, one button turns it on.</span></div>
+<section class="sec cycle" data-seq>
   <div class="wrap">
     <div class="head"><h2 class="d d2">From one sound<br><span class="mute">to an instrument.</span></h2><p class="lead">No mapping, no zones, no preparation. Everything after the first sound is playing.</p></div>
-    <div class="frame">
-      <img class="on" src="m/editor-empty-2000.webp" alt="ANDOR OSP waiting for a sound">
-      <img src="m/editor-1L-2000.webp" alt="One sound, mapped across the keyboard">
-      <img class="panel" src="m/panel-life-1100.webp" alt="The LIFE panel">
-      <img class="panel" src="m/panel-rm-tape-frame-1100.webp" alt="REIMAGINED in Tape Frame">
-      <img src="m/editor-3L-2000.webp" alt="Three sounds as one instrument">
+    <div class="frame screen">
+      <video class="on" muted playsinline preload="auto" poster="m/learn/a-load-and-play-poster.webp" aria-label="A sound dropped into ANDOR OSP and played"><source src="m/learn/a-load-and-play.webm" type="video/webm"><source src="m/learn/a-load-and-play.mp4" type="video/mp4"></video>
+      <video class="" muted playsinline preload="metadata" poster="m/learn/i7-filter-poster.webp" aria-label="The FILTER macro and its panel"><source src="m/learn/i7-filter.webm" type="video/webm"><source src="m/learn/i7-filter.mp4" type="video/mp4"></video>
+      <video class="" muted playsinline preload="metadata" poster="m/learn/i1-reimagined-poster.webp" aria-label="The REIMAGINED knob turned up"><source src="m/learn/i1-reimagined.webm" type="video/webm"><source src="m/learn/i1-reimagined.mp4" type="video/mp4"></video>
+      <video class="" muted playsinline preload="metadata" poster="m/learn/e2-add-layers-poster.webp" aria-label="A second and third sound added"><source src="m/learn/e2-add-layers.webm" type="video/webm"><source src="m/learn/e2-add-layers.mp4" type="video/mp4"></video>
+      <video class="" muted playsinline preload="metadata" poster="m/learn/g1-arp-basics-poster.webp" aria-label="The arpeggiator playing held notes"><source src="m/learn/g1-arp-basics.webm" type="video/webm"><source src="m/learn/g1-arp-basics.mp4" type="video/mp4"></video>
+      <button class="snd" aria-pressed="false"><span class="off">Sound off</span><span class="on">Sound on</span></button>
     </div>
     <div class="steps">
-      <button class="step on"><div class="n">01</div><div class="t">Load it.</div><p>Drop in one recording, or a phrase. A voice, a cello, a glass, a memo.</p><i class="bar"></i></button>
-      <button class="step"><div class="n">02</div><div class="t">Play it.</div><p>It is across every key already, in tune, with its character intact.</p><i class="bar"></i></button>
-      <button class="step"><div class="n">03</div><div class="t">Shape it.</div><p>Six macros. LIFE makes every note a slightly different take.</p><i class="bar"></i></button>
-      <button class="step"><div class="n">04</div><div class="t">Morph it.</div><p>Turn REIMAGINED and the sound travels, still recognisably yours.</p><i class="bar"></i></button>
-      <button class="step"><div class="n">05</div><div class="t">Stack it.</div><p>Add a second and a third sound. They play as one instrument.</p><i class="bar"></i></button>
+      <button class="step on"><div class="n">01</div><div class="t">Load it.</div><p>Drop in one recording. It plays across every key, the moment it lands.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">02</div><div class="t">Shape it.</div><p>Six macros, each with its own panel. Here FILTER closes the sound down.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">03</div><div class="t">Morph it.</div><p>Turn REIMAGINED and the sound travels, still recognisably yours.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">04</div><div class="t">Stack it.</div><p>Add a second and a third sound. They play as one instrument.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">05</div><div class="t">Play it.</div><p>Hold a chord and the arpeggiator plays it, across every layer.</p><i class="bar"></i></button>
     </div>
   </div>
 </section>
@@ -327,6 +333,23 @@ document.querySelectorAll("[data-cycle]").forEach((sec) => {
   if (sec.classList.contains("cycle")) { const imgs = sec.querySelectorAll(".frame img"); cycle(sec, [...sec.querySelectorAll(".step")], (i) => imgs.forEach((im, j) => im.classList.toggle("on", j === i))); }
   else if (sec.classList.contains("rm")) { const imgs = sec.querySelectorAll(".stage img"); cycle(sec, [...sec.querySelectorAll("li")], (i) => imgs.forEach((im, j) => im.classList.toggle("on", j === i))); }
   else if (sec.classList.contains("look")) { const panes = sec.querySelectorAll(".pane"); cycle(sec, [...sec.querySelectorAll(".tabs button")], (i) => panes.forEach((p, j) => p.classList.toggle("on", j === i))); }
+});
+// C02: the Learn clips in order; a step ends when its clip ends; the bar follows the clip's time
+document.querySelectorAll("[data-seq]").forEach((sec) => {
+  const vids = [...sec.querySelectorAll("video")], steps = [...sec.querySelectorAll(".step")], snd = sec.querySelector(".snd");
+  let i = 0, visible = false, raf = 0;
+  const bar = () => { const v = vids[i]; steps.forEach((st, j) => { st.querySelector(".bar").style.width = j === i && v.duration ? (100 * v.currentTime / v.duration) + "%" : "0"; }); raf = requestAnimationFrame(bar); };
+  const show = (k, play) => {
+    vids[i].pause(); i = (k + vids.length) % vids.length;
+    vids.forEach((v, j) => v.classList.toggle("on", j === i)); steps.forEach((st, j) => st.classList.toggle("on", j === i));
+    const v = vids[i]; v.preload = "auto"; v.currentTime = 0; if (vids[i + 1]) vids[i + 1].preload = "auto";
+    if (play) v.play().catch(() => {});
+  };
+  vids.forEach((v, j) => v.addEventListener("ended", () => { if (j === i) show(i + 1, visible && !reduce); }));
+  steps.forEach((st, j) => st.addEventListener("click", () => show(j, true)));
+  snd.addEventListener("click", () => { const on = snd.getAttribute("aria-pressed") !== "true"; snd.setAttribute("aria-pressed", on); vids.forEach((v) => (v.muted = !on)); if (on) vids[i].play().catch(() => {}); });
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting;
+    if (visible && !reduce) { vids[i].play().catch(() => {}); cancelAnimationFrame(raf); raf = requestAnimationFrame(bar); } else { vids[i].pause(); cancelAnimationFrame(raf); } }, { threshold: 0.4 }).observe(sec);
 });
 // layers loop: no controls
 document.querySelectorAll("[data-loop]").forEach((sec) => {
