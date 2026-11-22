@@ -3,8 +3,6 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ANDOR OSP · Section concepts</title>
 <meta name="robots" content="noindex">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;800;900&family=Manrope:wght@400;500;800&display=swap" rel="stylesheet">
 <style>
 @font-face { font-family: "ANDOR Sans"; src: url(font/inter-tight-var.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
 :root {
@@ -13,12 +11,11 @@
   --display: "ANDOR Sans", system-ui, sans-serif; --display-w: 780; --display-track: -0.035em;
   --body: "ANDOR Sans", system-ui, sans-serif; --max: 1240px; --r: 18px;
 }
-body.type-b { --display: "Archivo", sans-serif; --display-w: 800; --display-track: -0.03em; }
-body.type-c { --display: "Manrope", sans-serif; --display-w: 800; --display-track: -0.04em; }
 * { box-sizing: border-box; margin: 0; padding: 0 }
 html { scroll-behavior: auto; -webkit-text-size-adjust: 100% }  /* native, instant scrolling: no smoothing anywhere */
 body { background: var(--paper); color: var(--ink); font: 400 17px/1.55 var(--body); -webkit-font-smoothing: antialiased }
-img { display: block; max-width: 100%; height: auto }
+img, video { display: block; max-width: 100%; height: auto }
+:where(.wrap, .pane, .steps, .grid6, .tiles, .head) > * { min-width: 0 }  /* Safari: grid/flex items must not grow to an image's natural width */
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer }
 .wrap { max-width: var(--max); margin: 0 auto; padding: 0 32px }
 .d { font-family: var(--display); font-weight: var(--display-w); letter-spacing: var(--display-track); line-height: .98 }
@@ -98,7 +95,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .tabs button .bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--accent) } .tabs button.on .bar { animation: fill var(--dur) linear forwards }
 .paused .tabs button.on .bar { animation-play-state: paused }
 .look .pane { display: none; grid-template-columns: 0.75fr 1.25fr; gap: 56px; align-items: center } .look .pane.on { display: grid; animation: fade .5s ease }
-.look .pane img { border-radius: 14px } @keyframes fade { from { opacity: 0 } }
+.look .pane img { border-radius: 14px } .look .pane video.clip { width: 100%; border-radius: 14px; background: #282e2c } @keyframes fade { from { opacity: 0 } }
 /* C08 daw */
 .daw .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center }
 .fmt-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px } .fmt-chips span { padding: 10px 16px; border-radius: 10px; background: #fff; font-weight: 600; font-size: 14px; box-shadow: 0 1px 0 var(--line) }
@@ -127,7 +124,9 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
 .cta { text-align: center } .cta .d2 { margin-bottom: 22px } .cta form { display: flex; gap: 10px; justify-content: center; margin-top: 36px; flex-wrap: wrap }
 .cta input { height: 54px; width: min(360px, 100%); border-radius: 999px; border: 0; padding: 0 22px; font: inherit; background: var(--night-3); color: var(--on-night) }
 @media (max-width: 900px) {
-  .hero .wrap, .instant .wrap, .rm .wrap, .look .pane.on, .daw .wrap, .specs .wrap { grid-template-columns: 1fr }
+  .hero .wrap, .instant .wrap, .rm .wrap, .look .pane.on, .daw .wrap, .specs .wrap { grid-template-columns: minmax(0, 1fr); gap: 36px }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; gap: 22px; padding-bottom: 4px } .tabs button { white-space: nowrap }
+  .look .pane img { width: 100% }
   .hero .media { margin-right: 0 } .steps { grid-template-columns: repeat(5, 74%); overflow-x: auto; scroll-snap-type: x mandatory } .step { scroll-snap-align: start }
   .grid6 { grid-template-columns: minmax(0,1fr) minmax(0,1fr) } .tiles { grid-template-columns: minmax(0,1fr) minmax(0,1fr) } .tile b { font-size: 18px } .wrap { padding: 0 18px } .tag, .toolbar { padding-left: 18px; padding-right: 18px }
   .hot .tip { width: 200px }
@@ -139,13 +138,10 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
 
 <div class="toolbar">
   <strong>Section concepts</strong><span>· real ANDOR OSP 0.9.0-beta.1 captures · native scrolling, no smoothing, nothing pinned</span><span class="sp"></span>
-  <span>Display type</span>
-  <button data-type="" aria-pressed="true">A · Inter Tight Bold</button>
-  <button data-type="type-b" aria-pressed="false">B · Archivo ExtraBold</button>
-  <button data-type="type-c" aria-pressed="false">C · Manrope ExtraBold</button>
+  <span>Display type: Inter Tight Bold</span>
 </div>
 
-<div class="tag"><b>C01</b> Hero, product first <span>Short, bold claim; the instrument working inside a session. Media: mockup studio (Blender), real capture on screen.</span></div>
+<div class="tag"><b>C01</b> Hero, product first <span>Short, bold claim beside the instrument on a display. Media: mockup studio (Blender), the real editor alone on screen.</span></div>
 <section class="night hero">
   <div class="wrap">
     <div>
@@ -155,11 +151,11 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
       <div class="row"><a class="btn" href="#c12">Join the waitlist</a><a class="btn ghost" href="#c02">See how it works</a></div>
       <p class="fmt">AU · VST3 · Standalone · macOS at release</p>
     </div>
-    <div class="media feather"><img src="m/mock-hero-three-dark-1920.webp" srcset="m/mock-hero-three-dark-1200.webp 1200w, m/mock-hero-three-dark-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 70vw" alt="ANDOR OSP open in a session on a display"></div>
+    <div class="media feather"><img src="m/mock-solo-three-1920.webp" srcset="m/mock-solo-three-1200.webp 1200w, m/mock-solo-three-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 70vw" alt="ANDOR OSP on a display"></div>
   </div>
 </section>
 
-<div class="tag" id="c02"><b>C02</b> The whole idea, in five steps <span>Real screen recordings from ANDOR Learn (captured on the beta). Plays while on screen; each step moves on when its clip ends; click to jump. Sound off by default, one button turns it on.</span></div>
+<div class="tag" id="c02"><b>C02</b> The whole idea, in five steps <span>Real screen recordings from ANDOR Learn (captured on the beta; the last step is the per-layer arp). Plays while on screen; each step moves on when its clip ends; click to jump. Sound off by default, one button turns it on.</span></div>
 <section class="sec cycle" data-seq>
   <div class="wrap">
     <div class="head"><h2 class="d d2">From one sound<br><span class="mute">to an instrument.</span></h2><p class="lead">No mapping, no zones, no preparation. Everything after the first sound is playing.</p></div>
@@ -168,15 +164,15 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
       <video class="" muted playsinline preload="metadata" poster="m/learn/i7-filter-poster.webp" aria-label="The FILTER macro and its panel"><source src="m/learn/i7-filter.webm" type="video/webm"><source src="m/learn/i7-filter.mp4" type="video/mp4"></video>
       <video class="" muted playsinline preload="metadata" poster="m/learn/i1-reimagined-poster.webp" aria-label="The REIMAGINED knob turned up"><source src="m/learn/i1-reimagined.webm" type="video/webm"><source src="m/learn/i1-reimagined.mp4" type="video/mp4"></video>
       <video class="" muted playsinline preload="metadata" poster="m/learn/e2-add-layers-poster.webp" aria-label="A second and third sound added"><source src="m/learn/e2-add-layers.webm" type="video/webm"><source src="m/learn/e2-add-layers.mp4" type="video/mp4"></video>
-      <video class="" muted playsinline preload="metadata" poster="m/learn/g1-arp-basics-poster.webp" aria-label="The arpeggiator playing held notes"><source src="m/learn/g1-arp-basics.webm" type="video/webm"><source src="m/learn/g1-arp-basics.mp4" type="video/mp4"></video>
+      <video class="" muted playsinline preload="metadata" poster="m/learn/d1-arp-per-source-poster.webp" aria-label="Each layer with its own arpeggio"><source src="m/learn/d1-arp-per-source.webm" type="video/webm"><source src="m/learn/d1-arp-per-source.mp4" type="video/mp4"></video>
       <button class="snd" aria-pressed="false"><span class="off">Sound off</span><span class="on">Sound on</span></button>
     </div>
     <div class="steps">
-      <button class="step on"><div class="n">01</div><div class="t">Load it.</div><p>Drop in one recording. It plays across every key, the moment it lands.</p><i class="bar"></i></button>
-      <button class="step"><div class="n">02</div><div class="t">Shape it.</div><p>Six macros, each with its own panel. Here FILTER closes the sound down.</p><i class="bar"></i></button>
-      <button class="step"><div class="n">03</div><div class="t">Morph it.</div><p>Turn REIMAGINED and the sound travels, still recognisably yours.</p><i class="bar"></i></button>
-      <button class="step"><div class="n">04</div><div class="t">Stack it.</div><p>Add a second and a third sound. They play as one instrument.</p><i class="bar"></i></button>
-      <button class="step"><div class="n">05</div><div class="t">Play it.</div><p>Hold a chord and the arpeggiator plays it, across every layer.</p><i class="bar"></i></button>
+      <button class="step on"><div class="n">01</div><div class="t">Load it.</div><p>One recording, analysed, pitched and mapped across the keyboard the moment it lands.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">02</div><div class="t">Shape it.</div><p>Six macros, a full panel under each. FILTER: LP24, LP12, HP12, BP12 or TILT, with its own envelope.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">03</div><div class="t">Morph it.</div><p>Five engines on one knob. The sound leaves the recording and stays recognisably yours.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">04</div><div class="t">Stack it.</div><p>Three sources, each with its own mode, REIMAGINED, EQ, SYNTH and arpeggiator. One patch.</p><i class="bar"></i></button>
+      <button class="step"><div class="n">05</div><div class="t">Play it.</div><p>Three independent arpeggiators: on/off, rate, pattern and octaves per sound, or linked.</p><i class="bar"></i></button>
     </div>
   </div>
 </section>
@@ -188,7 +184,7 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
       <h2 class="d d2">Instant<br><span class="mute">instrument.</span></h2>
       <p class="lead" style="margin-top:28px">Use <b>LIFE</b> so no two notes play the same. Turn <b>DRIVE</b> for heat and <b>FILTER</b> to close it down. Add <b>MOVEMENT</b>, then <b>ECHO</b>. Dial in <b>SPACE</b> for depth.</p>
     </div>
-    <div class="media feather"><img src="m/mock-feat-space-1920.webp" srcset="m/mock-feat-space-1200.webp 1200w, m/mock-feat-space-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 50vw" alt="The SPACE panel, close up"></div>
+    <div class="media feather"><img src="m/mock-solo-space-1920.webp" srcset="m/mock-solo-space-1200.webp 1200w, m/mock-solo-space-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 50vw" alt="The SPACE panel, close up"></div>
   </div>
 </section>
 
@@ -244,19 +240,19 @@ details p { padding: 0 0 22px; color: var(--ink-2); max-width: 40em }
   <div class="wrap">
     <h2 class="d d2" style="text-align:center">A closer look.</h2>
     <div class="tabs"><button class="on">Live capture<i class="bar"></i></button><button>Note Map<i class="bar"></i></button><button>KEY DNA<i class="bar"></i></button><button>Granular<i class="bar"></i></button><button>Arpeggiator<i class="bar"></i></button></div>
-    <div class="pane on"><div><h3 class="d d3">Grab what you just played.</h3><p class="lead" style="margin-top:16px">Every card has a REC key. Record a take of up to a minute, or keep the last 10, 20, 30 or 60 seconds after the fact.</p></div><img src="m/mock-feat-capture-1920.webp" alt="The capture page"></div>
-    <div class="pane"><div><h3 class="d d3">A phrase becomes notes.</h3><p class="lead" style="margin-top:16px">Record a phrase and it is chopped into its notes and mapped for you, one per key.</p></div><img src="m/mock-feat-notemap-1920.webp" alt="Note Map"></div>
-    <div class="pane"><div><h3 class="d d3">Every key its own grain.</h3><p class="lead" style="margin-top:16px">In Granular mode, curves you draw across the keyboard give each key its own grain behaviour.</p></div><img src="m/mock-feat-keydna-1920.webp" alt="KEY DNA"></div>
-    <div class="pane"><div><h3 class="d d3">A cloud of the sound.</h3><p class="lead" style="margin-top:16px">POS, SIZE, DENS and SPREAD: the recording as grains, 20 to 400 ms long.</p></div><img src="m/editor-granular-2000.webp" alt="Granular mode"></div>
-    <div class="pane"><div><h3 class="d d3">Hold a chord. It plays.</h3><p class="lead" style="margin-top:16px">The arpeggiator plays the notes you hold as a repeating pattern, across all three sounds.</p></div><img src="m/editor-arp-2000.webp" alt="The arpeggiator"></div>
+    <div class="pane on"><div><h3 class="d d3">Capture after the fact.</h3><p class="lead" style="margin-top:16px">Each card takes its own input: a mic, an interface, or a DAW track over sidechain. Record up to a minute, or pull the last 10, 20, 30 or 60 seconds from the buffer. Notes are found and mapped on the spot.</p></div><img src="m/mock-solo-capture-1920.webp" alt="The capture page"></div>
+    <div class="pane"><div><h3 class="d d3">One take. A multisample.</h3><p class="lead" style="margin-top:16px">Note Atlas splits a played phrase into its notes and maps each to its own key, keeping the real note-to-note character of the performance.</p></div><img src="m/mock-solo-notemap-1920.webp" alt="Note Map"></div>
+    <div class="pane"><div><h3 class="d d3">Every key its own grain.</h3><p class="lead" style="margin-top:16px">Draw curves across the keyboard for POS, SIZE, DENS, SPREAD, TUNE, SCATTER and PAN, with depth and variation. The texture changes with register.</p></div><img src="m/mock-solo-keydna-1920.webp" alt="KEY DNA"></div>
+    <div class="pane"><div><h3 class="d d3">Any source, a grain cloud.</h3><p class="lead" style="margin-top:16px">Per layer: POS, SIZE from 20 to 400 ms, DENS from 4 to 40 grains a second, SPREAD, SCATTER, PAN and three window shapes.</p></div><img src="m/editor-granular-2000.webp" alt="Granular mode"></div>
+    <div class="pane"><div><h3 class="d d3">Three arps. Fully independent.</h3><p class="lead" style="margin-top:16px">One arpeggiator per sound, each with its own on/off, rate, pattern, octaves, gate and swing, or link all three. 18 patterns plus custom step patterns, STRUM for chord steps, host sync, and SATELLITE to send each layer on its own path through the stereo field.</p></div><video class="clip" muted loop playsinline autoplay preload="none" poster="m/learn/d3-satellite-poster.webp" aria-label="SATELLITE moving a layer in the stereo field"><source src="m/learn/d3-satellite.webm" type="video/webm"><source src="m/learn/d3-satellite.mp4" type="video/mp4"></video></div>
   </div>
 </section>
 
-<div class="tag"><b>C08</b> Standalone or in your DAW <span>The formats as plain facts beside the instrument in a session.</span></div>
+<div class="tag"><b>C08</b> Standalone or in your DAW <span>The formats as plain facts beside the instrument on a display.</span></div>
 <section class="sec daw">
   <div class="wrap">
     <div><h2 class="d d2">Standalone<br><span class="mute">or in your DAW.</span></h2><p class="lead" style="margin-top:24px">Runs as an app on its own, or inside your session as a plug-in.</p><div class="fmt-chips"><span>AU</span><span>VST3</span><span>Standalone</span><span>macOS at release</span></div></div>
-    <img class="feather" src="m/mock-hero-desk-light-1920.webp" srcset="m/mock-hero-desk-light-1200.webp 1200w, m/mock-hero-desk-light-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 50vw" alt="ANDOR OSP in a session on a display">
+    <img class="feather" src="m/mock-solo-desk-1920.webp" srcset="m/mock-solo-desk-1200.webp 1200w, m/mock-solo-desk-1920.webp 1920w" sizes="(max-width: 900px) 100vw, 50vw" alt="ANDOR OSP on a display">
   </div>
 </section>
 
