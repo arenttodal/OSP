@@ -34,7 +34,8 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
   shows and corrects the result. Sessions saved before this keep the sound they had.
 - **⋮ → Add source…** does the same from a file browser: one file is one layer, several
   files are one multi-sample layer.
-- **Remove** a layer from its card's **⋮** menu (**Remove source**, it asks once more). The
+- **Remove** a layer from its card's **⋮** menu (**Remove source**, at once; if a sound is still
+  being prepared it goes as soon as that is done). The
   layers after it move up (A + C never stays: it becomes A + B). **⋮ → Restore removed
   source** brings it back.
 - Each card's **⋮** menu acts on that card's source only, and names it ("SOURCE B · file"):

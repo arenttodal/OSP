@@ -27,6 +27,7 @@
 #include <cstring>
 #include <functional>
 #include <map>
+#include <set>
 #include <typeinfo>
 
 using Catch::Approx;

@@ -1307,17 +1307,11 @@ juce::PopupMenu OspAudioProcessorEditor::sourceMenu (int layer)
     menu.addSectionHeader ("MANAGEMENT");
     menu.addItem (menuicons::item (Kind::reset, "Reset source settings", [safe, layer] { if (safe != nullptr) safe->ospProcessor.resetLayerControls (layer), safe->timerCallback(); },
                                    ospProcessor.isLayerOccupied (layer) || ospProcessor.isKeptEmptySlot (layer)));
-    // Removing asks once more (a sub-menu); the removed source can be restored from the main menu.
-    juce::PopupMenu confirm;
-    menuicons::addItem (confirm, Kind::remove, "Remove " + (loaded != nullptr ? juce::String::fromUTF8 (loaded->filename.c_str()) : "source " + letter), true,
+    // Removes at once (the owner's choice: a confirming sub-menu read as "Remove does nothing");
+    // the message says it can be restored from the main menu, which it can, once.
+    menuicons::addItem (menu, Kind::remove, "Remove source " + letter,
+                        (ospProcessor.isLayerOccupied (layer) || ospProcessor.isKeptEmptySlot (layer)) && ! busy,
                         [safe, layer] { if (safe != nullptr) safe->ospProcessor.removeLayer (layer), safe->timerCallback(); }, true);
-    {
-        juce::PopupMenu::Item remove ("Remove source " + letter);
-        remove.setEnabled ((ospProcessor.isLayerOccupied (layer) || ospProcessor.isKeptEmptySlot (layer)) && ! busy).setImage (menuicons::make (Kind::remove));
-        remove.subMenu = std::make_unique<juce::PopupMenu> (std::move (confirm));
-        remove.setColour (menuicons::destructiveInk());
-        menu.addItem (std::move (remove));
-    }
     return menu;
 }
 

@@ -52,7 +52,12 @@ public:
     struct View
     {
         bool granular = false;
-        float start = 0.0f;        ///< START 0..1
+        float start = 0.0f;        ///< START 0..1 (the knob)
+        /** Where START's routes can take it (0..1, clamped), drawn as a faint band; only with
+            a route on START. The knob never jumps note by note (the owner's choice: a fast
+            random LFO on START made it strobe); the read heads show where notes play. */
+        bool startRange = false;
+        float startLo = 0.0f, startHi = 0.0f;
         float position = 0.5f;     ///< effective grain POS (START applied), 0..1
         float spread = 0.2f;
         bool loop = true;
@@ -93,6 +98,7 @@ public:
         the display moves, resizes, changes scale or skin, or the card's focus changes. */
     void invalidateBackdrop() noexcept { backdropKey = {}; }
     int headsShown() const noexcept { return static_cast<int> (heads.size()); }
+    const View& currentView() const noexcept { return view; }
     /** Visual tests: the cached pictures (backdrop, waveform) in JUCE's own renderer. The
         native image (CoreGraphics on macOS) is not bit-repeatable: two renders of the same state
         differed by a channel level now and then. On Linux the native image is this renderer
@@ -128,6 +134,7 @@ private:
     float xAtFraction (double fraction, juce::Rectangle<float> plot) const;
     /** Seconds after the start of the file where a note starts reading (START applied). */
     double startSeconds() const;
+    double startSecondsAt (double fraction) const;
 
     std::shared_ptr<const LoadedInstrument> instrument;
     std::vector<float> generatedCycle;   ///< a generated source's period (empty: none)
