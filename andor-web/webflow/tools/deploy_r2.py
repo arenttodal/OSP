@@ -11,7 +11,7 @@ Needs CLOUDFLARE_API_TOKEN with 'Workers R2 Storage: Edit' on <account id>. It
    a year (immutable) for media under a versioned prefix, an hour for andor.min.css / andor.min.js;
 5. re-running uploads everything again (about 57 MB): objects are simply replaced.
 """
-import json, mimetypes, os, sys, urllib.error, urllib.request
+import json, mimetypes, os, sys, time, urllib.error, urllib.request
 
 ACC, BUCKET, SRC = sys.argv[1:4]
 PREFIX = sys.argv[sys.argv.index("--prefix") + 1] if "--prefix" in sys.argv else "osp/v1"
@@ -23,7 +23,16 @@ TYPES = {".avif": "image/avif", ".webp": "image/webp", ".jpg": "image/jpeg", ".m
          ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".html": "text/html; charset=utf-8", ".png": "image/png"}
 
 
-def call(method, url, body=None, headers=None, raw=False):
+def call(method, url, body=None, headers=None, raw=False, tries=6):
+    for k in range(tries):                      # Cloudflare throttles bursts with HTTP 429: back off and retry
+        st, j = _call(method, url, body, headers, raw)
+        if st != 429:
+            return st, j
+        time.sleep(min(60, 4 * 2 ** k))
+    return st, j
+
+
+def _call(method, url, body=None, headers=None, raw=False):
     h = {"Authorization": f"Bearer {TOKEN}"}
     h.update(headers or {})
     if body is not None and not isinstance(body, bytes):
@@ -48,11 +57,13 @@ def ok(st, j, what):
 
 # 1. bucket
 st, j = call("GET", f"{API}/{BUCKET}")
-if st == 404 or (isinstance(j, dict) and j.get("success") is False and st != 200):
+if st == 404:   # create only when the bucket is really missing (not on a throttle or auth error)
     if DRY:
         print("would create bucket", BUCKET)
     else:
         st, j = call("POST", API, {"name": BUCKET}); ok(st, j, "create bucket"); print("created bucket", BUCKET)
+elif st >= 300:
+    sys.exit(f"bucket check failed: HTTP {st} {json.dumps(j)[:300]}")
 else:
     print("bucket exists:", BUCKET)
 if not DRY:
