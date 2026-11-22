@@ -1,5 +1,11 @@
 # Status
 
+> **22 Nov 2026, a saved project reopens with its preset's name (OSP and the shell):** the
+> session now records which preset (or starting state) was open - name, file, starting-state file -
+> and restores it, so a reopened project shows its preset's name again and SAVE still updates it
+> (a file not on this computer: the name shown, SAVE asks for a name). Preset files never carry
+> the record; older sessions open as before. Tests in both.
+
 > **22 Nov 2026, SAVE asks before writing over a preset; right-click is Save As (OSP and every
 > shell product):** SAVE on the musician's own open preset now asks "Save over <name>?" (Save,
 > Cancel, and "Don't warn me again for this patch", kept per preset file in the product's

@@ -1545,3 +1545,64 @@ TEST_CASE ("shell: the custom pattern browser and editor (R2) work through the s
     CHECK (p.customArpPattern (0) == nullptr);
     CHECK (p.customArpDocument (0) == nullptr);
 }
+
+TEST_CASE ("shell: a saved session reopens with its preset's name (and SAVE still updates it); a moved preset keeps its name; an old session opens as Init", "[shell][presets][session]")
+{
+    const auto ext = andor::shell::productInfo().presetExtension;
+    juce::MemoryBlock session;
+    juce::File mine;
+    {
+        ShellProcessor p;
+        mine = p.presetFolder().getChildFile ("AA Session Name Test" + ext);
+        REQUIRE (p.savePreset (mine));
+        REQUIRE (p.loadPreset (mine));
+        CHECK (p.presetDisplayName() == "AA Session Name Test");
+        p.getStateInformation (session);
+    }
+    {
+        // The project opened again: the same name, and SAVE still means that preset.
+        ShellProcessor q;
+        q.setStateInformation (session.getData(), static_cast<int> (session.getSize()));
+        CHECK (q.presetDisplayName() == "AA Session Name Test");
+        CHECK (q.currentPresetFile() == mine);
+        CHECK (q.canSaveInPlace());
+    }
+    {
+        // The file gone (another computer, moved): the name is still shown; SAVE asks for a name.
+        mine.deleteFile();
+        ShellProcessor q;
+        q.setStateInformation (session.getData(), static_cast<int> (session.getSize()));
+        CHECK (q.presetDisplayName() == "AA Session Name Test");
+        CHECK_FALSE (q.canSaveInPlace());
+        q.initPatch();
+        CHECK (q.presetDisplayName() == "Init");
+    }
+    {
+        // A session from before (no preset recorded) and a fresh Init: Init.
+        ShellProcessor fresh;
+        juce::MemoryBlock initSession;
+        fresh.getStateInformation (initSession);
+        auto xml = juce::AudioProcessor::getXmlFromBinary (initSession.getData(), static_cast<int> (initSession.getSize()));
+        REQUIRE (xml != nullptr);
+        xml->removeAttribute ("sessionPresetName");
+        xml->removeAttribute ("sessionPresetFile");
+        juce::MemoryBlock old;
+        juce::AudioProcessor::copyXmlToBinary (*xml, old);
+        ShellProcessor q;
+        q.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+        CHECK (q.presetDisplayName() == "Init");
+        ShellProcessor r;
+        r.setStateInformation (initSession.getData(), static_cast<int> (initSession.getSize()));
+        CHECK (r.presetDisplayName() == "Init");
+    }
+    // A preset file never carries the session's record.
+    {
+        ShellProcessor p;
+        const auto file = p.presetFolder().getChildFile ("AA Session Record Test" + ext);
+        REQUIRE (p.savePreset (file));
+        const auto saved = juce::XmlDocument::parse (file);
+        REQUIRE (saved != nullptr);
+        CHECK_FALSE (saved->hasAttribute ("sessionPresetName"));
+        file.deleteFile();
+    }
+}

@@ -280,3 +280,51 @@ TEST_CASE ("menus: main and source menu screenshots (OSP_MENU_SHOTS)", "[.][menu
         menuShot (*rig.editor, menu, card, out.getChildFile ("after-0" + juce::String (2 + layer) + "-source-" + osp::plugin::OspAudioProcessor::layerName (layer) + "-menu.png"));
     }
 }
+
+TEST_CASE ("presets: a saved session reopens with its preset's name (SAVE still updates it); a moved preset keeps its name; an old session opens as before", "[plugin][menus][session]")
+{
+    juce::MemoryBlock session;
+    OspAudioProcessor::presetFolder().createDirectory();
+    const auto file = OspAudioProcessor::presetFolder().getChildFile ("Session Name Test.osppreset");
+    {
+        OspAudioProcessor p;
+        REQUIRE (p.savePreset (file));
+        REQUIRE (p.loadPreset (file));
+        CHECK (p.presetDisplayName() == "Session Name Test");
+        p.getStateInformation (session);
+    }
+    {
+        OspAudioProcessor q;
+        q.setStateInformation (session.getData(), static_cast<int> (session.getSize()));
+        CHECK (q.presetDisplayName() == "Session Name Test");
+        CHECK (q.currentPresetFile() == file);
+        CHECK (q.canSaveInPlace());
+    }
+    {
+        file.deleteFile();
+        OspAudioProcessor q;
+        q.setStateInformation (session.getData(), static_cast<int> (session.getSize()));
+        CHECK (q.presetDisplayName() == "Session Name Test");
+        CHECK_FALSE (q.canSaveInPlace());
+    }
+    {
+        // A starting state: its name back as before.
+        OspAudioProcessor p;
+        p.setCurrentProgram (1);
+        const auto expected = p.presetDisplayName();
+        juce::MemoryBlock stateSession;
+        p.getStateInformation (stateSession);
+        OspAudioProcessor q;
+        q.setStateInformation (stateSession.getData(), static_cast<int> (stateSession.getSize()));
+        CHECK (q.presetDisplayName() == expected);
+    }
+    {
+        // A preset file never carries the session's record.
+        OspAudioProcessor p;
+        REQUIRE (p.savePreset (file));
+        const auto saved = juce::XmlDocument::parse (file);
+        REQUIRE (saved != nullptr);
+        CHECK_FALSE (saved->hasAttribute ("sessionPresetName"));
+        file.deleteFile();
+    }
+}

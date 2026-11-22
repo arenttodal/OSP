@@ -608,6 +608,9 @@ private:
 
     // Presets.
     juce::File lastPresetFile;
+    /** The open preset's name when its file is not on this computer (a session from elsewhere, a
+        moved file): shown, never saved over. */
+    juce::String presetNameOverride;
     std::unique_ptr<juce::XmlElement> previousState;
     juce::String previousStateLabel;
     std::unique_ptr<juce::XmlElement> learnKept;   ///< (ANDOR Learn: the sound from before an example)

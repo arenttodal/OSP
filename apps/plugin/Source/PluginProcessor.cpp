@@ -3605,7 +3605,16 @@ namespace
 void OspAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     if (const auto xml = createStateXml())
+    {
+        // The session (never a preset file) also keeps which preset or starting state was open,
+        // so reopening the project shows its name again (the sound is the state above).
+        xml->setAttribute ("sessionPresetName", presetDisplayName());
+        xml->setAttribute ("sessionPresetFile", lastPresetFile.getFullPathName());
+        xml->setAttribute ("sessionStartingStateFile", lastStartingStateFile.getFullPathName());
+        xml->setAttribute ("sessionPresetIsProgram", presetIsProgram);
+        xml->setAttribute ("sessionPresetNameOverride", presetNameOverride);
         copyXmlToBinary (*xml, destData);
+    }
 }
 
 std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
@@ -3754,7 +3763,29 @@ void OspAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
     const auto xml = getXmlFromBinary (data, sizeInBytes);
     if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
         return;
+    // What the session says was open (read, then taken off: never part of the parameters' tree).
+    const bool known = xml->hasAttribute ("sessionPresetName");
+    const auto name = xml->getStringAttribute ("sessionPresetName");
+    const auto presetPath = xml->getStringAttribute ("sessionPresetFile");
+    const auto statePath = xml->getStringAttribute ("sessionStartingStateFile");
+    const bool isProgram = xml->getBoolAttribute ("sessionPresetIsProgram", true);
+    const auto overrideName = xml->getStringAttribute ("sessionPresetNameOverride");
+    for (const char* a : { "sessionPresetName", "sessionPresetFile", "sessionStartingStateFile", "sessionPresetIsProgram", "sessionPresetNameOverride" })
+        xml->removeAttribute (a);
     applyStateXml (*xml);
+    if (! known)
+        return;   // (a session from before: as it always opened)
+    auto here = [] (const juce::String& path) {
+        return path.isNotEmpty() && juce::File::isAbsolutePath (path) && juce::File (path).existsAsFile() ? juce::File (path) : juce::File();
+    };
+    presetIsProgram = isProgram;
+    lastPresetFile = here (presetPath);
+    lastStartingStateFile = here (statePath);
+    presetNameOverride = overrideName;
+    // The preset's file is not on this computer (another machine, moved): its name is still shown
+    // (SAVE then asks for a name - there is no file to update).
+    if (! isProgram && lastPresetFile == juce::File() && presetPath.isNotEmpty())
+        presetNameOverride = name;
 }
 
 void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool settingsOnly)

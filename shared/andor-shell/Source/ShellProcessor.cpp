@@ -1690,13 +1690,28 @@ bool ShellProcessor::applyStateXml (const juce::XmlElement& xml)
 void ShellProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     if (auto xml = stateXml())
+    {
+        // The session (never a preset file) also keeps which preset was open, so reopening the
+        // project shows its name again - the sound itself is the state above.
+        xml->setAttribute ("sessionPresetName", presetDisplayName());
+        xml->setAttribute ("sessionPresetFile", lastPresetFile.getFullPathName());
         copyXmlToBinary (*xml, destData);
+    }
 }
 
 void ShellProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
-        applyStateXml (*xml);
+    {
+        if (! applyStateXml (*xml))
+            return;
+        // The preset the session was saved with: its file where it still is (SAVE then updates
+        // it), else only its name (shown; SAVE asks for a name). A session from before: Init.
+        const auto file = xml->getStringAttribute ("sessionPresetFile");
+        const auto name = xml->getStringAttribute ("sessionPresetName");
+        lastPresetFile = file.isNotEmpty() && juce::File::isAbsolutePath (file) && juce::File (file).existsAsFile() ? juce::File (file) : juce::File();
+        presetNameOverride = lastPresetFile == juce::File() && name != "Init" ? name : juce::String();
+    }
 }
 
 //==============================================================================
@@ -1792,6 +1807,7 @@ bool ShellProcessor::savePreset (const juce::File& file)
     if (! xml->writeTo (target))
         return false;
     lastPresetFile = target;
+    presetNameOverride.clear();
     return true;
 }
 
@@ -1812,6 +1828,7 @@ bool ShellProcessor::loadPreset (const juce::File& file)
     if (! applyStateXml (*xml))
         return false;
     lastPresetFile = file;
+    presetNameOverride.clear();
     undoManager.clearUndoHistory();
     return true;
 }
@@ -1906,7 +1923,9 @@ std::vector<InstrumentHost::PresetEntry> ShellProcessor::presetList() const
 
 juce::String ShellProcessor::presetDisplayName() const
 {
-    return lastPresetFile == juce::File() ? juce::String ("Init") : lastPresetFile.getFileNameWithoutExtension();
+    if (lastPresetFile != juce::File())
+        return lastPresetFile.getFileNameWithoutExtension();
+    return presetNameOverride.isNotEmpty() ? presetNameOverride : juce::String ("Init");
 }
 
 void ShellProcessor::stepPresetList (int delta)
@@ -2002,6 +2021,7 @@ void ShellProcessor::initPatch()
     for (int l = 0; l < numLayers; ++l)
         clearLayer (l);
     lastPresetFile = juce::File();
+    presetNameOverride.clear();
     undoManager.clearUndoHistory();
 }
 
