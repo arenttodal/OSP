@@ -188,7 +188,13 @@ namespace frame
         the instrument's height with no inline section open (draw::housing: what is above the
         housing's foot stays the same pixels whatever opens); 0: the content's own height. */
     void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros,
-                float rackShift = 0.0f, float sourceTrim = 0.0f, float housingBase = 0.0f);
+                float rackShift = 0.0f, float sourceTrim = 0.0f, float housingBase = 0.0f,
+                const std::vector<std::pair<const MacroKnob*, int>>* performanceKnobs = nullptr);
+    /** A core macro's knob centre (x, reference pixels) in Edit Mode (data order: index 0..5). */
+    float macroCentreX (int index);
+    /** Performance Mode's macro strip: the knobs' places (name, knob) for `count` macros spread
+        across the macro panel (no envelope panel), at the reference's knob size and lines. */
+    std::vector<std::pair<juce::Rectangle<int>, juce::Rectangle<int>>> performanceMacroPlaces (int count, float sourceTrim);
 
     /** A popover's card size in reference pixels (a panel laid out at a smaller unit is
         scaled up, so every popover's shell reads alike). */

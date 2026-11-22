@@ -3134,8 +3134,55 @@ void EngineCard::setNotesOpen (bool open)
     noteMap->setBounds (sourceDisplay.getBounds());
 }
 
+void EngineCard::setPerformance (bool on)
+{
+    if (performance == on)
+        return;
+    if (on)
+    {
+        editVisibility.clear();
+        for (auto* child : getChildren())
+            if (child != &sourceDisplay)
+                editVisibility.emplace_back (child, child->isVisible());
+        sourceDisplay.getInterceptsMouseClicks (editDisplayClicks, editDisplayChildClicks);
+        performance = true;
+        hideForPerformance();
+        sourceDisplay.setInterceptsMouseClicks (false, false);
+        setInterceptsMouseClicks (false, false);   // (a picture to look at: nothing to edit here)
+    }
+    else
+    {
+        performance = false;
+        for (auto& [child, visible] : editVisibility)
+            if (child != nullptr)
+                child->setVisible (visible);
+        editVisibility.clear();
+        sourceDisplay.setInterceptsMouseClicks (editDisplayClicks, editDisplayChildClicks);
+        setInterceptsMouseClicks (true, true);
+    }
+    resized();
+    repaint();
+}
+
+void EngineCard::hideForPerformance()
+{
+    for (auto* child : getChildren())
+        if (child != &sourceDisplay && child->isVisible())
+            child->setVisible (false);
+}
+
 void EngineCard::refresh()
 {
+    // (Performance: whatever the refresh shows stays hidden)
+    struct KeepHidden
+    {
+        EngineCard& card;
+        ~KeepHidden()
+        {
+            if (card.performance)
+                card.hideForPerformance();
+        }
+    } keepHidden { *this };
     eqButton.setActive (processor.layerEqSettings (layerIndex).audible());
     if (recButton != nullptr)
     {
@@ -3306,6 +3353,8 @@ void EngineCard::paint (juce::Graphics& g)
     if (auto* pieces = skin::active(); pieces != nullptr && sourceDisplay.isVisible())
         pieces->draw (g, "bezel-r9", sourceDisplay.getBounds().toFloat().reduced (0.5f).expanded (1.6f));
 
+    if (performance)
+        return;   // (the picture alone: no badge, root or name)
     // Header: the layer's badge, its light, the root and the file (its shown letter and
     // colour: a product may present its layers in another order).
     const auto& id = colour::identity (InstrumentHost::shownLayer (layerIndex));
@@ -3386,6 +3435,15 @@ void EngineCard::resized()
     const bool triple = density == EngineLayoutDensity::triple;
     auto at = [] (juce::Rectangle<float> r) { return r.getSmallestIntegerContainer(); };
 
+    if (performance)
+    {
+        // The picture alone, filling the card (the same 16 px margin as the well's sides).
+        sourceDisplay.setBounds (at ({ 16.0f, 16.0f, w - 32.0f, h - 32.0f }));
+        sourceDisplay.setBottomInset (0);
+        sourceDisplay.setOverlayBand (0);
+        hideForPerformance();
+        return;
+    }
     badgeArea = at ({ 21.0f, 10.0f, 47.0f, 43.0f });
     // MUTE above SOLO beside the badge (where the layer's light was).
     muteButton.setBounds (at ({ 77.0f, 10.0f, 27.0f, 21.0f }));

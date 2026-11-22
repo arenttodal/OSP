@@ -548,6 +548,12 @@ public:
         sourceTrim): ANDOR ANALOG's always are (on by default); ANDOR OSP's only while it shows
         three cards (a drag's preview of a third column keeps the cards' height and the well). */
     void setFootTrimmed (bool trimmed);
+    /** PERFORMANCE MODE (a presentation only): the card shows its source's picture alone - no
+        badge, root, name, keys, knobs, modifiers or well tools - the display filling the card
+        (16 px inside its edge), and takes no clicks. Off: every part as it was. The sound,
+        the parameters and what the card plays never change. */
+    void setPerformance (bool performance);
+    bool inPerformance() const noexcept { return performance; }
     /** Tests: modifier `index`'s key (0 LINK .. 3 FOLLOW), or nullptr. */
     ModifierButton* modifierKey (int index) const noexcept { return index >= 0 && index < 4 ? modifiers[static_cast<std::size_t> (index)].get() : nullptr; }
     /** Controls revealed in the well by the pointer (ProductInfo::wellOverlay); null: none.
@@ -667,6 +673,11 @@ private:
     std::unique_ptr<SynthChip> synthChip;              ///< SYNTHESIZE in the well's corner (a host with hasSynthesize(); null otherwise)
     std::array<std::unique_ptr<ModifierButton>, 4> modifiers;
     bool modifiersShown = true, modifiersInWell = false, footTrimmed = true;
+    bool performance = false;
+    /** Edit Mode's visibility of every part, kept while Performance hides them. */
+    std::vector<std::pair<juce::Component::SafePointer<juce::Component>, bool>> editVisibility;
+    bool editDisplayClicks = true, editDisplayChildClicks = true;
+    void hideForPerformance();
     int modifiersApplicable = 0xf;
     void updateModifiers();
     LayerStateButton muteButton, soloButton;

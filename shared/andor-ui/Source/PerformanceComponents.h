@@ -67,6 +67,7 @@ class MacroPicker final : public MiniPanel
 {
 public:
     MacroPicker (std::vector<PickerEntry> entries, juce::StringArray chosen, juce::StringArray defaults);
+    ~MacroPicker() override;
 
     /** The chosen ids in order, after a change. */
     std::function<void (const juce::StringArray& chosen, bool reset)> onChange;

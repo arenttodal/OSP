@@ -10,11 +10,21 @@
 >   XML (schema 1) and Interface.xml helpers; both processors keep it per instance (session only,
 >   never in a preset; loading a preset keeps it) and as the computer's preference. Tests
 >   `[performance]` in OSP and the shell.
-> - **Shared components (built, not yet placed):** `PerformanceComponents.h/.cpp` - the header's
->   gauge / pencil key, the macro housing's flap, the "Performance Macros" picker (compact popover:
->   ticks, "N of 8", up / down, Reset to Default).
-> - **NEXT:** Gate 3 simplified cards, Gate 4 macro strip, Gate 5 flap + picker in both editors,
->   Gate 6-10 persistence QA, OSP + ANALOG integration, screenshots, DAW checks (owner).
+> - **Shared components:** `PerformanceComponents.h/.cpp` - the header's gauge / pencil key, the
+>   macro housing's flap (inside the housing's top edge: the housing never grows), the
+>   "Performance Macros" picker (compact popover: ticks, "N of 8", up / down, Reset to Default;
+>   never more than eight, never none; every change applied at once, no value touched).
+> - **Gates 2-5 in the shell (opt-in `ProductInfo::performanceMode`; ANDOR ANALOG on):** the key at
+>   the end of the header's keys; `EngineCard::setPerformance` (the picture alone, filling the card;
+>   every part's visibility restored on return; no clicks); the frame's macro strip
+>   (`frame::performanceMacroPlaces`, `frame::paint`'s Performance lights, no envelope divider);
+>   the editor hides the modulation panel, CORE/USER tabs, the arpeggiator, racks, AUX strip, the
+>   routing key and the utility keys without changing them (the window shrinks by what was open;
+>   on return each is as it was); a stand-in-only hybrid leaves no column; Learn always runs in
+>   Edit Mode (an active lesson leaves Performance); the strip follows USER assignments. Other
+>   shell products: unchanged.
+> - **NEXT:** OSP editor integration (Gate 7: same model, key, cards, strip, flap, picker in
+>   `PluginEditor`), Gate 6/9/10 QA (scales, multiple instances, DAW - owner), screenshots matrix.
 
 > **22 Nov 2026, rack cells three knobs wide (shared, opt-in):** `rackui::Slot::threeKnobs` (3 x 104
 > + 2 x 7 px; dense 3 x 89 + 2 x 5) for a product's own wide cell - ANDOR ANALOG's KONTAKT

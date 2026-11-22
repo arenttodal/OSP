@@ -1,4 +1,5 @@
 #include "InstrumentFrame.h"
+#include "PerformanceView.h"
 #include "Binding.h"
 
 #include "CeramicSkin.h"
@@ -404,7 +405,7 @@ juce::Rectangle<int> sourceColumn (juce::Rectangle<int> area, int columns, int i
 }
 
 void paint (juce::Graphics& g, juce::Component& content, const Identity& identity, bool arpShown, const MacroRow& macros, float rackShift, float sourceTrim,
-            float housingBase)
+            float housingBase, const std::vector<std::pair<const MacroKnob*, int>>* performanceKnobs)
 {
     using namespace design;
     draw::housing (g, content.getLocalBounds().toFloat(), housingBase);
@@ -454,8 +455,11 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
     {
         const auto r = layout::macroPanel.translated (0.0f, -sourceTrim);
         draw::raised (g, r, layout::panelRadius, colour::panelTop, colour::panelBottom);
-        g.setColour (colour::divider);
-        g.fillRect (juce::Rectangle<float> (layout::envelopeX - 10.0f, 695.0f - sourceTrim, 1.0f, 190.0f));
+        if (performanceKnobs == nullptr)   // (Performance Mode: one row of macros, no envelope panel)
+        {
+            g.setColour (colour::divider);
+            g.fillRect (juce::Rectangle<float> (layout::envelopeX - 10.0f, 695.0f - sourceTrim, 1.0f, 190.0f));
+        }
         // No panel title: the six named knobs speak for themselves.
         // Under each macro a small light: lit when the macro's own settings are in use.
         // Ceramic: a rendered glass lens in the macro's colour (its glow stays drawn).
@@ -463,11 +467,21 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
         // product colours its macros itself (then the CORE lens of that place, as before).
         static const char* const lensNames[] = { "life", "drive", "character", "motion", "space", "echo" };
         auto* pieces = skin::active();
-        for (std::size_t i = 0; i < macros.size(); ++i)
+        // (Performance Mode: the lights under the knobs shown, core and USER mixed, each in its
+        // own macro's colour; else the row shown, as ever)
+        std::vector<std::pair<const MacroKnob*, int>> shown;
+        if (performanceKnobs != nullptr)
+            shown = *performanceKnobs;
+        else
+            for (std::size_t i = 0; i < macros.size(); ++i)
+                shown.emplace_back (&macros[i], static_cast<int> (i));
+        for (const auto& [knobPtr, index] : shown)
         {
-            const auto knob = macros[i].slider.getBounds().toFloat();
-            const bool lit = macros[i].label != nullptr && macros[i].label->isCustomised();
-            const bool user = macros[i].user;
+            const auto& macro = *knobPtr;
+            const auto i = static_cast<std::size_t> (index);
+            const auto knob = macro.slider.getBounds().toFloat();
+            const bool lit = macro.label != nullptr && macro.label->isCustomised();
+            const bool user = macro.user;
             const auto identityColour = user ? colour::userMacro (static_cast<int> (i)) : colour::macro (static_cast<int> (i));
             const bool ownLens = user && materials().macros[i].getAlpha() == 0 && materials().userMacros[i].getAlpha() == 0;
             const auto lensName = ownLens ? "led-user-" + juce::String (static_cast<int> (i) + 1) : juce::String ("led-") + lensNames[std::min<std::size_t> (i, 5)];
@@ -490,6 +504,24 @@ void paint (juce::Graphics& g, juce::Component& content, const Identity& identit
     // Ceramic: the keys on the housing (preset, ARP, Advanced), drawn here so their shadows
     // fall on it.
     skin::drawKeys (g, content);
+}
+
+float macroCentreX (int index)
+{
+    return macroCentres[static_cast<std::size_t> (juce::jlimit (0, macroCount - 1, index))];
+}
+
+std::vector<std::pair<juce::Rectangle<int>, juce::Rectangle<int>>> performanceMacroPlaces (int count, float sourceTrim)
+{
+    // One row across the whole macro panel (the envelope panel's width is the strip's now), the
+    // reference's knob size and lines: the name's centre 719, the knob's 818 (less the trim).
+    std::vector<std::pair<juce::Rectangle<int>, juce::Rectangle<int>>> out;
+    const auto panel = design::layout::macroPanel;
+    const float margin = 34.0f;
+    for (const float x : performance::stripCentres (panel.getX() + margin, panel.getWidth() - 2.0f * margin, count))
+        out.emplace_back (juce::Rectangle<float> (150.0f, 22.0f).withCentre ({ x, 719.0f - sourceTrim }).getSmallestIntegerContainer(),
+                          juce::Rectangle<float> (132.0f, 132.0f).withCentre ({ x, 818.0f - sourceTrim }).getSmallestIntegerContainer());
+    return out;
 }
 
 juce::Point<float> popoverSize (const MiniPanel& popup)

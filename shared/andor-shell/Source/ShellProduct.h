@@ -249,6 +249,9 @@ struct ProductInfo
     /** The header's MIX (off: none - the cards' own levels balance them; the preset bar takes
         its room, SAVE and the source view's key after it). On: ANDOR OSP's header. */
     bool headerMix = true;
+    /** PERFORMANCE MODE R1 (opt-in): the header's Edit / Performance key and the Performance view
+        (sources' pictures, the chosen macros, the keyboard). Off: none (the product as before). */
+    bool performanceMode = false;
     /** The ARPEGGIATOR's collapse as the racks' borderless X (off: the round chevron key). */
     bool crossCloseKeys = false;
     /** Controls in a card's well, revealed by the pointer (opt-in): one per storage layer

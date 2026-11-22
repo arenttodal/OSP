@@ -258,6 +258,8 @@ MacroPicker::MacroPicker (std::vector<PickerEntry> e, juce::StringArray chosenId
     rebuild();
 }
 
+MacroPicker::~MacroPicker() = default;
+
 juce::Point<int> MacroPicker::cardSize() const
 {
     return { pickerWidth, popover::headerTop + static_cast<int> (entries.size()) * rowHeight + footerHeight + popover::bottom };

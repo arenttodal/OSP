@@ -306,6 +306,15 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         content.addAndMakeVisible (sourceViewButton);
     }
 
+    // PERFORMANCE MODE (opt-in): its key at the end of the header's keys; the macro housing's flap.
+    if (shell.showsPerformanceMode())
+    {
+        modeKey.onClick = [this] { setPerformance (! performanceOn); };
+        content.addAndMakeVisible (modeKey);
+        macroFlap.onClick = [this] { togglePerformancePicker(); };
+        content.addChildComponent (macroFlap);
+    }
+
     // The six macros (the product's): names and knobs as ANDOR OSP's.
     const bool macroPopovers = shell.product().macroPopover != nullptr;
     for (std::size_t i = 0; i < macros.size(); ++i)
@@ -470,7 +479,13 @@ ShellEditor::ShellEditor (ShellProcessor& p)
     // (the housing's base: the instrument with no inline section open - a rack, the arpeggiator
     // or the strip adds room below its unchanged upper part)
     content.onPaint = [this] (juce::Graphics& g) {
-        frame::paint (g, content, shell.product().identity, arpShown, bankShown == 1 ? userRow : macros, rackShift(), sourceTrim(), design::height - cardTrim());
+        if (performanceOn)
+        {
+            const auto shown = performanceKnobs();
+            frame::paint (g, content, shell.product().identity, false, macros, 0.0f, sourceTrim(), design::height - cardTrim(), &shown);
+        }
+        else
+            frame::paint (g, content, shell.product().identity, arpShown, bankShown == 1 ? userRow : macros, rackShift(), sourceTrim(), design::height - cardTrim());
     };
     addAndMakeVisible (content);
     overflow.onScroll = [this] { resized(); };
@@ -501,6 +516,9 @@ ShellEditor::ShellEditor (ShellProcessor& p)
         refreshUtilityKeys();
         applyBindings();
     }
+    // The view this instance was left in (its session, else this computer's last choice).
+    if (shell.showsPerformanceMode() && shell.performanceView().performance)
+        setPerformance (true);
     startTimerHz (30);
 }
 
@@ -545,13 +563,13 @@ void ShellEditor::layoutInstrument()
     parts.arpControl = &arpButton;
     parts.utilityActions = &utilityKeys;
     parts.headerMix = &headerMix;
-    if (shell.showsRack())
+    if (shell.showsRack() && ! performanceOn)   // (Performance: the rack hidden, nothing pushed down)
     {
         parts.rack = &rack;
         parts.rackShift = rackShift();
     }
     parts.sourceTrim = sourceTrim();
-    frame::place (parts, arpShown);
+    frame::place (parts, arpShown && ! performanceOn);
     if (shell.showsSourceView())
     {
         // The icon beside SAVE, on its centre line (12 px from it), and MIX moved right by as
@@ -577,6 +595,28 @@ void ShellEditor::layoutInstrument()
                 headerMix.setBounds (mix.withTrimmedLeft (shift));
         }
     }
+    if (shell.showsPerformanceMode())
+    {
+        // The Edit / Performance key: the header group's last key, on its centre line, 8 px after
+        // the one before it (ROUTING with no MIX; else SAVE), the others moved left by as much.
+        const int gap = 8;
+        const auto last = shell.showsSourceView() && ! shell.headerMixShown() ? sourceViewButton.getBounds() : savePresetButton.getBounds();
+        const int step = last.getWidth() + gap;
+        if (shell.showsSourceView() && ! shell.headerMixShown())
+        {
+            modeKey.setBounds (last);
+            sourceViewButton.setBounds (last.translated (-step, 0));
+            savePresetButton.setBounds (savePresetButton.getBounds().translated (-step, 0));
+            presetBar.setBounds (presetBar.getBounds().withRight (savePresetButton.getX() - gap));
+        }
+        else
+        {
+            modeKey.setBounds (last.translated (step, 0));
+            if (shell.headerMixShown())
+                if (const auto mix = headerMix.getBounds(); mix.getX() < modeKey.getRight() + 15)
+                    headerMix.setBounds (mix.withTrimmedLeft (modeKey.getRight() + 15 - mix.getX()));
+        }
+    }
     placeMacroLamps();
     placeUserMacros();
     modOverlay.setBounds (content.getLocalBounds());
@@ -594,6 +634,8 @@ void ShellEditor::layoutInstrument()
             auxStrip->resized();
         }
     }
+    if (performanceOn)
+        layoutPerformance();
 }
 
 //==============================================================================
@@ -689,8 +731,8 @@ void ShellEditor::layoutSources()
     }
     shownTrim = sourceTrim();
     if (sourceView != nullptr)
-        sourceView->setVisible (sourceViewOpen);
-    if (sourceViewOpen && sourceView != nullptr)
+        sourceView->setVisible (sourceViewOpen && ! performanceOn);
+    if (sourceViewOpen && ! performanceOn && sourceView != nullptr)
     {
         // The product's view in the cards' place (the sound is the same either way).
         for (auto& card : cards)
@@ -706,19 +748,33 @@ void ShellEditor::layoutSources()
     {
         // Three engines: every card, always, at equal widths, in the product's order; the
         // hybrid, while empty, is its ADD SAMPLE invitation in its own column.
-        const bool hybrid = shell.isLayerOccupied (ShellProcessor::hybridLayer);
-        if (hybrid == shownHybrid && shownCount == 3)
+        // (Performance: a hybrid that only shows its stand-in - ADD SAMPLE - plays nothing: no column)
+        osp::plugin::InstrumentHost::GeneratedSource standIn;
+        const bool hybrid = shell.isLayerOccupied (ShellProcessor::hybridLayer)
+                            && ! (performanceOn && shell.generatedSource (ShellProcessor::hybridLayer, standIn) && standIn.placeholder.isNotEmpty());
+        if (hybrid == shownHybrid && shownCount == (performanceOn ? 4 : 3))
             return;
-        shownCount = 3;
+        shownCount = performanceOn ? 4 : 3;   // (Performance: its own layout, remade when it changes)
         shownHybrid = hybrid;
         dropZone.setVisible (false);
         addTarget.setVisible (false);
         const auto& order = shell.product().threeEngines.order;
+        // Performance: only the sources that play, at equal widths (an empty hybrid leaves no
+        // column - its invitation is an editing tool).
+        const bool skipEmpty = performanceOn && ! hybrid;
+        const int columns = skipEmpty ? 2 : 3;
+        int placed = 0;
         for (int shown = 0; shown < 3; ++shown)
         {
             const int l = order[static_cast<std::size_t> (shown)];
             auto& card = *cards[static_cast<std::size_t> (l)];
-            const auto column = frame::sourceColumn (sourceArea, 3, shown);
+            if (skipEmpty && l == ShellProcessor::hybridLayer)
+            {
+                card.setVisible (false);
+                sampleDock.setVisible (false);
+                continue;
+            }
+            const auto column = frame::sourceColumn (sourceArea, columns, placed++);
             if (l == ShellProcessor::hybridLayer && ! hybrid)
             {
                 card.setVisible (false);
@@ -1995,6 +2051,18 @@ void ShellEditor::timerCallback()
         popup->refreshContent();
     if (learn != nullptr)
         learn->tick();   // (returns at once while Learn shows nothing)
+    if (performanceOn)
+    {
+        // A lesson shows the editing controls: Learn always runs in Edit Mode.
+        if (learn != nullptr && learn->isActive())
+            setPerformance (false);
+        // A USER macro assigned or cleared: the strip follows (never an inert knob).
+        else if (performance::visible (shell.performanceView(), performanceCatalog(), performanceAssigned()) != shownPerformanceMacros)
+        {
+            layoutPerformance();
+            content.repaint();
+        }
+    }
     refreshUtilityKeys();
 }
 
@@ -2894,6 +2962,206 @@ void ShellEditor::userMacroLabelMenu (int macro)
     namespace menuicons = osp::plugin::menuicons;
     menuicons::decorate (menu, { { "Edit Assignments", menuicons::Kind::list }, { "Rename", menuicons::Kind::rename }, { "Clear Assignments", menuicons::Kind::remove } });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (userRow[static_cast<std::size_t> (macro)].label.get()));
+}
+
+//==============================================================================
+// PERFORMANCE MODE R1
+
+performance::Catalog ShellEditor::performanceCatalog() const
+{
+    performance::Catalog c;
+    // The product's six core macros in their display order (left to right on the panel).
+    std::array<std::size_t, frame::macroCount> column {};
+    for (std::size_t i = 0; i < column.size(); ++i)
+        column[i] = i;
+    std::sort (column.begin(), column.end(), [] (std::size_t a, std::size_t b) {
+        return frame::macroCentreX (static_cast<int> (a)) < frame::macroCentreX (static_cast<int> (b));
+    });
+    for (const auto i : column)
+        c.core.add (shell.macroSpecs()[i].parameterId);
+    c.userSlots = shell.userMacros() != nullptr && bankTab != nullptr ? static_cast<int> (userRow.size()) : 0;
+    return c;
+}
+
+performance::AssignedFn ShellEditor::performanceAssigned() const
+{
+    auto* hooks = shell.userMacros();
+    auto& host = shell;
+    return [hooks, &host] (int slot) {
+        return hooks != nullptr && hooks->activeCount != nullptr && hooks->activeCount (host, slot) > 0;
+    };
+}
+
+std::vector<std::pair<const frame::MacroKnob*, int>> ShellEditor::performanceKnobs() const
+{
+    std::vector<std::pair<const frame::MacroKnob*, int>> out;
+    for (const auto& id : shownPerformanceMacros)
+    {
+        if (const int slot = performance::userSlotOf (id); slot >= 0)
+        {
+            if (slot < static_cast<int> (userRow.size()))
+                out.emplace_back (&userRow[static_cast<std::size_t> (slot)], slot);
+            continue;
+        }
+        for (std::size_t i = 0; i < macros.size(); ++i)
+            if (shell.macroSpecs()[i].parameterId == id)
+                out.emplace_back (&macros[i], static_cast<int> (i));
+    }
+    return out;
+}
+
+void ShellEditor::setPerformance (bool on)
+{
+    if (! shell.showsPerformanceMode() || on == performanceOn)
+        return;
+    if (on)
+    {
+        // Transient tools close safely (nothing is changed or lost: their settings are the sound's).
+        closePopup();
+        closeAnchoredPopover();
+        cancelUserMacroAssign();
+        renameField.reset();
+        renaming = -1;
+    }
+    performanceOn = on;
+    modeKey.setPerformance (on);
+    for (auto& card : cards)
+        card->setPerformance (on);
+    if (! on)
+    {
+        // Every editing area as it was (its state never changed while hidden).
+        modPanel.setVisible (true);
+        arpButton.setVisible (true);
+        arpPanel.setVisible (arpShown);
+        if (shell.showsRack())
+            rack.setVisible (true);
+        utilityKeys.setVisible (true);
+        if (shell.showsSourceView())
+            sourceViewButton.setVisible (true);
+        macroFlap.setVisible (false);
+        if (bankTab != nullptr)
+        {
+            bankTab->setVisible (true);
+            showMacroBank (bankShown);
+        }
+        else
+            for (auto& m : macros)
+            {
+                m.slider.setVisible (true);
+                if (m.label != nullptr)
+                    m.label->setVisible (true);
+            }
+        shownPerformanceMacros.clear();
+    }
+    shownCount = -1;
+    {
+        const juce::ScopedValueSetter<bool> shaping (shapingWindow, true);
+        layoutInstrument();
+    }
+    frame::applyWindowShape (*this, instrumentHeight(), true);
+    applyBindings();
+    content.repaint();
+    // This instance keeps it (its session), and this computer remembers it.
+    auto view = shell.performanceView();
+    view.performance = on;
+    shell.setPerformanceView (view);
+}
+
+void ShellEditor::layoutPerformance()
+{
+    // Hidden, never changed: the modulation panel, the macro banks' tabs, the arpeggiator, the
+    // racks, the AUX strip, the source view's key, the keyboard's utility keys.
+    modPanel.setVisible (false);
+    if (bankTab != nullptr)
+        bankTab->setVisible (false);
+    arpButton.setVisible (false);
+    arpPanel.setVisible (false);
+    if (shell.showsRack())
+        rack.setVisible (false);
+    if (auxStrip != nullptr)
+        auxStrip->setVisible (false);
+    utilityKeys.setVisible (false);
+    if (shell.showsSourceView())
+        sourceViewButton.setVisible (false);
+    for (auto& lens : lenses)
+        if (lens != nullptr)
+            lens->setVisible (false);
+    // The strip: the chosen macros (core and USER mixed, in the musician's order), spread across
+    // the panel at the reference's knob size; every other knob hidden.
+    shownPerformanceMacros = performance::visible (shell.performanceView(), performanceCatalog(), performanceAssigned());
+    auto hide = [] (frame::MacroKnob& m) {
+        m.slider.setVisible (false);
+        if (m.label != nullptr)
+            m.label->setVisible (false);
+    };
+    for (auto& m : macros)
+        hide (m);
+    for (auto& m : userRow)
+        hide (m);
+    const auto places = frame::performanceMacroPlaces (shownPerformanceMacros.size(), sourceTrim());
+    const auto knobs = performanceKnobs();
+    for (std::size_t k = 0; k < knobs.size() && k < places.size(); ++k)
+    {
+        auto& m = const_cast<frame::MacroKnob&> (*knobs[k].first);
+        if (m.label != nullptr)
+        {
+            m.label->setBounds (places[k].first);
+            m.label->setVisible (true);
+        }
+        m.slider.setBounds (places[k].second);
+        m.slider.setVisible (true);
+    }
+    // The flap: on the housing's top edge at its upper right (its hit area larger than the tab),
+    // inside the panel's own height - nothing moves for it.
+    const auto panel = design::layout::macroPanel.translated (0.0f, -sourceTrim());
+    macroFlap.setBounds (juce::Rectangle<float> (panel.getRight() - 24.0f - 46.0f, panel.getY(), 46.0f, 24.0f).toNearestInt());
+    macroFlap.setVisible (true);
+    macroFlap.toFront (false);
+    placeMacroLamps();   // (MORPH's lamp follows its name, shown with it)
+    for (auto& [macro, lamp] : macroLamps)
+        if (auto* label = macros[static_cast<std::size_t> (macro)].label.get())
+            lamp->setVisible (label->isVisible());
+}
+
+performance::MacroPicker* ShellEditor::performancePicker() const noexcept
+{
+    return popupIndex == anchoredPopup ? dynamic_cast<performance::MacroPicker*> (popup.get()) : nullptr;
+}
+
+void ShellEditor::togglePerformancePicker()
+{
+    if (anchoredPopoverOpenFrom (macroFlap))
+    {
+        closeAnchoredPopover();
+        return;
+    }
+    const auto catalog = performanceCatalog();
+    const auto assigned = performanceAssigned();
+    std::vector<performance::PickerEntry> entries;
+    for (std::size_t i = 0; i < catalog.core.size(); ++i)
+        for (std::size_t m = 0; m < macros.size(); ++m)
+            if (shell.macroSpecs()[m].parameterId == catalog.core[static_cast<int> (i)])
+                entries.push_back ({ catalog.core[static_cast<int> (i)], shell.macroSpecs()[m].name, false, true });
+    for (int slot = 0; slot < catalog.userSlots; ++slot)
+    {
+        auto* hooks = shell.userMacros();
+        auto name = hooks != nullptr && hooks->name != nullptr ? hooks->name (shell, slot) : juce::String();
+        if (name.isEmpty())
+            name = "MACRO " + juce::String (slot + 1);
+        entries.push_back ({ performance::userId (slot), name, true, assigned (slot) });
+    }
+    auto view = shell.performanceView();
+    auto picker = std::make_unique<performance::MacroPicker> (entries, performance::selection (view, catalog, assigned),
+                                                              performance::defaultSelection (catalog, assigned));
+    picker->onChange = [this] (const juce::StringArray& chosen, bool reset) {
+        auto v = shell.performanceView();
+        v.customised = ! reset;
+        v.macros = reset ? juce::StringArray() : chosen;
+        shell.setPerformanceView (v);
+        layoutPerformance();
+        content.repaint();
+    };
+    openAnchoredPopover (std::move (picker), macroFlap);
 }
 
 } // namespace andor::shell

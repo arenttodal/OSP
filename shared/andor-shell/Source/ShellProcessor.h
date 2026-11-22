@@ -152,6 +152,7 @@ public:
     bool showsRack() const noexcept { return ! referenceParity && (! product().rackModules.empty() || ! product().productRacks.empty()); }
     /** The product's other view of the sources' area and its icon (not in the parity render). */
     bool showsSourceView() const noexcept { return ! referenceParity && product().sourceAreaView.create != nullptr; }
+    bool showsPerformanceMode() const noexcept { return ! referenceParity && product().performanceMode; }
     /** The product's AUX strip (ShellProduct::auxStrip), and whether it is shown (a view
         setting: saved with the session, kept as it is when a preset loads). */
     bool hasAuxStrip() const noexcept { return ! referenceParity && product().auxStrip.has_value() && product().auxStrip->create != nullptr; }

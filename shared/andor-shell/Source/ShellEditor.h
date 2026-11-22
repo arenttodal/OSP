@@ -13,6 +13,7 @@
 #include "MainSections.h"
 #include "ModulationPanel.h"
 #include "OspLookAndFeel.h"
+#include "PerformanceComponents.h"
 #include "ShellProcessor.h"
 #include "UserMacroBank.h"
 
@@ -115,7 +116,20 @@ public:
     bool sourceViewShown() const noexcept { return sourceViewOpen; }
     juce::Component* sourceViewComponent() const noexcept { return sourceView.get(); }
     juce::Button& sourceViewToggle() noexcept { return sourceViewButton; }
-    float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown, rackShift(), sourceTrim()); }
+    float instrumentHeight() const noexcept { return osp::plugin::frame::instrumentHeight (arpShown && ! performanceOn, performanceOn ? 0.0f : rackShift(), sourceTrim()); }
+    /** PERFORMANCE MODE R1 (ShellProduct::performanceMode): the sources' pictures, the chosen
+        macros and the keyboard; every editing area hidden, never changed (on return each is as
+        it was). A view only: the sound and the parameters never change. Kept per instance and as
+        the computer's preference (ShellProcessor::performanceView). */
+    void setPerformance (bool on);
+    bool performanceShown() const noexcept { return performanceOn; }
+    osp::plugin::performance::ModeKey& performanceKey() noexcept { return modeKey; }
+    osp::plugin::performance::MacroFlap& performanceFlap() noexcept { return macroFlap; }
+    /** The macros the strip shows now (ids, in order). */
+    juce::StringArray performanceMacrosShown() const { return shownPerformanceMacros; }
+    /** The flap's "Performance Macros" picker (open / closed). */
+    void togglePerformancePicker();
+    osp::plugin::performance::MacroPicker* performancePicker() const noexcept;
     /** The source cards' trim (their modifiers in the well: nothing kept under the knobs). */
     float cardTrim() const noexcept
     {
@@ -132,7 +146,7 @@ public:
     bool shapingWindow = false;
     /** How far everything under the cards moves up: the cards' trim, less the AUX strip's room
         while it is shown (negative: down). */
-    float sourceTrim() const noexcept { return cardTrim() - auxShift(); }
+    float sourceTrim() const noexcept { return cardTrim() - (performanceOn ? 0.0f : auxShift()); }
     /** The product's AUX strip (ShellProduct::auxStrip): shown or hidden (a view change only;
         the window grows or shrinks by its room). */
     void setAuxStripShown (bool shown);
@@ -306,6 +320,16 @@ private:
     /** The product's other view of the sources' area (ShellProduct::sourceAreaView) and its icon. */
     using SourceViewButton = osp::plugin::RoutingKey;   // (shared: ANDOR OSP shows the same key)
     SourceViewButton sourceViewButton;
+    osp::plugin::performance::ModeKey modeKey;
+    osp::plugin::performance::MacroFlap macroFlap;
+    bool performanceOn = false;
+    juce::StringArray shownPerformanceMacros;
+    osp::plugin::performance::Catalog performanceCatalog() const;
+    osp::plugin::performance::AssignedFn performanceAssigned() const;
+    /** Performance: the editing areas hidden, the macro strip and the flap placed (after the
+        instrument's own layout). */
+    void layoutPerformance();
+    std::vector<std::pair<const osp::plugin::frame::MacroKnob*, int>> performanceKnobs() const;
     std::unique_ptr<juce::Component> sourceView;
     std::unique_ptr<juce::Component> auxStrip;   ///< (ShellProduct::auxStrip; made when first shown)
     bool auxShownApplied = false;
