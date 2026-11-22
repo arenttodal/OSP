@@ -55,7 +55,7 @@ namespace
         // (names in UTF-8, as OSP keeps them: on Windows a narrow string is not)
         std::filesystem::path write (const std::string& relative, const AudioData& audio, io::SampleFormat format = io::SampleFormat::pcm24)
         {
-            const auto path = files / osp::pathFromUtf8 (relative);
+            const auto path = (files / osp::pathFromUtf8 (relative)).make_preferred();   // native separators, as the scanner records them
             std::filesystem::create_directories (path.parent_path());
             std::string error;
             const bool written = io::writeAudioFile (path, audio, format, error);
@@ -65,7 +65,7 @@ namespace
         }
         std::filesystem::path bytes (const std::string& relative, const std::string& data)
         {
-            const auto path = files / osp::pathFromUtf8 (relative);
+            const auto path = (files / osp::pathFromUtf8 (relative)).make_preferred();
             std::filesystem::create_directories (path.parent_path());
             std::ofstream (path, std::ios::binary) << data;
             return path;
