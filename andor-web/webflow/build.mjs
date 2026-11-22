@@ -56,7 +56,7 @@ let html = readFileSync(join(HERE, "src/page.html"), "utf8")
   .replace(/<x-img\s([^>]*)><\/x-img>/g, (_, s) => picture(attrs(s)))
   .replace(/<x-film\s([^>]*)><\/x-film>/g, (_, s) => film(attrs(s)))
   .replaceAll("{{M}}", MEDIA)
-  .replace('<div class="andor" id="andor-top">', `<div class="andor" id="andor-top" data-media="${MEDIA}"${WAITLIST ? ` data-waitlist="${esc(WAITLIST)}"` : ""}>`)
+  .replace('<div class="andor" id="andor-top">', `<div class="andor" id="andor-top" data-media="${MEDIA}"${WAITLIST ? ` data-waitlist-endpoint="${esc(WAITLIST)}"` : ""}>`)
   .replace(/<!--[\s\S]*?-->/g, "").replace(/\n\s*\n/g, "\n").replace(/>\s+</g, (m) => (m.includes("\n") ? ">\n<" : m));
 if (missing.length) { console.error("missing media:", [...new Set(missing)].join(", ")); process.exit(1); }
 

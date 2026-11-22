@@ -153,7 +153,7 @@
       e.preventDefault();
       if ($(".a-hp", form).value) return;                        // a bot filled the hidden field
       if (!email.validity.valid) { say("Please enter a valid email address.", true); email.focus(); return; }
-      const endpoint = root.dataset.waitlist;
+      const endpoint = root.dataset.waitlistEndpoint;
       if (!endpoint) { say("The waitlist is not connected yet. Please try again soon.", true); return; }
       btn.disabled = true; say("Joining…");
       try {

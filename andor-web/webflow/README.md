@@ -15,7 +15,30 @@
 | `media.json` | Media manifest (widths and ratios), written by `tools/stage_media.py` |
 | `build.mjs` | Builds `dist/`: minified CSS and JS, the three Webflow snippets, a single-embed variant and `preview.html` |
 | `tools/stage_media.py` | Collects the approved images, films and fonts into the upload layout: `img/`, `film/`, `font/` and `lib/` (about 57 MB) |
+| `tools/deploy_r2.py` | Publishes the staged media to R2: bucket, CORS, public URL, upload |
 | `tools/qa.mjs` | Browser QA: four sizes; screenshots, console errors, failed requests, overflow and layout shift |
+
+## Services
+
+**Waitlist: MailerLite** (the Evenant account, chosen by the owner).
+- **Where sign-ups go:** the group *ANDOR OSP waitlist* (`204835922699618252`), through the embedded form *ANDOR OSP waitlist (website)* (`204835943155238722`).
+- **How the page submits:** it posts to `https://assets.mailerlite.com/jsonp/161928/forms/204835943155238722/subscribe`.
+- **Checked:** that endpoint allows any origin (CORS `*`) and rejects an invalid address with `success: false`.
+
+**Before launch, in MailerLite** (the API can't set these):
+- turn on **double opt-in** for this form. The page promises a confirmation email first.
+- set the form's **sender name** to ANDOR.
+
+**Media: Cloudflare R2** (the owner's personal account).
+- `tools/deploy_r2.py <account id> andor-media <media dir>` does the publishing:
+  - creates the bucket;
+  - sets read-only CORS, which the fonts need;
+  - enables the public `r2.dev` URL;
+  - uploads everything under `osp/v1/`, with content types and cache lifetimes.
+- **What it needs:**
+  - R2 enabled in that account;
+  - a `CLOUDFLARE_API_TOKEN` with *Workers R2 Storage: Edit* on that account.
+- **For production traffic:** connect a custom domain to the bucket. Cloudflare rate-limits `r2.dev` URLs. Then rebuild with `--media https://<domain>/osp/v1`.
 
 ## Build
 
