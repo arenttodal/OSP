@@ -5,6 +5,7 @@
 
 #include "core/PitchMath.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace osp::plugin
@@ -3149,7 +3150,7 @@ void EngineCard::setPerformance (bool on)
         performance = true;
         hideForPerformance();
         sourceDisplay.setInterceptsMouseClicks (false, false);
-        setInterceptsMouseClicks (false, false);   // (a picture to look at: nothing to edit here)
+        setInterceptsMouseClicks (false, true);   // (the picture to look at; its knobs to play)
     }
     else
     {
@@ -3168,8 +3169,12 @@ void EngineCard::setPerformance (bool on)
 
 void EngineCard::hideForPerformance()
 {
+    // The picture and the knob row stay (each knob as Edit Mode shows it); every other part goes.
+    auto isKnob = [this] (const juce::Component* c) {
+        return std::any_of (knobs.begin(), knobs.end(), [c] (const auto& k) { return k.get() == c; });
+    };
     for (auto* child : getChildren())
-        if (child != &sourceDisplay && child->isVisible())
+        if (child != &sourceDisplay && ! isKnob (child) && child->isVisible())
             child->setVisible (false);
 }
 
@@ -3437,15 +3442,6 @@ void EngineCard::resized()
     const bool triple = density == EngineLayoutDensity::triple;
     auto at = [] (juce::Rectangle<float> r) { return r.getSmallestIntegerContainer(); };
 
-    if (performance)
-    {
-        // The picture alone, filling the card (the same 16 px margin as the well's sides).
-        sourceDisplay.setBounds (at ({ 16.0f, 16.0f, w - 32.0f, h - 32.0f }));
-        sourceDisplay.setBottomInset (0);
-        sourceDisplay.setOverlayBand (0);
-        hideForPerformance();
-        return;
-    }
     badgeArea = at ({ 21.0f, 10.0f, 47.0f, 43.0f });
     // MUTE above SOLO beside the badge (where the layer's light was).
     muteButton.setBounds (at ({ 77.0f, 10.0f, 27.0f, 21.0f }));
@@ -3519,6 +3515,24 @@ void EngineCard::resized()
             knobs[i]->setBounds (at (juce::Rectangle<float> (std::min (cellWidth, pitch + 6.0f), height).withCentre ({ cx, centreY - 0.5f * (height - cellHeight) })));
         }
     };
+
+    if (performance)
+    {
+        // The picture (the same 16 px margin as the well's sides; Edit Mode's well height, the
+        // shell trimming the card), the knob row under it where Edit Mode puts it below the
+        // well, across the card's width (no modifiers beside it).
+        const float foot = performanceFoot (triple);
+        sourceDisplay.setBounds (at ({ 16.0f, 16.0f, w - 32.0f, h - 16.0f - foot }));
+        sourceDisplay.setBottomInset (0);
+        sourceDisplay.setOverlayBand (0);
+        if (triple)
+            row (16.0f, w - 16.0f, 0.87f * 100.0f, 0.87f * 113.0f, h - foot + 68.0f, true);
+        else
+            row (16.0f, w - 16.0f, 0.87f * 110.0f, 0.87f * 125.0f, h - foot + 70.5f, false);
+        dividerArea = {};
+        hideForPerformance();
+        return;
+    }
 
     if (modifiersInWell)
     {

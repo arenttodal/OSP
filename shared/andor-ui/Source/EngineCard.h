@@ -551,17 +551,22 @@ public:
         sourceTrim): ANDOR ANALOG's always are (on by default); ANDOR OSP's only while it shows
         three cards (a drag's preview of a third column keeps the cards' height and the well). */
     void setFootTrimmed (bool trimmed);
-    /** PERFORMANCE MODE (a presentation only): the card shows its source's picture alone - no
-        badge, root, name, keys, knobs, modifiers or well tools - the display filling the card
-        (16 px inside its edge), and takes no clicks. Off: every part as it was. The sound,
-        the parameters and what the card plays never change. */
+    /** PERFORMANCE MODE (a presentation only): the card shows its source's picture and its
+        knob row (START TUNE PAN LEVEL ..., as shown in Edit Mode, still playable) - no badge,
+        root, name, keys, modifiers or well tools; the picture 16 px inside the card's edge,
+        the knobs across the card's width under it. Off: every part as it was. The sound, the
+        parameters and what the card plays never change. */
     void setPerformance (bool performance);
     bool inPerformance() const noexcept { return performance; }
+    /** The card's height under the picture in Performance Mode (reference pixels): the knob
+        row (its centre where Edit Mode puts it below the well) and the foot's margin. */
+    static constexpr float performanceFoot (bool triple) noexcept { return triple ? 136.0f : 143.0f; }
     /** How much shorter a card is in Performance Mode, so its picture keeps the dark well's
         Edit Mode height exactly (the well: the card less 267 px with three cards, 206 with one or
-        two, the foot's trim given back; in Performance: the card less 16 px above and below).
-        `triple`: the Edit layout's three narrow cards. Everything under the cards moves up. */
-    static constexpr float performanceTrim (bool triple) noexcept { return (triple ? 267.0f : 206.0f) - 32.0f; }
+        two, the foot's trim given back; in Performance: the card less 16 px above, the knob
+        row and its foot below). `triple`: the Edit layout's three narrow cards. Everything
+        under the cards moves up. */
+    static constexpr float performanceTrim (bool triple) noexcept { return (triple ? 267.0f : 206.0f) - 16.0f - performanceFoot (triple); }
     /** Tests: modifier `index`'s key (0 LINK .. 3 FOLLOW), or nullptr. */
     ModifierButton* modifierKey (int index) const noexcept { return index >= 0 && index < 4 ? modifiers[static_cast<std::size_t> (index)].get() : nullptr; }
     /** Controls revealed in the well by the pointer (ProductInfo::wellOverlay); null: none.

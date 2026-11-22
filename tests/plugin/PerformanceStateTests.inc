@@ -165,6 +165,24 @@ TEST_CASE ("Performance Mode (OSP): one key; 1, 2 or 3 sources become pictures; 
     CHECK (ui->engineCard (0).isVisible());
     // The picture keeps the dark well's Edit Mode height (the card is shorter instead).
     CHECK (std::abs (ui->engineCard (0).display().getHeight() - editWell) <= 1);
+
+    // The knob row stays (as Edit Mode shows it), under the picture and inside the card.
+    {
+        auto& card = ui->engineCard (0);
+        int knobs = 0;
+        for (int k = 0; k < 5; ++k)
+            if (auto* knob = card.cardKnob (k); knob != nullptr && knob->isVisible())
+            {
+                ++knobs;
+                CHECK (knob->getY() >= card.display().getBottom());
+                CHECK (card.getLocalBounds().contains (knob->getBounds()));
+            }
+        CHECK (knobs >= 3);
+        bool self = true, children = false;
+        card.getInterceptsMouseClicks (self, children);
+        CHECK_FALSE (self);
+        CHECK (children);   // (its knobs still play)
+    }
     CHECK_FALSE (ui->sourceViewToggle().isVisible());
     // OSP's six core macros, in the panel's order (LIFE ... ECHO, SPACE).
     CHECK (ui->performanceMacrosShown().size() == 6);

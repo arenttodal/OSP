@@ -15,8 +15,10 @@
 >   "Performance Macros" picker (compact popover: ticks, "N of 8", up / down, Reset to Default;
 >   never more than eight, never none; every change applied at once, no value touched).
 > - **Gates 2-5 in the shell (opt-in `ProductInfo::performanceMode`; ANDOR ANALOG on):** the key at
->   the end of the header's keys; `EngineCard::setPerformance` (the picture alone, filling the card;
->   every part's visibility restored on return; no clicks); the frame's macro strip
+>   the end of the header's keys; `EngineCard::setPerformance` (the picture at the dark well's Edit
+>   Mode height and, owner feedback, the card's knob row under it as Edit Mode shows it, still
+>   playable - `performanceFoot` / `performanceTrim`; badge, keys, modifiers and well tools hidden;
+>   every part's visibility restored on return); the frame's macro strip
 >   (`frame::performanceMacroPlaces`, `frame::paint`'s Performance lights, no envelope divider);
 >   the editor hides the modulation panel, CORE/USER tabs, the arpeggiator, racks, AUX strip, the
 >   routing key and the utility keys without changing them (the window shrinks by what was open;
