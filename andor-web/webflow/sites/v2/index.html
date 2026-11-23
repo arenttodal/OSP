@@ -33,6 +33,7 @@ body { background: var(--bg) }
 .pos { list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--line) }
 .pos li { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 16.5px; line-height: 1.5; color: var(--ink-2) }
 .pos b { color: var(--ink); font-weight: 700 }
+.pos li:last-child { border-bottom: 0 } .pos + .row { margin-top: 30px }
 @media (max-width: 560px) { .pos li { grid-template-columns: minmax(0, 1fr); gap: 2px } }
 /* hero */
 .hero { padding: clamp(56px, 7vw, 96px) 0 clamp(72px, 8vw, 120px) }
@@ -128,11 +129,10 @@ body { background: var(--bg) }
   <div class="wrap">
     <div>
       <h2 class="d">Turn anything into <span class="hl">a playable instrument.</span></h2>
-      <p class="lead">From one shots to melodic phrases.</p>
+      <p class="lead">From one shots to melodic phrases. Repeated notes and matching one shots become round robins on their own.</p>
       <ul class="pos">
         <li><b>Phrases</b>Cut, mapped and the ranges filled. Automatically.</li>
         <li><b>One shots</b>Turned into dynamic instruments. Automatically.</li>
-        <li><b>Duplicates</b>Repeated notes in a phrase, or a set of matching one shots, become round robins. Automatically.</li>
       </ul>
       <div class="row"><a class="btn" href="#waitlist">Join the waitlist</a><a class="btn ghost" href="#how">See how it works</a></div>
       <p class="fine">AU · VST3 · Standalone · macOS at release</p>
