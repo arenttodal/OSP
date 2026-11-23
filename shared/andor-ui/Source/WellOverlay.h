@@ -44,6 +44,15 @@ public:
         is hidden then (an oscillator's settings belong to its regular mode), unless it says
         it stays (a source type selector the grains do not cover). */
     virtual bool shownWhileGranular() const { return false; }
+    /** PERFORMANCE MODE (opt-in, a product's): the overlay stays over its card's picture while
+        performing - its own picture there (an external instrument's name and live waveform),
+        none of its controls (setPerformance tells it). By default it is hidden, as every
+        editing part of the card. */
+    virtual bool performancePicture() const { return false; }
+    /** The card enters / leaves Performance Mode: the revealed controls never show while
+        performing; performanceChanged() lets the overlay show its picture. */
+    void setPerformance (bool performing);
+    bool isPerforming() const noexcept { return performingNow; }
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -51,6 +60,11 @@ public:
 
     /** Tests: as if the pointer were in (or out of) the well, at once (no fade). */
     void setRevealedForTest (bool shown);
+
+protected:
+    /** Performance Mode entered / left (an overlay with a picture: its controls hidden, its
+        picture shown; and back). */
+    virtual void performanceChanged (bool /*performing*/) {}
 
 private:
     struct Reveal final : juce::Component
@@ -61,6 +75,7 @@ private:
     bool wantsReveal() const;
     Reveal reveal;
     float alpha = 0.0f, target = 0.0f;
+    bool performingNow = false;
     double lastInside = -1.0e9;
     bool dismissed = false, forced = false, forcedShown = false;
     int frames = 0;

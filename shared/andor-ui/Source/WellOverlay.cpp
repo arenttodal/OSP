@@ -24,6 +24,21 @@ WellOverlay::~WellOverlay()
     stopTimer();
 }
 
+void WellOverlay::setPerformance (bool performing)
+{
+    if (performingNow == performing)
+        return;
+    performingNow = performing;
+    if (performing)
+    {
+        alpha = target = 0.0f;
+        reveal.setVisible (false);
+        reveal.setAlpha (0.0f);
+    }
+    performanceChanged (performing);
+    repaint();
+}
+
 void WellOverlay::resized()
 {
     reveal.setBounds (getLocalBounds());
@@ -45,6 +60,8 @@ void WellOverlay::paint (juce::Graphics& g)
 
 bool WellOverlay::wantsReveal() const
 {
+    if (performingNow)
+        return false;   // (Performance Mode: nothing to edit here)
     if (forced)
         return forcedShown;
     if (dismissed)

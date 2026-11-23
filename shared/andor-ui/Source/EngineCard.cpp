@@ -2214,6 +2214,8 @@ void EngineCard::setWellOverlay (std::unique_ptr<WellOverlay> overlay)
     {
         addChildComponent (*wellOverlay);
         wellOverlay->setBounds (sourceDisplay.getBounds());
+        if (performance)
+            wellOverlay->setPerformance (true);   // (made again while performing: its picture at once)
     }
     updateWellOverlay();
 }
@@ -2224,6 +2226,15 @@ void EngineCard::updateWellOverlay()
         updateModifiers();
     if (wellOverlay == nullptr)
         return;
+    if (performance)
+    {
+        // Performing: only an overlay with its own picture, over the picture.
+        wellOverlay->setBounds (sourceDisplay.getBounds());
+        wellOverlay->setVisible (wellOverlay->performancePicture() && sourceDisplay.isVisible());
+        if (wellOverlay->isVisible())
+            wellOverlay->toFront (false);
+        return;
+    }
     const bool wellTaken = eqEditor != nullptr || noteMap != nullptr || synthEditor != nullptr || captureEditor != nullptr
                            || (wellEditor != nullptr && wellEditor->isVisible());
     wellOverlay->setBounds (sourceDisplay.getBounds());
@@ -3148,6 +3159,8 @@ void EngineCard::setPerformance (bool on)
         sourceDisplay.getInterceptsMouseClicks (editDisplayClicks, editDisplayChildClicks);
         sourceDisplay.setPictureOnly (true);
         performance = true;
+        if (wellOverlay != nullptr)
+            wellOverlay->setPerformance (true);
         hideForPerformance();
         sourceDisplay.setInterceptsMouseClicks (false, false);
         setInterceptsMouseClicks (false, true);   // (the picture to look at; its knobs to play)
@@ -3155,6 +3168,8 @@ void EngineCard::setPerformance (bool on)
     else
     {
         performance = false;
+        if (wellOverlay != nullptr)
+            wellOverlay->setPerformance (false);
         for (auto& [child, visible] : editVisibility)
             if (child != nullptr)
                 child->setVisible (visible);
@@ -3173,8 +3188,10 @@ void EngineCard::hideForPerformance()
     auto isKnob = [this] (const juce::Component* c) {
         return std::any_of (knobs.begin(), knobs.end(), [c] (const auto& k) { return k.get() == c; });
     };
+    // (a well overlay with its own Performance picture stays: a product's opt-in)
+    const juce::Component* picture = wellOverlay != nullptr && wellOverlay->performancePicture() ? wellOverlay.get() : nullptr;
     for (auto* child : getChildren())
-        if (child != &sourceDisplay && ! isKnob (child) && child->isVisible())
+        if (child != &sourceDisplay && child != picture && ! isKnob (child) && child->isVisible())
             child->setVisible (false);
 }
 
@@ -3531,6 +3548,7 @@ void EngineCard::resized()
             row (16.0f, w - 16.0f, 0.87f * 110.0f, 0.87f * 125.0f, h - foot + 70.5f, false);
         dividerArea = {};
         hideForPerformance();
+        updateWellOverlay();
         return;
     }
 
