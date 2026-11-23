@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="../kit/kit.css">
 <style>
 /* V2 "Studio": light, friendly-pro; the software is the hero; centred headlines with one accented phrase. */
-:root { --bg: #f6f3ee; --card: #ffffff; --soft: #efeae3 }
+:root { --bg: #f6f3ee; --card: #ffffff; --soft: #efeae3; --paper-2: #ebe5dc }
 body { background: var(--bg) }
 .hl { background: linear-gradient(92deg, #d9774a 0%, #c9893d 55%, #b9785a 100%); -webkit-background-clip: text; background-clip: text; color: transparent }
 .nav { position: sticky; top: 0; z-index: 40; background: rgba(246,243,238,.86); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line) }
@@ -17,11 +17,28 @@ body { background: var(--bg) }
 .nav .btn { height: 40px; padding: 0 18px; font-size: 14px }
 .sec { padding: clamp(88px, 10vw, 140px) 0 } .center { text-align: center } .center .lead { margin-left: auto; margin-right: auto }
 .title { margin-bottom: 18px }
+/* the original static hero (H01 plate, centred copy) */
+.ohero { position: relative; height: calc(100svh - 68px); min-height: 600px; overflow: hidden; background: var(--sand); color: #23251f }
+.ohero__media { position: absolute; top: 6vh; left: 0; right: 0; bottom: -6vh }
+.ohero__media::before { content: ""; position: absolute; left: 0; right: 0; top: -6vh; height: 8vh; background: linear-gradient(var(--sand), rgba(220,216,211,0)); z-index: 1 }
+.ohero__media picture { height: 100% } .ohero__media img { width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 50% 62% }
+.ohero__veil { position: absolute; inset: 0; background: radial-gradient(120% 70% at 50% 0%, rgba(207,200,191,.55), rgba(207,200,191,0) 60%); pointer-events: none }
+.ohero__copy { position: relative; z-index: 2; display: grid; justify-items: center; text-align: center; padding: max(64px, 8vh) var(--gut) 0 }
+.ohero__label { color: #6f6b62 } .ohero__title { margin-top: 1.6vh; font-size: clamp(2.4rem, min(5.2vw, 6.6vh), 6.4rem); max-width: 12em }
+.ohero__sub { margin-top: 2.2vh; font-size: clamp(.95rem, 2.1vh, 1.3rem); color: #4d4b45; max-width: 46em }
+.ohero__cta { margin-top: 2.6vh; display: flex; gap: 14px 22px; align-items: center; justify-content: center; flex-wrap: wrap }
+.ohero__meta { position: absolute; z-index: 2; left: var(--gut); right: var(--gut); bottom: 24px; display: flex; justify-content: space-between } .ohero__meta .label { color: rgba(239,233,222,.62) }
+@media (max-aspect-ratio: 4/5) { .ohero__media { top: 0; bottom: 0 } .ohero__media::before { display: none } .ohero__media img { object-position: 50% 8% } .ohero__copy { position: absolute; inset: 0; align-content: start; padding-top: clamp(72px, 10vh, 120px) } .ohero__cta { position: absolute; left: 0; right: 0; bottom: max(64px, 9vh); margin: 0 } .ohero__meta .label:last-child { display: none } }
+@media (min-aspect-ratio: 2/1) { .ohero__media img { object-position: 50% 75% } }
+.pos { list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--line) }
+.pos li { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 16.5px; line-height: 1.5; color: var(--ink-2) }
+.pos b { color: var(--ink); font-weight: 700 }
+@media (max-width: 560px) { .pos li { grid-template-columns: minmax(0, 1fr); gap: 2px } }
 /* hero */
 .hero { padding: clamp(56px, 7vw, 96px) 0 clamp(72px, 8vw, 120px) }
 .hero .wrap { display: grid; grid-template-columns: .82fr 1.18fr; gap: 56px; align-items: center }
 .hero .brand { display: flex; align-items: baseline; gap: 10px; margin-bottom: 28px; font-weight: 800; letter-spacing: .2em; font-size: 14px } .hero .brand span { font-weight: 500; letter-spacing: .02em; color: var(--ink-3) }
-.hero h1 { font-size: clamp(2.8rem, 5.4vw, 5.2rem) } .hero .lead { margin: 26px 0 34px }
+.hero h2 { font-size: clamp(2.6rem, 5vw, 4.8rem) } .hero .lead { margin: 26px 0 34px }
 .hero .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap } .hero .row .btn.ghost { color: var(--ink) }
 .hero .fine { margin-top: 22px; font-size: 14px; color: var(--ink-3) }
 .hero .clip { aspect-ratio: 1.6; box-shadow: 0 40px 100px rgba(40,46,44,.28), 0 0 0 1px rgba(0,0,0,.04) }
@@ -51,6 +68,18 @@ body { background: var(--bg) }
 .look .panes { position: relative } .look .pane { display: none; grid-template-columns: .7fr 1.3fr; gap: 48px; align-items: center; text-align: left } .look .pane.on { display: grid }
 .look .pane h3 { font-size: clamp(1.6rem, 2.4vw, 2.2rem) } .look .pane p { margin-top: 14px; color: var(--ink-2) }
 .look .pane .clip { aspect-ratio: var(--ar, 1.6) }
+/* stories */
+.story { padding: clamp(70px, 8vw, 120px) 0; border-top: 1px solid var(--line) }
+.story .grid { display: grid; grid-template-columns: .85fr 1.15fr; gap: 64px; align-items: center }
+.story.flip .grid { grid-template-columns: 1.15fr .85fr } .story.flip .txt { order: 2 }
+.story .no { font-weight: 650; font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent) }
+.story h2 { margin-top: 14px } .story .lead { margin-top: 22px; font-size: clamp(1.08rem, 1.5vw, 1.28rem); line-height: 1.6 }
+.story .lead b { color: var(--ink); font-weight: 650 }
+.story .clip { aspect-ratio: var(--ar, 1.6); box-shadow: 0 40px 100px rgba(40,46,44,.25) }
+.story .pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px } .story .pair .clip { --ar: 2.42 }
+.steps-mini { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 26px } .steps-mini span { padding: 7px 12px; border-radius: 999px; background: var(--paper-2); font-size: 13.5px; font-weight: 600; color: var(--ink-2) }
+.patch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 26px } .patch div { background: #fff; border-radius: 12px; padding: 12px 14px; font-size: 14px; color: var(--ink-2) } .patch b { display: block; color: var(--ink); font-size: 16px }
+.libshot { border-radius: 14px; box-shadow: 0 40px 100px rgba(40,46,44,.25) }
 /* life */
 .life { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center }
 .scale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 30px } .scale div { background: var(--card); border-radius: 16px; padding: 18px } .scale b { font-size: 26px; font-weight: 760; letter-spacing: -.03em } .scale p { font-size: 14px; color: var(--ink-2); margin-top: 4px }
@@ -67,20 +96,44 @@ body { background: var(--bg) }
   .nav nav { display: none } .hero .wrap, .life, .band { grid-template-columns: minmax(0, 1fr) } .steps3, .src { grid-template-columns: minmax(0, 1fr) }
   .diff { grid-template-columns: minmax(0, 1fr); padding: 22px } .diff .cards { grid-template-columns: repeat(2, minmax(0, 1fr)) }
   .look .pane.on { grid-template-columns: minmax(0, 1fr); gap: 24px } .reqcard { grid-template-columns: minmax(0, 1fr); padding: 28px }
+  .story .grid, .story.flip .grid { grid-template-columns: minmax(0, 1fr); gap: 34px } .story.flip .txt { order: 0 } .patch { grid-template-columns: minmax(0, 1fr) }
   .look .tabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start } .look .tabs button { white-space: nowrap }
 }
 </style></head>
 <body>
 <header class="nav"><div class="wrap"><a class="wm" href="#top">ANDOR<i>OSP</i></a>
-  <nav><a href="#how">How it works</a><a href="#sources">Sources</a><a href="#look">A closer look</a><a href="#faq">FAQ</a></nav>
+  <nav><a href="#intro">The instrument</a><a href="#how">How it works</a><a href="#sources">Sources</a><a href="#look">A closer look</a><a href="#faq">FAQ</a></nav>
   <a class="btn" href="#waitlist">Join the waitlist</a></div></header>
 
-<section class="hero" id="top">
+<section class="ohero" id="top" aria-labelledby="oh-title">
+  <div class="ohero__media">
+    <picture>
+      <source media="(max-aspect-ratio: 4/5)" type="image/avif" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-640.avif 640w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-860.avif 860w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-1290.avif 1290w" sizes="100vw">
+      <source media="(max-aspect-ratio: 4/5)" type="image/webp" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-640.webp 640w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-860.webp 860w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-1290.webp 1290w" sizes="100vw">
+      <source type="image/avif" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1280.avif 1280w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.avif 1920w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-2560.avif 2560w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-3840.avif 3840w" sizes="100vw">
+      <img src="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.webp" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1280.webp 1280w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.webp 1920w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-2560.webp 2560w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-3840.webp 3840w" sizes="100vw" alt="The ANDOR OSP instrument seen from the front on an ivory backdrop" width="3840" height="2160" fetchpriority="high" decoding="async">
+    </picture>
+  </div>
+  <div class="ohero__veil"></div>
+  <div class="ohero__copy">
+    <p class="label ohero__label">ANDOR OSP · One Shot Performer</p>
+    <h1 class="d ohero__title" id="oh-title">One sound.<br>An entire instrument.</h1>
+    <p class="ohero__sub">Drop in a single recording. Play it as an expressive instrument, across every key.</p>
+    <div class="ohero__cta"><a class="btn" href="#waitlist">Join the waitlist <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a class="tlink" href="#how">See how it works</a></div>
+  </div>
+  <div class="ohero__meta"><span class="label">Scroll</span><span class="label">In development · macOS · AU, VST3, Standalone</span></div>
+</section>
+
+<section class="hero" id="intro">
   <div class="wrap">
     <div>
-      <div class="brand">ANDOR OSP <span>One Shot Performer</span></div>
-      <h1 class="d">Any sound.<br><span class="hl">A playable instrument.</span></h1>
-      <p class="lead">Drop in one recording and play it across the whole keyboard. Every note performed, every sustain held, every sound still yours.</p>
+      <h2 class="d">Turn anything into <span class="hl">a playable instrument.</span></h2>
+      <p class="lead">From one shots to melodic phrases.</p>
+      <ul class="pos">
+        <li><b>Phrases</b>Cut, mapped and the ranges filled. Automatically.</li>
+        <li><b>One shots</b>Turned into dynamic instruments. Automatically.</li>
+        <li><b>Duplicates</b>Repeated notes in a phrase, or a set of matching one shots, become round robins. Automatically.</li>
+      </ul>
       <div class="row"><a class="btn" href="#waitlist">Join the waitlist</a><a class="btn ghost" href="#how">See how it works</a></div>
       <p class="fine">AU · VST3 · Standalone · macOS at release</p>
     </div>
@@ -153,6 +206,56 @@ body { background: var(--bg) }
     </div>
   </div>
 </section>
+
+<!-- Stories (from the Story site, components Story · 03–07) -->
+<section class="story" id="story-memo">
+  <div class="wrap grid">
+    <div class="txt"><p class="no">Story 01</p><h2 class="d d2">The voice memo.</h2>
+      <p class="lead">You hum a phrase into your phone on a walk. At home it is already waiting in the <b>Inbox</b>, which watches your Voice Memos, Dropbox or iCloud folder. <b>MAP NOTES</b> splits it into its notes, each on its own key. Add <b>LIFE</b>, hold a chord, and the sustain never loops.</p>
+      <div class="steps-mini"><span>Inbox</span><span>MAP NOTES</span><span>LIFE</span><span>Continuation</span></div></div>
+    <div class="clip"><video data-clip muted loop playsinline preload="none" poster="../m/learn/b-phrase-map-notes-poster.webp"><source src="../m/learn/b-phrase-map-notes.webm" type="video/webm"><source src="../m/learn/b-phrase-map-notes.mp4" type="video/mp4"></video><button class="snd" data-sound aria-pressed="false"><span class="n">Sound off</span><span class="y">Sound on</span></button></div>
+  </div>
+</section>
+
+<section class="story flip" id="story-note">
+  <div class="wrap grid">
+    <div class="txt"><p class="no">Story 02</p><h2 class="d d2">The one perfect note.</h2>
+      <p class="lead">One bowed note becomes a whole-keyboard instrument. <b>TAPE FRAME</b> gives it a faded-film version of itself. <b>IMPRINT</b> underneath adds a synth body that still sounds like the instrument, and holds after the bow has stopped.</p>
+      <div class="steps-mini"><span>REIMAGINED · TAPE FRAME</span><span>SYNTH</span><span>IMPRINT</span></div></div>
+    <div class="pair">
+      <div class="clip"><video data-clip muted loop playsinline preload="none" poster="../m/learn/i1-reimagined-poster.webp"><source src="../m/learn/i1-reimagined.webm" type="video/webm"><source src="../m/learn/i1-reimagined.mp4" type="video/mp4"></video></div>
+      <div class="clip"><video data-clip muted loop playsinline preload="none" poster="../m/learn/f2-synth-imprint-poster.webp"><source src="../m/learn/f2-synth-imprint.webm" type="video/webm"><source src="../m/learn/f2-synth-imprint.mp4" type="video/mp4"></video></div>
+    </div>
+  </div>
+</section>
+
+<section class="story" id="story-grab">
+  <div class="wrap grid">
+    <div class="txt"><p class="no">Story 03</p><h2 class="d d2">Grab what just happened.</h2>
+      <p class="lead">You improvised something great on your guitar, and you weren't recording. <b>GRAB LAST 30 s</b>, and it is already an instrument: trimmed, chopped into its notes and mapped across the keys.</p>
+      <div class="steps-mini"><span>GRAB LAST 10 · 20 · 30 · 60 s</span><span>Sidechain or input</span></div></div>
+    <div class="clip"><video data-clip muted loop playsinline preload="none" poster="../m/learn/c2-grab-last-poster.webp"><source src="../m/learn/c2-grab-last.webm" type="video/webm"><source src="../m/learn/c2-grab-last.mp4" type="video/mp4"></video></div>
+  </div>
+</section>
+
+<section class="story flip" id="story-hybrid">
+  <div class="wrap grid">
+    <div class="txt"><p class="no">Story 04</p><h2 class="d d2">A hybrid patch in a minute.</h2>
+      <p class="lead">Three sounds, one instrument. A vocal vowel on A. An old synth note on B, in Granular with <b>KEY DNA</b>. A pluck through <b>MOSAIC</b> on C. The arpeggiator on B only, <b>ABYSS</b> on the space.</p>
+      <div class="patch"><div><b>A</b>Vocal vowel</div><div><b>B</b>Granular + KEY DNA, arp</div><div><b>C</b>Pluck through MOSAIC</div></div></div>
+    <div class="clip" style="--ar:1.47"><video data-clip muted loop playsinline preload="none" poster="../m/learn/granular-3card-poster.webp"><source src="../m/learn/granular-3card.webm" type="video/webm"><source src="../m/learn/granular-3card.mp4" type="video/mp4"></video></div>
+  </div>
+</section>
+
+<section class="story" id="story-travel">
+  <div class="wrap grid">
+    <div class="txt"><p class="no">Story 05</p><h2 class="d d2">The instrument that travels.</h2>
+      <p class="lead">Save it as a preset, or start from a <b>starting state</b>. When it is done, export an <b>.ospinstrument</b>: the recordings, their analysis and every setting in one file, sounding the same on another computer. And every sound you ever dropped in stays in the <b>Library</b>, tagged and searchable.</p>
+      <div class="steps-mini"><span>Presets</span><span>Starting states</span><span>.ospinstrument</span><span>Library</span></div></div>
+    <div class="clip" style="--ar:1.66"><video data-clip muted loop playsinline preload="none" poster="../m/learn/e5-export-instrument-poster.webp"><source src="../m/learn/e5-export-instrument.webm" type="video/webm"><source src="../m/learn/e5-export-instrument.mp4" type="video/mp4"></video></div>
+  </div>
+</section>
+
 
 <section class="sec">
   <div class="wrap life">

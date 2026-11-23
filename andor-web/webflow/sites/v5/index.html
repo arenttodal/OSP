@@ -16,6 +16,9 @@ body { background: var(--paper) }
 .hero { position: relative; height: 100svh; min-height: 640px; overflow: hidden; background: var(--sand); color: #23251f }
 .hero .media { position: absolute; top: 6vh; left: 0; right: 0; bottom: -6vh }
 .hero .media::before { content: ""; position: absolute; left: 0; right: 0; top: -6vh; height: 8vh; background: linear-gradient(var(--sand), rgba(220,216,211,0)); z-index: 1 }
+.hero .media picture { height: 100% } .hero .media img { width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 50% 62% }
+@media (max-aspect-ratio: 4/5) { .hero .media img { object-position: 50% 8% } }
+@media (min-aspect-ratio: 2/1) { .hero .media img { object-position: 50% 75% } }
 .hero .copy { position: relative; z-index: 2; display: grid; justify-items: center; text-align: center; padding: max(96px, 11vh) var(--gut) 0 }
 .hero .copy .label { color: #6f6b62 } .hero h1 { margin-top: 1.6vh; font-size: clamp(2.3rem, min(4.8vw, 6.2vh), 6rem); max-width: 13em }
 .hero .sub { margin-top: 2.2vh; font-size: clamp(.95rem, 2.1vh, 1.3rem); color: #4d4b45; max-width: 44em } .hero .cta { margin-top: 2.6vh; display: flex; gap: 14px 22px; justify-content: center; align-items: center; flex-wrap: wrap }
@@ -57,11 +60,13 @@ body { background: var(--paper) }
 <header class="nav" data-nav><a class="wm" href="#top">ANDOR OSP</a><a class="btn" href="#waitlist">Join the waitlist</a></header>
 
 <section class="hero" id="top">
-  <div class="media" data-rise data-frames="24" data-base="../m/rise/rise-" data-copy=".copy">
-    <div class="rise__bg"><img src="../m/rise/rise-backdrop.webp" alt="" width="1600" height="900"></div>
-    <div class="rise__light" aria-hidden="true"><i></i><i></i></div>
-    <canvas class="rise__inst" aria-label="The ANDOR OSP instrument"></canvas>
-    <picture class="rise__phone"><source media="(max-aspect-ratio: 4/5)" type="image/webp" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-860.webp 860w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-1290.webp 1290w" sizes="100vw"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""></picture>
+  <div class="media">
+    <picture>
+      <source media="(max-aspect-ratio: 4/5)" type="image/avif" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-640.avif 640w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-860.avif 860w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-1290.avif 1290w" sizes="100vw">
+      <source media="(max-aspect-ratio: 4/5)" type="image/webp" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-640.webp 640w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-860.webp 860w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-phone-1290.webp 1290w" sizes="100vw">
+      <source type="image/avif" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1280.avif 1280w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.avif 1920w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-2560.avif 2560w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-3840.avif 3840w" sizes="100vw">
+      <img src="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.webp" srcset="https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1280.webp 1280w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-1920.webp 1920w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-2560.webp 2560w, https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/v1/img/hero-desktop-3840.webp 3840w" sizes="100vw" alt="The ANDOR OSP instrument seen from the front on an ivory backdrop" width="3840" height="2160" fetchpriority="high" decoding="async">
+    </picture>
   </div>
   <div class="copy">
     <p class="label">ANDOR OSP · One Shot Performer</p>
