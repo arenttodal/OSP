@@ -269,11 +269,13 @@ TEST_CASE ("sub: the drawn response is SubOsc::keyGain's, and the range drag is 
     drag (d.handlePosition (SubResponseDisplay::Handle::low).translated (0.0f, 4.0f), { d.keyArea (96).getCentreX(), d.keybedArea().getCentreY() });
     CHECK (juce::roundToInt (subValue (p, "lowKey")) == 84);
     CHECK (juce::roundToInt (subValue (p, "highKey")) == 84);
-    // FROM on the curve, whole semitones.
+    // The curve is a picture only (24 Nov): a drag where FROM sits changes nothing.
     setSub (p, "lowKey", 48.0f);
     setSub (p, "highKey", 84.0f);
+    CHECK (d.handleAt (d.handlePosition (SubResponseDisplay::Handle::from)) != SubResponseDisplay::Handle::from);
+    CHECK (d.handleAt (d.handlePosition (SubResponseDisplay::Handle::slope)) != SubResponseDisplay::Handle::slope);
     drag (d.handlePosition (SubResponseDisplay::Handle::from), { d.keyArea (67).getCentreX(), d.handlePosition (SubResponseDisplay::Handle::from).y });
-    CHECK (juce::roundToInt (subValue (p, "taperStart")) == 67);
+    CHECK (juce::roundToInt (subValue (p, "taperStart")) == 60);
 }
 
 TEST_CASE ("sub: the SUB lesson, end to end, from the musician's own actions", "[plugin][sub][learn]")

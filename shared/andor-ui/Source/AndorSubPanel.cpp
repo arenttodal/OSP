@@ -277,17 +277,8 @@ juce::Point<float> SubResponseDisplay::handlePosition (Handle h) const
 
 SubResponseDisplay::Handle SubResponseDisplay::handleAt (juce::Point<float> p) const
 {
-    // The curve's handles (TAPER only), with a 12-unit target; the keyboard below for the range.
-    if (taper())
-    {
-        const auto f = handlePosition (Handle::from), s = handlePosition (Handle::slope);
-        const float df = p.getDistanceFrom (f), ds = p.getDistanceFrom (s);
-        const bool slopeShown = taperStart() + 1 <= viewport().last;
-        if (df <= 12.0f && (! slopeShown || df <= ds))
-            return Handle::from;
-        if (slopeShown && ds <= 12.0f)
-            return Handle::slope;
-    }
+    // The curve is a picture only (the owner's choice, 24 Nov: the response has no controls);
+    // the keyboard below edits the range.
     if (p.y < bed.getY() - 12.0f || p.y > labels.getBottom() || p.x < bed.getX() - 8.0f || p.x > bed.getRight() + 8.0f)
         return Handle::none;
     const float lx = handlePosition (Handle::low).x, hx = handlePosition (Handle::high).x;
@@ -426,7 +417,7 @@ void SubResponseDisplay::paint (juce::Graphics& g)
         }
     }
 
-    // The handles (TAPER): FROM on the flat line, the slope an octave above it.
+    // TAPER: where it starts, a faint guide down to the keyboard (no handles: a picture only).
     if (tapered)
     {
         const auto f = handlePosition (Handle::from);
@@ -436,24 +427,8 @@ void SubResponseDisplay::paint (juce::Graphics& g)
         line.startNewSubPath (f.x, f.y + 5.0f);
         line.lineTo (f.x, bed.getY() - 2.0f);
         juce::PathStrokeType (1.0f).createDashedStroke (dashed, line, guide, 2);
-        g.setColour (curveColour.withAlpha (0.22f));
+        g.setColour (curveColour.withAlpha (fromShown ? 0.22f : 0.0f));
         g.fillPath (dashed);
-        auto knob = [&] (juce::Point<float> c, Handle which, bool solid) {
-            const bool lit = drag == which || (drag == Handle::none && hover == which);
-            const float rr = lit ? 5.5f : 4.5f;
-            if (lit)
-            {
-                g.setColour (accent.withAlpha (0.35f));
-                g.fillEllipse (juce::Rectangle<float> (2.0f * rr + 6.0f, 2.0f * rr + 6.0f).withCentre (c));
-            }
-            g.setColour (juce::Colour (0xff1f2626));
-            g.fillEllipse (juce::Rectangle<float> (2.0f * rr, 2.0f * rr).withCentre (c));
-            g.setColour (curveColour.withAlpha (solid ? 1.0f : 0.5f));
-            g.drawEllipse (juce::Rectangle<float> (2.0f * rr, 2.0f * rr).withCentre (c), 1.5f);
-        };
-        if (taperStart() + 1 <= v.last)
-            knob (handlePosition (Handle::slope), Handle::slope, true);
-        knob (f, Handle::from, fromShown);
     }
 
     // The keyboard: ivory and graphite, the range lit, the rest dimmed; its ends' caps.

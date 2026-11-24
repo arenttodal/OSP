@@ -23,8 +23,11 @@ namespace
     std::shared_ptr<const PlaybackSource> makeSource (const AudioData& audio, double rootMidi, const PlaybackPreparation& prep,
                                                       int zeroCrossings)
     {
-        return std::make_shared<const PlaybackSource> (audio, rootMidi, InstrumentEngine::requiredSourcePaddingFor (zeroCrossings),
-                                                       prep.startSeconds, prep.gainDb);
+        auto source = std::make_shared<PlaybackSource> (audio, rootMidi, InstrumentEngine::requiredSourcePaddingFor (zeroCrossings),
+                                                        prep.startSeconds, prep.gainDb);
+        // Reads far above the recording use octave-down copies (InstrumentVoice::readFrame).
+        source->buildOctaveLevels (InstrumentVoice::octaveReadLevels);
+        return source;
     }
 
     void addTransient (PitchLayer& layer, const AudioData& audio, double rootMidi, const PlaybackPreparation& prep, int zeroCrossings)

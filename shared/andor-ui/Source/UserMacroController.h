@@ -63,6 +63,12 @@ public:
     void tick();
     /** The editor's popover closed (the macro panel with it). */
     void popupClosed();
+    /** A popover opened. While a lens is dragged or a control is picked, its knobs become
+        targets too (SUB's LEVEL, LIFE's ...), ringed above it. */
+    void popupOpened();
+    /** Whether a press on `c` belongs to an assignment (a macro's lens, the picking overlay):
+        the editor keeps an open popover open for it, so its knobs can be the target. */
+    bool keepsPopoverOpen (const juce::Component* c) const;
     /** A press anywhere in the editor (a click elsewhere returns the halos to their quiet arcs). */
     void mouseDownAnywhere (juce::Component* c);
     /** Escape during an assignment (a lens drag, a pick) cancels it (true: used). */

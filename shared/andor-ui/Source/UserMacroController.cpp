@@ -79,11 +79,13 @@ void UserMacroController::setUp()
             auto& self = *safe;
             if (self.dragMacro != macro)
             {
-                if (self.ed.closePopup != nullptr)
+                // A USER macro's own panel folds away; any other popover stays, its knobs targets.
+                if (self.openMacro >= 0 && self.ed.closePopup != nullptr)
                     self.ed.closePopup();
                 self.dragMacro = macro;
                 self.collectTargets();
                 self.overlay.beginDrag (self.colour (macro), self.hooks.name (self.host, macro));
+                self.overlay.toFront (false);   // (its rings above an open popover)
             }
             self.overlay.pointAt (self.ed.content->getLocalPoint (nullptr, screen).toFloat());
         };
@@ -338,6 +340,24 @@ void UserMacroController::openPanel (int macro, const juce::String& select)
         ed.learnAction ("usermacro.panel.opened", "macros", {});
 }
 
+void UserMacroController::popupOpened()
+{
+    if (dragMacro < 0 && pickMacro < 0)
+        return;
+    collectTargets();
+    overlay.toFront (false);
+}
+
+bool UserMacroController::keepsPopoverOpen (const juce::Component* c) const
+{
+    if (c == nullptr)
+        return false;
+    for (const auto& l : lenses)
+        if (l != nullptr && (c == l.get() || l->isParentOf (c)))
+            return true;
+    return c == &overlay && overlay.mode() == MacroAssignOverlay::Mode::pick;
+}
+
 void UserMacroController::popupClosed()
 {
     if (openMacro < 0)
@@ -451,6 +471,8 @@ void UserMacroController::tick()
             revision = now;   // (an undo, a preset, a session: names and lenses follow)
             refresh();
         }
+    if (dragMacro >= 0 || pickMacro >= 0)
+        collectTargets();   // (a popover opening or animating mid-assignment: its knobs where they are)
     updateArcs();
 }
 

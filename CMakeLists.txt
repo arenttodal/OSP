@@ -78,6 +78,7 @@ add_library(osp_dsp STATIC
     src/core/Statistics.cpp
     src/audio/envelopes/Adsr.cpp
     src/audio/pitch/SincInterpolator.cpp
+    src/audio/pitch/OctaveDecimator.cpp
     src/audio/pitch/OfflinePitchShifter.cpp
     src/audio/voices/SamplerVoice.cpp
     src/audio/sampler/BaselineSampler.cpp

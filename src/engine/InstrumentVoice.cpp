@@ -1449,6 +1449,17 @@ void InstrumentVoice::updateControl() noexcept
 void InstrumentVoice::readFrame (double pos, double step, float& l, float& r) noexcept
 {
     const auto& src = *layer->source;
+    if (step > SincInterpolator::maxTableStretch && src.octaveLevels() > 0)
+    {
+        // Far above the recording: the octave-down copy that brings the read back within the
+        // stretch tables (2..4 there), instead of a kernel as wide as the speed (up to 16x the
+        // taps). Up to two octaves up nothing changes (bit-identical).
+        const int level = std::min (src.octaveLevels(), static_cast<int> (std::ceil (std::log2 (step / SincInterpolator::maxTableStretch))));
+        const double scale = std::ldexp (1.0, -level);
+        sinc->readFast (pos * scale, step * scale, kernelLevel, kernel, src.octaveData (level, 0),
+                        src.numChannels() > 1 ? src.octaveData (level, 1) : nullptr, l, r);
+        return;
+    }
     sinc->readFast (pos, step, kernelLevel, kernel, src.channelData (0), src.numChannels() > 1 ? src.channelData (1) : nullptr, l, r);
 }
 

@@ -18,8 +18,7 @@ namespace osp::plugin
     SUB's popover, V7 (docs/SUB_POPUP_V7.md): WAVE and a compact OCT on one line; one dark display
     (the wave's shape, the key response, the playable range on a keyboard); GRIT with a small
     valve that warms with it, LEVEL, and VOICES (POLY / MONO) over MONO NOTE (LOWEST / LATEST).
-    The response (FLAT / TAPER, FROM, dB / OCT) is shown by the display, edited on its curve; it
-    has no controls of its own. Interface only: every control is one of SUB's parameters.
+    The response (FLAT / TAPER, FROM, dB / OCT) is shown by the display only (no controls). Interface only: every control is one of SUB's parameters.
 */
 namespace subview
 {
@@ -51,8 +50,7 @@ namespace subview
     faint where they would not), its two handles, the keyboard with the range's ends.
 
     Edits (each one host gesture, undoable): the range's ends and its span on the keyboard
-    (arrow keys: the low end; with Shift, the high one); FROM (horizontal) and the slope
-    (vertical) on the curve, while TAPER is chosen. Everything it shows is read from the
+    (arrow keys: the low end; with Shift, the high one). The response curve is a picture only. Everything it shows is read from the
     parameters, so knobs, automation, presets and undo move it at once.
 */
 class SubResponseDisplay final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer

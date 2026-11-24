@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "SourceOctaveRow.h"
 #include "MenuIcons.h"
 #include "UserMacroEditor.h"
 #include "MacroPopups.h"
@@ -162,6 +163,10 @@ void OspAudioProcessorEditor::mouseDownAnywhere (juce::Component* c)
         return;
     }
     if (c == nullptr || c == popup.get() || popup->isParentOf (c))
+        return;
+    // A USER macro's lens (dragged onto a control) or the picking overlay: the popover stays, so
+    // its own knobs (SUB's LEVEL...) can be assigned.
+    if (userMacroController != nullptr && userMacroController->keepsPopoverOpen (c))
         return;
     // The shared modulation overlay lies above everything, popovers included: a right-click on a
     // popover's knob (its menu: Assign to Macro, modulation) or a press on its halo's range is
@@ -695,6 +700,8 @@ void OspAudioProcessorEditor::presentPopup (int which)
     popup->toFront (false);
     modOverlay.toFront (false);
     positionPopup();
+    if (userMacroController != nullptr)
+        userMacroController->popupOpened();   // (mid-assignment: its knobs become targets)
     frame::animatePopoverOpening (*popup);
     if (isShowing())
         grabKeyboardFocus(); // Escape closes it
@@ -1245,6 +1252,19 @@ juce::PopupMenu OspAudioProcessorEditor::sourceMenu (int layer)
     {
         menu.addSeparator();
         menu.addSectionHeader ("AUDIO");
+        // OCTAVE: the detected note in another octave (the root, not a transposition).
+        if (loaded->atlas == nullptr && loaded->analysis.pitch.detected)
+        {
+            const double detected = loaded->analysisRootMidi;
+            menu.addCustomItem (SourceOctaveRow::itemId,
+                                std::make_unique<SourceOctaveRow> (SourceOctaveRow::octaveOf (ospProcessor.rootOverride (layer), detected),
+                                                                   palette::layer (InstrumentHost::shownLayer (layer)),
+                                                                   [safe, layer, detected] (int octave) {
+                                                                       if (safe != nullptr)
+                                                                           safe->ospProcessor.changeRootOverride (SourceOctaveRow::overrideFor (octave, detected), layer);
+                                                                   }),
+                                nullptr, "OCTAVE");
+        }
         {
             juce::PopupMenu root;
             const auto overrideMidi = ospProcessor.rootOverride (layer);

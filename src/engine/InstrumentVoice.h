@@ -109,6 +109,10 @@ struct InstrumentVoiceStart
 class InstrumentVoice
 {
 public:
+    /** Octave-down copies each prepared source keeps (PlaybackSource::buildOctaveLevels): a read
+        more than SincInterpolator::maxTableStretch (two octaves) above the recording reads the
+        copy that brings it back within it - six octaves up costs as two. */
+    static constexpr int octaveReadLevels = 4;
     /** `shaping`: the engine's live shaping settings and macro positions (read at control rate). */
     void prepare (double outputSampleRate, const AdsrSettings& adsr, const SincInterpolator* interpolator,
                   const ShapingState* shaping = nullptr) noexcept;

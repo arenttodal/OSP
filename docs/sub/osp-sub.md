@@ -126,8 +126,8 @@ output is bit-identical (tested), so every baseline render and golden is unchang
 
 The panel's right-hand column is now **VOICES** (POLY / MONO) over **MONO NOTE** (LOWEST /
 LATEST), in RESPONSE's segmented style; RESPONSE (FLAT / TAPER), FROM and dB / OCT have no
-controls of their own any more - the display shows the response and its curve still edits FROM
-and the slope. MONO plays one sub note: the lowest key held (or sustained by the pedal) in the
+controls of their own any more - the display shows the response as a picture only (the range's
+ends on its keyboard stay editable). MONO plays one sub note: the lowest key held (or sustained by the pedal) in the
 range, or the latest pressed; when that key changes while it sounds the voice moves legato (no
 new attack), and it releases when no key is left. Parameters `sub.voices`, `sub.priority`
 (hint 37, appended): POLY and LOWEST by default, so every session from before plays as it did.

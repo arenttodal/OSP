@@ -730,3 +730,42 @@ TEST_CASE ("SAVE key: a right-click is Save As", "[plugin][menus][save]")
     CHECK (saveAs == 1);
     CHECK (save->isSecondaryClick());
 }
+
+TEST_CASE ("user macros UI: SUB's LEVEL (inside its open panel) takes a macro by the lens's drag and by + ADD ASSIGNMENT's pick", "[plugin][usermacro][ui][sub]")
+{
+    using Editor = osp::plugin::OspAudioProcessorEditor;
+    UserMacroRig rig;
+    auto& macros = rig.macros();
+    const juce::String level = OspAudioProcessor::subFieldId ("level");
+    // The lens: pressed (the panel stays open), dragged onto LEVEL in the SUB panel.
+    rig.ui->openPopup (Editor::subPopup);
+    rig.ui->refreshNow();
+    auto* sub = rig.ui->openPopupPanel();
+    REQUIRE (sub != nullptr);
+    auto* knob = rig.slider (level);
+    REQUIRE (knob != nullptr);
+    auto* lens = macros.lens (0);
+    REQUIRE (lens != nullptr);
+    rig.ui->mouseDownAnywhere (lens);
+    CHECK (rig.ui->openPopupPanel() == sub);
+    macros.dragLens (0, lens->getScreenBounds().getCentre(), knob->getScreenBounds().getCentre());
+    CHECK (rig.state().find (0, level) == 0);
+    // + ADD ASSIGNMENT: the macro's panel folds into the banner; SUB opened while picking rings
+    // its knobs (above it) and a click on LEVEL assigns it.
+    rig.ui->closePopup();
+    macros.beginPick (1);
+    REQUIRE (macros.assignOverlay().mode() == osp::plugin::MacroAssignOverlay::Mode::pick);
+    rig.ui->openPopup (Editor::subPopup);
+    rig.ui->refreshNow();
+    bool ringed = false;
+    for (const auto& c : macros.assignOverlay().eligibleControls())
+        ringed = ringed || c.parameterId == level;
+    CHECK (ringed);
+    REQUIRE (rig.ui->openPopupPanel() != nullptr);
+    CHECK (macros.assignOverlay().getParentComponent()->getIndexOfChildComponent (&macros.assignOverlay())
+           > macros.assignOverlay().getParentComponent()->getIndexOfChildComponent (rig.ui->openPopupPanel()));   // (the rings above the panel)
+    rig.ui->mouseDownAnywhere (&macros.assignOverlay());
+    CHECK (rig.ui->openPopupPanel() != nullptr);   // (a press on a ring keeps SUB open)
+    macros.assignOverlay().onPicked (level);
+    CHECK (rig.state().find (1, level) == 0);
+}

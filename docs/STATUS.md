@@ -14,19 +14,30 @@
 >   ends). No shipped preset has assignments. **NEXT (ANDOR ANALOG):** ANALOG keeps its own copy
 >   of the core (`product/Source/UserMacroCore.h`, older OSP pin): take this one when its pin moves.
 > - **SUB: VOICES (POLY / MONO) and MONO NOTE (LOWEST / LATEST)** replace RESPONSE, FROM and
->   dB / OCT in the SUB panel (the display still shows the response; its curve still edits FROM
->   and the slope). MONO plays one sub note - the lowest key held, or the latest - legato as keys
+>   dB / OCT in the SUB panel (the display still shows the response, as a picture only). MONO plays one sub note - the lowest key held, or the latest - legato as keys
 >   come and go. `sub.voices`, `sub.priority` (hint 37): POLY and LOWEST by default, so every
 >   session plays as before. docs/sub/osp-sub.md. **NEXT (ANDOR ANALOG):** its SUB is in its own
 >   repository (older OSP pin): it takes these when the pin moves.
-> - **Cosmic Strings struggles past 4 notes (found, not yet fixed):** measured headless with
->   stand-in sounds, the preset needs 112 % of real time at 4 notes and 277 % at 8 on this
->   container. B and C have their roots set by hand to B0 and C0, so a note around C4 reads C's
->   sample about 16x faster (B's about 4x, with its TUNE -12); the band-limited reader widens its
->   kernel with the speed (`SincInterpolator`, up to 16x: ~512 taps per output sample). C alone:
->   120 % at 4 notes; A alone (root B3): 14 %. SYNTH and REIMAGINED barely matter. Proposed fix
->   (waiting for the owner): read high transpositions from pre-halved copies of the sample
->   (built when the sound is prepared), so the cost stays near a 2x read at any speed.
+> - **Cosmic Strings struggles past 4 notes (fixed, owner's go-ahead):** measured headless with
+>   stand-in sounds, the preset needed 112 % of real time at 4 notes and 277 % at 8 on this
+>   container. B and C have their roots set by hand to B0 and C0, so a note around C4 read C's
+>   sample about 16x faster (B's about 4x, with its TUNE -12), and the band-limited reader widens
+>   its kernel with the speed (`SincInterpolator`: ~512 taps per output sample at 16x). Engine C
+>   now keeps four octave-down copies of each prepared sample (`PlaybackSource::buildOctaveLevels`,
+>   `decimateByTwo`: a zero-phase 33-tap Kaiser half-band, built off the audio thread, ~0.94x the
+>   samples again) and `InstrumentVoice::readFrame` reads a copy for any speed above 4x, so six
+>   octaves up costs as two. Up to two octaves up nothing changes (bit-identical; every golden
+>   render passes unchanged). Cosmic Strings, same machine and stand-ins: 4 notes 112 % -> 18 %
+>   of real time, 8 notes 277 % -> 27 %. Tests: "[octave-read]". Baselines A / B untouched.
+> - **OCTAVE in each source's menu (owner's request):** -2 -1 0 +1 +2 against the detected root
+>   (`SourceOctaveRow`, above "Root"): 0 is Auto, the others pin the root that many octaves
+>   away (fine tuning kept; undoable like a root from the list). A root set by hand shows the
+>   octave it is nearest, within a semitone.
+> - **SUB's LEVEL (and any open popover's knob) takes a USER macro by the lens's drag and by
+>   + ADD ASSIGNMENT's pick:** a press on a lens no longer closes the open popover (only a USER
+>   macro's own panel folds away), a popover opened while picking has its knobs ringed above it,
+>   and the rings follow while it animates (`UserMacroController::popupOpened`,
+>   `keepsPopoverOpen`). A right-click on the knob already worked.
 > - **Right-click SAVE (Ctrl-click on a Mac) is Save As** (`SavePresetButton::onSaveAs`); a click
 >   saves as before. The sister shell's SAVE already always asks for a file.
 >

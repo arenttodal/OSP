@@ -3,6 +3,7 @@
 // letter; SAVE updates a writable user preset and otherwise saves a new one (factory and pack
 // presets and starting states are never overwritten). docs/research/menu-content/.
 
+#include "SourceOctaveRow.h"
 #include "LibraryPlaces.h"
 
 namespace
@@ -126,7 +127,7 @@ TEST_CASE ("menus: each source's menu names its source and acts on it, never on 
     for (const auto& e : b)
         if (e.header)
             headers.add (e.text.upToFirstOccurrenceOf (" ", false, false));
-    CHECK (headers == juce::StringArray { "SOURCE", "AUDIO", "MANAGEMENT" });
+    CHECK (headers == juce::StringArray { "SOURCE", "AUDIO", "OCTAVE", "MANAGEMENT" });   // (OCTAVE: a custom row)
     CHECK (entryStarting (b, "Replace audio") != nullptr);
     CHECK (entryStarting (b, "Map notes") != nullptr);
     CHECK (entryStarting (b, "Root") != nullptr);
@@ -241,4 +242,49 @@ TEST_CASE ("menus: main and source menu screenshots (OSP_MENU_SHOTS)", "[.][menu
         auto& card = rig.ui.engineCard (layer == 2 ? 1 : layer);
         menuShot (*rig.editor, menu, card, out.getChildFile ("after-0" + juce::String (2 + layer) + "-source-" + osp::plugin::OspAudioProcessor::layerName (layer) + "-menu.png"));
     }
+}
+
+TEST_CASE ("menus: a source's OCTAVE row moves the detected root by octaves (Auto at 0), undoable, and shows a hand-set root's octave", "[plugin][menus][octave]")
+{
+    MenuRig rig;
+    rig.loadTwo();
+    REQUIRE (rig.p.isLayerOccupied (1));
+    const auto loaded = rig.p.currentInstrument (1);
+    REQUIRE (loaded != nullptr);
+    REQUIRE (loaded->analysis.pitch.detected);
+    const double detected = loaded->analysisRootMidi;
+    auto rowOf = [&rig] (int layer) -> osp::plugin::SourceOctaveRow* {
+        auto menu = rig.ui.sourceMenu (layer);
+        for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+            if (auto* row = dynamic_cast<osp::plugin::SourceOctaveRow*> (it.getItem().customComponent.get()))
+            {
+                static juce::PopupMenu kept;   // (keeps the row alive past this menu)
+                kept = menu;
+                return row;
+            }
+        return nullptr;
+    };
+    auto* row = rowOf (1);
+    REQUIRE (row != nullptr);
+    CHECK (row->lit() == std::optional<int> (0));   // Auto
+    row->choose (-1);
+    REQUIRE (rig.p.rootOverride (1).has_value());
+    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected - 12.0));   // (its fine tuning kept)
+    CHECK (rig.p.effectiveRootMidi (1) == Catch::Approx (detected - 12.0));
+    CHECK (! rig.p.rootOverride (0).has_value());   // (B's row, B's root only)
+    row = rowOf (1);
+    REQUIRE (row != nullptr);
+    CHECK (row->lit() == std::optional<int> (-1));
+    row->choose (2);
+    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected + 24.0));
+    rig.p.undo().undo();
+    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected - 12.0));
+    rowOf (1)->choose (0);
+    CHECK (! rig.p.rootOverride (1).has_value());   // 0: Auto again
+    // A root set by hand from the list: the octave it is nearest (within a semitone), else none.
+    using Row = osp::plugin::SourceOctaveRow;
+    CHECK (Row::octaveOf (23.0, 35.05) == std::optional<int> (-1));   // (Cosmic Strings: B0 against a detected B1)
+    CHECK (Row::octaveOf (30.0, 35.05) == std::nullopt);
+    CHECK (Row::octaveOf (std::nullopt, 35.05) == std::optional<int> (0));
+    CHECK (Row::overrideFor (0, 35.05) == std::nullopt);
 }

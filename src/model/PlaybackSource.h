@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio/pitch/OctaveDecimator.h"
 #include "core/AudioData.h"
 
 #include <algorithm>
@@ -48,6 +49,50 @@ public:
         }
     }
 
+    /**
+        Adds `levels` octave-down copies of every channel (level L: the rate halved L times,
+        each padded as the original), for reads more than two octaves above the recording
+        (InstrumentVoice::readFrame): those read a copy instead, so their cost stays that of a
+        read two octaves up. Off the audio thread (allocates; ~0.94x the samples again for 4).
+        Baselines A / B never call it.
+    */
+    void buildOctaveLevels (int levels)
+    {
+        octaves.clear();
+        std::vector<std::vector<float>> previous;
+        for (int ch = 0; ch < numChannels(); ++ch)
+        {
+            const auto& p = padded[static_cast<std::size_t> (ch)];
+            previous.emplace_back (p.begin() + pad, p.begin() + pad + frames);
+        }
+        for (int level = 1; level <= levels && ! previous.empty() && previous.front().size() > 1; ++level)
+        {
+            std::vector<std::vector<float>> next, stored;
+            for (const auto& channel : previous)
+            {
+                auto half = decimateByTwo (channel);
+                std::vector<float> withPad (half.size() + 2 * static_cast<std::size_t> (pad), 0.0f);
+                std::copy (half.begin(), half.end(), withPad.begin() + pad);
+                stored.push_back (std::move (withPad));
+                next.push_back (std::move (half));
+            }
+            octaves.push_back (std::move (stored));
+            previous = std::move (next);
+        }
+    }
+
+    /** How many octave-down copies there are (0: none). */
+    int octaveLevels() const noexcept { return static_cast<int> (octaves.size()); }
+
+    /** Sample 0 of a channel of octave-down copy `level` (1..octaveLevels(); 0: the original). */
+    const float* octaveData (int level, int channel) const noexcept
+    {
+        if (level <= 0)
+            return channelData (channel);
+        const auto& copy = octaves[static_cast<std::size_t> (level - 1)];
+        return copy[static_cast<std::size_t> (std::min (channel, numChannels() - 1))].data() + pad;
+    }
+
     /** Copy played at a different root (a user's root correction). Off the audio thread. */
     PlaybackSource withRootMidi (double newRootMidi) const
     {
@@ -82,6 +127,7 @@ private:
     double start = 0.0;
     double gainLinear = 1.0;
     std::vector<std::vector<float>> padded;
+    std::vector<std::vector<std::vector<float>>> octaves;   ///< [level - 1][channel], padded
 };
 
 } // namespace osp
