@@ -1,5 +1,35 @@
 # Status
 
+> **24 Nov 2026, owner's notes:**
+> - **USER macro assignments are linear (fixed):** an assignment was anchored where the macro sat
+>   when it was made, two straight pieces meeting there - made at 95 %, the first 95 % of the
+>   macro hardly moved the target and the last 5 % moved almost all of it. Now every assignment
+>   is one straight line from LOW at macro 0 % to HIGH at 100 % (`usermacro::offsetOf`), wherever
+>   the macro was. A new one still never jumps: its default range is a line through where the
+>   target is now at the macro's position now (`usermacro::defaultRange`, a quarter of the travel
+>   over the sweep; only a target at the very end of its travel with the macro part-way starts
+>   its range from macro 0 %). The halo's ends set only the range (the knob stays put); EASE is
+>   an S over the whole travel. State: `<UserMacros schema="2">`; schema 1 is read as lines
+>   (`linearisedFromSchema1`: made at 0 % or 100 %, exactly the same line; part-way, the same
+>   ends). No shipped preset has assignments. **NEXT (ANDOR ANALOG):** ANALOG keeps its own copy
+>   of the core (`product/Source/UserMacroCore.h`, older OSP pin): take this one when its pin moves.
+> - **SUB: VOICES (POLY / MONO) and MONO NOTE (LOWEST / LATEST)** replace RESPONSE, FROM and
+>   dB / OCT in the SUB panel (the display still shows the response; its curve still edits FROM
+>   and the slope). MONO plays one sub note - the lowest key held, or the latest - legato as keys
+>   come and go. `sub.voices`, `sub.priority` (hint 37): POLY and LOWEST by default, so every
+>   session plays as before. docs/sub/osp-sub.md. **NEXT (ANDOR ANALOG):** its SUB is in its own
+>   repository (older OSP pin): it takes these when the pin moves.
+> - **Cosmic Strings struggles past 4 notes (found, not yet fixed):** measured headless with
+>   stand-in sounds, the preset needs 112 % of real time at 4 notes and 277 % at 8 on this
+>   container. B and C have their roots set by hand to B0 and C0, so a note around C4 reads C's
+>   sample about 16x faster (B's about 4x, with its TUNE -12); the band-limited reader widens its
+>   kernel with the speed (`SincInterpolator`, up to 16x: ~512 taps per output sample). C alone:
+>   120 % at 4 notes; A alone (root B3): 14 %. SYNTH and REIMAGINED barely matter. Proposed fix
+>   (waiting for the owner): read high transpositions from pre-halved copies of the sample
+>   (built when the sound is prepared), so the cost stays near a 2x read at any speed.
+> - **Right-click SAVE (Ctrl-click on a Mac) is Save As** (`SavePresetButton::onSaveAs`); a click
+>   saves as before. The sister shell's SAVE already always asks for a file.
+>
 > **22 Nov 2026, the owner's three presets (Analog Dreamscape, Bukkehorn Tape, Arp - Sixteen Pulses):**
 > - **Remove did nothing (fixed):** `removeLayer` refused without a word while any sound was still
 >   being prepared (a later stage, another layer's load): the layers above move down, and a result

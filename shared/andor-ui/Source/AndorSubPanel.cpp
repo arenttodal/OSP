@@ -70,7 +70,8 @@ namespace
 subview::Ids subview::Ids::from (const std::function<juce::String (const char*)>& idOf)
 {
     return { idOf ("enabled"), idOf ("wave"), idOf ("octave"), idOf ("grit"), idOf ("level"),
-             idOf ("lowKey"), idOf ("highKey"), idOf ("response"), idOf ("taperStart"), idOf ("taperSlope") };
+             idOf ("lowKey"), idOf ("highKey"), idOf ("response"), idOf ("taperStart"), idOf ("taperSlope"),
+             idOf ("voices"), idOf ("priority") };
 }
 
 //==============================================================================
@@ -841,7 +842,8 @@ SubPanel::SubPanel (InstrumentHost& h, subview::Ids subIds, std::function<bool (
     };
     waveSegments = segments (ids.wave, { "SINE", "TRI", "SQUARE", "SAW" }, "SUB's wave (band-limited)");
     octaveSegments = segments (ids.octave, { "-1", "-2" }, "One or two octaves below the key");
-    responseSegments = segments (ids.response, { "FLAT", "TAPER" }, "FLAT: every key the same. TAPER: quieter above FROM (the low end stays full)");
+    voicesSegments = segments (ids.voices, { "POLY", "MONO" }, "POLY: a sub note under every key held. MONO: one sub note only");
+    prioritySegments = segments (ids.priority, { "LOWEST", "LATEST" }, "MONO's note: the lowest key held, or the latest one played");
     auto knob = [&] (const juce::String& id, const char* caption, bool small) {
         auto* p = state.getParameter (id);
         auto k = std::make_unique<MiniKnob> (state, id, caption, textOf (*p));
@@ -852,21 +854,19 @@ SubPanel::SubPanel (InstrumentHost& h, subview::Ids subIds, std::function<bool (
     };
     grit = knob (ids.grit, "GRIT", false);
     level = knob (ids.level, "LEVEL", false);
-    from = knob (ids.taperStart, "FROM", true);
-    slopeKnobPtr = knob (ids.taperSlope, "dB / OCT", true);
     responseDisplay = std::make_unique<SubResponseDisplay> (host, accent, ids);
     responseDisplay->isKeyDown = std::move (isKeyDown);
     addAndMakeVisible (*responseDisplay);
     gritValve = std::make_unique<SubGritValve>();
     addAndMakeVisible (*gritValve);
-    // The valve and FLAT's dimming follow the parameters (message thread; no polling).
+    // The valve and MONO NOTE's dimming follow the parameters (message thread; no polling).
     auto follow = [this] (const juce::String& id) {
         auto a = std::make_unique<juce::ParameterAttachment> (*host.apvts().getParameter (id), [this] (float) { updateDependents(); }, nullptr);
         return a;
     };
     gritA = follow (ids.grit);
     enabledA = follow (ids.enabled);
-    responseA = follow (ids.response);
+    voicesA = follow (ids.voices);
     updateDependents();
 }
 
@@ -874,13 +874,13 @@ SubPanel::~SubPanel() = default;
 
 void SubPanel::updateDependents()
 {
-    if (gritValve == nullptr || from == nullptr)
+    if (gritValve == nullptr || prioritySegments == nullptr)
         return;
     gritValve->setAmount (host.parameterValue (ids.grit) / 100.0f, host.parameterValue (ids.enabled) >= 0.5f);
-    // FLAT: FROM and dB / OCT stay in place, readable and editable, dimmed (their values kept).
-    const bool tapered = juce::roundToInt (host.parameterValue (ids.response)) == 1;
-    from->setAlpha (tapered ? 1.0f : 0.42f);
-    slopeKnobPtr->setAlpha (tapered ? 1.0f : 0.42f);
+    // POLY: MONO NOTE stays in place, readable and editable, dimmed (its choice kept).
+    const bool mono = juce::roundToInt (host.parameterValue (ids.voices)) == 1;
+    prioritySegments->setAlpha (mono ? 1.0f : 0.42f);
+    repaint (priorityCaption);
 }
 
 void SubPanel::refreshContent()
@@ -890,7 +890,7 @@ void SubPanel::refreshContent()
 
 juce::Point<int> SubPanel::cardSize() const
 {
-    // Header 32, WAVE / OCT 24, display 158, the controls 94, gaps; the same in FLAT and TAPER.
+    // Header 32, WAVE / OCT 24, display 158, the controls 94, gaps.
     return { width, 32 + 24 + 10 + 158 + 12 + 94 + 10 };
 }
 
@@ -910,7 +910,7 @@ void SubPanel::layoutContent (juce::Rectangle<int> area)
     responseDisplay->setBounds (area.removeFromTop (158));
     area.removeFromTop (12);
 
-    // Bottom: the valve, GRIT and LEVEL; RESPONSE over FROM and dB / OCT.
+    // Bottom: the valve, GRIT and LEVEL; VOICES over MONO NOTE.
     auto bottom = area.removeFromTop (94);
     auto valveArea = bottom.removeFromLeft (38);
     gritValve->setBounds (valveArea.withSizeKeepingCentre (32, 76));
@@ -923,13 +923,13 @@ void SubPanel::layoutContent (juce::Rectangle<int> area)
     bottom.removeFromLeft (6);
     rightDivider = juce::Rectangle<float> (static_cast<float> (bottom.getX()), static_cast<float> (bottom.getY()) + 6.0f, 1.0f, static_cast<float> (bottom.getHeight()) - 12.0f);
     bottom.removeFromLeft (12);
-    responseCaption = bottom.removeFromTop (13);
-    responseSegments->setBounds (bottom.removeFromTop (22));
-    bottom.removeFromTop (3);
-    const int half = bottom.getWidth() / 2;
-    from->setBounds (bottom.removeFromLeft (half));
-    knobDivider = juce::Rectangle<float> (static_cast<float> (bottom.getX()), static_cast<float> (bottom.getY()) + 10.0f, 1.0f, static_cast<float> (bottom.getHeight()) - 20.0f);
-    slopeKnobPtr->setBounds (bottom);
+    // Two captioned rows (13 + 22 each, 10 between), centred in the 94.
+    bottom.removeFromTop ((bottom.getHeight() - (13 + 22 + 10 + 13 + 22)) / 2);
+    voicesCaption = bottom.removeFromTop (13);
+    voicesSegments->setBounds (bottom.removeFromTop (22));
+    bottom.removeFromTop (10);
+    priorityCaption = bottom.removeFromTop (13);
+    prioritySegments->setBounds (bottom.removeFromTop (22));
 }
 
 void SubPanel::paint (juce::Graphics& g)
@@ -939,9 +939,12 @@ void SubPanel::paint (juce::Graphics& g)
     g.setFont (fonts::label (9.5f));
     g.drawText ("WAVE", waveCaption.withTrimmedLeft (2), juce::Justification::centredLeft, false);
     g.drawText ("OCT", octCaption, juce::Justification::centredLeft, false);
-    g.drawText ("RESPONSE", responseCaption.withTrimmedLeft (2), juce::Justification::centredLeft, false);
+    g.drawText ("VOICES", voicesCaption.withTrimmedLeft (2), juce::Justification::centredLeft, false);
+    const bool mono = juce::roundToInt (host.parameterValue (ids.voices)) == 1;
+    g.setColour (palette::textDim.withMultipliedAlpha (mono ? 1.0f : 0.42f));
+    g.drawText ("MONO NOTE", priorityCaption.withTrimmedLeft (2), juce::Justification::centredLeft, false);
     g.setColour (palette::hairline);
-    for (const auto& d : { topDivider, leftDivider, rightDivider, knobDivider })
+    for (const auto& d : { topDivider, leftDivider, rightDivider })
         g.fillRect (d);
 }
 

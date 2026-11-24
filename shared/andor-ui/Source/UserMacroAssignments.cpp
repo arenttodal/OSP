@@ -100,6 +100,7 @@ UserMacroState UserMacroState::fromXml (const juce::XmlElement* xml)
     if (xml == nullptr || ! xml->hasTagName ("UserMacros"))
         return s;
     // A newer schema is read as far as this one understands it (its unknown fields ignored).
+    const int saved = xml->getIntAttribute ("schema", 1);
     for (auto* macro : xml->getChildWithTagNameIterator ("Macro"))
     {
         const int i = macro->getIntAttribute ("index", -1);
@@ -129,6 +130,8 @@ UserMacroState UserMacroState::fromXml (const juce::XmlElement* xml)
             a.map.curve = m->getStringAttribute ("curve") == "ease" ? usermacro::Curve::ease : usermacro::Curve::linear;
             a.map.enabled = m->getIntAttribute ("enabled", 1) != 0;
             a.map = usermacro::sanitised (a.map);
+            if (saved < 2)
+                a.map = usermacro::linearisedFromSchema1 (a.map);   // (the same line where it was one)
             a.orphaned = m->getIntAttribute ("orphaned", 0) != 0;
             a.reason = sanitisedName (m->getStringAttribute ("reason"));
             list.push_back (a);

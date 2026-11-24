@@ -52,6 +52,8 @@ void SubOsc::reset() noexcept
     applyFilterTimes();
     held.fill (0);
     sustained.fill (false);
+    pressedAt.fill (0);
+    presses = 0;
     pedal = false;
     bendSemitones = 0.0;
     toneState = hp1x = hp1y = hp2x = hp2y = 0.0f;
@@ -213,6 +215,11 @@ void SubOsc::reconcile() noexcept
         }
     if (! settings.enabled)
         return;
+    if (settings.mono)
+    {
+        updateMono();
+        return;
+    }
     for (int key = 0; key < 128; ++key)
     {
         const auto k = static_cast<std::size_t> (key);
@@ -223,6 +230,60 @@ void SubOsc::reconcile() noexcept
             playing = playing || (v.key == key && ! v.releasing);
         if (! playing)
             startKey (key, heldVelocity[k]);
+    }
+}
+
+int SubOsc::monoKey() const noexcept
+{
+    int chosen = -1;
+    for (int key = 0; key < 128; ++key)
+    {
+        const auto k = static_cast<std::size_t> (key);
+        if ((held[k] == 0 && ! sustained[k]) || ! inRange (key))
+            continue;
+        if (! settings.latest)
+            return key;   // (the lowest)
+        if (chosen < 0 || pressedAt[k] > pressedAt[static_cast<std::size_t> (chosen)])
+            chosen = key;
+    }
+    return chosen;
+}
+
+void SubOsc::updateMono() noexcept
+{
+    const int target = settings.enabled ? monoKey() : -1;
+    // The one voice sounding (the newest, should more be left from POLY); the others released.
+    Voice* lead = nullptr;
+    for (auto& v : voices)
+        if (v.key >= 0 && ! v.releasing && (lead == nullptr || v.age > lead->age))
+            lead = &v;
+    for (auto& v : voices)
+        if (&v != lead && v.key >= 0 && ! v.releasing)
+        {
+            v.releasing = true;
+            v.filterEnv.noteOff();
+        }
+    if (target < 0)
+    {
+        if (lead != nullptr)
+        {
+            lead->releasing = true;
+            lead->filterEnv.noteOff();
+        }
+        return;
+    }
+    if (lead == nullptr)
+    {
+        startKey (target, heldVelocity[static_cast<std::size_t> (target)]);
+        return;
+    }
+    if (lead->key != target)
+    {
+        // Legato: the voice moves to the key (its phase and envelopes carry on).
+        lead->key = target;
+        lead->velocity = heldVelocity[static_cast<std::size_t> (target)];
+        lead->gainTarget = keyGain (target) * velocityGain (lead->velocity);
+        lead->age = ++clock;
     }
 }
 
@@ -240,7 +301,10 @@ void SubOsc::handleMidi (const std::uint8_t* data, int size) noexcept
             held[k] = static_cast<std::uint8_t> (std::min (255, held[k] + 1));
             sustained[k] = false;
             heldVelocity[k] = static_cast<float> (data[2]) / 127.0f;
-            if (settings.enabled && inRange (key))
+            pressedAt[k] = ++presses;
+            if (settings.mono)
+                updateMono();
+            else if (settings.enabled && inRange (key))
                 startKey (key, heldVelocity[k]);
         }
         else if (held[k] > 0)
@@ -249,6 +313,8 @@ void SubOsc::handleMidi (const std::uint8_t* data, int size) noexcept
             {
                 if (pedal)
                     sustained[k] = true;
+                else if (settings.mono)
+                    updateMono();
                 else
                     releaseKey (key);
             }
@@ -266,9 +332,11 @@ void SubOsc::handleMidi (const std::uint8_t* data, int size) noexcept
                     if (sustained[static_cast<std::size_t> (key)])
                     {
                         sustained[static_cast<std::size_t> (key)] = false;
-                        if (held[static_cast<std::size_t> (key)] == 0)
+                        if (held[static_cast<std::size_t> (key)] == 0 && ! settings.mono)
                             releaseKey (key);
                     }
+            if (! pedal && settings.mono)
+                updateMono();
         }
         else if (controller == 120 || controller == 123)   // ALL SOUND OFF (at once) / ALL NOTES OFF
         {

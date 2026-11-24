@@ -480,7 +480,7 @@ it back. Every edit is one undo step; the pattern is saved with the project and 
     and collections stay);
   - otherwise (a new patch, a starting state, or a factory or pack preset, which are read-only)
     they ask for a name and save a new preset.
-- **⋮ → Save as…** always saves a new preset (`.osppreset`: settings plus which sample(s)).
+- **Right-click SAVE** (Ctrl-click on a Mac) or **⋮ → Save as…** always saves a new preset (`.osppreset`: settings plus which sample(s)).
   Presets live in `Documents/OSP/Presets` as ordinary files. **Previous / Next preset** step
   through the collection the loaded preset was chosen from (a category, Favorites, a pack, or
   all presets); the preset name's menu and the Library show them all.

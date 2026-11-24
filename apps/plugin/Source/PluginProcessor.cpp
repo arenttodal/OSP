@@ -168,6 +168,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     addStrumParameters (layout, {}, 35);
     // CUSTOM per card (version 36, after STRUM: nothing moves). Off: every session as it was.
     addCustomPatternParameters (layout, {}, 36);
+    // SUB's VOICES and MONO's key (version 37, after CUSTOM): POLY and LOWEST, every session as it was.
+    addSubVoicingParameters (layout, 37, [] (const char* field) { return subFieldId (field); });
     return layout;
 }
 
@@ -331,6 +333,8 @@ OspAudioProcessor::OspAudioProcessor()
     bendRangeParam = liveParameter (ids::bendRange);
     for (std::size_t i = 0; i < subFields().size(); ++i)
         subParams[i] = liveParameter (subFieldId (subFields()[i]));
+    for (std::size_t i = 0; i < subVoicingFields().size(); ++i)
+        subVoicingParams[i] = liveParameter (subFieldId (subVoicingFields()[i]));
     {
         const std::array<juce::String, 10> vibratoIds { ids::vibratoEnabled, ids::vibratoDepth, ids::vibratoRate, ids::vibratoDelay, ids::vibratoRise,
                                                         ids::vibratoControl, ids::vibratoAmount, ids::vibratoSourceA, ids::vibratoSourceB, ids::vibratoSourceC };
@@ -718,7 +722,9 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         std::array<float, 10> raw {};
         for (std::size_t i = 0; i < raw.size(); ++i)
             raw[i] = subParams[i]->load();
-        engine.setSub (subSettingsFrom (raw));
+        auto settings = subSettingsFrom (raw);
+        applySubVoicing (settings, { subVoicingParams[0]->load(), subVoicingParams[1]->load() });
+        engine.setSub (settings);
         engine.setSubBendRange (static_cast<double> (bendRangeParam->load()));
     }
     const float attack = attackParam->load();

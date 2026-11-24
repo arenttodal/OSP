@@ -17,7 +17,9 @@ namespace osp::plugin
     the sound's state (saved with the patch, the preset and the host's project). The bank shown
     (CORE / USER) is not here: it is the musician's interface preference.
 
-    Saved as an optional <UserMacros schema="1"> child, written only when something differs from
+    Saved as an optional <UserMacros schema="2"> child (2: every assignment is a straight line from
+    LOW at macro 0 % to HIGH at 100 %; a schema-1 one, anchored where it was made, is read as that
+    line - see usermacro::linearisedFromSchema1), written only when something differs from
     the default (no names, no assignments). Its absence is exactly the state from before: no
     assignment, the six macros at 0, the sound unchanged.
 
@@ -34,7 +36,7 @@ struct UserMacroAssignment
 
 struct UserMacroState
 {
-    static constexpr int schema = 1;
+    static constexpr int schema = 2;   ///< 2: linear assignments (1: anchored, migrated on load)
     static constexpr int maxNameLength = 24;
 
     std::array<juce::String, usermacro::macroCount> names;   ///< empty: the default ("MACRO 1" ...)

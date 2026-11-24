@@ -36,6 +36,8 @@ struct SubSettings
     bool taper = true;           ///< TAPER: quieter above taperStart; FLAT: every key the same
     int taperStart = 60;         ///< C4
     double taperDbPerOctave = 6.0;
+    bool mono = false;           ///< MONO: one voice, for one held key in the range (POLY: one per key)
+    bool latest = false;         ///< MONO's key: the latest pressed (false: the lowest held)
     bool operator== (const SubSettings&) const = default;
 };
 
@@ -116,6 +118,12 @@ private:
     void releaseKey (int key) noexcept;
     void releaseAll() noexcept;
     void reconcile() noexcept;   ///< voices for the held keys in range; the others released
+    /** MONO: the one key it plays (the lowest held or sustained in the range, or the latest
+        pressed), -1 for none. */
+    int monoKey() const noexcept;
+    /** MONO: its one voice follows monoKey() - legato (no new attack) when the key changes
+        while it sounds, released when no key is left; any other voice released. */
+    void updateMono() noexcept;
     bool inRange (int key) const noexcept { return key >= settings.lowKey && key <= settings.highKey; }
     float velocityGain (float velocity) const noexcept { return 0.6f + 0.4f * velocity; }
     float sample (Voice& v, double increment) noexcept;
@@ -126,6 +134,8 @@ private:
     std::array<std::uint8_t, 128> held {};       ///< how many times each key is down (repeated notes)
     std::array<bool, 128> sustained {};          ///< released while the pedal was down
     std::array<float, 128> heldVelocity {};
+    std::array<std::uint64_t, 128> pressedAt {};   ///< when each key was last pressed (MONO's LATEST)
+    std::uint64_t presses = 0;
     bool pedal = false;
     std::uint64_t clock = 0;
     float attackStep = 0.0f, releaseCoef = 0.0f, rangeCoef = 0.0f, quickCoef = 0.0f;

@@ -899,6 +899,7 @@ private:
     LiveParam fineTuneParam {};
     LiveParam bendRangeParam {};
     std::array<LiveParam, 10> subParams {};   ///< SUB (subFields() order, version hint 33)
+    std::array<LiveParam, 2> subVoicingParams {};   ///< SUB's VOICES and MONO key (subVoicingFields(), version hint 37)
     /** VIBRATO (enabled, depth, rate, delay, rise, control, amount, sources A-C). */
     std::array<LiveParam, 10> vibratoParams {};
     LiveParam lifeParam {};

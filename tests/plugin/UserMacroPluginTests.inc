@@ -1,5 +1,5 @@
 // USER MACROS in ANDOR OSP (docs/research/osp-user-macros/): ANDOR ANALOG's six USER macros,
-// ported - the parameters, the anchored zero-jump assignments the engine adds before anything reads
+// ported - the parameters, the linear, zero-jump assignments the engine adds before anything reads
 // a parameter, the state, undo and eligibility. Included after AtlasRefineTests.inc.
 #include "UserMacroEditor.h"
 
@@ -107,10 +107,10 @@ TEST_CASE ("user macros: an assignment never jumps, then moves the engine's valu
     const auto& map = p.userMacroAssignments()->maps[0].front().map;
     CHECK (map.anchorMacro == Approx (0.73f).margin (1.0e-3));
     CHECK (map.anchorTarget == Approx (base));
-    CHECK (map.low < map.anchorTarget);    // (a visible default range: a quarter of the travel each way)
+    CHECK (map.low < map.anchorTarget);    // (a visible default range: a line through where it is, rising a quarter of the travel)
     CHECK (map.high > map.anchorTarget);
     renderNote (p, 4);
-    CHECK (std::abs (p.userMacroOffsetOf ("layerA.level")) < 1.0e-6f);   // 0 at the anchor (float rounding of 73 %): no jump
+    CHECK (std::abs (p.userMacroOffsetOf ("layerA.level")) < 1.0e-5f);   // 0 where it was made (float rounding of 73 %): no jump
     // Macro to 100 %: the engine's LEVEL rises (glides in ~20 ms); the knob itself never moves.
     setNormalised (p, "userMacro.1", 1.0f);
     renderNote (p, 40);
@@ -459,7 +459,7 @@ TEST_CASE ("user macros UI: right-click LEVEL - Assign to Macro 1; its range on 
     const auto& map = rig.state().maps[0][0].map;
     CHECK (map.anchorTarget == Approx (0.5f));
     CHECK (map.high == Approx (0.75f));
-    CHECK (map.low == Approx (0.25f));
+    CHECK (map.low == Approx (0.5f));    // (made at macro 0 %: the line starts where LEVEL is)
     renderNote (rig.p, 8);
     CHECK (rig.p.userMacroOffsetOf ("layerA.level") == 0.0f);   // (made at macro 0 %: no jump)
     CHECK (macros.chosen() == 0);
@@ -656,4 +656,77 @@ TEST_CASE ("user macros: CPU - six macros moving 48 assignments against none (OS
     if (const char* path = std::getenv ("OSP_USER_MACRO_CPU"))
         juce::File (juce::String::fromUTF8 (path)).replaceWithText ("audio_ms " + juce::String (audio) + "\nnone_ms " + juce::String (none) + "\nmoving48_ms " + juce::String (moving) + "\n");
     CHECK (moving < none * 1.5 + 50.0);
+}
+
+TEST_CASE ("user macros: assigned with the macro at 95 %, the target moves evenly over the macro's whole travel; a schema-1 patch reads as lines", "[plugin][usermacro][linear]")
+{
+    OspAudioProcessor p;
+    loadPluck (p);
+    namespace um = osp::plugin::usermacros;
+    setNormalised (p, "layerA.level", 0.5f);
+    setNormalised (p, "userMacro.1", 0.95f);
+    renderNote (p, 4);
+    REQUIRE (um::assign (p, 0, "layerA.level"));
+    renderNote (p, 40);
+    CHECK (std::abs (p.userMacroOffsetOf ("layerA.level")) < 1.0e-5f);   // (no jump where it was made)
+    const auto map = p.userMacroAssignments()->maps[0].front().map;
+    CHECK (map.high - map.low == Approx (0.25f).margin (1.0e-4));          // (a quarter of the travel over the macro's sweep)
+    // Equal macro steps, equal LEVEL steps: half the travel is half the range (not 5 %).
+    std::vector<float> at;
+    for (const float m : { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f })
+    {
+        setNormalised (p, "userMacro.1", m);
+        renderNote (p, 60);
+        at.push_back (p.userMacroOffsetOf ("layerA.level"));
+    }
+    for (std::size_t i = 1; i < at.size(); ++i)
+        CHECK (at[i] - at[i - 1] == Approx (0.0625f).margin (2.0e-3));
+    // A patch saved before (schema 1, made at 0 %, an unused LOW): exactly the line it played.
+    juce::XmlElement old ("UserMacros");
+    old.setAttribute ("schema", 1);
+    auto* macro = old.createNewChildElement ("Macro");
+    macro->setAttribute ("index", 0);
+    auto* m = macro->createNewChildElement ("Map");
+    m->setAttribute ("target", "layerA.level");
+    m->setAttribute ("anchorMacro", 0.0);
+    m->setAttribute ("anchorTarget", 0.5);
+    m->setAttribute ("low", 0.25);
+    m->setAttribute ("high", 0.75);
+    const auto read = osp::plugin::UserMacroState::fromXml (&old);
+    const auto& a = read.maps[0].front().map;
+    CHECK (a.low == Approx (0.5f));
+    CHECK (a.high == Approx (0.75f));
+    CHECK (osp::usermacro::offsetOf (a, 0.0) == Approx (0.0));
+    CHECK (osp::usermacro::offsetOf (a, 1.0) == Approx (0.25));
+    // Written back: schema 2, read again unchanged.
+    const auto xml = read.toXml();
+    CHECK (xml->getIntAttribute ("schema") == 2);
+    CHECK (osp::plugin::UserMacroState::fromXml (xml.get()) == read);
+}
+
+TEST_CASE ("SAVE key: a right-click is Save As", "[plugin][menus][save]")
+{
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    editor->setSize (1448, 1086);
+    osp::plugin::SavePresetButton* save = nullptr;
+    std::function<void (juce::Component&)> find = [&] (juce::Component& c) {
+        if (auto* s = dynamic_cast<osp::plugin::SavePresetButton*> (&c))
+            save = s;
+        for (auto* child : c.getChildren())
+            find (*child);
+    };
+    find (*editor);
+    REQUIRE (save != nullptr);
+    REQUIRE (save->onSaveAs != nullptr);
+    // The editor's own SAVE wiring: a right-click goes to Save As (counted here, so no chooser opens).
+    int saveAs = 0;
+    save->onSaveAs = [&saveAs] { ++saveAs; };
+    const auto at = save->getLocalBounds().getCentre().toFloat();
+    const juce::MouseEvent e (juce::Desktop::getInstance().getMainMouseSource(), at, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier),
+                              1.0f, 0.0f, 0.0f, 0.0f, 0.0f, save, save, juce::Time::getCurrentTime(), at, juce::Time::getCurrentTime(), 1, false);
+    static_cast<juce::Component*> (save)->mouseDown (e);   // (as JUCE dispatches it)
+    static_cast<juce::Component*> (save)->mouseUp (e);
+    CHECK (saveAs == 1);
+    CHECK (save->isSecondaryClick());
 }

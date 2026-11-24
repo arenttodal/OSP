@@ -175,10 +175,19 @@ class SavePresetButton final : public juce::Button, public skin::KeyFace
 {
 public:
     SavePresetButton();
+    /** Right-click (or Ctrl-click on a Mac): Save As. Null: a right-click saves as a click does. */
+    std::function<void()> onSaveAs;
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    /** A secondary click goes to onSaveAs instead of onClick. */
+    void clicked (const juce::ModifierKeys& modifiers) override { secondaryClick = modifiers.isPopupMenu() && onSaveAs != nullptr; }
+    /** True while onClick runs for a secondary click (the button calls onClick for every click). */
+    bool isSecondaryClick() const noexcept { return secondaryClick; }
     void buttonStateChanged() override { skin::repaintKey (*this); }
     skin::KeyRole keyRole() const override { return skin::KeyRole::preset; }
     skin::KeyState keyState() const override { return isDown() ? skin::KeyState::pressed : isOver() ? skin::KeyState::hover : skin::KeyState::normal; }
+
+private:
+    bool secondaryClick = false;
 };
 
 /** ‹  PRESET NAME  ♡  › : the factory starting states, then the user's presets. */

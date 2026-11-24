@@ -232,7 +232,15 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
             libraryPanel->selectScope (scope);
     };
     content.addAndMakeVisible (presetBar);
-    savePresetButton.onClick = [this] { saveInstrument(); };
+    // SAVE: a click saves (in place when it can); a right-click is Save As.
+    savePresetButton.onSaveAs = [this] { choosePresetFile (true, false); };
+    savePresetButton.onClick = [this] {
+        if (savePresetButton.isSecondaryClick())
+            savePresetButton.onSaveAs();
+        else
+            saveInstrument();
+    };
+    savePresetButton.setTooltip ("Save (right-click: Save as" + juce::String::fromUTF8 ("\xe2\x80\xa6") + ")");
     content.addAndMakeVisible (savePresetButton);
     content.addAndMakeVisible (volume);
     menuButton.setTooltip ("Instrument, sources, content, preferences, support");

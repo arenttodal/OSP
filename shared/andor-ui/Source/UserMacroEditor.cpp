@@ -103,14 +103,6 @@ namespace usermacros
         return 0.0f;
     }
 
-    std::pair<float, float> defaultRange (float b0)
-    {
-        constexpr float span = 0.25f, least = 0.1f;
-        const float up = std::min (1.0f, b0 + span), down = std::max (0.0f, b0 - span);
-        return { b0 - down >= least ? down : up,     // LOW: below, unless the control sits at its bottom
-                 up - b0 >= least ? up : down };     // HIGH: above, unless it sits at its top
-    }
-
     bool assign (InstrumentHost& host, int macro, const juce::String& id)
     {
         if (macro < 0 || macro >= usermacro::macroCount || ! eligible (host, id) || stateOf (host) == nullptr)
@@ -124,9 +116,9 @@ namespace usermacros
         a.target = id;
         a.map.anchorMacro = macroValue (host, macro);
         a.map.anchorTarget = host.apvts().getParameter (id)->getValue();   // the target's own value now
-        // A visible default range around it, towards the room there is (a quarter of the travel
-        // each way). The anchor keeps it exactly where it is at the macro's position now: no jump.
-        const auto range = defaultRange (a.map.anchorTarget);
+        // A visible default range, a straight line through where the target is now at the
+        // macro's position now: no jump, and linear over the macro's whole travel.
+        const auto range = usermacro::defaultRange (a.map.anchorMacro, a.map.anchorTarget);
         a.map.low = range.first;
         a.map.high = range.second;
         edit (host, [macro, &a] (UserMacroState& s) { s.maps[static_cast<std::size_t> (macro)].push_back (a); },
@@ -136,8 +128,6 @@ namespace usermacros
 
     namespace
     {
-        constexpr float anchorEpsilon = 1.0e-6f;
-
         /** A map rebased on the control's value now: its offsets kept, b0 = the base, so LOW and
             HIGH are where macro 0 % and 100 % put the control (clamped to the travel). */
         void rebase (usermacro::Mapping& map, float base)
@@ -155,8 +145,6 @@ namespace usermacros
             int macro = -1;
             juce::String target;
             UserMacroState start;
-            float paramStart = 0.0f;
-            bool paramMoved = false;
         };
         RangeDrag& rangeDrag()
         {
@@ -225,9 +213,7 @@ namespace usermacros
             drag.macro = macro;
             drag.target = id;
             drag.start = *stateOf (host);
-            drag.paramStart = p->getValue();
-            // One undo step for the whole drag: the range, and the control's own value when the
-            // dragged end is the anchor's (below). (Changes not yet recorded go first, in their own.)
+            // One undo step for the whole drag. (Changes not yet recorded go first, in their own.)
             host.apvts().copyState();
             host.undo().beginNewTransaction ("Macro range");
             auto next = drag.start;
@@ -248,34 +234,14 @@ namespace usermacros
                 return;
             auto& map = next.maps[static_cast<std::size_t> (macro)][static_cast<std::size_t> (i)].map;
             position = std::clamp (position, 0.0f, 1.0f);
-            const float a = map.anchorMacro;
-            // The end the anchor sits on is the control's own value there (an anchored map adds
-            // nothing at its anchor): that end moves the knob itself, the other end stays put.
-            const bool anchoredEnd = end == 0 ? a <= anchorEpsilon : a >= 1.0f - anchorEpsilon;
-            if (anchoredEnd)
-            {
-                if (! drag.paramMoved)
-                {
-                    p->beginChangeGesture();
-                    drag.paramMoved = true;
-                }
-                p->setValueNotifyingHost (position);
-                map.anchorTarget = position;
-                (end == 0 ? map.low : map.high) = position;
-            }
-            else
-                (end == 0 ? map.low : map.high) = position;
+            // Either end sets only the range (the line from 0 % to 100 %); the knob stays put.
+            (end == 0 ? map.low : map.high) = position;
             host.setUserMacroAssignments (next);
             return;
         }
         if (phase == 2)
         {
             const auto after = *stateOf (host);
-            if (drag.paramMoved)
-            {
-                p->endChangeGesture();
-                host.apvts().copyState();   // (the parameter's change joins this step)
-            }
             host.setUserMacroAssignments (drag.start);
             if (! (after == drag.start))
                 host.undo().perform (new UserMacroEdit (host, drag.start, after), "Macro range");
@@ -286,11 +252,6 @@ namespace usermacros
         }
         // Cancelled: as it was.
         host.setUserMacroAssignments (drag.start);
-        if (drag.paramMoved)
-        {
-            p->setValueNotifyingHost (drag.paramStart);
-            p->endChangeGesture();
-        }
         drag = {};
     }
 
@@ -316,12 +277,12 @@ namespace usermacros
         if (p == nullptr)
             return;
         const float base = p->getValue();
-        edit (host, [macro, &id, base] (UserMacroState& s) {
+        edit (host, [&host, macro, &id, base] (UserMacroState& s) {
             if (const int i = s.find (macro, id); i >= 0)
             {
                 auto& map = s.maps[static_cast<std::size_t> (macro)][static_cast<std::size_t> (i)].map;
                 map.anchorTarget = base;
-                const auto range = defaultRange (base);
+                const auto range = usermacro::defaultRange (macroValue (host, macro), base);
                 map.low = range.first;
                 map.high = range.second;
             }
@@ -437,17 +398,17 @@ UserMacroPanel::UserMacroPanel (InstrumentHost& h, int m, const juce::String& se
     };
     swap.setTooltip ("Swap LOW and HIGH (the other direction)");
     swap.onClick = [this] { editSelected ([] (UserMacroAssignment& a) { std::swap (a.map.low, a.map.high); }, "Swap assignment"); };
-    ease.setTooltip ("A gentler curve near the anchor");
+    ease.setTooltip ("An S-curve: gentle at both ends of the macro's travel (same LOW and HIGH)");
     ease.setClickingTogglesState (false);
     ease.onClick = [this] {
         editSelected ([] (UserMacroAssignment& a) { a.map.curve = a.map.curve == usermacro::Curve::ease ? usermacro::Curve::linear : usermacro::Curve::ease; }, "Assignment curve");
     };
     bypass.setTooltip ("Silence this assignment (kept)");
     bypass.onClick = [this] { editSelected ([] (UserMacroAssignment& a) { a.map.enabled = ! a.map.enabled; }, "Bypass assignment"); };
-    rebase.setTooltip ("Rebase at current: the target keeps the sound it has now, and the macro's range starts from here");
+    rebase.setTooltip ("Rebase at current: the target's own knob takes the sound it has now; the range keeps its ends");
     rebase.onClick = [this] {
-        // The sound now becomes the target's own value (one gesture on it), the assignment
-        // anchored here: nothing jumps, the range keeps its ends.
+        // The sound now becomes the target's own value (one gesture on it), the range measured
+        // from there with the same ends: nothing moves at any macro position.
         if (selectedRow < 0)
             return;
         const auto& a = state().maps[static_cast<std::size_t> (macroIndex)][static_cast<std::size_t> (selectedRow)];

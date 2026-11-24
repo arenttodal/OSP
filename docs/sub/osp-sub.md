@@ -121,3 +121,16 @@ output is bit-identical (tested), so every baseline render and golden is unchang
   many keys can pass 0 dBFS, as any loud patch can.
 - **PEDAL LOOP.** OSP's per-layer PEDAL LOOP repurposes the sustain pedal for the layers, but
   SUB always treats CC64 as sustain.
+
+## VOICES and MONO NOTE (24 Nov 2026, owner's request)
+
+The panel's right-hand column is now **VOICES** (POLY / MONO) over **MONO NOTE** (LOWEST /
+LATEST), in RESPONSE's segmented style; RESPONSE (FLAT / TAPER), FROM and dB / OCT have no
+controls of their own any more - the display shows the response and its curve still edits FROM
+and the slope. MONO plays one sub note: the lowest key held (or sustained by the pedal) in the
+range, or the latest pressed; when that key changes while it sounds the voice moves legato (no
+new attack), and it releases when no key is left. Parameters `sub.voices`, `sub.priority`
+(hint 37, appended): POLY and LOWEST by default, so every session from before plays as it did.
+Tests: SUB-04 (unit), "sub: VOICES (POLY / MONO) and MONO NOTE" (plugin). **NEXT (ANDOR
+ANALOG):** ANALOG's SUB lives in its own repository (older OSP pin); it takes `SubSettings::mono`
+/ `latest`, `addSubVoicingParameters` and the panel when its pin moves.

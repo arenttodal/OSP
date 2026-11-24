@@ -296,7 +296,7 @@ TEST_CASE ("popover macros: LIFE stays open through a right-click, Assign to Mac
     CHECK (highAfterDrag == Approx (0.9f).margin (0.03f));
     CHECK (rig.value ("life.pitch") == Approx (base));   // (the 100 % end never moves the knob)
     CHECK (rig.p.undo().getUndoDescription() == "Macro range");
-    // 4. The 0 % end: the knob itself moves there (made at macro 0 %), LIFE open.
+    // 4. The 0 % end: the range's start moves there, the knob stays (linear ranges), LIFE open.
     {
         const auto zero = rig.handle ("life.pitch", 0, 0);
         rig.press (zero);
@@ -304,7 +304,8 @@ TEST_CASE ("popover macros: LIFE stays open through a right-click, Assign to Mac
         rig.drag (target);
         rig.release (target);
         CHECK (rig.ui->openPopupPanel() == life);
-        CHECK (rig.value ("life.pitch") == Approx (0.2f).margin (0.03f));
+        CHECK (rig.value ("life.pitch") == Approx (base));
+        CHECK (rig.overlay().macroArcsOf ("life.pitch")[0].atMin == Approx (0.2f).margin (0.03f));
     }
     // 5. Inverted: the 100 % end below the 0 % end.
     {

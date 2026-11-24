@@ -17,8 +17,9 @@ namespace osp::plugin
 /**
     SUB's popover, V7 (docs/SUB_POPUP_V7.md): WAVE and a compact OCT on one line; one dark display
     (the wave's shape, the key response, the playable range on a keyboard); GRIT with a small
-    valve that warms with it, LEVEL, and RESPONSE over FROM and dB / OCT. Interface only: every
-    control is one of SUB's existing parameters, nothing here touches the sound.
+    valve that warms with it, LEVEL, and VOICES (POLY / MONO) over MONO NOTE (LOWEST / LATEST).
+    The response (FLAT / TAPER, FROM, dB / OCT) is shown by the display, edited on its curve; it
+    has no controls of its own. Interface only: every control is one of SUB's parameters.
 */
 namespace subview
 {
@@ -34,11 +35,11 @@ namespace subview
     Viewport fit (int lowKey, int highKey) noexcept;
     /** The keyboard's note names: the parameters' own convention (MIDI 60 = C4). */
     juce::String noteName (int key);
-    /** SUB's ten parameter IDs (InstrumentHost::subFields()): each product names its own
-        (ANDOR OSP "sub.<field>", ANDOR ANALOG "analog.sub.<field>"). */
+    /** SUB's parameter IDs (InstrumentHost::subFields(), then subVoicingFields()): each product
+        names its own (ANDOR OSP "sub.<field>", ANDOR ANALOG "analog.sub.<field>"). */
     struct Ids
     {
-        juce::String enabled, wave, octave, grit, level, lowKey, highKey, response, taperStart, taperSlope;
+        juce::String enabled, wave, octave, grit, level, lowKey, highKey, response, taperStart, taperSlope, voices, priority;
         static Ids from (const std::function<juce::String (const char* field)>& idOf);
     };
 } // namespace subview
@@ -172,11 +173,10 @@ public:
     SubGritValve& valve() noexcept { return *gritValve; }
     SegmentedControl& waveControl() noexcept { return *waveSegments; }
     SegmentedControl& octaveControl() noexcept { return *octaveSegments; }
-    SegmentedControl& responseControl() noexcept { return *responseSegments; }
+    SegmentedControl& voicesControl() noexcept { return *voicesSegments; }
+    SegmentedControl& priorityControl() noexcept { return *prioritySegments; }
     MiniKnob& gritKnob() noexcept { return *grit; }
     MiniKnob& levelKnob() noexcept { return *level; }
-    MiniKnob& fromKnob() noexcept { return *from; }
-    MiniKnob& slopeKnob() noexcept { return *slopeKnobPtr; }
 
 protected:
     void layoutContent (juce::Rectangle<int> area) override;
@@ -186,13 +186,13 @@ private:
     InstrumentHost& host;
     juce::Colour accent;
     const subview::Ids ids;
-    std::unique_ptr<SegmentedControl> waveSegments, octaveSegments, responseSegments;
+    std::unique_ptr<SegmentedControl> waveSegments, octaveSegments, voicesSegments, prioritySegments;
     std::unique_ptr<SubResponseDisplay> responseDisplay;
     std::unique_ptr<SubGritValve> gritValve;
-    std::unique_ptr<MiniKnob> grit, level, from, slopeKnobPtr;
-    std::unique_ptr<juce::ParameterAttachment> gritA, enabledA, responseA;
-    juce::Rectangle<int> waveCaption, octCaption, responseCaption;
-    juce::Rectangle<float> topDivider, leftDivider, rightDivider, knobDivider;
+    std::unique_ptr<MiniKnob> grit, level;
+    std::unique_ptr<juce::ParameterAttachment> gritA, enabledA, voicesA;
+    juce::Rectangle<int> waveCaption, octCaption, voicesCaption, priorityCaption;
+    juce::Rectangle<float> topDivider, leftDivider, rightDivider;
 };
 
 } // namespace osp::plugin

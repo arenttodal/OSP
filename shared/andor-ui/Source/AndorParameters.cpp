@@ -203,6 +203,25 @@ void InstrumentHost::addSubParameters (juce::AudioProcessorValueTreeState::Param
                                                              Attributes().withLabel ("dB/oct").withStringFromValueFunction ([] (float v, int) { return juce::String (v, 1) + " dB/oct"; })));
 }
 
+const std::array<const char*, 2>& InstrumentHost::subVoicingFields()
+{
+    static const std::array<const char*, 2> fields { "voices", "priority" };
+    return fields;
+}
+
+void InstrumentHost::addSubVoicingParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint, const SubIdOf& idOf)
+{
+    auto id = [&] (const char* field) { return juce::ParameterID { idOf (field), versionHint }; };
+    layout.add (parameters::make<juce::AudioParameterChoice> (id ("voices"), "Sub Voices", juce::StringArray { "POLY", "MONO" }, 0));
+    layout.add (parameters::make<juce::AudioParameterChoice> (id ("priority"), "Sub Mono Key", juce::StringArray { "LOWEST", "LATEST" }, 0));
+}
+
+void InstrumentHost::applySubVoicing (sub::SubSettings& settings, const std::array<float, 2>& raw) noexcept
+{
+    settings.mono = std::lround (raw[0]) == 1;
+    settings.latest = std::lround (raw[1]) == 1;
+}
+
 sub::SubSettings InstrumentHost::subSettingsFrom (const std::array<float, 10>& raw) noexcept
 {
     // (ANDOR ANALOG's Reader: the same mapping.)

@@ -5,12 +5,13 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <utility>
 
 namespace osp::usermacro
 {
 
 /**
-    USER MACROS (ANDOR ANALOG docs/USER_MACROS_V1_1.md; ANDOR OSP docs/research/osp-user-macros): the pure core, shared by both instruments - the anchored, zero-jump mapping
+    USER MACROS (ANDOR ANALOG docs/USER_MACROS_V1_1.md; ANDOR OSP docs/research/osp-user-macros): the pure core, shared by both instruments - the linear mapping
     of one macro onto one target, the bounded compiled table the audio thread reads, and the
     lock-free hand-over of that table. No JUCE, no allocation, no state but what is passed in.
 
@@ -23,11 +24,15 @@ constexpr int maxMaps = macroCount * mapsPerMacro;   ///< 48
 
 enum class Curve : std::uint8_t { linear, ease };
 
-/** One assignment's shape (spec §6.2). Created with low = high = anchorTarget: no influence. */
+/** One assignment's shape (spec §6.2, made linear in schema 2). LOW and HIGH are where the
+    target goes at macro 0 % and 100 %, a straight line between them, wherever the macro was when
+    the assignment was made. The line is an offset on the target's own value: it is measured from
+    anchorTarget (the target's value when the range was set), so turning the target's own knob
+    moves the whole line with it. */
 struct Mapping
 {
-    float anchorMacro = 0.0f;    ///< a: the macro's position when the assignment was made
-    float anchorTarget = 0.0f;   ///< b0: the target's normalised value then
+    float anchorMacro = 0.0f;    ///< the macro's position when the assignment was made (a record: the line never bends there)
+    float anchorTarget = 0.0f;   ///< b0: the target's normalised value the range is measured from
     float low = 0.0f;            ///< L: where the target goes at macro 0 (from b0)
     float high = 0.0f;           ///< H: where it goes at macro 1
     Curve curve = Curve::linear;
@@ -35,22 +40,63 @@ struct Mapping
     bool operator== (const Mapping&) const = default;
 };
 
-/** The offset a mapping adds to its target at macro position `m` (0..1). Exactly 0 at the
-    anchor, so making an assignment never jumps; LOW above HIGH inverts it. */
+/** The offset a mapping adds to its target at macro position `m` (0..1): a straight line from
+    LOW at 0 % to HIGH at 100 % (EASE: an S over the whole travel, same ends). LOW above HIGH
+    inverts it. */
 inline double offsetOf (const Mapping& map, double m) noexcept
 {
     if (! map.enabled)
         return 0.0;
-    constexpr double epsilon = 1.0e-6;
     m = std::clamp (m, 0.0, 1.0);
-    const double a = std::clamp (static_cast<double> (map.anchorMacro), 0.0, 1.0);
-    const double b0 = static_cast<double> (map.anchorTarget);
-    auto shape = [&map] (double t) { return map.curve == Curve::ease ? t * t * (3.0 - 2.0 * t) : t; };   // (on the distance, never the value)
-    if (m < a && a > epsilon)
-        return (static_cast<double> (map.low) - b0) * shape ((a - m) / a);
-    if (m > a && a < 1.0 - epsilon)
-        return (static_cast<double> (map.high) - b0) * shape ((m - a) / (1.0 - a));
-    return 0.0;
+    const double t = map.curve == Curve::ease ? m * m * (3.0 - 2.0 * m) : m;
+    const double low = static_cast<double> (map.low), high = static_cast<double> (map.high);
+    return low + (high - low) * t - static_cast<double> (map.anchorTarget);
+}
+
+/** A new assignment's default range: a straight line through the target's value now (b0) at the
+    macro's position now (a), so making it never jumps, rising by up to a quarter of the travel
+    over the macro's whole sweep (falling where there is no room to rise). Only a target at the
+    very end of its travel with the macro part-way (no visible line through that point fits)
+    starts its range from b0 at macro 0 % instead, as an assignment made at 0 % does. */
+inline std::pair<float, float> defaultRange (float macroNow, float targetNow) noexcept
+{
+    constexpr double sweep = 0.25, least = 0.1, epsilon = 1.0e-6;
+    const double a = std::clamp (static_cast<double> (macroNow), 0.0, 1.0);
+    const double b0 = std::clamp (static_cast<double> (targetNow), 0.0, 1.0);
+    // The steepest slope (up to `sweep`) whose line through (a, b0) stays inside 0..1.
+    auto room = [a, b0] (bool up) {
+        double s = sweep;
+        if (a > epsilon)
+            s = std::min (s, (up ? b0 : 1.0 - b0) / a);
+        if (a < 1.0 - epsilon)
+            s = std::min (s, (up ? 1.0 - b0 : b0) / (1.0 - a));
+        return std::max (0.0, s);
+    };
+    const double up = room (true), down = room (false);
+    const bool rise = up >= least || up >= down;
+    const double s = rise ? up : down;
+    if (s >= least)
+    {
+        const double sign = rise ? 1.0 : -1.0;
+        return { static_cast<float> (std::clamp (b0 - sign * s * a, 0.0, 1.0)),
+                 static_cast<float> (std::clamp (b0 + sign * s * (1.0 - a), 0.0, 1.0)) };
+    }
+    const double to = b0 + sweep <= 1.0 ? b0 + sweep : b0 - sweep;
+    return { static_cast<float> (b0), static_cast<float> (std::clamp (to, 0.0, 1.0)) };
+}
+
+/** A schema-1 mapping (anchored: no movement on the side of the anchor it was made at 0 % or
+    100 %, two straight pieces meeting at the anchor otherwise) as a linear one. Made at 0 % or
+    100 %: exactly the same line (the unused end becomes the anchor's value). Made part-way:
+    the same ends, a straight line between them. */
+inline Mapping linearisedFromSchema1 (Mapping map) noexcept
+{
+    constexpr float epsilon = 1.0e-6f;
+    if (map.anchorMacro <= epsilon)
+        map.low = map.anchorTarget;
+    else if (map.anchorMacro >= 1.0f - epsilon)
+        map.high = map.anchorTarget;
+    return map;
 }
 
 /** A sanitised mapping: finite, in range (a NaN or an infinity becomes the neutral value). */

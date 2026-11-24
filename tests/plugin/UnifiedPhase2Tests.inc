@@ -202,8 +202,10 @@ TEST_CASE ("plugin: Phase 2's parameters are appended and neutral; the modulatio
     for (const char* card : { "arp.strum.", "arp.cardB.strum.", "arp.cardC.strum." })   // (version 35: STRUM)
         for (const char* field : { "on", "direction", "sync", "ms", "division" })
             expected.add (juce::String (card) + field);
-    for (const char* id : { "arp.custom", "arp.cardB.custom", "arp.cardC.custom" })   // (version 36, last: CUSTOM)
+    for (const char* id : { "arp.custom", "arp.cardB.custom", "arp.cardC.custom" })   // (version 36: CUSTOM)
         expected.add (id);
+    for (const auto* field : osp::plugin::InstrumentHost::subVoicingFields())   // (version 37, last: SUB's MONO / POLY)
+        expected.add (osp::plugin::InstrumentHost::subFieldId (field));
     REQUIRE (all.size() > expected.size());
     for (int i = 0; i < expected.size(); ++i)
     {

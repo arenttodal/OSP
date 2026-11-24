@@ -359,6 +359,12 @@ TEST_CASE ("sub: screenshots and demo renders (OSP_SUB_SHOTS)", "[.][sub-shots]"
             panel->display().pollHeldKeys();
         ui.refreshNow();
         shoot (*e, "sub-05-panel-held-" + w);
+        setSub (p, "voices", 1.0f);
+        ui.refreshNow();
+        shoot (*e, "sub-06-panel-mono-" + w);
+        setSub (p, "priority", 1.0f);
+        ui.refreshNow();
+        shoot (*e, "sub-07-panel-mono-latest-" + w);
     }
 
     // Demo renders: the plucked tutorial note, C3 E3 G3 held under the arpeggiator (1/16, UP),
@@ -417,4 +423,48 @@ TEST_CASE ("sub: screenshots and demo renders (OSP_SUB_SHOTS)", "[.][sub-shots]"
         setSub (p, "grit", 70.0f);
         setSub (p, "octave", 0.0f);
     });
+}
+
+TEST_CASE ("sub: VOICES (POLY / MONO) and MONO NOTE (LOWEST / LATEST) - POLY and LOWEST by default, in the panel where RESPONSE was, and the engine takes them", "[plugin][sub]")
+{
+    OspAudioProcessor p;
+    CHECK (subValue (p, "voices") == 0.0f);     // POLY: every session from before as it was
+    CHECK (subValue (p, "priority") == 0.0f);   // LOWEST
+    auto panel = p.createSubPanel();
+    auto* sub = dynamic_cast<osp::plugin::SubPanel*> (panel.get());
+    REQUIRE (sub != nullptr);
+    panel->setSize (panel->cardSize().x, panel->cardSize().y);
+    CHECK (sub->voicesControl().isVisible());
+    CHECK (sub->priorityControl().isVisible());
+    CHECK (sub->priorityControl().getAlpha() < 1.0f);   // (POLY: MONO NOTE dimmed, still there)
+    CHECK (sub->priorityControl().getY() > sub->voicesControl().getBottom());
+    CHECK (sub->voicesControl().getX() > sub->levelKnob().getRight());
+    CHECK (panel->getLocalBounds().contains (sub->priorityControl().getBounds()));
+    setSub (p, "voices", 1.0f);
+    sub->refreshContent();
+    CHECK (sub->priorityControl().getAlpha() == 1.0f);
+    // What it plays: three keys held (below the taper, so the level is the same for each), MONO
+    // sounds exactly as the lowest alone; POLY sounds all three.
+    auto render = [] (bool mono, std::initializer_list<int> keys) {
+        OspAudioProcessor q;
+        setSub (q, "enabled", 1.0f);
+        setSub (q, "voices", mono ? 1.0f : 0.0f);
+        juce::MidiBuffer chord;
+        for (const int k : keys)
+            chord.addEvent (juce::MidiMessage::noteOn (1, k, static_cast<juce::uint8> (100)), 0);
+        return renderSub (q, 0.5, chord);
+    };
+    const auto mono = render (true, { 58, 50, 55 });
+    const auto lowest = render (true, { 50 });
+    const auto poly = render (false, { 58, 50, 55 });
+    REQUIRE (mono.size() == lowest.size());
+    double monoDiff = 0.0, polyDiff = 0.0;
+    for (std::size_t i = 0; i < mono.size(); ++i)
+    {
+        monoDiff = std::max (monoDiff, static_cast<double> (std::abs (mono[i] - lowest[i])));
+        polyDiff = std::max (polyDiff, static_cast<double> (std::abs (poly[i] - lowest[i])));
+    }
+    CHECK (subRms (lowest, 4800) > 0.0);
+    CHECK (monoDiff < 1.0e-6);
+    CHECK (polyDiff > 1.0e-3);
 }

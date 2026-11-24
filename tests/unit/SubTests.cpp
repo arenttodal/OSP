@@ -383,3 +383,111 @@ TEST_CASE ("SUB in the engine: its keys, settings and rendering never allocate",
         CHECK (scope.count() == 0);
     }
 }
+
+TEST_CASE ("SUB-04: MONO plays one note - the lowest key held (or the latest), legato as keys come and go; POLY as before", "[unit][sub]")
+{
+    // The key of the one voice sounding (-1: none).
+    auto playing = [] (const SubOsc& s) {
+        int key = -1, count = 0;
+        for (int i = 0; i < SubOsc::maxVoices; ++i)
+            if (s.voiceKey (i) >= 0)
+            {
+                key = s.voiceKey (i);
+                ++count;
+            }
+        return count == 1 ? key : (count == 0 ? -1 : -100 - count);
+    };
+    std::vector<float> l (480), r (480);
+    SECTION ("LOWEST (the default MONO note)")
+    {
+        SubOsc sub;
+        sub.prepare (rate);
+        auto s = on (-18.0);
+        s.mono = true;
+        sub.setSettings (s);
+        send (sub, 0x90, 60, 100);
+        send (sub, 0x90, 67, 100);
+        send (sub, 0x90, 64, 100);
+        CHECK (sub.activeVoices() == 1);
+        CHECK (playing (sub) == 60);           // (not the latest: the lowest)
+        send (sub, 0x90, 55, 100);
+        CHECK (playing (sub) == 55);           // a lower key takes it, the same voice (legato)
+        CHECK (sub.activeVoices() == 1);
+        send (sub, 0x80, 55, 0);
+        CHECK (playing (sub) == 60);           // back to the lowest still held
+        send (sub, 0x80, 60, 0);
+        CHECK (playing (sub) == 64);
+        // The pedal: a released key it holds still counts.
+        send (sub, 0xb0, 64, 127);
+        send (sub, 0x90, 50, 100);
+        send (sub, 0x80, 50, 0);
+        CHECK (playing (sub) == 50);
+        send (sub, 0xb0, 64, 0);
+        CHECK (playing (sub) == 64);
+        // A key outside the range never plays; none held: released.
+        send (sub, 0x90, 20, 100);
+        CHECK (playing (sub) == 64);
+        send (sub, 0x80, 20, 0);
+        send (sub, 0x80, 64, 0);
+        send (sub, 0x80, 67, 0);
+        CHECK (sub.activeVoices() == 0);
+        for (int i = 0; i < 40; ++i)
+            sub.render (l.data(), r.data(), 480);
+        CHECK (! sub.sounding());
+    }
+    SECTION ("LATEST")
+    {
+        SubOsc sub;
+        sub.prepare (rate);
+        auto s = on (-18.0);
+        s.mono = true;
+        s.latest = true;
+        sub.setSettings (s);
+        send (sub, 0x90, 60, 100);
+        send (sub, 0x90, 67, 100);
+        send (sub, 0x90, 64, 100);
+        CHECK (playing (sub) == 64);
+        send (sub, 0x80, 64, 0);
+        CHECK (playing (sub) == 67);           // the latest still held
+        CHECK (sub.activeVoices() == 1);
+    }
+    SECTION ("switched while playing: POLY to MONO keeps one, MONO to POLY gives every key its own")
+    {
+        SubOsc sub;
+        sub.prepare (rate);
+        auto s = on (-18.0);
+        sub.setSettings (s);
+        send (sub, 0x90, 60, 100);
+        send (sub, 0x90, 64, 100);
+        send (sub, 0x90, 67, 100);
+        CHECK (sub.activeVoices() == 3);
+        s.mono = true;
+        sub.setSettings (s);
+        CHECK (sub.activeVoices() == 1);
+        s.mono = false;
+        sub.setSettings (s);
+        CHECK (sub.activeVoices() == 3);
+    }
+    SECTION ("the same MIDI, the same output (deterministic)")
+    {
+        auto render = [&] {
+            SubOsc sub;
+            sub.prepare (rate);
+            auto s = on (-12.0);
+            s.mono = true;
+            sub.setSettings (s);
+            std::vector<float> out;
+            const int keys[] { 60, 55, 67, 50 };
+            for (const int k : keys)
+            {
+                send (sub, 0x90, static_cast<std::uint8_t> (k), 100);
+                std::fill (l.begin(), l.end(), 0.0f);
+                std::fill (r.begin(), r.end(), 0.0f);
+                sub.render (l.data(), r.data(), 480);
+                out.insert (out.end(), l.begin(), l.end());
+            }
+            return out;
+        };
+        CHECK (render() == render());
+    }
+}

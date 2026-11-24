@@ -134,6 +134,12 @@ public:
     static const std::array<const char*, 10>& subFields();
     /** SUB's settings from its parameters' raw values in subFields() order (real-time safe). */
     static sub::SubSettings subSettingsFrom (const std::array<float, 10>& raw) noexcept;
+    /** SUB's VOICES (POLY / MONO) and MONO's key (LOWEST / LATEST): appended later than the ten
+        (their own version hint), POLY and LOWEST by default - every session from before as it was. */
+    static void addSubVoicingParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint, const SubIdOf& idOf);
+    static const std::array<const char*, 2>& subVoicingFields();
+    /** `settings` with VOICES and MONO's key from their raw values (subVoicingFields() order). */
+    static void applySubVoicing (sub::SubSettings& settings, const std::array<float, 2>& raw) noexcept;
     static juce::String pedalLoopParameterId (int layer);
     /** DAMPEN's parameters in their order: enabled, mode, amount, frequency, cutoff. */
     static const juce::StringArray& dampenParameterNames();
