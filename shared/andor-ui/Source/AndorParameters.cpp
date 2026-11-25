@@ -212,7 +212,9 @@ const std::array<const char*, 2>& InstrumentHost::subVoicingFields()
 void InstrumentHost::addSubVoicingParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint, const SubIdOf& idOf)
 {
     auto id = [&] (const char* field) { return juce::ParameterID { idOf (field), versionHint }; };
-    layout.add (parameters::make<juce::AudioParameterChoice> (id ("voices"), "Sub Voices", juce::StringArray { "POLY", "MONO" }, 0));
+    // MONO (one sub note, the lowest key) for every new patch (owner, 25 Nov); a state saved
+    // before VOICES existed loads POLY, as it played (the product's state loader writes it).
+    layout.add (parameters::make<juce::AudioParameterChoice> (id ("voices"), "Sub Voices", juce::StringArray { "POLY", "MONO" }, 1));
     layout.add (parameters::make<juce::AudioParameterChoice> (id ("priority"), "Sub Mono Key", juce::StringArray { "LOWEST", "LATEST" }, 0));
 }
 

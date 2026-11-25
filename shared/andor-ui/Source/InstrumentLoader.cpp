@@ -400,8 +400,15 @@ LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store,
     try
     {
         std::vector<Imported> imported;
+        const auto files = std::max<std::size_t> (1, request.files.size());
+        auto report = [&request] (double fraction) {
+            if (request.progress != nullptr)
+                request.progress->store (static_cast<float> (std::clamp (fraction, 0.0, 1.0)), std::memory_order_relaxed);
+        };
+        report (0.0);
         for (const auto& file : request.files)
         {
+            report (0.5 * static_cast<double> (&file - request.files.data()) / static_cast<double> (files));
             auto one = importAndAnalyse (file, store);
             result.warnings.insert (result.warnings.end(), one.warnings.begin(), one.warnings.end());
             if (one.ok)
@@ -419,7 +426,9 @@ LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store,
             sources.push_back ({ &one.audio, &one.analysis, one.filename });
         InstrumentBuildOptions options;
         options.interpolationZeroCrossings = playbackZeroCrossings;
-        auto set = std::make_shared<InstrumentSet> (instrument::buildSet (sources, options, request.assignments, true, request.policy));
+        report (0.5);
+        auto set = std::make_shared<InstrumentSet> (instrument::buildSet (sources, options, request.assignments, true, request.policy,
+                                                                          [&report] (int built, int total) { report (0.5 + 0.5 * built / std::max (1, total)); }));
         if (! set->isValid())
         {
             result.error = "the files could not be combined into an instrument";

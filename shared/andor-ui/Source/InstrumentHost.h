@@ -135,7 +135,8 @@ public:
     /** SUB's settings from its parameters' raw values in subFields() order (real-time safe). */
     static sub::SubSettings subSettingsFrom (const std::array<float, 10>& raw) noexcept;
     /** SUB's VOICES (POLY / MONO) and MONO's key (LOWEST / LATEST): appended later than the ten
-        (their own version hint), POLY and LOWEST by default - every session from before as it was. */
+        (their own version hint). MONO and LOWEST by default (new patches); a state saved without
+        VOICES is POLY, as it played - the product's state loader sets that. */
     static void addSubVoicingParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint, const SubIdOf& idOf);
     static const std::array<const char*, 2>& subVoicingFields();
     /** `settings` with VOICES and MONO's key from their raw values (subVoicingFields() order). */
@@ -202,6 +203,9 @@ public:
     enum class LoadState { empty, loading, ready, failed };
     /** `layer` -1: the layer being edited. */
     virtual LoadState loadState (int layer = -1) const noexcept = 0;
+    /** How far a layer's loading is (0..1), when the loader reports it (a set of several files);
+        -1: not known (one file, or not loading). Any non-audio thread. */
+    virtual float loadProgress (int /*layer*/) const noexcept { return -1.0f; }
     /** The source a layer shows (waveform, root, file), or nullptr when it is empty (any non-audio thread). */
     virtual std::shared_ptr<const LoadedInstrument> currentInstrument (int layer = -1) const = 0;
     /** Manual root (fractional MIDI), or nullopt for the analysed one. */

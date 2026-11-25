@@ -210,7 +210,7 @@ std::shared_ptr<InstrumentModel> addAnchors (const InstrumentModel& base, const 
 
 InstrumentSet buildSet (const std::vector<SetSource>& sources, const InstrumentBuildOptions& options,
                         const std::vector<SetAssignment>& assignments, bool withContinuation,
-                        const SetInferenceOptions& setOptions)
+                        const SetInferenceOptions& setOptions, const std::function<void (int built, int total)>& onMemberBuilt)
 {
     // One gain for the whole set: the loudest member reaches the usual target level.
     double loudest = -200.0, peak = -200.0;
@@ -246,6 +246,8 @@ InstrumentSet buildSet (const std::vector<SetSource>& sources, const InstrumentB
             model = addContinuation (*model, *s.audio, memberOptions);
         model->stage = InstrumentModel::Stage::complete;
         inputs.push_back ({ std::move (model), s.filename });
+        if (onMemberBuilt)
+            onMemberBuilt (static_cast<int> (inputs.size()), static_cast<int> (sources.size()));   // (a progress report; offline)
     }
     return inferSampleSet (inputs, assignments, setOptions);
 }

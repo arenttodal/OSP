@@ -888,5 +888,5 @@ arp.cardC.strum.division v35 choice "Arp Card C Strum Sync Spread" label="" rang
 arp.custom v36 bool "Arp Custom" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Off|On|On
 arp.cardB.custom v36 bool "Arp Card B Custom" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Off|On|On
 arp.cardC.custom v36 bool "Arp Card C Custom" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Off|On|On
-sub.voices v37 choice "Sub Voices" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=POLY|POLY|MONO [POLY|MONO]
+sub.voices v37 choice "Sub Voices" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=POLY|POLY|MONO [POLY|MONO]
 sub.priority v37 choice "Sub Mono Key" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=LOWEST|LOWEST|LATEST [LOWEST|LATEST]

@@ -856,6 +856,8 @@
   <PARAM id="sub.response" value="1.0"/>
   <PARAM id="sub.taperSlope" value="6.0"/>
   <PARAM id="sub.taperStart" value="60.0"/>
+  <PARAM id="sub.voices" value="1.0"/>
+  <PARAM id="sub.priority" value="0.0"/>
   <PARAM id="sub.wave" value="0.0"/>
   <PARAM id="sustain" value="1.0"/>
   <PARAM id="sustainLevel" value="100.0"/>

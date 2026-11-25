@@ -462,10 +462,35 @@ namespace
             setInterceptsMouseClicks (false, false);
         }
 
+        /** The widest the name and the file may make the menu (a long or machine-made file
+            name - a hash - is shortened in the middle instead; the card is as wide as for a
+            sound called "Atmos - Synth String Bed 01 - B"). */
+        static constexpr float maxTextWidth = 180.0f;
+
+        /** `text` within `width` in `font`: as it is if it fits, else its start and its end
+            (the extension kept) around an ellipsis. */
+        static juce::String elideMiddle (const juce::Font& font, const juce::String& text, float width)
+        {
+            if (juce::GlyphArrangement::getStringWidth (font, text) <= width)
+                return text;
+            const auto ellipsis = juce::String::fromUTF8 ("\xe2\x80\xa6");
+            const int dot = text.lastIndexOfChar ('.');
+            const int tailKeep = dot > 0 && text.length() - dot <= 6 ? text.length() - dot + 6 : 7;   // ("13000.wav")
+            for (int keep = text.length() - 1; keep > 2; --keep)
+            {
+                const int tail = std::min (tailKeep, keep / 2);
+                const int head = keep - tail;
+                const auto candidate = text.substring (0, head).trimEnd() + ellipsis + text.substring (text.length() - tail).trimStart();
+                if (juce::GlyphArrangement::getStringWidth (font, candidate) <= width)
+                    return candidate;
+            }
+            return text.substring (0, 1) + ellipsis;
+        }
+
         void getIdealSize (int& idealWidth, int& idealHeight) override
         {
-            const auto nameWidth = juce::GlyphArrangement::getStringWidth (nameFont(), name);
-            const auto detailWidth = juce::GlyphArrangement::getStringWidth (detailFont(), detail);
+            const auto nameWidth = juce::GlyphArrangement::getStringWidth (nameFont(), elideMiddle (nameFont(), name, maxTextWidth));
+            const auto detailWidth = juce::GlyphArrangement::getStringWidth (detailFont(), elideMiddle (detailFont(), detail, maxTextWidth));
             idealWidth = juce::roundToInt (std::max (nameWidth, detailWidth)) + 44 + 18;   // (JUCE adds the borders)
             idealHeight = 46;
         }
@@ -487,10 +512,10 @@ namespace
             auto text = juce::Rectangle<float> (w, h).withTrimmedLeft (44.0f).withTrimmedRight (12.0f);
             g.setColour (juce::Colour (0xff2f2c28));
             g.setFont (nameFont());
-            g.drawFittedText (name, text.withTrimmedTop (h * 0.5f - 17.0f).withHeight (18.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.9f);
+            g.drawText (elideMiddle (nameFont(), name, text.getWidth()), text.withTrimmedTop (h * 0.5f - 17.0f).withHeight (18.0f), juce::Justification::centredLeft, false);
             g.setColour (juce::Colour (0xff8a847a));
             g.setFont (detailFont());
-            g.drawFittedText (detail, text.withTrimmedTop (h * 0.5f + 1.0f).withHeight (15.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.9f);
+            g.drawText (elideMiddle (detailFont(), detail, text.getWidth()), text.withTrimmedTop (h * 0.5f + 1.0f).withHeight (15.0f), juce::Justification::centredLeft, false);
             // A rule under the identity (the menu's groups follow).
             g.setColour (juce::Colour (0xffe6ddcf));
             g.fillRect (juce::Rectangle<float> (12.0f, h - 1.0f, w - 24.0f, 1.0f));

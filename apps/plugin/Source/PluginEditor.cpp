@@ -1323,11 +1323,22 @@ juce::PopupMenu OspAudioProcessorEditor::sourceMenu (int layer)
                 if (safe->samplesShown)
                     safe->learnAction ("samples.opened", "osp.samples");
             }, true, samplesShown && ospProcessor.editLayer() == layer));
-        // The recording's file: where it was dropped from, else its copy in the sample store.
-        const juce::File original (juce::String::fromUTF8 (loaded->originalPath.c_str())), stored (juce::String::fromUTF8 (loaded->storedPath.c_str()));
-        const auto file = original.existsAsFile() ? original : stored;
-        if (loaded->set == nullptr && loaded->atlasSources.size() <= 1 && file.existsAsFile())
-            menu.addItem (menuicons::item (Kind::reveal, "Reveal source file", [file] { file.revealToUser(); }));
+        // The recording's file: where it was dropped from, else its copy in the sample store. A
+        // sound mapped into notes reveals the recording it came from; a set of samples, its first
+        // member that still exists (the folder opens on it, the others beside it).
+        auto existing = [] (const std::string& path) {
+            const juce::File f (juce::String::fromUTF8 (path.c_str()));
+            return path.empty() || ! f.existsAsFile() ? juce::File() : f;
+        };
+        juce::File file = existing (loaded->originalPath);
+        if (file == juce::File())
+            file = existing (loaded->storedPath);
+        for (const auto& member : loaded->atlas != nullptr ? loaded->atlasSources : loaded->memberFiles)
+            if (file == juce::File())
+                file = existing (member.originalPath);
+        const bool several = loaded->set != nullptr && loaded->atlas == nullptr && loaded->memberFiles.size() > 1;
+        if (file != juce::File())
+            menu.addItem (menuicons::item (Kind::reveal, several ? "Reveal source files" : "Reveal source file", [file] { file.revealToUser(); }));
     }
 
     // MANAGEMENT

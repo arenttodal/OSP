@@ -427,11 +427,41 @@ TEST_CASE ("sub: screenshots and demo renders (OSP_SUB_SHOTS)", "[.][sub-shots]"
     });
 }
 
-TEST_CASE ("sub: VOICES (POLY / MONO) and MONO NOTE (LOWEST / LATEST) - POLY and LOWEST by default, in the panel where RESPONSE was, and the engine takes them", "[plugin][sub]")
+TEST_CASE ("sub: VOICES (POLY / MONO) and MONO NOTE (LOWEST / LATEST) - MONO and LOWEST for new patches, POLY for states saved before, in the panel where RESPONSE was, and the engine takes them", "[plugin][sub]")
 {
     OspAudioProcessor p;
-    CHECK (subValue (p, "voices") == 0.0f);     // POLY: every session from before as it was
+    CHECK (subValue (p, "voices") == 1.0f);     // MONO: a new patch (owner, 25 Nov)
     CHECK (subValue (p, "priority") == 0.0f);   // LOWEST
+    {
+        // A state saved before VOICES existed (no sub.voices in it): POLY, as it played.
+        juce::MemoryBlock saved;
+        p.getStateInformation (saved);
+        auto xml = juce::AudioProcessor::getXmlFromBinary (saved.getData(), static_cast<int> (saved.getSize()));
+        REQUIRE (xml != nullptr);
+        for (auto* e = xml->getFirstChildElement(); e != nullptr;)
+        {
+            auto* next = e->getNextElement();
+            if (e->hasTagName ("PARAM") && e->getStringAttribute ("id") == OspAudioProcessor::subFieldId ("voices"))
+                xml->removeChildElement (e, true);
+            e = next;
+        }
+        juce::MemoryBlock old;
+        juce::AudioProcessor::copyXmlToBinary (*xml, old);
+        OspAudioProcessor q;
+        q.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+        CHECK (subValue (q, "voices") == 0.0f);   // POLY
+        // Saved again, it keeps POLY (now written down).
+        juce::MemoryBlock again;
+        q.getStateInformation (again);
+        OspAudioProcessor r;
+        r.setStateInformation (again.getData(), static_cast<int> (again.getSize()));
+        CHECK (subValue (r, "voices") == 0.0f);
+        // A state that has it keeps its own (MONO here).
+        OspAudioProcessor m;
+        m.setStateInformation (saved.getData(), static_cast<int> (saved.getSize()));
+        CHECK (subValue (m, "voices") == 1.0f);
+    }
+    setSub (p, "voices", 0.0f);
     auto panel = p.createSubPanel();
     auto* sub = dynamic_cast<osp::plugin::SubPanel*> (panel.get());
     REQUIRE (sub != nullptr);

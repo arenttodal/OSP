@@ -405,6 +405,11 @@ public:
     // setParameterValue / parameterValue: InstrumentHost.
 
     LoadState loadState (int layer = -1) const noexcept override { return layers[resolve (layer)].state.load(); }
+    float loadProgress (int layer) const noexcept override
+    {
+        const auto& l = layers[resolve (layer)];
+        return l.state.load() == LoadState::loading && l.setProgress != nullptr ? l.setProgress->load (std::memory_order_relaxed) : -1.0f;
+    }
     juce::String statusMessage() const;
     void showMessage (const juce::String& message)
     {
@@ -657,6 +662,7 @@ private:
         bool lastLoadFailed = false;                     // message thread
         std::vector<std::string> missingSources;         // message thread: the last Atlas load's
         std::shared_ptr<std::atomic<bool>> cancelPreparation;   // message thread: the current analysis / atlas job's
+        std::shared_ptr<std::atomic<float>> setProgress;         // message thread: the current set load's progress (the loader writes the value), else null
         std::uint64_t messageLoad = 0;                   // message thread: the load the status message is about
         std::uint64_t promptLoad = 0;                    // message thread: the load "Map notes?" asks about (0: none)
         int promptNotes = 0;

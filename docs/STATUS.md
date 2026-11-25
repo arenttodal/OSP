@@ -15,8 +15,8 @@
 >   of the core (`product/Source/UserMacroCore.h`, older OSP pin): take this one when its pin moves.
 > - **SUB: VOICES (POLY / MONO) and MONO NOTE (LOWEST / LATEST)** replace RESPONSE, FROM and
 >   dB / OCT in the SUB panel (the display still shows the response, as a picture only). MONO plays one sub note - the lowest key held, or the latest - legato as keys
->   come and go. `sub.voices`, `sub.priority` (hint 37): POLY and LOWEST by default, so every
->   session plays as before. docs/sub/osp-sub.md. **NEXT (ANDOR ANALOG):** its SUB is in its own
+>   come and go. `sub.voices`, `sub.priority` (hint 37): MONO and LOWEST for new patches and the
+>   built-in starting states (owner, 25 Nov); a state saved without VOICES loads POLY, as it played. docs/sub/osp-sub.md. **NEXT (ANDOR ANALOG):** its SUB is in its own
 >   repository (older OSP pin): it takes these when the pin moves.
 > - **Cosmic Strings struggles past 4 notes (fixed, owner's go-ahead):** measured headless with
 >   stand-in sounds, the preset needed 112 % of real time at 4 notes and 277 % at 8 on this
@@ -29,10 +29,25 @@
 >   octaves up costs as two. Up to two octaves up nothing changes (bit-identical; every golden
 >   render passes unchanged). Cosmic Strings, same machine and stand-ins: 4 notes 112 % -> 18 %
 >   of real time, 8 notes 277 % -> 27 %. Tests: "[octave-read]". Baselines A / B untouched.
-> - **OCTAVE in each source's menu (owner's request):** -2 -1 0 +1 +2 against the detected root
->   (`SourceOctaveRow`, above "Root"): 0 is Auto, the others pin the root that many octaves
->   away (fine tuning kept; undoable like a root from the list). A root set by hand shows the
->   octave it is nearest, within a semitone.
+> - **OCTAVE in each source's menu (owner's request):** -2 -1 0 +1 +2 as the sound is HEARD
+>   (`SourceOctaveRow`, above "Root"; owner, 25 Nov: -1 must sound an octave lower): -1 pins the
+>   root an octave above the detected one, so every key plays an octave lower; 0 is Auto (fine
+>   tuning kept; undoable like a root from the list). A root set by hand shows the octave it
+>   sounds nearest to, within a semitone (Cosmic Strings' C0 against a detected C1: +1).
+> - **START line (owner, 25 Nov):** the card's START line stays where the knob sets it; when routes
+>   move START per note (an LFO, VEL, NOTE...), where the newest note really started is a faint
+>   dashed mark beside it, instead of the line jumping between the two
+>   (`SourceDisplay::View::noteStart`).
+> - **Progress while a set loads (owner, 25 Nov):** several files dropped at once (27 one-shots)
+>   showed ANALYZING with no sign of progress. The set loader reports how far it is (files analysed,
+>   then members prepared: `SetLoadRequest::progress`, `InstrumentHost::loadProgress`) and the card
+>   draws a bar with a percentage under ANALYZING.
+> - **Reveal source file(s) for notes and sets (owner, 25 Nov):** a sound mapped into notes reveals
+>   its recording again, a set of samples its first member's file (the folder opens on it).
+> - **Source menu width (owner, 25 Nov):** a long or machine-made file name (a 64-character hash)
+>   made the menu several times wider than a named sound's. The header's name and file line are
+>   now shortened in the middle (their start, an ellipsis, their end with the extension) to the
+>   width a name like "Atmos - Synth String Bed 01 - B" takes (`SourceHeader::elideMiddle`).
 > - **SUB's LEVEL (and any open popover's knob) takes a USER macro by the lens's drag and by
 >   + ADD ASSIGNMENT's pick:** a press on a lens no longer closes the open popover (only a USER
 >   macro's own panel folds away), a popover opened while picking has its knobs ringed above it,

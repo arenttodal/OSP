@@ -52,7 +52,8 @@ public:
     struct View
     {
         bool granular = false;
-        float start = 0.0f;        ///< START 0..1
+        float start = 0.0f;        ///< START 0..1 (the knob: the line stays where it is set)
+        float noteStart = -1.0f;   ///< START as the newest note took it, when routes move it (a faint mark); < 0: none
         float position = 0.5f;     ///< effective grain POS (START applied), 0..1
         float spread = 0.2f;
         bool loop = true;
@@ -71,7 +72,11 @@ public:
     void setLayer (int layer);
     void setFocused (bool focused);
     void setLoading (bool loading);
+    /** While loading: how far (0..1), drawn as a bar under ANALYZING; < 0: not known (no bar). */
+    void setLoadProgress (float fraction);
+    float loadProgress() const noexcept { return progress; }
     void setView (const View&);
+    const View& shownView() const noexcept { return view; }   ///< (tests: what is drawn)
     void setGrains (const Dot* dots, int count);
     void setPlayheads (const Dot* heads, int count);
     /** While a file is dragged over this layer: "REPLACE A" (empty: none). */
@@ -135,6 +140,7 @@ private:
     juce::String generatedPlaceholder;   ///< a stand-in's caption (its picture drawn faint), or empty
     int layer = 0;
     bool focused = true, loading = false;
+    float progress = -1.0f;
     View view;
     std::vector<Dot> grains, heads;
     juce::String dropLabel;
@@ -495,7 +501,7 @@ public:
     void refresh();
     /** The granular view (POS, SPREAD) and the playing grains; START in percent (0 for a
         generator, whose grains have no start). */
-    void refreshGrains (float startPercent);
+    void refreshGrains (float startPercent, float noteStartPercent = -1.0f);
     SourceDisplay& display() noexcept { return sourceDisplay; }
 
     std::function<void (int)> onFocus;                 ///< the card was clicked

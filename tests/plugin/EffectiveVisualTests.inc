@@ -265,3 +265,91 @@ TEST_CASE ("effective values: per voice - a note held, its grain POSITION is pub
     CHECK (reads.load() >= 2000);
     CHECK (knobReads.load() == 0);
 }
+
+TEST_CASE ("effective values: the card's START line stays on the knob; a note's own start (routes moving START) is a faint mark beside it", "[plugin][effective][voice][start-line]")
+{
+    TempDir tmp;
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const auto a = writeSource (tmp.dir, "first.wav", testsignals::vowel (midiToHz (57), 2.0, 48000.0, 3));
+    OspAudioProcessor p;
+    p.loadFile (a, 0);
+    REQUIRE (p.waitForLoads (30000));
+    p.pollLoads();
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto& ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor&> (*editor);
+    editor->setSize (1448, 1086);
+    p.prepareToPlay (48000.0, 256);
+    const auto start = OspAudioProcessor::layerParameterId (0, "start");
+    p.setParameterValue (start, 38.0f);
+    p.assignModulation (mod::Source::vel, mod::Dest::startA, -100.0f);   // (velocity 100: each note starts at the very beginning)
+    effectiveRun (p, 30);
+    osp::plugin::InstrumentHost::EffectiveValue v;
+    REQUIRE (p.effectiveValue (start, v));
+    REQUIRE (v.value < 1.0f);
+    ui.refreshNow();
+    const auto& view = ui.engineCard (0).display().shownView();
+    CHECK (view.start == Approx (0.38f).margin (1.0e-3));      // the line: the knob, steady
+    CHECK (view.noteStart == Approx (0.01f * v.value).margin (1.0e-3));   // the faint mark: the note's own
+    // No route moving START: no mark.
+    juce::AudioBuffer<float> buffer (2, 256);
+    for (int i = 0; i < 400; ++i)
+    {
+        juce::MidiBuffer midi;
+        if (i == 0)
+            midi.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+        buffer.clear();
+        p.processBlock (buffer, midi);
+    }
+    ui.refreshNow();
+    CHECK (ui.engineCard (0).display().shownView().noteStart < 0.0f);
+    CHECK (ui.engineCard (0).display().shownView().start == Approx (0.38f).margin (1.0e-3));
+}
+
+TEST_CASE ("set loading: several files dropped at once report how far the analysis is; the card draws it under ANALYZING", "[plugin][set][progress]")
+{
+    TempDir tmp;
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const ScopedEnvironment store ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    juce::Array<juce::File> files;
+    for (int i = 0; i < 6; ++i)
+        files.add (writeSource (tmp.dir, "Bowl " + juce::String (i + 1) + ".wav", testsignals::pluck (midiToHz (48 + 2 * i), 2.0, 48000.0, 3)));
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto& ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor&> (*editor);
+    editor->setSize (1448, 1086);
+    CHECK (p.loadProgress (0) < 0.0f);   // (nothing loading: no bar)
+    p.loadFiles (files, 0);
+    std::vector<float> seen;
+    for (int i = 0; i < 6000 && p.loadState (0) == OspAudioProcessor::LoadState::loading; ++i)
+    {
+        if (const float f = p.loadProgress (0); f >= 0.0f && (seen.empty() || f != seen.back()))
+            seen.push_back (f);   // (-1 once it is done: not a reading)
+        if (i == 5)
+        {
+            ui.refreshNow();
+            CHECK (ui.engineCard (0).display().loadProgress() >= 0.0f);   // (the card has it while it loads)
+        }
+        juce::Thread::sleep (5);
+        p.pollLoads();
+    }
+    REQUIRE (p.waitForLoads (60000));
+    p.pollLoads();
+    REQUIRE (! seen.empty());
+    for (std::size_t i = 0; i < seen.size(); ++i)
+    {
+        CHECK (seen[i] >= 0.0f);
+        CHECK (seen[i] <= 1.0f);
+        if (i > 0)
+            CHECK (seen[i] >= seen[i - 1]);   // (never backwards)
+    }
+    CHECK (seen.size() >= 3);   // (it moves while the files are analysed)
+    CHECK (p.loadProgress (0) < 0.0f);   // done: no bar
+    ui.refreshNow();
+    CHECK (ui.engineCard (0).display().loadProgress() < 0.0f);
+    // One file: no progress to show (the bar is for sets).
+    p.loadFiles ({ files[0] }, 1);
+    CHECK (p.loadProgress (1) < 0.0f);
+    REQUIRE (p.waitForLoads (60000));
+}

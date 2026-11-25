@@ -130,7 +130,9 @@ controls of their own any more - the display shows the response as a picture onl
 ends on its keyboard stay editable). MONO plays one sub note: the lowest key held (or sustained by the pedal) in the
 range, or the latest pressed; when that key changes while it sounds the voice moves legato (no
 new attack), and it releases when no key is left. Parameters `sub.voices`, `sub.priority`
-(hint 37, appended): POLY and LOWEST by default, so every session from before plays as it did.
+(hint 37, appended): MONO and LOWEST for every new patch and the built-in starting states (owner,
+25 Nov); a state saved without `sub.voices` (every session and preset from before) loads POLY, as
+it played - `setStateInformation` writes it in.
 Tests: SUB-04 (unit), "sub: VOICES (POLY / MONO) and MONO NOTE" (plugin). **NEXT (ANDOR
 ANALOG):** ANALOG's SUB lives in its own repository (older OSP pin); it takes `SubSettings::mono`
 / `latest`, `addSubVoicingParameters` and the panel when its pin moves.

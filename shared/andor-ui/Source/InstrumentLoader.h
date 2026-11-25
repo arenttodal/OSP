@@ -11,6 +11,7 @@
 
 #include <juce_core/juce_core.h>
 
+#include <atomic>
 #include <memory>
 #include <optional>
 #include <string>
@@ -75,6 +76,9 @@ struct SetLoadRequest
     /** How the set is inferred: files imported together get SetInferenceOptions::automatic();
         a saved set its stored policy (none stored: the original rules). */
     SetInferenceOptions policy;
+    /** Where the loader reports how far it is (0..1: the files imported and analysed, then the
+        members prepared, half each); null: not reported. Written by the loader thread. */
+    std::shared_ptr<std::atomic<float>> progress;
 };
 
 /**

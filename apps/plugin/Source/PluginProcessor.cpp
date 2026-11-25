@@ -2031,6 +2031,7 @@ OspAudioProcessor::ArpView OspAudioProcessor::arpView() const noexcept
 
 void OspAudioProcessor::enqueueLoad (LoadRequest request, int layer)
 {
+    layers[resolve (layer)].setProgress.reset();   // (one file or an atlas: no progress to show)
     auto& target = layers[resolve (layer)];
     ++pendingLoads;
     target.state = LoadState::loading;
@@ -2078,6 +2079,8 @@ void OspAudioProcessor::enqueueSetLoad (SetLoadRequest request, int layer)
     target.state = LoadState::loading;
     const auto generation = nextGeneration.fetch_add (1);
     target.latestLoadId = generation;
+    request.progress = std::make_shared<std::atomic<float>> (0.0f);
+    target.setProgress = request.progress;   // (the card's bar reads it; message thread)
     loaderPool.addJob ([this, request = std::move (request), generation, layer] {
         pushResult (loadInstrumentSet (request, store, generation), layer);
         --pendingLoads;
@@ -2096,6 +2099,7 @@ std::shared_ptr<std::atomic<bool>> OspAudioProcessor::newPreparation (std::size_
 
 void OspAudioProcessor::enqueueAtlasLoad (AtlasLoadRequest request, int layer)
 {
+    layers[resolve (layer)].setProgress.reset();   // (one file or an atlas: no progress to show)
     const auto index = resolve (layer);
     auto& target = layers[index];
     ++pendingLoads;
@@ -3979,6 +3983,16 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
     for (const auto& child : stateTree)
         if (child.hasProperty ("id"))
             savedIds.add (child["id"].toString());
+    // SUB's VOICES: MONO for new patches, but a state saved before VOICES existed (sessions,
+    // presets, packs) played POLY - it keeps that.
+    if (const auto voices = subFieldId ("voices"); ! savedIds.contains (voices))
+    {
+        juce::ValueTree poly ("PARAM");
+        poly.setProperty ("id", voices, nullptr);
+        poly.setProperty ("value", 0.0, nullptr);
+        stateTree.appendChild (poly, nullptr);
+        savedIds.add (voices);
+    }
     parameters.replaceState (stateTree);
     // A parameter the session does not contain (it is older than the parameter) starts from
     // its default: APVTS would otherwise keep whatever this instance had (e.g. Mono).

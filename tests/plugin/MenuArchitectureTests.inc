@@ -244,7 +244,7 @@ TEST_CASE ("menus: main and source menu screenshots (OSP_MENU_SHOTS)", "[.][menu
     }
 }
 
-TEST_CASE ("menus: a source's OCTAVE row moves the detected root by octaves (Auto at 0), undoable, and shows a hand-set root's octave", "[plugin][menus][octave]")
+TEST_CASE ("menus: a source's OCTAVE row moves the sound by octaves as heard (-1 an octave lower; Auto at 0), undoable, and shows a hand-set root's octave", "[plugin][menus][octave]")
 {
     MenuRig rig;
     rig.loadTwo();
@@ -267,24 +267,67 @@ TEST_CASE ("menus: a source's OCTAVE row moves the detected root by octaves (Aut
     auto* row = rowOf (1);
     REQUIRE (row != nullptr);
     CHECK (row->lit() == std::optional<int> (0));   // Auto
-    row->choose (-1);
+    row->choose (-1);   // an octave LOWER on every key: the root an octave above the detected one
     REQUIRE (rig.p.rootOverride (1).has_value());
-    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected - 12.0));   // (its fine tuning kept)
-    CHECK (rig.p.effectiveRootMidi (1) == Catch::Approx (detected - 12.0));
+    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected + 12.0));   // (its fine tuning kept)
+    CHECK (rig.p.effectiveRootMidi (1) == Catch::Approx (detected + 12.0));
     CHECK (! rig.p.rootOverride (0).has_value());   // (B's row, B's root only)
     row = rowOf (1);
     REQUIRE (row != nullptr);
     CHECK (row->lit() == std::optional<int> (-1));
-    row->choose (2);
-    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected + 24.0));
+    row->choose (2);   // two octaves higher
+    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected - 24.0));
     rig.p.undo().undo();
-    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected - 12.0));
+    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected + 12.0));
     rowOf (1)->choose (0);
     CHECK (! rig.p.rootOverride (1).has_value());   // 0: Auto again
     // A root set by hand from the list: the octave it is nearest (within a semitone), else none.
     using Row = osp::plugin::SourceOctaveRow;
-    CHECK (Row::octaveOf (23.0, 35.05) == std::optional<int> (-1));   // (Cosmic Strings: B0 against a detected B1)
+    CHECK (Row::octaveOf (23.0, 35.05) == std::optional<int> (1));   // (Cosmic Strings: B0 against a detected B1 sounds an octave up)
     CHECK (Row::octaveOf (30.0, 35.05) == std::nullopt);
     CHECK (Row::octaveOf (std::nullopt, 35.05) == std::optional<int> (0));
     CHECK (Row::overrideFor (0, 35.05) == std::nullopt);
+}
+
+TEST_CASE ("menus: a source named by a long machine-made file (a hash) keeps its menu as narrow as a named sound's", "[plugin][menus]")
+{
+    MenuRig rig;
+    juce::Array<juce::File> list;
+    list.add (writeSource (rig.tmp.dir, "Atmos - Synth String Bed 01 - B.wav", testsignals::vowel (midiToHz (59), 1.0, 48000.0, 3)));
+    list.add (writeSource (rig.tmp.dir, "6db9eb2687ea53086abb7124575496befaf51986ef1ad5ae11b998c63ff13000.wav", testsignals::pluck (midiToHz (48), 1.0, 48000.0, 4)));
+    rig.p.addLayers (list);
+    REQUIRE (rig.p.waitForLoads (30000));
+    rig.p.pollLoads();
+    auto headerWidth = [&rig] (int layer) {
+        auto menu = rig.ui.sourceMenu (layer);
+        for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+            if (it.getItem().isEnabled == false && it.getItem().customComponent != nullptr && it.getItem().text.startsWith ("SOURCE"))
+            {
+                int w = 0, h = 0;
+                it.getItem().customComponent->getIdealSize (w, h);
+                return w;
+            }
+        return -1;
+    };
+    const int named = headerWidth (0), hashed = headerWidth (1);
+    REQUIRE (named > 0);
+    REQUIRE (hashed > 0);
+    CHECK (hashed <= named + 8);   // (shortened in the middle, not as wide as its 68 characters)
+    CHECK (hashed <= 280);
+}
+
+TEST_CASE ("menus: a source of several samples, or of notes mapped from one recording, still offers to reveal its files", "[plugin][menus][reveal]")
+{
+    MenuRig rig;
+    juce::Array<juce::File> files;
+    for (int i = 0; i < 3; ++i)
+        files.add (writeSource (rig.tmp.dir, "Bowl " + juce::String (i + 1) + ".wav", testsignals::pluck (midiToHz (48 + 4 * i), 1.0, 48000.0, 3)));
+    rig.p.loadFiles (files, 0);
+    REQUIRE (rig.p.waitForLoads (60000));
+    rig.p.pollLoads();
+    const auto loaded = rig.p.currentInstrument (0);
+    REQUIRE (loaded != nullptr);
+    REQUIRE (loaded->set != nullptr);
+    const auto entries = entriesOf (rig.ui.sourceMenu (0));
+    CHECK (entryStarting (entries, "Reveal source files") != nullptr);
 }

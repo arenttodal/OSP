@@ -6,6 +6,7 @@
 #include "engine/SampleSetInference.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -67,7 +68,8 @@ namespace instrument
     */
     InstrumentSet buildSet (const std::vector<SetSource>& sources, const InstrumentBuildOptions& options,
                             const std::vector<SetAssignment>& assignments, bool withContinuation,
-                            const SetInferenceOptions& setOptions = {});
+                            const SetInferenceOptions& setOptions = {},
+                            const std::function<void (int built, int total)>& onMemberBuilt = {});
 
     /** Body resonances and resonator tuning for CHARACTER / Reimagined (spec §22, §46). */
     void findResonances (InstrumentModel& model, const AudioData& audio);

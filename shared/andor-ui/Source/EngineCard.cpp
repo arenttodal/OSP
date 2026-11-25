@@ -318,6 +318,17 @@ void SourceDisplay::setFocused (bool f)
     }
 }
 
+void SourceDisplay::setLoadProgress (float fraction)
+{
+    const float p = fraction < 0.0f ? -1.0f : std::clamp (fraction, 0.0f, 1.0f);
+    if (std::abs (p - progress) >= 0.005f || (p < 0.0f) != (progress < 0.0f))
+    {
+        progress = p;
+        cacheDirty = true;
+        repaint();
+    }
+}
+
 void SourceDisplay::setLoading (bool l)
 {
     if (loading != l)
@@ -754,6 +765,20 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
             g.setColour (colour::wellText);
             g.setFont (fonts::make (14.0f, fonts::Weight::medium, 0.12f));
             g.drawText (juce::String::fromUTF8 ("ANALYZING\xe2\x80\xa6"), bounds, juce::Justification::centred, false);
+            if (progress >= 0.0f)
+            {
+                // A set of several files: how far (the files analysed, then the samples prepared).
+                const float w = std::min (180.0f, bounds.getWidth() * 0.45f);
+                const auto bar = juce::Rectangle<float> (w, 4.0f).withCentre (bounds.getCentre().translated (0.0f, 18.0f));
+                g.setColour (colour::wellText.withAlpha (0.18f));
+                g.fillRoundedRectangle (bar, 2.0f);
+                g.setColour (colour::accent.withAlpha (0.9f));
+                g.fillRoundedRectangle (bar.withWidth (std::max (4.0f, w * progress)), 2.0f);
+                g.setColour (colour::wellText.withAlpha (0.7f));
+                g.setFont (fonts::make (11.0f, fonts::Weight::medium, 0.08f));
+                g.drawText (juce::String (juce::roundToInt (100.0f * progress)) + " %", bar.translated (0.0f, 8.0f).withHeight (16.0f).expanded (30.0f, 0.0f),
+                            juce::Justification::centred, false);
+            }
         }
         else
         {
@@ -1021,6 +1046,24 @@ void SourceDisplay::paintStatic (juce::Graphics& g)
         const float d = view.reverse ? -1.0f : 1.0f;
         cap.addTriangle (x, plot.getY() - 8.0f, x + d * 6.5f, plot.getY() - 5.0f, x, plot.getY() - 2.0f);
         g.fillPath (cap);
+        // Where the newest note really started, when routes move START: a faint dashed mark (no
+        // cap, no shade), so the set START above stays still while each note's start shows.
+        if (view.noteStart >= 0.0f && std::abs (view.noteStart - view.start) > 0.002f)
+        {
+            auto shown = view;
+            shown.start = view.noteStart;
+            const auto keep = view;
+            view = shown;
+            const float nx = std::clamp (xAtSeconds (startSeconds(), plot), plot.getX(), plot.getRight());
+            view = keep;
+            juce::Path line, dashed;
+            line.startNewSubPath (nx, plot.getY() + 2.0f);
+            line.lineTo (nx, plot.getBottom() - 2.0f);
+            const float dash[] = { 3.0f, 3.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, line, dash, 2);
+            g.setColour (colour::accent.withAlpha (0.45f));
+            g.fillPath (dashed);
+        }
     }
 }
 
@@ -3188,6 +3231,7 @@ void EngineCard::refresh()
     }
     const auto instrument = processor.currentInstrument (layerIndex);
     const bool loading = processor.loadState (layerIndex) == InstrumentHost::LoadState::loading;
+    sourceDisplay.setLoadProgress (loading ? processor.loadProgress (layerIndex) : -1.0f);
     const auto generation = instrument != nullptr ? instrument->generation : 0;
     if (generation != shownGeneration || loading != shownLoading)
     {
@@ -3256,11 +3300,18 @@ void EngineCard::refresh()
         repaint (sourceDisplay.getBounds());
     }
 
-    // (what plays: START as the newest note took it, when the engine publishes it)
-    refreshGrains (InstrumentHost::shownValue (processor.apvts(), InstrumentHost::layerParameterId (layerIndex, "start")));
+    // START: the line where the knob sets it (owner's choice, 25 Nov: it no longer jumps with each
+    // note); where the newest note really started, when routes move START, a faint mark beside it.
+    const auto startId = InstrumentHost::layerParameterId (layerIndex, "start");
+    float knobStart = 0.0f;
+    if (auto* p = processor.apvts().getParameter (startId))
+        knobStart = p->convertFrom0to1 (p->getValue());
+    InstrumentHost::EffectiveValue played;
+    const bool moved = processor.effectiveValue (startId, played);
+    refreshGrains (knobStart, moved ? played.value : -1.0f);
 }
 
-void EngineCard::refreshGrains (float startPercent)
+void EngineCard::refreshGrains (float startPercent, float noteStartPercent)
 {
     // The band draws what the newest note plays (POSITION and SPREAD moved by its routes) when
     // the engine publishes it, else the knobs - as turning the knobs there would draw it.
@@ -3268,6 +3319,7 @@ void EngineCard::refreshGrains (float startPercent)
     SourceDisplay::View view;
     view.granular = value ("sourceMode") >= 0.5f;
     view.start = 0.01f * startPercent;
+    view.noteStart = noteStartPercent >= 0.0f ? 0.01f * noteStartPercent : -1.0f;
     view.position = std::clamp (0.01f * (value ("granular.position") + startPercent), 0.0f, 1.0f);
     view.spread = 0.01f * value ("granular.spread");
     view.loop = value ("loop") >= 0.5f;

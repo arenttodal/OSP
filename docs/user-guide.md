@@ -13,8 +13,9 @@
   name, its length, sample rate, channels, bit depth and root.
 - The detected root is shown next to the layer's letter. If it is wrong (or `?`), choose
   the right one in the card's **⋮ → Root** (undoable with Cmd/Ctrl+Z). When only the octave is
-  wrong, the **OCTAVE** row just above it (−2 −1 0 +1 +2) moves the detected note by octaves
-  (0 is the detected root).
+  wrong, the **OCTAVE** row just above it (−2 −1 0 +1 +2) moves the sound by octaves as you
+  hear it: −1 plays it an octave lower on every key, +1 an octave higher, 0 is the detected
+  root.
 - Your files are copied into OSP's own sample library, so projects still open when the
   originals move.
 
@@ -43,7 +44,7 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
 - Each card's **⋮** menu acts on that card's source only, and names it ("SOURCE B · file"):
   - **SOURCE:** Load / Replace audio…, Load example, Record audio…;
   - **AUDIO:** OCTAVE, Root, Map notes… or Notes / Detect notes again / Play as one sample, Samples,
-    Reveal source file;
+    Reveal source file (a set of samples: Reveal source files);
   - **MANAGEMENT:** Reset source settings, Remove source.
 
   Click a card to make it the **edited** layer (its letter is in colour). All layers stay
