@@ -279,7 +279,7 @@ public:
         analysed atlas it detects again with `detection` and keeps the musician's corrections
         (one undo step). Message thread.
     */
-    virtual void mapNotes (int layer, phrase::Detection detection = phrase::Detection::normal)
+    virtual void mapNotes (int layer, phrase::Detection detection = phrase::Detection::fewer)
     {
         juce::ignoreUnused (layer, detection);
     }

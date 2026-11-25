@@ -67,6 +67,7 @@ TEST_CASE ("short loop: a new session holds a short note; one saved before the f
     REQUIRE (xml != nullptr);
     xml->setAttribute ("stateVersion", 15);
     xml->removeAttribute ("loopFallback");
+    xml->removeAttribute ("loopHold");   // (nor HOLD, which came later)
     juce::MemoryBlock old;
     juce::AudioProcessor::copyXmlToBinary (*xml, old);
     OspAudioProcessor q;
@@ -92,4 +93,50 @@ TEST_CASE ("short loop: a new session holds a short note; one saved before the f
     loadAndWait (q, writeSource (tmp.dir, "short2.wav", shortSustained()));
     CHECK (q.loopFallback (0));
     CHECK (shortLoopHeldDb (q) > -45.0);
+}
+
+TEST_CASE ("LOOP's HOLD: on for new sessions and new sounds, off for a sound saved before it", "[plugin][short-loop][hold]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    const auto file = writeSource (tmp.dir, "short.wav", shortSustained());
+    OspAudioProcessor p;
+    for (int l = 0; l < 3; ++l)
+        CHECK (p.loopHold (l));
+    loadAndWait (p, file);
+    REQUIRE (p.loadState (0) == OspAudioProcessor::LoadState::ready);
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    {
+        OspAudioProcessor q;
+        q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+        REQUIRE (q.waitForLoads (20000));
+        q.pollLoads();
+        CHECK (q.loopHold (0));
+    }
+    // Saved before HOLD (no loopHold): the layer with a sound plays as it did, empty ones hold.
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    xml->removeAttribute ("loopHold");
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*xml, old);
+    OspAudioProcessor q;
+    q.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    REQUIRE (q.waitForLoads (20000));
+    q.pollLoads();
+    CHECK_FALSE (q.loopHold (0));
+    CHECK (q.loopHold (1));
+    loadAndWait (q, writeSource (tmp.dir, "short2.wav", shortSustained()));
+    CHECK (q.loopHold (0));
+}
+
+TEST_CASE ("DAMPEN is on after INIT (a new patch); a state without it plays as saved", "[plugin][dampen]")
+{
+    OspAudioProcessor p;
+    p.initPatch();
+    for (int l = 0; l < 3; ++l)
+        CHECK (p.parameterValue (OspAudioProcessor::dampenParameterId (l, "enabled")) == 1.0f);
+    // The parameter's own default is unchanged: a state that never stored it recalls it off.
+    OspAudioProcessor fresh;
+    CHECK (fresh.parameterValue (OspAudioProcessor::dampenParameterId (0, "enabled")) == 0.0f);
 }

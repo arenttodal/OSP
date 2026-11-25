@@ -49,6 +49,9 @@ struct InstrumentVoiceStart
     /** LOOP's fallback: a short note with no loop of its own holds on the layer's
         fallbackContinuation (when there is one). */
     bool fallbackLoop = false;
+    /** LOOP's HOLD: a decaying note with no loop of its own holds on its first Pedal Loop
+        region while the key is down (LayerSettings::holdDecaying). */
+    bool holdDecaying = false;
     bool releaseGraft = true;
     int layerIndex = 0;                         ///< A/B layer (0 = A, 1 = B)
     SourceMode sourceMode = SourceMode::oneShot;
@@ -145,7 +148,7 @@ public:
     bool isReleased() const noexcept { return released; }
     bool isFading() const noexcept { return fadeRemaining > 0; }
     bool isHeldByPedal() const noexcept { return heldByPedal; }
-    void setHeldByPedal (bool held) noexcept { heldByPedal = held; }
+    void setHeldByPedal (bool held) noexcept;
     int note() const noexcept { return currentNote; }
     int layerIndex() const noexcept { return voiceLayer; }
     /** Universal modulation-aware visual feedback: this note's own moves now (shares of the
@@ -347,6 +350,8 @@ private:
     /** PEDAL LOOP x REIMAGINED: the note's engine loops its own reading (it gets the pedal), and
         whether the voice's own read loops too (no engine, or MOSAIC's dry part). */
     bool enginePedal = false, voicePedal = false;
+    bool holding = false;             ///< LOOP's HOLD: this decaying note loops while its key is down
+    bool holdOwnsPedal = false;       ///< HOLD made the pedal machinery loop (the layer's PEDAL LOOP is Normal)
     int pedalRegion = -1;
     double ppDir = 1.0;               ///< read direction multiplier (-1: Ping-Pong reading back)
     double xDir = 1.0;                ///< the incoming crossfade stream's (ppDir takes it at the end)

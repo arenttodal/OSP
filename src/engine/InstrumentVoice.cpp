@@ -417,6 +417,21 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
     voicePedal = pedalMode != PedalLoopMode::normal && (modeEngine == nullptr || modeEngine->wantsDryRead());
     pedalTurnFrames = std::max (0.0, params.pedalTurnSeconds) * src.sampleRate();
     pedalTurnCorrelation = std::clamp (params.pedalTurnCorrelation, 0.0f, 1.0f);
+    // LOOP's HOLD: a decaying note with no loop of its own (a bowl, a bell) holds on its first
+    // Pedal Loop region while the key is down, as if the pedal were down from the start: Forward
+    // (or the layer's Ping-Pong), the decay compensated so every pass is at the note's level.
+    holding = params.holdDecaying && strategy == ContinuationStrategy::off && params.strategy != ContinuationStrategy::off
+              && modeEngine == nullptr && ! granularMode && direction > 0.0 && cont->pedal.valid && ! cont->pedal.regions.empty();
+    holdOwnsPedal = false;
+    if (holding)
+    {
+        holdOwnsPedal = pedalMode == PedalLoopMode::normal;
+        if (holdOwnsPedal)
+            pedalMode = PedalLoopMode::forward;
+        voicePedal = true;
+        pedalWanted = true;
+        pedalUpdate();
+    }
     if (granularMode)
     {
         if (modeEngine != nullptr)
@@ -822,6 +837,8 @@ void InstrumentVoice::setPedal (bool down) noexcept
 {
     if (! active || released || pedalMode == PedalLoopMode::normal)
         return;
+    if (holding || holdOwnsPedal)
+        return;   // HOLD loops while the key is down; with PEDAL LOOP Normal the pedal never loops
     if (enginePedal)
         modeEngine->pedal (down);
     if (! voicePedal)
@@ -829,6 +846,22 @@ void InstrumentVoice::setPedal (bool down) noexcept
     pedalWanted = down;
     if (! crossfading)
         pedalUpdate();
+}
+
+void InstrumentVoice::setHeldByPedal (bool held) noexcept
+{
+    heldByPedal = held;
+    if (! held || ! holding)
+        return;
+    // The key is up, the sustain pedal holds the note: HOLD ends. With PEDAL LOOP Normal it rings
+    // out as the recording does (the pedal as it was); Forward / Ping-Pong keep looping under it.
+    holding = false;
+    if (holdOwnsPedal)
+    {
+        pedalWanted = false;
+        if (! crossfading)
+            pedalUpdate();
+    }
 }
 
 void InstrumentVoice::pedalUpdate() noexcept

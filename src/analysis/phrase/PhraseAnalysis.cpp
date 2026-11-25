@@ -893,7 +893,13 @@ namespace
                     const auto prev = describePiece (c, segs[i - 1]);
                     const bool falls = std::abs (p.tail - prev.centre) >= std::abs (p.head - prev.centre) + 0.5 && ! p.plateau;
                     const bool slip = std::abs (std::abs (p.centre - prev.centre) - 12.0) < 0.7;
-                    const bool fading = p.levelDb <= prev.levelDb - 10.0;
+                    // A quieter piece that holds a steady pitch of its own a step away (a semitone
+                    // down at the end of a bowed phrase: it ends where it began) is the next note,
+                    // not the last one's tail; a droop still travelling, an octave slip or the same
+                    // pitch still count as tail.
+                    const bool ownStep = p.plateau && ! p.weak && p.seconds >= 0.15 && std::abs (p.tail - p.head) < 0.35
+                                         && foldedDistance (p.centre, prev.centre) >= 0.7;
+                    const bool fading = p.levelDb <= prev.levelDb - 10.0 && ! ownStep;
                     if (falls || slip || fading || p.weak)
                     {
                         mergeInto (i, i - 1);

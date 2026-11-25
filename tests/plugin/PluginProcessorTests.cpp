@@ -3858,9 +3858,12 @@ namespace
             p.getStateInformation (state);
         }
         // ...saved by a build that knew nothing about routing (per-layer patches: as saved)...
-        if (auto xml = scene.perLayer ? nullptr : juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize())))
+        // (and, like every session from before 25 Nov 2026, without LOOP's HOLD for decaying sounds)
+        if (auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize())))
         {
-            xml->removeAttribute ("reimaginedRouting");
+            if (! scene.perLayer)
+                xml->removeAttribute ("reimaginedRouting");
+            xml->removeAttribute ("loopHold");
             state.reset();
             juce::AudioProcessor::copyXmlToBinary (*xml, state);
         }

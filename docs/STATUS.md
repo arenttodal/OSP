@@ -56,6 +56,33 @@
 > - **Right-click SAVE (Ctrl-click on a Mac) is Save As** (`SavePresetButton::onSaveAs`); a click
 >   saves as before. The sister shell's SAVE already always asks for a file.
 >
+> **25 Nov 2026, owner's notes (2):**
+> - **NOTES: a quieter step a semitone down was swallowed (fixed, owner's nyckelharpa take):** G#3
+>   then G3 held 0.4 s, 12 dB quieter, at the end of a phrase read as one "G#3 with vibrato". The
+>   pitch split was found; the end-of-phrase rule that folds a fading scrap into the note before
+>   then took it back for being 10 dB quieter. A piece that holds its own steady pitch (plateau,
+>   not weak, >= 0.15 s, ending where it began: a droop still travelling stays a tail) at least 0.7 semitone away from the note before (octave slips folded
+>   away) is now a note, however quiet (`consolidate`, `ownStep`). Nothing else in the detector
+>   changed: the generated fixtures and the stress set give identical results before and after
+>   (both backends; 81/84 and 53/53 with yin-viterbi, "repeated"'s three offered splits as before). `analysisVersion` 5 (cached
+>   analyses redo; saved atlases keep their notes). Tests: "[phrase]".
+> - **LOOP holds decaying sounds (HOLD, owner's choice):** a bowl, a bell or a pluck has no steady
+>   body, so LOOP used to play it once. With LOOP on it now holds on its first Pedal Loop region
+>   while the key is down - Forward (or the layer's Ping-Pong), the decay compensated so every pass
+>   lands at the level the note had - and, released, reads on into its own ring under the
+>   envelope (`LayerSettings::holdDecaying`, `InstrumentVoice::holding`). Key up under the
+>   sustain pedal it rings out too (PEDAL LOOP Normal: the pedal as it was; Forward / Ping-Pong
+>   keep it looping under the pedal). LOOP off plays it once. Per layer `loopHold` in the state:
+>   absent (saved before), a layer holding a saved sound plays as it did; on for new sessions and
+>   for every sound loaded later. Engine default off: research renderer, baselines A / B and
+>   every golden unchanged (the plugin's "sessions from before" scenes drop `loopHold` as such
+>   sessions do). Tests: "[hold]".
+> - **New patches: DAMPEN on, NOTES detect FEWER (owner):** INIT turns DAMPEN's power on for every
+>   layer (`initPatch`; the built-in starting states already had it on). The parameter's own
+>   default stays off, so a state that never stored it - and every reference render - is as it
+>   was. MAP NOTES, a capture's automatic mapping and the source menu's Map notes detect FEWER;
+>   "Detect notes again" still offers all three.
+>
 > **22 Nov 2026, the owner's three presets (Analog Dreamscape, Bukkehorn Tape, Arp - Sixteen Pulses):**
 > - **Remove did nothing (fixed):** `removeLayer` refused without a word while any sound was still
 >   being prepared (a later stage, another layer's load): the layers above move down, and a result

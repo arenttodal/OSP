@@ -70,6 +70,13 @@ struct LayerSettings
         baselines and every golden): it plays once, as before the fallback existed. ANDOR OSP
         turns it on for every sound but those of sessions saved before it. */
     bool fallbackLoop = false;
+    /** With LOOP: HOLD. A decaying source (a bowl, a bell, a pluck) whose analysis offers no
+        loop of its own holds on its first Pedal Loop region (Forward, the decay compensated so
+        each pass lands at the note's own level) while the key is down; released, it reads on
+        into its own ring. Off (the default: the research renderer, the baselines and every
+        golden): it plays once. ANDOR OSP turns it on for every sound but those of sessions
+        saved before it. */
+    bool holdDecaying = false;
     bool follow = true;           ///< FOLLOW: keep the recording's own loudness contour (off: flatten it)
     /** Heard in the mix (MUTE / SOLO). An unheard layer ramps to silence; its held notes
         wait for it to come back, released ones end (as at LEVEL -48). */

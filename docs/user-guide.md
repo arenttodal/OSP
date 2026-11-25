@@ -67,7 +67,7 @@ from itself is its own: every card has its own **REIMAGINED**.
 | **REIMAGINED** (spectral arc) | How far this source travels into its REIMAGINED mode (below). 0 % is the recording itself; double-click returns there. A can stay almost untouched while B is fully reimagined. Click the **REIMAGINED** name to choose the mode. |
 | **LINK** (chain) | Linked layers move together: turning one linked layer's START, TUNE, PAN, LEVEL or REIMAGINED moves the others by the same amount, so their relationship stays. |
 | **REVERSE** | Play backwards (Granular: every grain backwards). With LOOP on, a held note keeps going backwards the way a forward note sustains. Reimagined acts on a reversed layer exactly as on a forward one. |
-| **LOOP** | One Shot: hold a note and it continues on the recording's own loops (off: it plays once and ends). Granular sustains by itself, so LOOP rests there. |
+| **LOOP** | One Shot: hold a note and it continues on the recording's own loops (off: it plays once and ends). A decaying sound (a bowl, a bell, a pluck) holds on a short stretch near its start, kept at the level it had, until the key is up; then it rings out. Granular sustains by itself, so LOOP rests there. |
 | **FOLLOW** | On: the recording's own loudness contour. Off: its fades are lifted (up to 24 dB) so a decaying sound plays on like a held tone; the envelope then shapes it. |
 
 While you play, an orange read head per note follows the recording (One Shot); you see it

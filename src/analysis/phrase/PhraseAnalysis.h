@@ -186,9 +186,10 @@ AnalysisResult analysePhrase (const AudioData& audio, const atlas::SourceAsset& 
 atlas::NoteEvent analyseRange (const AudioData& audio, std::int64_t startFrame, std::int64_t endFrame, const AnalysisSettings& settings = {});
 
 /** The analysis algorithm's version: bump when results change (it invalidates caches). */
-constexpr int analysisVersion = 4;   // 2: scoops/falls/octave slips absorbed, level-relative re-articulation, MIN NOTE
+constexpr int analysisVersion = 5;   // 2: scoops/falls/octave slips absorbed, level-relative re-articulation, MIN NOTE
                                      // 3 (OSP Phase 4): per-note doubts, the recording's verdict, quiet alternates left out
                                      // 4 (OSP Phase 4B): a soft dip (bow change, swell, beating) no longer splits; possible repeats flagged
+                                     // 5: a quieter end piece holding its own pitch a step away is a note, not a fading tail
 /** A take of a key this much quieter (peak, dB) than the loudest take of the same key and velocity
     layer is left off the keyboard: as a round robin it would sound like a dropout. */
 constexpr double quietAlternateDb = 24.0;

@@ -1284,7 +1284,7 @@ juce::PopupMenu OspAudioProcessorEditor::sourceMenu (int layer)
             menu.addItem (menuicons::item (Kind::mapNotes, "Map notes" + ellipsis(), [safe, layer] {
                 if (safe == nullptr)
                     return;
-                safe->ospProcessor.mapNotes (layer, phrase::Detection::normal);
+                safe->ospProcessor.mapNotes (layer, phrase::Detection::fewer);
                 safe->timerCallback();
                 safe->learnAction ("notes.mapped", "osp.source.mapNotes");
             }, ospProcessor.canMapNotes (layer)));

@@ -186,3 +186,92 @@ TEST_CASE ("pedal loop: no heap allocation while notes loop, turn, arm late, lea
         CHECK (allocations == 0);
     }
 }
+
+namespace
+{
+    /** A struck bowl: a few inharmonic partials ringing down at about 8 dB/s, 3 s. */
+    AudioData bowl()
+    {
+        AudioData out;
+        out.sampleRate = rate;
+        out.channels.resize (1);
+        const auto n = static_cast<std::size_t> (3.0 * rate);
+        out.channels[0].resize (n);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const double t = static_cast<double> (i) / rate;
+            const double env = std::min (1.0, t / 0.004) * std::pow (10.0, -8.0 * t / 20.0);
+            const double x = std::sin (2.0 * 3.141592653589793 * 220.0 * t) + 0.5 * std::sin (2.0 * 3.141592653589793 * 598.4 * t)
+                           + 0.3 * std::sin (2.0 * 3.141592653589793 * 1112.0 * t);
+            out.channels[0][i] = static_cast<float> (0.3 * env * x);
+        }
+        return out;
+    }
+
+    /** RMS of the engine's output over `seconds` (dBFS). */
+    double renderRmsDb (InstrumentEngine& engine, double seconds)
+    {
+        std::vector<float> l (64), r (64);
+        float* ch[2] = { l.data(), r.data() };
+        double sum = 0.0;
+        std::size_t count = 0;
+        for (int done = 0; done < static_cast<int> (seconds * rate); done += 64)
+        {
+            engine.render (ch, 2, 64);
+            for (std::size_t k = 0; k < 64; ++k, ++count)
+                sum += 0.5 * (static_cast<double> (l[k]) * l[k] + static_cast<double> (r[k]) * r[k]);
+        }
+        return 10.0 * std::log10 (std::max (1.0e-20, sum / static_cast<double> (std::max<std::size_t> (1, count))));
+    }
+}
+
+TEST_CASE ("LOOP's HOLD: a decaying source holds on its first pedal region while the key is down", "[integration][pedal-loop][hold]")
+{
+    const auto audio = bowl();
+    const auto model = instrument::buildComplete (audio, test::analyse (audio), {}, false);
+    REQUIRE_FALSE (model->original.continuation.canSustain);   // a decaying source: no loop of its own
+    REQUIRE (model->original.continuation.pedal.valid);
+
+    auto play = [&] (bool hold, double& earlyDb, double& lateDb, bool& sounding)
+    {
+        EngineSettings s;
+        s.macros.space = 0.0;
+        s.macros.motion = 0.0;
+        s.layer[0].loop = true;
+        s.layer[0].holdDecaying = hold;
+        InstrumentEngine engine;
+        engine.prepare (rate, 64, s);
+        engine.setModel (model.get(), 0);
+        engine.noteOn (57, 100);
+        run (engine, 0.3);
+        earlyDb = renderRmsDb (engine, 0.5);
+        run (engine, 4.0);   // past the end of the 3 s recording
+        lateDb = renderRmsDb (engine, 0.5);
+        sounding = engine.activeVoiceCount() > 0;
+        engine.noteOff (57);
+        run (engine, 3.0);
+        CHECK (engine.activeVoiceCount() == 0);   // released, it ends
+    };
+    double early = 0.0, late = 0.0;
+    bool sounding = false;
+    play (true, early, late, sounding);
+    CHECK (sounding);
+    CHECK (late > early - 6.0);   // rings on near the level it had early (the decay compensated)
+    play (false, early, late, sounding);
+    CHECK_FALSE (sounding);       // without HOLD it plays once, as before
+
+    // Key up under the sustain pedal (PEDAL LOOP Normal): HOLD ends, the note rings out as recorded.
+    EngineSettings s;
+    s.macros.space = 0.0;
+    s.macros.motion = 0.0;
+    s.layer[0].holdDecaying = true;
+    InstrumentEngine engine;
+    engine.prepare (rate, 64, s);
+    engine.setModel (model.get(), 0);
+    engine.setSustainPedal (true);
+    engine.noteOn (57, 100);
+    run (engine, 0.5);
+    engine.noteOff (57);
+    run (engine, 4.0);
+    CHECK (engine.activeVoiceCount() == 0);
+}

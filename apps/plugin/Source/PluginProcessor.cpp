@@ -904,9 +904,12 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             modes[i] = lp.modes[i]->load();
         const float pedalLoop = lp.pedalLoop != nullptr ? lp.pedalLoop->load() : 0.0f;
         const int loopFallback = layers[static_cast<std::size_t> (layer)].loopFallback.load() ? 1 : 0;
+        const int loopHold = layers[static_cast<std::size_t> (layer)].loopHold.load() ? 1 : 0;
         if (force || controls != lp.lastControls || ! juce::exactlyEqual (ownReimagined, lp.lastReimagined) || modes != lp.lastModes
-            || audible != lp.lastAudible || ! juce::exactlyEqual (pedalLoop, lp.lastPedalLoop) || loopFallback != lp.lastLoopFallback)
+            || audible != lp.lastAudible || ! juce::exactlyEqual (pedalLoop, lp.lastPedalLoop) || loopFallback != lp.lastLoopFallback
+            || loopHold != lp.lastLoopHold)
         {
+            lp.lastLoopHold = loopHold;
             lp.lastPedalLoop = pedalLoop;
             lp.lastLoopFallback = loopFallback;
             lp.lastControls = controls;
@@ -921,6 +924,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             ls.reverse = controls[5] >= 0.5f;
             ls.loop = controls[6] >= 0.5f;
             ls.fallbackLoop = loopFallback == 1;
+            ls.holdDecaying = loopHold == 1;
             ls.follow = controls[7] >= 0.5f;
             ls.pedalLoop = static_cast<PedalLoopMode> (std::clamp (static_cast<int> (std::lround (pedalLoop)), 0, 2));
             ls.audible = audible;
@@ -2872,6 +2876,7 @@ OspAudioProcessor::LayerSnapshot OspAudioProcessor::captureLayer (int layer) con
     snapshot.latestByLoad = slot.latestByLoad;
     snapshot.lastPublishedLoad = slot.lastPublishedLoad;
     snapshot.loopFallback = slot.loopFallback.load();
+    snapshot.loopHold = slot.loopHold.load();
     return snapshot;
 }
 
@@ -2897,6 +2902,7 @@ void OspAudioProcessor::applyLayer (int layer, const LayerSnapshot& snapshot)
     republish (snapshot.instrument, layer);
     slot.lastPublishedLoad = snapshot.lastPublishedLoad;
     slot.loopFallback.store (snapshot.loopFallback);
+    slot.loopHold.store (snapshot.loopHold);
     slot.lastLoadFailed = false;
     slot.state = LoadState::ready;
 }
@@ -3488,7 +3494,10 @@ void OspAudioProcessor::timerCallback()
                 {
                     // A new sound the user chose: LOOP's fallback holds its short notes.
                     if (userLoads.count (loadId) > 0)
+                    {
                         layer.loopFallback.store (true);
+                        layer.loopHold.store (true);
+                    }
                     // A new sound on this layer: into the Library (its history when the user chose it).
                     libraryHub->soundLoaded (*result.instrument, static_cast<int> (index), userLoads.count (loadId) > 0);
                     // A new sample (not a later stage of the same one): undoable if the user asked for it.
@@ -3714,6 +3723,10 @@ std::unique_ptr<juce::XmlElement> OspAudioProcessor::createStateXml()
         for (const auto& l : layers)
             fallback << (l.loopFallback.load() ? "1" : "0");
         stateTree.setProperty ("loopFallback", fallback, nullptr);
+        juce::String hold;
+        for (const auto& l : layers)
+            hold << (l.loopHold.load() ? "1" : "0");
+        stateTree.setProperty ("loopHold", hold, nullptr);
     }
 
     stateTree.setProperty ("editLayer", editLayer(), nullptr);
@@ -3911,8 +3924,13 @@ void OspAudioProcessor::applyStateXml (const juce::XmlElement& xml, bool setting
             const bool holdsSound = tree.isValid() && (tree.hasProperty ("contentHash") || tree.getChildWithName ("Set").isValid() || tree.getChildWithName ("Atlas").isValid());
             const bool on = saved.length() > static_cast<int> (l) ? saved[static_cast<int> (l)] == '1' : (savedVersion >= 16 || ! holdsSound);
             layers[l].loopFallback.store (on);
+            // LOOP's HOLD for decaying sounds: saved before it (no loopHold), a layer holding a
+            // saved sound plays once as it did.
+            const auto savedHold = stateTree.getProperty ("loopHold").toString();
+            layers[l].loopHold.store (savedHold.length() > static_cast<int> (l) ? savedHold[static_cast<int> (l)] == '1' : ! holdsSound);
         }
         stateTree.removeProperty ("loopFallback", nullptr);
+        stateTree.removeProperty ("loopHold", nullptr);
     }
     // Made before per-layer Reimagined (no routing saved): the legacy shared stage, exactly.
     perLayerReimagined = savedVersion >= 8 && stateTree.getProperty ("reimaginedRouting", "legacyGlobal").toString() == "perLayer";
@@ -4438,6 +4456,10 @@ void OspAudioProcessor::initPatch()
     undoManager.clearUndoHistory();
     setEditLayer (0);
     resetSettings();
+    // New patches start with DAMPEN on (owner, 25 Nov), as the built-in starting states do; the
+    // parameter's own default stays off, so a state without it plays as it was saved.
+    for (int layer = 0; layer < numLayers; ++layer)
+        setParameterValue (dampenParameterId (layer, "enabled"), 1.0f);
     presetNameOverride = "INIT";
 }
 

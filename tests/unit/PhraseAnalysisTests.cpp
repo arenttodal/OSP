@@ -375,6 +375,15 @@ TEST_CASE ("Phrase analysis: scoops, falls and octave slips belong to their note
         const auto segs = segmentsOf ({ { 0.2, 0, 0, silent, false }, { 1.2, 72, 72 }, { 0.3, 59.8, 59.8, -30.0f }, { 0.2, 0, 0, silent, false } });
         CHECK (segs.size() == 1);
     }
+    SECTION ("a quieter step a semitone down at the end of a phrase is a note, not a fading tail")
+    {
+        // The nyckelharpa case: G#3 then G3 held 0.4 s, 12 dB quieter, phrase ends.
+        const auto step = segmentsOf ({ { 0.2, 0, 0, silent, false }, { 0.4, 56.1, 56.1, -9.0f }, { 0.4, 55.0, 55.0, -21.0f }, { 0.2, 0, 0, silent, false } });
+        CHECK (step.size() == 2);
+        // A quiet tail at the same pitch, and one that falls away without settling, still join.
+        const auto fall = segmentsOf ({ { 0.2, 0, 0, silent, false }, { 0.8, 56, 56, -9.0f }, { 0.3, 56, 54.5, -21.0f }, { 0.2, 0, 0, silent, false } });
+        CHECK (fall.size() == 1);
+    }
     SECTION ("an octave slip across a short dropout joins the neighbouring note")
     {
         const auto segs = segmentsOf ({ { 0.2, 0, 0, silent, false }, { 0.6, 72, 72 }, { 0.04, 0, 0, -40.0f, false }, { 0.07, 60.1, 60.1 },

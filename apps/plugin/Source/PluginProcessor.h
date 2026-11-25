@@ -322,7 +322,7 @@ public:
     /** MAP NOTES: the layer's recording (its copy in the sample store) analysed with
         `detection` (analyseRecording). On an analysed atlas: detected again with `detection`,
         the musician's corrections kept and conflicts reported (one undo step). */
-    void mapNotes (int layer, phrase::Detection detection = phrase::Detection::normal) override;
+    void mapNotes (int layer, phrase::Detection detection = phrase::Detection::fewer) override;
     /** The notes a dropped (user-loaded) one-file recording holds, when it holds two or more
         and lasts a second or more (library::heldNotes over the load's own pitch track):
         the card's "Map notes?" prompt. 0 once answered, mapped or replaced. */
@@ -592,6 +592,10 @@ public:
     /** LOOP's fallback for short notes on `layer` (on, but off for the sounds of a session saved
         before it; tests). */
     bool loopFallback (int layer) const noexcept { return layers[static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1))].loopFallback.load(); }
+    /** LOOP's HOLD for decaying sounds on `layer` (LayerSettings::holdDecaying; `loopHold`, one
+        0/1 per layer). Absent from a saved session: off for every layer holding a saved sound,
+        so it plays as it did; on for a sound loaded later and every new session (tests). */
+    bool loopHold (int layer) const noexcept { return layers[static_cast<std::size_t> (std::clamp (layer, 0, numLayers - 1))].loopHold.load(); }
 
     /** KEY DNA (message thread): a layer's per-key identity. Its profile (all 128 keys) is
         computed here and handed to the audio thread through a ModelExchange; new notes take
@@ -676,6 +680,7 @@ private:
         /** LOOP's fallback for short notes (InstrumentEngine LayerSettings::fallbackLoop): on for
             every sound but those of a session saved before it (state version 16). */
         std::atomic<bool> loopFallback { true };
+        std::atomic<bool> loopHold { true };   ///< LOOP's HOLD for decaying sounds (loopHold())
         float autoPosition = -1.0f;                      // POS set from the analysis (granular), until the user moves it
         std::uint64_t autoPositionLoad = 0;
         // Phase 5 (message thread): the atlas's decoded sources (for its edits), the edits
@@ -757,6 +762,7 @@ private:
         std::map<std::uint64_t, std::shared_ptr<const LoadedInstrument>> latestByLoad;
         std::uint64_t lastPublishedLoad = 0;
         bool loopFallback = true;
+        bool loopHold = true;
     };
     LayerSnapshot captureLayer (int layer) const;
     void applyLayer (int layer, const LayerSnapshot& snapshot);
@@ -985,6 +991,7 @@ private:
         std::array<LiveParam, 10> satellite {};   ///< SATELLITE's fields (satelliteFields(), hint 32)
         float lastPedalLoop = -1.0f;
         int lastLoopFallback = -1;
+        int lastLoopHold = -1;
         std::array<LiveParam, 6> synth {};   ///< the SYNTH page (hint 23), synthParameterNames() order
         std::array<LiveParam, 3> imprint {};   ///< its spectral imprint (hint 28), imprintParameterNames() order
     };
