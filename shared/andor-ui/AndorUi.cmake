@@ -50,6 +50,7 @@ set(ANDOR_UI_SOURCES
     ${ANDOR_UI_DIR}/Source/ModulationPanel.cpp
     ${ANDOR_UI_DIR}/Source/EqEditor.cpp
     ${ANDOR_UI_DIR}/Source/NoteMapEditor.cpp
+    ${ANDOR_UI_DIR}/Source/ZoneEditor.cpp
     ${ANDOR_UI_DIR}/Source/KeyDnaEditor.cpp
     ${ANDOR_UI_DIR}/Source/KeyDnaState.cpp
     ${ANDOR_UI_DIR}/Source/WellOverlay.cpp

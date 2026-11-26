@@ -2660,6 +2660,79 @@ void OspAudioProcessor::reassignSample (const std::string& filename, SampleRole 
     });
 }
 
+void OspAudioProcessor::setSetAssignments (int layer, std::vector<SetAssignment> assignments)
+{
+    const int index = static_cast<int> (resolve (layer));
+    const auto instrument = currentInstrument (index);
+    if (instrument == nullptr || instrument->set == nullptr || instrument->atlas != nullptr)
+        return;
+    ++pendingLoads;
+    loaderPool.addJob ([this, instrument, assignments = std::move (assignments), generation = nextGeneration.fetch_add (1), index] {
+        pushResult (reassignInstrumentSet (*instrument, assignments, generation), index);
+        --pendingLoads;
+    });
+}
+
+void OspAudioProcessor::auditionSetMember (int layer, int member)
+{
+    const auto instrument = currentInstrument (static_cast<int> (resolve (layer)));
+    if (instrument == nullptr || instrument->set == nullptr || auditionHub == nullptr || member < 0
+        || member >= static_cast<int> (instrument->set->members.size()))
+        return;
+    const auto& m = instrument->set->members[static_cast<std::size_t> (member)];
+    if (m.model == nullptr || m.model->original.source == nullptr || ! m.model->original.source->isValid())
+        return;
+    const auto& src = *m.model->original.source;
+    // As recorded from its start, at most 6 s, with short fades (no click at either end).
+    const auto from = static_cast<std::int64_t> (src.startFrame());
+    const auto length = std::min<std::int64_t> (src.numFrames() - from, static_cast<std::int64_t> (6.0 * src.sampleRate()));
+    if (length < 16)
+        return;
+    auto slice = std::make_shared<AudioData> (AudioData::allocate (src.numChannels(), length, src.sampleRate()));
+    for (int c = 0; c < src.numChannels(); ++c)
+        std::copy (src.channelData (c) + from, src.channelData (c) + from + length, slice->channels[static_cast<std::size_t> (c)].begin());
+    const auto fadeIn = std::min<std::int64_t> (length / 4, static_cast<std::int64_t> (0.002 * src.sampleRate()));
+    const auto fadeOut = std::min<std::int64_t> (length / 4, static_cast<std::int64_t> (0.05 * src.sampleRate()));
+    for (auto& ch : slice->channels)
+    {
+        for (std::int64_t i = 0; i < fadeIn; ++i)
+            ch[static_cast<std::size_t> (i)] *= static_cast<float> (i) / static_cast<float> (fadeIn);
+        for (std::int64_t i = 0; i < fadeOut; ++i)
+            ch[ch.size() - 1 - static_cast<std::size_t> (i)] *= static_cast<float> (i) / static_cast<float> (fadeOut);
+    }
+    auditionHub->previewAudio (std::move (slice), juce::String::fromUTF8 (m.filename.c_str()));
+}
+
+void OspAudioProcessor::addSamplesToSet (int layer, const juce::Array<juce::File>& files)
+{
+    const int index = static_cast<int> (resolve (layer));
+    const auto instrument = currentInstrument (index);
+    if (files.isEmpty() || instrument == nullptr || instrument->set == nullptr || instrument->atlas != nullptr)
+        return;
+    // The set as it is (each member from the sample store, as a session recalls it), then the
+    // new files in natural name order; the musician's corrections are kept.
+    SetLoadRequest request;
+    request.policy = SetInferenceOptions::of (*instrument->set);
+    request.assignments = instrument->assignments;
+    for (const auto& member : instrument->memberFiles)
+    {
+        LoadRequest r;
+        r.expectedHash = member.contentHash;
+        r.filename = member.filename;
+        r.originalPath = member.originalPath;
+        request.files.push_back (std::move (r));
+    }
+    auto sorted = files;
+    std::sort (sorted.begin(), sorted.end(), [] (const juce::File& a, const juce::File& b) { return a.getFileName().compareNatural (b.getFileName()) < 0; });
+    for (const auto& f : sorted)
+    {
+        LoadRequest r;
+        r.file = f;
+        request.files.push_back (std::move (r));
+    }
+    enqueueSetLoad (std::move (request), index);
+}
+
 void OspAudioProcessor::loadFile (const juce::File& file, int layer)
 {
     LoadRequest request;
@@ -3846,6 +3919,11 @@ juce::ValueTree OspAudioProcessor::instrumentTree (int layer)
             t.setProperty ("layer", a.layer.value_or (0), nullptr);
             if (a.rootMidi)
                 t.setProperty ("rootMidi", exactString (*a.rootMidi), nullptr);
+            if (a.keyLow && a.keyHigh)
+            {
+                t.setProperty ("keyLow", *a.keyLow, nullptr);    // ZONES (additive: absent = automatic)
+                t.setProperty ("keyHigh", *a.keyHigh, nullptr);
+            }
             setTree.appendChild (t, nullptr);
         }
         tree.appendChild (setTree, nullptr);
@@ -4271,6 +4349,11 @@ void OspAudioProcessor::recallInstrument (const juce::ValueTree& tree, int layer
                 a.layer = static_cast<int> (child["layer"]);
                 if (child.hasProperty ("rootMidi"))
                     a.rootMidi = exactValue (child["rootMidi"], 60.0);
+                if (child.hasProperty ("keyLow") && child.hasProperty ("keyHigh"))
+                {
+                    a.keyLow = static_cast<int> (child["keyLow"]);
+                    a.keyHigh = static_cast<int> (child["keyHigh"]);
+                }
                 request.assignments.push_back (a);
             }
         }

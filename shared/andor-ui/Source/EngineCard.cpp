@@ -2128,7 +2128,7 @@ void NotesButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
     }
     g.setFont (type::button (narrow ? 12.5f : 13.5f));
     g.setColour (colour::text.withAlpha (open || review ? 0.92f : 0.62f));
-    g.drawText ("NOTES", r.withTrimmedLeft (review ? (narrow ? 9.0f : 12.0f) : 0.0f), juce::Justification::centred, false);
+    g.drawText (zones ? "ZONES" : "NOTES", r.withTrimmedLeft (review ? (narrow ? 9.0f : 12.0f) : 0.0f), juce::Justification::centred, false);
 }
 
 juce::Rectangle<int> EngineCard::reimaginedLabelBounds() const
@@ -2218,7 +2218,7 @@ void EngineCard::setModifiersApplicable (int mask)
 void EngineCard::updateModifiers()
 {
     // In the well they give way to whatever takes it (the EQ, the note map, an editor).
-    const bool wellTaken = eqEditor != nullptr || noteMap != nullptr || synthEditor != nullptr || (wellEditor != nullptr && wellEditor->isVisible());
+    const bool wellTaken = eqEditor != nullptr || isNotesOpen() || synthEditor != nullptr || (wellEditor != nullptr && wellEditor->isVisible());
     for (std::size_t i = 0; i < modifiers.size(); ++i)
         if (auto& m = modifiers[i]; m != nullptr)
         {
@@ -2266,7 +2266,7 @@ void EngineCard::updateWellOverlay()
         updateModifiers();
     if (wellOverlay == nullptr)
         return;
-    const bool wellTaken = eqEditor != nullptr || noteMap != nullptr || synthEditor != nullptr || captureEditor != nullptr
+    const bool wellTaken = eqEditor != nullptr || isNotesOpen() || synthEditor != nullptr || captureEditor != nullptr
                            || (wellEditor != nullptr && wellEditor->isVisible());
     wellOverlay->setBounds (sourceDisplay.getBounds());
     wellOverlay->setVisible (sourceDisplay.isVisible() && ! wellTaken && (! isGranular() || wellOverlay->shownWhileGranular()));
@@ -2636,7 +2636,7 @@ void EngineCard::InfoCard::paint (juce::Graphics& g)
 
 void EngineCard::updateMapPrompt()
 {
-    const int notes = (noteMap != nullptr || eqEditor != nullptr) ? 0 : processor.mapNotesPrompt (layerIndex);
+    const int notes = (isNotesOpen() || eqEditor != nullptr) ? 0 : processor.mapNotesPrompt (layerIndex);
     if (notes <= 0)
     {
         if (mapPrompt != nullptr)
@@ -3138,6 +3138,7 @@ void EngineCard::setNotesOpen (bool open)
     if (! open)
     {
         noteMap.reset();
+        zoneMap.reset();
         updateWellOverlay();
         return;
     }
@@ -3146,8 +3147,6 @@ void EngineCard::setNotesOpen (bool open)
     setCaptureOpen (false);
     setWellEditorShown (false);
     showGranularControls (false);
-    noteMap = std::make_unique<NoteMapEditor> (processor, layerIndex);
-    updateWellOverlay();
     juce::Component::SafePointer<EngineCard> safe (this);
     auto later = [safe] (std::function<void (EngineCard&)> f) {
         juce::MessageManager::callAsync ([safe, f] {
@@ -3155,6 +3154,25 @@ void EngineCard::setNotesOpen (bool open)
                 f (*safe);
         });
     };
+    if (zonesLayer)
+    {
+        // ZONES: a multi-sample layer's map over the keyboard, in the same place.
+        zoneMap = std::make_unique<ZoneEditor> (processor, layerIndex);
+        updateWellOverlay();
+        zoneMap->onClose = [later] {
+            later ([] (EngineCard& c) {
+                if (c.onNotesToggle != nullptr)
+                    c.onNotesToggle (c.layerIndex, false);
+                else
+                    c.setNotesOpen (false);
+            });
+        };
+        addAndMakeVisible (*zoneMap);
+        zoneMap->setBounds (sourceDisplay.getBounds());
+        return;
+    }
+    noteMap = std::make_unique<NoteMapEditor> (processor, layerIndex);
+    updateWellOverlay();
     noteMap->onClose = [later] {
         later ([] (EngineCard& c) {
             if (c.onNotesToggle != nullptr)
@@ -3196,6 +3214,8 @@ void EngineCard::refresh()
         eqEditor->refresh();
     if (noteMap != nullptr)
         noteMap->refresh();
+    if (zoneMap != nullptr)
+        zoneMap->refresh();
     if (isWellEditorShown())
         wellEditor->refresh();
     if (processor.hasKeyDnaKey (layerIndex))
@@ -3250,12 +3270,16 @@ void EngineCard::refresh()
     // ("9 notes · Ready"); MAP NOTES on a recording says it is analysing. Ordinary layers: as before.
     {
         const bool isAtlas = instrument != nullptr && instrument->atlas != nullptr;
-        if (isAtlas != atlasLayer)
+        // A set of files (several samples, not an atlas): the same key reads ZONES.
+        const bool isZones = ! isAtlas && instrument != nullptr && instrument->set != nullptr && instrument->set->members.size() > 1;
+        if (isAtlas != atlasLayer || isZones != zonesLayer)
         {
-            atlasLayer = isAtlas;
-            notesButton.setVisible (isAtlas);
-            if (! isAtlas)
+            if (isZones != zonesLayer || ! (isAtlas || isZones))
                 setNotesOpen (false);
+            atlasLayer = isAtlas;
+            zonesLayer = isZones;
+            notesButton.setZones (isZones);
+            notesButton.setVisible (isAtlas || isZones);
             resized();
             repaint();
         }
@@ -3454,9 +3478,10 @@ void EngineCard::resized()
     const float eqWidth = triple ? 38.0f : 46.0f;
     eqButton.setBounds (at ({ w - 62.0f - modeWidth - 8.0f - eqWidth, 16.0f, eqWidth, 33.0f }));
     textArea = at ({ 117.0f, 14.0f, w - 62.0f - modeWidth - 12.0f - eqWidth - 8.0f - 117.0f, 36.0f });
-    if (atlasLayer)
+    if (atlasLayer || zonesLayer)
     {
-        // NOTES: the same key, left of EQ (only on a Note Atlas layer: an ordinary card is unchanged).
+        // NOTES / ZONES: the same key, left of EQ (only on a Note Atlas or multi-sample layer:
+        // an ordinary card is unchanged).
         const float notesWidth = triple ? 54.0f : 66.0f;
         notesButton.setBounds (at ({ static_cast<float> (eqButton.getX()) - 6.0f - notesWidth, 16.0f, notesWidth, 33.0f }));
         textArea.setRight (notesButton.getX() - 8);
@@ -3465,7 +3490,7 @@ void EngineCard::resized()
     {
         // REC: the same key, left of the others (narrow cards: its dot alone).
         const float recWidth = triple ? 34.0f : 60.0f;
-        const float right = static_cast<float> (atlasLayer ? notesButton.getX() : eqButton.getX());
+        const float right = static_cast<float> (atlasLayer || zonesLayer ? notesButton.getX() : eqButton.getX());
         recButton->setBounds (at ({ right - 6.0f - recWidth, 16.0f, recWidth, 33.0f }));
         textArea.setRight (std::max (textArea.getX(), recButton->getX() - 8));
     }
@@ -3481,6 +3506,8 @@ void EngineCard::resized()
         eqEditor->setBounds (sourceDisplay.getBounds());   // exactly the display's place
     if (noteMap != nullptr)
         noteMap->setBounds (sourceDisplay.getBounds());
+    if (zoneMap != nullptr)
+        zoneMap->setBounds (sourceDisplay.getBounds());
     if (wellEditor != nullptr)
         wellEditor->setBounds (sourceDisplay.getBounds());
     if (synthEditor != nullptr)

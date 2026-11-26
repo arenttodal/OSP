@@ -2,6 +2,7 @@
 
 #include "model/InstrumentModel.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -37,6 +38,13 @@ struct SetMember
     double layerLoudnessDb = 0.0; ///< mean onset loudness of its (pitch group, layer): levelling keeps take-to-take differences
     double confidence = 1.0; ///< how sure the inference is about role/layer, 0..1
     bool userAssigned = false;
+    /** ZONES (a file set's zone editor): the keys this member plays, inclusive MIDI notes.
+        -1: none set (automatic: the nearest pitch group). Once any member has a range the set
+        is zoned (InstrumentSet::zoned): every key plays the members whose range holds it, and
+        a key no range holds is silent. */
+    int keyLow = -1, keyHigh = -1;
+    bool hasKeyRange() const noexcept { return keyLow >= 0 && keyHigh >= keyLow; }
+    bool coversKey (int note) const noexcept { return hasKeyRange() && note >= keyLow && note <= keyHigh; }
     /** A set built from a Note Atlas (engine/AtlasSet): the note region this member was copied
         from, in its source asset's frames, so the region stays identifiable (and a later
         shared-buffer implementation can read it in place). Empty for file sets. */
@@ -111,9 +119,32 @@ struct InstrumentSet
         file order). */
     bool cycleTakes = false;
     bool loudnessLayers = true;
+    /** ZONES: some member has a key range of its own (SetMember::keyLow / keyHigh), so keys
+        follow the ranges instead of the nearest pitch group (finaliseSampleSet sets it). */
+    bool zoned = false;
+    /** The most velocity layers any pitch group has (the zone editor's rows; zoned sets choose
+        a layer from the velocity against it). */
+    int layerCount() const noexcept
+    {
+        int n = 1;
+        for (const auto& g : groups)
+            n = std::max (n, g.layers);
+        return n;
+    }
+    /** Whether `note` starts a voice: a zoned set when a playable member's range holds it,
+        otherwise when groupFor finds a group. */
+    bool playsKey (int note, bool loopOn = false) const noexcept
+    {
+        if (! zoned)
+            return groupFor (note, loopOn) >= 0;
+        for (const auto& m : members)
+            if (m.role != SampleRole::articulation && m.coversKey (note) && plays (m, loopOn))
+                return true;
+        return false;
+    }
     /** Whether a key can be left silent (a set from an atlas with a finite reach or no fill,
         or one that leaves notes that cannot loop out). */
-    bool restrictsKeys() const noexcept { return ! fill || std::isfinite (fillLimitSemitones) || loopSelects; }
+    bool restrictsKeys() const noexcept { return zoned || ! fill || std::isfinite (fillLimitSemitones) || loopSelects; }
     /** Whether a member is played: with LOOP on in a set that selects, only one that can loop. */
     bool plays (const SetMember& m, bool loopOn) const noexcept
     {

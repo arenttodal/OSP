@@ -8763,3 +8763,4 @@ TEST_CASE ("plugin: the compact bottom edge - the housing ends 22 px under the k
     editor->refreshNow();
     CHECK (editor->modulationOverlay().currentNotice() == "Opened Warm Hymn");
 }
+#include "ZoneEditorTests.inc"

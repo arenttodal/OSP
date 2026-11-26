@@ -33,8 +33,16 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
   nearest one (between two, the lower). Several takes of one note alternate in turn, in
   file-name order (`C4_01`, `C4_02`, … then `C4_01` again), and a key filled from that note
   alternates them too. Takes that are only louder or softer stay takes. Velocity layers come
-  from dynamics words in the names (pp, mf, ff, soft, hard, …). The card's **⋮ → Samples**
-  shows and corrects the result. Sessions saved before this keep the sound they had.
+  from dynamics words in the names (pp, mf, ff, soft, hard, …). Sessions saved before this keep
+  the sound they had.
+- **ZONES** (the key on a multi-sample card, or **⋮ → Zones**) shows the result over the
+  keyboard: each sample a bar over the keys it plays, its root a dot, one row per velocity layer
+  (the hardest on top), takes of one note sharing a bar. Click a bar to hear it; drag its edges
+  to change its keys, its body to move it, up or down to another velocity row. **AUTO** is the
+  automatic map; the first change (or **MANUAL**) makes the zones yours, and keys no zone covers
+  are silent until **FILL GAPS** stretches the zones over them. **ROOT − / +** retunes the
+  selected sample. Drop more files on ZONES (or **+ ADD SAMPLES**) to add them to the sound.
+  Everything is saved with the session.
 - **⋮ → Add source…** does the same from a file browser: one file is one layer, several
   files are one multi-sample layer.
 - **Remove** a layer from its card's **⋮** menu (**Remove source**, at once; if a sound is still

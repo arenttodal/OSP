@@ -56,6 +56,24 @@
 > - **Right-click SAVE (Ctrl-click on a Mac) is Save As** (`SavePresetButton::onSaveAs`); a click
 >   saves as before. The sister shell's SAVE already always asks for a file.
 >
+> **26 Nov 2026, owner's notes:**
+> - **ZONES: the multi-sample zone editor (owner approved the mockup):** a set of dropped files
+>   shows ZONES on its card (the NOTES key; the menu's Samples is now Zones and opens it). Each
+>   sample is a bar over its keys with its root as a dot; rows are velocity layers (hardest on
+>   top); round-robin takes share a bar. Click a bar to hear it; drag an edge to resize, the body
+>   to move, up / down to another row (above the top row: a new, harder layer). AUTO is the
+>   automatic map (nearest sample); the first edit, MANUAL or FILL GAPS makes the zones the
+>   musician's own and a key no zone holds is silent; AUTO forgets the ranges again. ROOT - / + /
+>   AUTO retune the selected sample; files dropped on it (or + ADD SAMPLES) join the set with the
+>   corrections kept. Model: `SetMember::keyLow / keyHigh`, `InstrumentSet::zoned`, `playsKey`,
+>   `layerCount`; the engine's `memberFor` picks by range then velocity row when zoned (unzoned
+>   sets, atlases and every golden unchanged). Edits go through the existing corrections
+>   (`SetAssignment::keyLow / keyHigh`, `InstrumentHost::setSetAssignments`, `reassignInstrumentSet`;
+>   nothing is analysed again) and are saved as `<Assignment keyLow keyHigh>` (additive).
+>   `ZoneEditor` (shared/andor-ui), the old Samples panel removed; the multi-sample Learn lesson
+>   points at ZONES. Not yet: undo of a zone edit (AUTO resets the map), editing velocity
+>   boundaries other than by rows. Tests: "[zones]".
+>
 > **25 Nov 2026, owner's notes (2):**
 > - **NOTES: a quieter step a semitone down was swallowed (fixed, owner's nyckelharpa take):** G#3
 >   then G3 held 0.4 s, 12 dB quieter, at the end of a phrase read as one "G#3 with vibrato". The

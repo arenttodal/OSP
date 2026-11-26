@@ -383,24 +383,24 @@ static Catalog ospCatalog()
         l.steps.push_back (step ("play", "osp.keyboard", "Play across the keyboard",
                                  "Play low and high notes. Each key plays the recording nearest in pitch, transposed the rest of the way; repeated notes take turns between takes of the same pitch.",
                                  Completion::action ({ "note.played" }, Condition::state ("osp.source.set"))));
-        auto samples = step ("samples", "osp.source.menu", "Open Samples",
-                             juce::String::fromUTF8 ("Open the layer's \xe2\x8b\xaf menu and choose Samples to see how OSP has placed each file."),
+        auto samples = step ("samples", "osp.source.menu", "Open Zones",
+                             juce::String::fromUTF8 ("Press ZONES on the card (or choose Zones in the layer's \xe2\x8b\xaf menu) to see where OSP has placed each file on the keyboard."),
                              Completion::action ({ "samples.opened" }, Condition::state ("osp.samples.open")).withAlreadyDone (Condition::state ("osp.samples.open"), "Already open"));
         samples.revealOnEnter = false;
         l.steps.push_back (samples);
         auto root = step ("root", "osp.samples.root", "The root note",
-                          "The root is the pitch OSP believes a file was recorded at, and maps it by. If one was detected wrongly, choose the right note here.");
-        root.unavailableBody = "The Samples inspector is closed. Show me opens it again.";
+                          "The root is the pitch OSP believes a file was recorded at, the dot on its zone. If one was detected wrongly, select its zone and step it with ROOT here.");
+        root.unavailableBody = "ZONES is closed. Show me opens it again.";
         l.steps.push_back (root);
-        auto role = step ("role", "osp.samples.role", "Takes and roles",
-                          "Files of the same pitch are Round robin takes, played in turn. Pitch is the only file of its note; Articulation is kept out of normal notes.");
+        auto role = step ("role", "osp.samples.role", "Zones and takes",
+                          "Each bar is a sample over the keys it plays: drag its edges to resize it, its body to move it. Files of the same pitch share a bar (2 takes) and play in turn.");
         role.unavailableBody = root.unavailableBody;
         l.steps.push_back (role);
         auto vel = step ("velocity", "osp.samples.layer", "Velocity layers",
-                         "Layer 1 to 4 is the velocity layer: files of one pitch played at different strengths. OSP makes layers from dynamics words in the names, such as pp, mf or ff.");
+                         "Rows are velocity layers, the hardest on top: files of one pitch played at different strengths. OSP makes them from dynamics words in the names, such as pp, mf or ff; drag a bar up or down to move it.");
         vel.unavailableBody = root.unavailableBody;
         l.steps.push_back (vel);
-        l.completionText = "A multi-sample sound gives OSP a recording near every note. Samples shows how each file is used, and lets you correct it.";
+        l.completionText = "A multi-sample sound gives OSP a recording near every note. ZONES shows where each file plays, and lets you change it.";
         setUp (l, { sampleSet() }, "This lesson needs several recordings loaded as one sound: a folder dropped on a layer, or the pluck set example.");
         c.lessons.push_back (l);
     }
@@ -762,7 +762,7 @@ static Catalog ospCatalog()
     help ("osp.header.preset", "Presets and Library", "The preset's name: arrows step through presets; the name opens the Library, starting states and the sound before the last load.",
           "osp.presets");
     help ("osp.header.menu", "Menu", "The instrument (new, save, open, the Library, undo), its sources (add, record, clear), content (starting states, portable instruments, packs), preferences and support (tutorials). Each source's own actions are on its card's menu.");
-    help ("osp.samples", "Samples", "How each file of a multi-sample sound is used: its role, its root note and its velocity layer. A change is yours and is kept.", "osp.multisample");
+    help ("osp.samples", "Zones", "Where each file of a multi-sample sound plays: its keys, its root note and its velocity row. Drag to change them; drop files to add more. A change is yours and is kept.", "osp.multisample");
     help ("osp.advanced", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
     help ("keyboard.settings", "Advanced Settings", "Advanced contains instrument-wide settings for tuning, voice behavior, dynamics and supported MIDI expression.");
     help ("keyboard.info", "Info", "Turn Info on to read explanations of OSP's controls as you point to them.");
@@ -1049,19 +1049,25 @@ struct OspLearnTargets
                  openKeyDna });
 
         // Samples, the Library.
-        auto showSamples = [&e, &p] {
-            const auto inst = p.currentInstrument (p.editLayer());
-            if (inst == nullptr || inst->set == nullptr)
-                return false;
-            e.samplesShown = true;
-            e.samplesPanel.setVisible (true);
-            e.samplesPanel.setInstrument (inst, p.editLayer());
-            e.updateFocus();
-            return true;
+        auto zonesOf = [&e, &p]() -> ZoneEditor* {
+            const int layer = p.editLayer();
+            return layer >= 0 && layer < static_cast<int> (e.cards.size()) ? e.cards[static_cast<std::size_t> (layer)]->zoneEditorComponent() : nullptr;
         };
-        t.add ({ "osp.samples", [&e] { return e.samplesShown ? static_cast<juce::Component*> (&e.samplesPanel) : nullptr; }, {}, showSamples, {}, true });
-        for (const auto* which : { "role", "root", "layer" })
-            t.add ({ juce::String ("osp.samples.") + which, [&e, which] { return e.samplesShown ? e.samplesPanel.firstRowControl (which) : nullptr; }, {}, showSamples });
+        auto showSamples = [&e, &p, zonesOf] {
+            const auto inst = p.currentInstrument (p.editLayer());
+            if (inst == nullptr || inst->set == nullptr || inst->atlas != nullptr)
+                return false;
+            auto& card = *e.cards[static_cast<std::size_t> (p.editLayer())];
+            if (zonesOf() == nullptr && card.onNotesToggle != nullptr)
+                card.onNotesToggle (p.editLayer(), true);
+            return zonesOf() != nullptr;
+        };
+        t.add ({ "osp.samples", [zonesOf] { return static_cast<juce::Component*> (zonesOf()); }, {}, showSamples, {}, true });
+        t.add ({ "osp.samples.root", [zonesOf] { return static_cast<juce::Component*> (zonesOf()); },
+                 [] (juce::Component& c) { auto& z = static_cast<ZoneEditor&> (c); return z.actionArea ("root-").getUnion (z.actionArea ("root.auto")).toNearestInt(); }, showSamples });
+        for (const auto* which : { "role", "layer" })
+            t.add ({ juce::String ("osp.samples.") + which, [zonesOf] { return static_cast<juce::Component*> (zonesOf()); },
+                     [] (juce::Component& c) { return static_cast<ZoneEditor&> (c).laneArea().toNearestInt(); }, showSamples });
         auto openLibrary = [&e] { e.openLibrary(); return e.libraryPanel != nullptr; };
         t.add ({ "osp.library", [&e] { return static_cast<juce::Component*> (e.libraryPanel.get()); }, {}, openLibrary });
         t.add ({ "osp.library.save", [&e] { return e.libraryPanel != nullptr ? &e.libraryPanel->saveKey() : nullptr; }, {}, openLibrary, {}, false, true });
@@ -1107,7 +1113,7 @@ struct OspLearnTargets
                     return true;
             return false;
         });
-        t.addState ("osp.samples.open", [&e] { return e.samplesShown; });
+        t.addState ("osp.samples.open", [zonesOf] { return zonesOf() != nullptr; });
         t.addState ("osp.library.open", [&e] { return e.libraryPanel != nullptr; });
     }
 };
@@ -1279,7 +1285,6 @@ void OspAudioProcessorEditor::createLearn()
         example();
         learnAction ("source.load.requested", "osp.source.dropZone");
     };
-    samplesPanel.onUserEdit = [this] (const juce::String& what) { learnAction ("samples." + what, "osp.samples"); };
 }
 
 void OspAudioProcessorEditor::learnAction (const juce::String& actionId, const juce::String& targetId, const juce::String& parameterId)

@@ -322,6 +322,25 @@ public:
         juce::ignoreUnused (layer, start, end);
     }
 
+    /** ZONES (a file set's zone editor): the set is rebuilt with these corrections in place of
+        its current ones (key ranges, velocity rows, roots, roles); no file is analysed again.
+        Message thread. */
+    virtual void setSetAssignments (int layer, std::vector<SetAssignment> assignments)
+    {
+        juce::ignoreUnused (layer, assignments);
+    }
+    /** Plays one member of the layer's set as recorded (ZONES: a click on a zone), outside the
+        instrument and its effects. Message thread. */
+    virtual void auditionSetMember (int layer, int member)
+    {
+        juce::ignoreUnused (layer, member);
+    }
+    /** Files dropped on ZONES join the layer's set (its corrections kept). Message thread. */
+    virtual void addSamplesToSet (int layer, const juce::Array<juce::File>& files)
+    {
+        juce::ignoreUnused (layer, files);
+    }
+
     /** The last re-detection on the layer (DETECTION): what it kept and where it disagrees with
         the musician's corrections (note ids, kept as the musician left them). Empty: none. */
     virtual juce::String atlasReport (int layer) const

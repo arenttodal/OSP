@@ -27,43 +27,6 @@ namespace osp::plugin
 {
 
 /**
-    Samples inspector (spec §48): the inferred structure of a multi-sample set, one row
-    per file under its pitch group, with role and layer selectors. Changing a selector
-    pins that file's place (a user assignment) and rebuilds the set.
-*/
-class SamplesPanel final : public juce::Component
-{
-public:
-    explicit SamplesPanel (OspAudioProcessor& processor);
-    void setInstrument (std::shared_ptr<const LoadedInstrument> instrument, int layer);
-    /** ANDOR Learn: a row's choice the musician made ("role", "root", "layer"). */
-    std::function<void (const juce::String& what)> onUserEdit;
-    /** ANDOR Learn and tests: the first file's role, root or velocity-layer list (nullptr: none). */
-    juce::Component* firstRowControl (const juce::String& which)
-    {
-        for (auto& r : rows)
-            if (! r->isHeader)
-                return which == "role" ? static_cast<juce::Component*> (&r->role) : which == "root" ? static_cast<juce::Component*> (&r->root) : &r->layer;
-        return nullptr;
-    }
-    void paint (juce::Graphics&) override;
-    void resized() override;
-
-private:
-    struct Row
-    {
-        juce::Label name, info;
-        juce::ComboBox role, layer, root;
-        bool isHeader = false;
-    };
-    OspAudioProcessor& ospProcessor;
-    juce::Viewport viewport;
-    juce::Component content;
-    std::vector<std::unique_ptr<Row>> rows;
-    std::uint64_t shownGeneration = 0;
-};
-
-/**
     The instrument (adaptive 1-3 layer redesign). From the top: header (identity, preset,
     volume, menu); the source area, which is the only part that changes with the number of
     sounds (none: a drop zone; one: a full-width card; two or three: equal cards); the mix
@@ -298,8 +261,6 @@ public:
     void openNewLayerCapture();
     CaptureEditor* newLayerCaptureComponent() noexcept { return newLayerCapture.get(); }
 private:
-    SamplesPanel samplesPanel { ospProcessor };
-    bool samplesShown = false;
     std::array<bool, OspAudioProcessor::numLayers> shownOccupied {};
     std::array<float, 6> shownValues {};   ///< mix x/y and ADSR last drawn
     int shownCount = -1;

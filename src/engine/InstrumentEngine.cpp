@@ -398,30 +398,60 @@ int InstrumentEngine::memberFor (int note, int velocity, std::uint64_t eventInde
     // Nearest pitch anchor (ties: the lower one); an atlas's mapping may leave the key silent,
     // and with LOOP on it plays only notes that can loop.
     const bool loopOn = config.layer[which].loop;
-    const int groupIndex = set->groupFor (note, loopOn);
-    if (groupIndex < 0)
-        return unmappedMember;
-    const PitchGroup* group = &set->groups[static_cast<std::size_t> (groupIndex)];
-    // Velocity layer, then a round-robin take that is never the previous one.
-    const int layer = std::clamp (static_cast<int> (std::clamp (velocity, 1, 127) / 128.0 * group->layers), 0, group->layers - 1);
-    // The requested layer, or the nearest layer that has playable takes.
-    int chosenLayer = -1;
-    for (int id : group->members)
-    {
-        const auto& m = set->members[static_cast<std::size_t> (id)];
-        if (m.role != SampleRole::articulation && set->plays (m, loopOn) && (chosenLayer < 0 || std::abs (m.layer - layer) < std::abs (chosenLayer - layer)))
-            chosenLayer = m.layer;
-    }
+    int groupIndex = -1, chosenLayer = -1;
     int candidates[64];
     int count = 0;
-    for (int id : group->members)
+    if (set->zoned)
     {
-        const auto& m = set->members[static_cast<std::size_t> (id)];
-        if (m.role != SampleRole::articulation && m.layer == chosenLayer && set->plays (m, loopOn) && count < 64)
-            candidates[count++] = id;
+        // ZONES: the members whose key range holds the note; the velocity layer against the
+        // set's rows (the nearest layer that has one); of those, the pitch group nearest the
+        // note (overlapping zones), whose takes alternate as in an automatic set.
+        const int rows = set->layerCount();
+        const int layer = std::clamp (static_cast<int> (std::clamp (velocity, 1, 127) / 128.0 * rows), 0, rows - 1);
+        for (const auto& m : set->members)
+            if (m.role != SampleRole::articulation && m.coversKey (note) && set->plays (m, loopOn)
+                && (chosenLayer < 0 || std::abs (m.layer - layer) < std::abs (chosenLayer - layer)))
+                chosenLayer = m.layer;
+        if (chosenLayer < 0)
+            return unmappedMember;
+        for (const auto& m : set->members)
+            if (m.role != SampleRole::articulation && m.coversKey (note) && m.layer == chosenLayer && set->plays (m, loopOn)
+                && (groupIndex < 0 || std::abs (set->groups[static_cast<std::size_t> (m.pitchGroup)].rootMidi - note)
+                                          < std::abs (set->groups[static_cast<std::size_t> (groupIndex)].rootMidi - note)))
+                groupIndex = m.pitchGroup;
+        for (int id = 0; id < static_cast<int> (set->members.size()) && count < 64; ++id)
+        {
+            const auto& m = set->members[static_cast<std::size_t> (id)];
+            if (m.role != SampleRole::articulation && m.coversKey (note) && m.layer == chosenLayer && m.pitchGroup == groupIndex && set->plays (m, loopOn))
+                candidates[count++] = id;
+        }
+        if (count == 0)
+            return unmappedMember;
     }
-    if (count == 0)
-        return group->members.front();
+    else
+    {
+        groupIndex = set->groupFor (note, loopOn);
+        if (groupIndex < 0)
+            return unmappedMember;
+        const PitchGroup* group = &set->groups[static_cast<std::size_t> (groupIndex)];
+        // Velocity layer, then a round-robin take that is never the previous one.
+        const int layer = std::clamp (static_cast<int> (std::clamp (velocity, 1, 127) / 128.0 * group->layers), 0, group->layers - 1);
+        // The requested layer, or the nearest layer that has playable takes.
+        for (int id : group->members)
+        {
+            const auto& m = set->members[static_cast<std::size_t> (id)];
+            if (m.role != SampleRole::articulation && set->plays (m, loopOn) && (chosenLayer < 0 || std::abs (m.layer - layer) < std::abs (chosenLayer - layer)))
+                chosenLayer = m.layer;
+        }
+        for (int id : group->members)
+        {
+            const auto& m = set->members[static_cast<std::size_t> (id)];
+            if (m.role != SampleRole::articulation && m.layer == chosenLayer && set->plays (m, loopOn) && count < 64)
+                candidates[count++] = id;
+        }
+        if (count == 0)
+            return group->members.front();
+    }
     if (count == 1)
         return candidates[0];
     const auto key = static_cast<std::size_t> ((groupIndex % 64) * 8 + std::min (chosenLayer, 7));
@@ -773,7 +803,7 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
         return;
     // A key the layer's set does not play (a Note Atlas's FILL reach): no voice is started and
     // nothing is stolen. (File sets play every key: their member is chosen below as before.)
-    if (set != nullptr && set->restrictsKeys() && set->groupFor (note, config.layer[context].loop) < 0)
+    if (set != nullptr && set->restrictsKeys() && ! set->playsKey (note, config.layer[context].loop))
         return;
 
     const auto stealFade = std::max (1, static_cast<int> (config.stealFadeSeconds * sampleRate));

@@ -278,6 +278,9 @@ public:
     void loadFiles (const juce::Array<juce::File>& files, int layer = -1);
     /** Samples inspector correction: pin one file's role/layer and rebuild the set. */
     void reassignSample (const std::string& filename, SampleRole role, int velocityLayer, std::optional<double> rootMidi = std::nullopt);
+    void setSetAssignments (int layer, std::vector<SetAssignment> assignments) override;
+    void auditionSetMember (int layer, int member) override;
+    void addSamplesToSet (int layer, const juce::Array<juce::File>& files) override;
     void loadExample (int layer = -1);
     /** ANDOR Learn: loads a tutorial example (TutorialSounds: "bowed", "pluck", "voice",
         "layered", "pluckSet") as a new instrument, after keeping the whole current state so

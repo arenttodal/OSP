@@ -216,6 +216,11 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
                 m.role = a.role;
                 if (a.layer)
                     m.layer = std::max (0, *a.layer);
+                if (a.keyLow && a.keyHigh)
+                {
+                    m.keyLow = std::clamp (std::min (*a.keyLow, *a.keyHigh), 0, 127);
+                    m.keyHigh = std::clamp (std::max (*a.keyLow, *a.keyHigh), 0, 127);
+                }
                 m.userAssigned = true;
                 m.confidence = 1.0;
                 auto& g = set.groups[static_cast<std::size_t> (m.pitchGroup)];
@@ -241,6 +246,7 @@ void finaliseSampleSet (InstrumentSet& set)
 {
     if (set.members.empty() || set.groups.empty())
         return;
+    set.zoned = std::any_of (set.members.begin(), set.members.end(), [] (const SetMember& m) { return m.hasKeyRange(); });
     // Levelling reference: each (group, layer) by its mean loudness, so groups and layers
     // line up while round-robin takes keep their natural differences.
     set.loudestDb = -200.0;

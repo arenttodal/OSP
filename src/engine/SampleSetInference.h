@@ -23,6 +23,8 @@ struct SetAssignment
     SampleRole role = SampleRole::roundRobin;
     std::optional<double> rootMidi;  ///< move to the pitch group nearest this root
     std::optional<int> layer;        ///< velocity layer (0 = softest)
+    /** ZONES: the keys the file plays (inclusive MIDI notes); unset = automatic. */
+    std::optional<int> keyLow, keyHigh;
 };
 
 /**

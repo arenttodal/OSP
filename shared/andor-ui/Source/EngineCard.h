@@ -4,6 +4,7 @@
 #include "WellOverlay.h"
 #include "EqEditor.h"
 #include "NoteMapEditor.h"
+#include "ZoneEditor.h"
 #include "OspLookAndFeel.h"
 #include "InstrumentHost.h"
 #include "ShapingPopups.h"
@@ -269,6 +270,18 @@ public:
         setTitle ("NOTES");
     }
     void setNeedsReview (bool on) { if (review != on) { review = on; repaint(); } }
+    /** ZONES on a multi-sample layer (the same key; NOTES on a Note Atlas layer). */
+    void setZones (bool on)
+    {
+        if (zones == on)
+            return;
+        zones = on;
+        setTitle (on ? "ZONES" : "NOTES");
+        setTooltip (on ? "This layer's samples over the keyboard: their keys, roots and velocity rows (it opens over the waveform)"
+                       : "This layer's notes: where each one is, its pitch and key (it opens over the waveform)");
+        repaint();
+    }
+    bool showsZones() const noexcept { return zones; }
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     void buttonStateChanged() override { skin::repaintKey (*this); }
     skin::KeyRole keyRole() const override { return skin::KeyRole::eq; }
@@ -279,6 +292,7 @@ public:
 
 private:
     bool review = false;
+    bool zones = false;
 };
 
 /** REC (live capture, a host with liveCapture()): opens the layer's CAPTURE page; its dot
@@ -619,7 +633,8 @@ public:
     /** The "Map notes?" prompt answered by the musician (true: MAP NOTES); after it is acted on. */
     std::function<void (int, bool)> onMapNotesAnswer;
     void setNotesOpen (bool open);
-    bool isNotesOpen() const noexcept { return noteMap != nullptr; }
+    bool isNotesOpen() const noexcept { return noteMap != nullptr || zoneMap != nullptr; }
+    ZoneEditor* zoneEditorComponent() noexcept { return zoneMap.get(); }
     NoteMapEditor* noteMapComponent() noexcept { return noteMap.get(); }
     NotesButton& notesToggle() noexcept { return notesButton; }
     /** Tests: the "Map notes?" prompt when it is shown (null otherwise), and its answer. */
@@ -683,10 +698,12 @@ private:
     std::unique_ptr<EqEditor> eqEditor;
     NotesButton notesButton;
     std::unique_ptr<NoteMapEditor> noteMap;
+    std::unique_ptr<ZoneEditor> zoneMap;   ///< ZONES (a multi-sample layer), in NOTES' place
     std::unique_ptr<WellOverlay> wellOverlay;
     void updateWellOverlay();
     std::unique_ptr<CardWellEditor> wellEditor;   ///< (null on every card that did not ask for one)
     bool atlasLayer = false;
+    bool zonesLayer = false;   ///< a multi-sample file set: the NOTES key reads ZONES
     juce::Rectangle<int> badgeArea, textArea, dividerArea;
     juce::String rootText, fileText;
     struct HeadingDoor;

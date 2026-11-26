@@ -31,123 +31,6 @@ namespace
 }
 
 //==============================================================================
-SamplesPanel::SamplesPanel (OspAudioProcessor& p) : ospProcessor (p)
-{
-    viewport.setViewedComponent (&content, false);
-    viewport.setScrollBarsShown (true, false);
-    addAndMakeVisible (viewport);
-}
-
-void SamplesPanel::paint (juce::Graphics& g)
-{
-    g.setColour (palette::display);
-    g.fillRoundedRectangle (getLocalBounds().toFloat(), 7.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.55f));
-    g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (0.5f), 7.0f, 1.0f);
-}
-
-void SamplesPanel::setInstrument (std::shared_ptr<const LoadedInstrument> instrument, int)
-{
-    if (instrument == nullptr || instrument->set == nullptr)
-    {
-        rows.clear();
-        content.removeAllChildren();
-        shownGeneration = 0;
-        return;
-    }
-    if (instrument->generation == shownGeneration)
-        return;
-    shownGeneration = instrument->generation;
-    rows.clear();
-    content.removeAllChildren();
-    const auto& set = *instrument->set;
-    for (const auto& group : set.groups)
-    {
-        auto header = std::make_unique<Row>();
-        header->isHeader = true;
-        header->name.setText (juce::String (midiNoteName (static_cast<int> (std::lround (group.rootMidi))))
-                                  + (group.layers > 1 ? "   " + juce::String (group.layers) + " velocity layers" : juce::String()),
-                              juce::dontSendNotification);
-        header->name.setFont (fonts::make (14.0f, fonts::Weight::medium));
-        header->name.setColour (juce::Label::textColourId, palette::housingLight);
-        content.addAndMakeVisible (header->name);
-        rows.push_back (std::move (header));
-        for (int id : group.members)
-        {
-            const auto& member = set.members[static_cast<std::size_t> (id)];
-            auto row = std::make_unique<Row>();
-            row->name.setText (juce::String::fromUTF8 (member.filename.c_str()), juce::dontSendNotification);
-            row->name.setColour (juce::Label::textColourId, palette::housingLight);
-            row->info.setText (member.userAssigned ? juce::String ("set by you")
-                                                   : "auto " + juce::String (static_cast<int> (std::lround (member.confidence * 100))) + "%",
-                               juce::dontSendNotification);
-            row->info.setColour (juce::Label::textColourId, palette::displayText);
-            row->role.addItemList ({ "Pitch", "Velocity layer", "Round robin", "Articulation" }, 1);
-            row->role.setSelectedId (static_cast<int> (member.role) + 1, juce::dontSendNotification);
-            for (int l = 1; l <= 4; ++l)
-                row->layer.addItem ("Layer " + juce::String (l), l);
-            row->layer.setSelectedId (std::clamp (member.layer + 1, 1, 4), juce::dontSendNotification);
-            // Root: the detected pitch, or a correction (octave errors on unusual sources).
-            row->root.addItem ("root auto", 1);
-            for (int note = 24; note <= 108; ++note)
-                row->root.addItem ("root " + juce::String (midiNoteName (note)), note + 2);
-            int pinnedRoot = 1;
-            for (const auto& a : instrument->assignments)
-                if (a.filename == member.filename && a.rootMidi)
-                    pinnedRoot = static_cast<int> (std::lround (*a.rootMidi)) + 2;
-            row->root.setSelectedId (pinnedRoot, juce::dontSendNotification);
-            const auto filename = member.filename;
-            auto* rolePtr = &row->role;
-            auto* layerPtr = &row->layer;
-            auto* rootPtr = &row->root;
-            auto apply = [this, filename, rolePtr, layerPtr, rootPtr] {
-                std::optional<double> root;
-                if (rootPtr->getSelectedId() >= 2)
-                    root = static_cast<double> (rootPtr->getSelectedId() - 2);
-                ospProcessor.reassignSample (filename, static_cast<SampleRole> (rolePtr->getSelectedId() - 1), layerPtr->getSelectedId() - 1, root);
-            };
-            // (A combo box's change: only the musician's choice; the rows are filled silently.)
-            row->role.onChange = [this, apply] { apply(); if (onUserEdit != nullptr) onUserEdit ("role"); };
-            row->layer.onChange = [this, apply] { apply(); if (onUserEdit != nullptr) onUserEdit ("layer"); };
-            row->root.onChange = [this, apply] { apply(); if (onUserEdit != nullptr) onUserEdit ("root"); };
-            for (juce::Component* c : { static_cast<juce::Component*> (&row->name), static_cast<juce::Component*> (&row->info),
-                                        static_cast<juce::Component*> (&row->role), static_cast<juce::Component*> (&row->layer),
-                                        static_cast<juce::Component*> (&row->root) })
-                content.addAndMakeVisible (c);
-            rows.push_back (std::move (row));
-        }
-    }
-    resized();
-}
-
-void SamplesPanel::resized()
-{
-    viewport.setBounds (getLocalBounds().reduced (8));
-    const int width = viewport.getWidth() - viewport.getScrollBarThickness();
-    int y = 0;
-    for (auto& row : rows)
-    {
-        if (row->isHeader)
-        {
-            row->name.setBounds (0, y + 6, width, 22);
-            y += 30;
-            continue;
-        }
-        auto line = juce::Rectangle<int> (0, y, width, 26);
-        row->layer.setBounds (line.removeFromRight (90));
-        line.removeFromRight (6);
-        row->root.setBounds (line.removeFromRight (100));
-        line.removeFromRight (6);
-        row->role.setBounds (line.removeFromRight (130));
-        line.removeFromRight (6);
-        row->info.setBounds (line.removeFromRight (90));
-        row->name.setBounds (line.withTrimmedLeft (12));
-        y += 30;
-    }
-    content.setSize (width, std::max (y, 10));
-}
-
-//==============================================================================
 void OspAudioProcessorEditor::OutsideClickWatcher::mouseDown (const juce::MouseEvent& e)
 {
     editor.mouseDownAnywhere (e.eventComponent);
@@ -314,7 +197,6 @@ OspAudioProcessorEditor::OspAudioProcessorEditor (OspAudioProcessor& p)
     };
     content.addChildComponent (dropZone);
     content.addChildComponent (addTarget);
-    content.addChildComponent (samplesPanel);
 
     headerMix.onOpenMix = [this] {
         if (! design::showMixTriangle)
@@ -1053,12 +935,6 @@ void OspAudioProcessorEditor::updateFocus()
     }
     for (int l = 0; l < OspAudioProcessor::numLayers; ++l)
         cards[static_cast<std::size_t> (l)]->setFocused (shownCount <= 1 || l == edit);
-    if (samplesShown)
-    {
-        const auto& card = *cards[static_cast<std::size_t> (edit)];
-        samplesPanel.setBounds (card.getBounds().reduced (12).withTrimmedTop (36).withTrimmedBottom (100));
-        samplesPanel.toFront (false);
-    }
 }
 
 OspAudioProcessorEditor::DropTarget OspAudioProcessorEditor::targetAt (juce::Point<int> where) const
@@ -1311,18 +1187,16 @@ juce::PopupMenu OspAudioProcessorEditor::sourceMenu (int layer)
                     safe->ospProcessor.playAsOneSample (layer), safe->timerCallback();
             }));
         }
-        if (loaded->set != nullptr)
-            menu.addItem (menuicons::item (Kind::list, "Samples", [safe, layer] {
+        if (loaded->set != nullptr && loaded->atlas == nullptr && loaded->set->members.size() > 1)
+            menu.addItem (menuicons::item (Kind::list, "Zones", [safe, layer] {
+                // ZONES: the card's editor over the waveform (the samples' keys, roots, rows).
                 if (safe == nullptr)
                     return;
-                safe->ospProcessor.setEditLayer (layer);
-                safe->samplesShown = ! safe->samplesShown;
-                safe->samplesPanel.setVisible (safe->samplesShown);
-                safe->samplesPanel.setInstrument (safe->ospProcessor.currentInstrument (layer), layer);
-                safe->updateFocus();
-                if (safe->samplesShown)
+                auto& c = *safe->cards[static_cast<std::size_t> (layer)];
+                c.onNotesToggle (layer, ! c.isNotesOpen());
+                if (c.isNotesOpen())
                     safe->learnAction ("samples.opened", "osp.samples");
-            }, true, samplesShown && ospProcessor.editLayer() == layer));
+            }, true, cards[static_cast<std::size_t> (layer)]->isNotesOpen()));
         // The recording's file: where it was dropped from, else its copy in the sample store. A
         // sound mapped into notes reveals the recording it came from; a set of samples, its first
         // member that still exists (the folder opens on it, the others beside it).
@@ -2112,17 +1986,6 @@ void OspAudioProcessorEditor::timerCallback()
     {
         shownWheelPosition = wheel;
         modWheel.setValue (wheel);
-    }
-    if (samplesShown)
-    {
-        const auto instrument = ospProcessor.currentInstrument (ospProcessor.editLayer());
-        if (instrument == nullptr || instrument->set == nullptr)
-        {
-            samplesShown = false;
-            samplesPanel.setVisible (false);
-        }
-        else
-            samplesPanel.setInstrument (instrument, ospProcessor.editLayer());
     }
     // Pictures that follow parameters repaint only when those moved.
     {
