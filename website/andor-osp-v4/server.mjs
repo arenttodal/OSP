@@ -9,7 +9,8 @@ const types = {".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-
 let archive = {};
 let ready = false;
 try {
-  const zip = unzipSync(new Uint8Array(await readFile(new URL("./site.zip",import.meta.url))));
+  const archiveName = "andor-osp-premium-art-direction-v4.zip";
+  const zip = unzipSync(new Uint8Array(await readFile(new URL(`./${archiveName}`,import.meta.url))));
   for (const [name,bytes] of Object.entries(zip)) {
     if (name.endsWith("/") || !name.startsWith("andor-osp-v4/")) continue;
     const rel = name.slice("andor-osp-v4/".length);
@@ -19,9 +20,9 @@ try {
   ready = Boolean(archive["index.html"] && archive["style.css"]);
   console.log(ready ? "Loaded ANDOR V4 source archive" : "V4 ZIP missing required site files");
 } catch (error) {
-  console.log("V4 site.zip pending upload:",error.message);
+  console.log("V4 source ZIP pending upload:",error.message);
 }
-const pending = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ANDOR V4 — Upload pending</title></head><body style="font:16px system-ui;background:#100d0c;color:#e8e3da;margin:12vh auto;max-width:580px;padding:24px"><h1>ANDOR OSP V4</h1><p>The preview service is ready. The exact V4 site.zip asset package has not been uploaded yet.</p></body></html>';
+const pending = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ANDOR V4 — Upload pending</title></head><body style="font:16px system-ui;background:#100d0c;color:#e8e3da;margin:12vh auto;max-width:580px;padding:24px"><h1>ANDOR OSP V4</h1><p>The preview service is ready. The exact V4 image and HTML asset package has not been uploaded yet.</p></body></html>';
 const server = http.createServer((req,res)=>{
   let requestPath;
   try { requestPath = decodeURIComponent(new URL(req.url,"http://localhost").pathname); } catch { res.writeHead(400);res.end();return; }
