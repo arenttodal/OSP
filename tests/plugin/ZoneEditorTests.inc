@@ -202,3 +202,57 @@ TEST_CASE ("plugin zones: a picture of ZONES in the editor (OSP_ZONES_SHOT=<file
     juce::FileOutputStream stream (out);
     juce::PNGImageFormat().writeImageToStream (image, stream);
 }
+
+TEST_CASE ("plugin zones: every zone edit is one undo step (the editor's arrows and the instrument's history), redo too", "[plugin][zones][undo]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    juce::Array<juce::File> files;
+    files.add (writeSource (tmp.dir, "low A2.wav", testsignals::vowel (midiToHz (45), 1.0, 48000.0, 1)));
+    files.add (writeSource (tmp.dir, "mid A3.wav", testsignals::vowel (midiToHz (57), 1.0, 48000.0, 2)));
+    OspAudioProcessor p;
+    p.loadFiles (files);
+    settleSet (p);
+    ZoneEditor z (p, 0);
+    z.setSize (900, 260);
+    REQUIRE (z.zones().size() == 2);
+    const int high0 = z.zones()[0].high;
+    auto shrink = [&z] (int keys) {
+        const auto r = z.zoneBounds (0);
+        const juce::Point<float> edge (r.getRight() - 2.0f, r.getCentreY());
+        const float keyW = z.xForKey (1) - z.xForKey (0);
+        z.mouseDown (zoneMouse (z, edge, edge));
+        z.mouseDrag (zoneMouse (z, edge.translated (-static_cast<float> (keys) * keyW, 0.0f), edge));
+        z.mouseUp (zoneMouse (z, edge.translated (-static_cast<float> (keys) * keyW, 0.0f), edge));
+    };
+    shrink (3);
+    settleSet (p);
+    z.refresh();
+    REQUIRE (z.isManual());
+    CHECK (z.zones()[0].high == high0 - 3);
+    CHECK (p.undo().getUndoDescription() == "Zones");
+
+    // Undo: the automatic map again; redo: the edit again.
+    REQUIRE (z.perform ("undo"));
+    settleSet (p);
+    z.refresh();
+    CHECK_FALSE (z.isManual());
+    CHECK_FALSE (p.currentInstrument()->set->zoned);
+    CHECK (z.zones()[0].high == high0);
+    REQUIRE (z.perform ("redo"));
+    settleSet (p);
+    z.refresh();
+    CHECK (z.isManual());
+    CHECK (z.zones()[0].high == high0 - 3);
+
+    // Two edits in quick succession (the first not built yet): one undo takes back only the last.
+    shrink (2);
+    shrink (2);   // (the editor shows the first edit at once, so this starts from it)
+    settleSet (p);
+    z.refresh();
+    CHECK (z.zones()[0].high == high0 - 7);
+    REQUIRE (z.perform ("undo"));
+    settleSet (p);
+    z.refresh();
+    CHECK (z.zones()[0].high == high0 - 5);
+}

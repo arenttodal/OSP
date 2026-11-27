@@ -197,6 +197,19 @@ void ZoneEditor::selectZone (int index)
 
 bool ZoneEditor::perform (const juce::String& action)
 {
+    // Undo / redo: the instrument's own history (a zone edit is one step there).
+    if (action == "undo" || action == "redo")
+    {
+        auto& history = host.undo();
+        if (action == "undo" ? ! history.canUndo() : ! history.canRedo())
+            return false;
+        if (action == "undo")
+            history.undo();
+        else
+            history.redo();
+        repaint();
+        return true;
+    }
     if (action == "close")
     {
         if (onClose != nullptr)
@@ -286,6 +299,8 @@ bool ZoneEditor::perform (const juce::String& action)
 juce::Rectangle<float> ZoneEditor::actionArea (const juce::String& action) const
 {
     if (action == "close") return closeArea;
+    if (action == "undo") return undoArea;
+    if (action == "redo") return redoArea;
     if (action == "auto") return autoArea;
     if (action == "manual") return manualArea;
     if (action == "fill") return fillArea;
@@ -302,6 +317,9 @@ void ZoneEditor::resized()
     auto top = r.removeFromTop (30.0f);
     titleArea = top.removeFromLeft (110.0f);
     closeArea = top.removeFromRight (26.0f).withSizeKeepingCentre (26.0f, 26.0f);
+    top.removeFromRight (6.0f);
+    redoArea = top.removeFromRight (26.0f).withSizeKeepingCentre (26.0f, 26.0f);
+    undoArea = top.removeFromRight (26.0f).withSizeKeepingCentre (26.0f, 26.0f);
     top.removeFromRight (8.0f);
     addArea = top.removeFromRight (118.0f).reduced (0.0f, 3.0f);
     top.removeFromRight (6.0f);
@@ -393,6 +411,20 @@ void ZoneEditor::paint (juce::Graphics& g)
     pill (manualArea, "MANUAL", manual, any);
     pill (fillArea, "FILL GAPS", false, any);
     pill (addArea, "+ ADD SAMPLES", false, instrument != nullptr);
+    {
+        // Undo / redo, as NOTES draws them.
+        auto arrow = [&g] (juce::Rectangle<float> r, bool redo, bool enabled) {
+            const auto c = r.reduced (5.0f);
+            juce::Path p;
+            p.addCentredArc (c.getCentreX(), c.getCentreY() + 1.0f, 5.5f, 5.0f, 0.0f, redo ? -1.9f : 1.9f, redo ? 1.2f : -1.2f, true);
+            g.setColour (colour::wellText.brighter (0.3f).withAlpha (enabled ? 1.0f : 0.35f));
+            g.strokePath (p, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            const auto tip = juce::Point<float> (c.getCentreX() + (redo ? 1.0f : -1.0f) * 5.5f * std::sin (1.2f), c.getCentreY() + 1.0f - 5.0f * std::cos (1.2f));
+            g.fillEllipse (juce::Rectangle<float> (2.8f, 2.8f).withCentre (tip));
+        };
+        arrow (undoArea, false, host.undo().canUndo());
+        arrow (redoArea, true, host.undo().canRedo());
+    }
     {
         const auto x = closeArea.reduced (7.5f);
         juce::Path cross;
@@ -598,7 +630,7 @@ void ZoneEditor::mouseMove (const juce::MouseEvent& e)
             break;
         }
     }
-    for (const auto& a : { autoArea, manualArea, fillArea, addArea, closeArea, rootDown, rootUp, rootAuto })
+    for (const auto& a : { autoArea, manualArea, fillArea, addArea, closeArea, undoArea, redoArea, rootDown, rootUp, rootAuto })
         if (a.contains (e.position))
             cursor = juce::MouseCursor::PointingHandCursor;
     setMouseCursor (cursor);
@@ -608,7 +640,7 @@ void ZoneEditor::mouseDown (const juce::MouseEvent& e)
 {
     drag = Drag::none;
     dragChanged = false;
-    for (const char* action : { "close", "auto", "manual", "fill", "add" })
+    for (const char* action : { "close", "undo", "redo", "auto", "manual", "fill", "add" })
         if (actionArea (action).contains (e.position))
         {
             perform (action);

@@ -2,9 +2,11 @@
 
 #include "model/InstrumentSet.h"
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace osp
@@ -37,9 +39,27 @@ struct SetInferenceOptions
 {
     bool cycleTakes = false;
     bool loudnessLayers = true;
-    static SetInferenceOptions automatic() noexcept { return { true, false }; }
-    static SetInferenceOptions of (const InstrumentSet& set) noexcept { return { set.cycleTakes, set.loudnessLayers }; }
+    /** A file of several separate attacks (five plucks in one recording) is cut into one take
+        per attack (splitIntoTakes) when files are imported together. Off for sets saved before
+        it (they keep their members); on for files imported since. */
+    bool splitTakes = false;
+    static SetInferenceOptions automatic() noexcept { return { true, false, true }; }
+    static SetInferenceOptions of (const InstrumentSet& set) noexcept { return { set.cycleTakes, set.loudnessLayers, set.splitTakes }; }
 };
+
+/**
+    The takes in one recording: where each of several separate attacks begins and ends (source
+    frames, [start, end)), e.g. a file of five plucks of the same string. An attack counts when
+    the level jumps at least 20 dB within 20 ms from a floor it had fallen to in the 300 ms
+    before, to within 15 dB of the recording's loudest moment, at least 0.3 s after the one
+    before; each take starts 5 ms before its attack. Empty when the recording is one take (or a
+    piece would be shorter than 0.3 s). Deterministic; offline only (allocates).
+*/
+std::vector<std::pair<std::int64_t, std::int64_t>> splitIntoTakes (const AudioData& audio);
+/** Frames [start, end) of `audio` as a recording of its own, with 1 ms fades at both cuts. */
+AudioData takeOf (const AudioData& audio, std::int64_t start, std::int64_t end);
+/** The name a take of `filename` is known by in the set ("Pluck.wav" -> "Pluck #2.wav"). */
+std::string takeName (const std::string& filename, int take);
 
 /**
     Sample-set intelligence (spec §47): turns several dropped recordings into one

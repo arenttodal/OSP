@@ -71,7 +71,7 @@ struct LoadedInstrument
         std::string filename;
         std::string originalPath;
     };
-    std::vector<MemberFile> memberFiles;           ///< identities of set->members, same order
+    std::vector<MemberFile> memberFiles;           ///< the set's files, each once, in member order (a file cut into takes: once)
     std::vector<SetAssignment> assignments;        ///< user corrections the set was built with
     /** A set built from a Note Atlas (Phase 3): the atlas, as loaded (null otherwise; a source
         relinked while loading keeps its new location). The session saves it in place of

@@ -104,3 +104,21 @@ TEST_CASE ("built-in states: a new instance opens on the first, whole; a session
     CHECK (p.parameterValue ("life") == Catch::Approx (70.0f).margin (0.01f));
     CHECK (p.presetDisplayName() == "Alive");
 }
+
+TEST_CASE ("built-in states: a preset saved while on a starting state becomes the one shown and stepped from", "[plugin][built-in-states][preset-bar]")
+{
+    TempDir tmp;
+    const ScopedEnvironment documents ("OSP_DOCUMENTS_DIR", tmp.dir.getChildFile ("documents").getFullPathName());
+    const ScopedEnvironment library ("OSP_LIBRARY_DIR", tmp.dir.getChildFile ("library").getFullPathName());
+    const ScopedFirstState opening;
+    OspAudioProcessor p;
+    REQUIRE (p.presetDisplayName() == "Natural");
+    const auto file = tmp.dir.getChildFile ("My Pad.osppreset");
+    REQUIRE (p.savePreset (file));
+    CHECK (p.presetDisplayName() == "My Pad");   // the saved preset, not the state it began from
+    CHECK (p.activeBuiltInState() < 0);
+    CHECK (p.canSaveInPlace());                   // SAVE writes to it again
+    // Choosing a starting state afterwards shows that state again.
+    p.setCurrentProgram (1);
+    CHECK (p.presetDisplayName() == "Alive");
+}

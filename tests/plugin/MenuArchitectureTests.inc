@@ -244,15 +244,11 @@ TEST_CASE ("menus: main and source menu screenshots (OSP_MENU_SHOTS)", "[.][menu
     }
 }
 
-TEST_CASE ("menus: a source's OCTAVE row moves the sound by octaves as heard (-1 an octave lower; Auto at 0), undoable, and shows a hand-set root's octave", "[plugin][menus][octave]")
+TEST_CASE ("menus: a source's OCTAVE row shifts the keys reaching the layer (-1: each key plays as the key an octave lower), the recording untouched, undoable", "[plugin][menus][octave]")
 {
     MenuRig rig;
     rig.loadTwo();
     REQUIRE (rig.p.isLayerOccupied (1));
-    const auto loaded = rig.p.currentInstrument (1);
-    REQUIRE (loaded != nullptr);
-    REQUIRE (loaded->analysis.pitch.detected);
-    const double detected = loaded->analysisRootMidi;
     auto rowOf = [&rig] (int layer) -> osp::plugin::SourceOctaveRow* {
         auto menu = rig.ui.sourceMenu (layer);
         for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
@@ -264,29 +260,29 @@ TEST_CASE ("menus: a source's OCTAVE row moves the sound by octaves as heard (-1
             }
         return nullptr;
     };
+    const auto id = osp::plugin::InstrumentHost::octaveParameterId (1);
+    // Layer B alone: what key 60 and key 48 sound like before.
+    rig.p.setParameterValue (osp::plugin::InstrumentHost::layerParameterId (0, "level"), -48.0f);
+    const auto key48 = playNote (rig.p, 48, 48000.0, 0.5);
     auto* row = rowOf (1);
     REQUIRE (row != nullptr);
-    CHECK (row->lit() == std::optional<int> (0));   // Auto
-    row->choose (-1);   // an octave LOWER on every key: the root an octave above the detected one
-    REQUIRE (rig.p.rootOverride (1).has_value());
-    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected + 12.0));   // (its fine tuning kept)
-    CHECK (rig.p.effectiveRootMidi (1) == Catch::Approx (detected + 12.0));
-    CHECK (! rig.p.rootOverride (0).has_value());   // (B's row, B's root only)
+    CHECK (row->lit() == std::optional<int> (0));
+    row->choose (-1);
+    CHECK (rig.p.parameterValue (id) == Catch::Approx (1.0f));   // index 1 = -1
+    CHECK_FALSE (rig.p.rootOverride (1).has_value());            // the recording's root untouched
+    // Key 60 now plays what key 48 played: its pitch, from the same recording read the same way.
+    const auto shifted = playNote (rig.p, 60, 48000.0, 0.5);
+    CHECK (pitchOf (shifted) == Catch::Approx (pitchOf (key48)).epsilon (0.006));
+    CHECK (rig.p.parameterValue (osp::plugin::InstrumentHost::octaveParameterId (0)) == Catch::Approx (2.0f));   // (B's row, B's keys only)
     row = rowOf (1);
     REQUIRE (row != nullptr);
     CHECK (row->lit() == std::optional<int> (-1));
-    row->choose (2);   // two octaves higher
-    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected - 24.0));
+    row->choose (2);
+    CHECK (rig.p.parameterValue (id) == Catch::Approx (4.0f));
     rig.p.undo().undo();
-    CHECK (*rig.p.rootOverride (1) == Catch::Approx (detected + 12.0));
+    CHECK (rig.p.parameterValue (id) == Catch::Approx (1.0f));
     rowOf (1)->choose (0);
-    CHECK (! rig.p.rootOverride (1).has_value());   // 0: Auto again
-    // A root set by hand from the list: the octave it is nearest (within a semitone), else none.
-    using Row = osp::plugin::SourceOctaveRow;
-    CHECK (Row::octaveOf (23.0, 35.05) == std::optional<int> (1));   // (Cosmic Strings: B0 against a detected B1 sounds an octave up)
-    CHECK (Row::octaveOf (30.0, 35.05) == std::nullopt);
-    CHECK (Row::octaveOf (std::nullopt, 35.05) == std::optional<int> (0));
-    CHECK (Row::overrideFor (0, 35.05) == std::nullopt);
+    CHECK (rig.p.parameterValue (id) == Catch::Approx (2.0f));
 }
 
 TEST_CASE ("menus: a source named by a long machine-made file (a hash) keeps its menu as narrow as a named sound's", "[plugin][menus]")

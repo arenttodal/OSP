@@ -12,10 +12,10 @@
 - Rest the pointer on (or click) the layer's letter **A / B / C** to see the sample's full file
   name, its length, sample rate, channels, bit depth and root.
 - The detected root is shown next to the layer's letter. If it is wrong (or `?`), choose
-  the right one in the card's **⋮ → Root** (undoable with Cmd/Ctrl+Z). When only the octave is
-  wrong, the **OCTAVE** row just above it (−2 −1 0 +1 +2) moves the sound by octaves as you
-  hear it: −1 plays it an octave lower on every key, +1 an octave higher, 0 is the detected
-  root.
+  the right one in the card's **⋮ → Root** (undoable with Cmd/Ctrl+Z).
+- The **OCTAVE** row in the same menu (−2 −1 0 +1 +2) shifts the keys that reach the layer:
+  at −1 every key plays exactly what the key an octave lower plays, as if you had played there.
+  The recording itself is not changed (no new root, no retuning). Undoable; saved with the session.
 - Your files are copied into OSP's own sample library, so projects still open when the
   originals move.
 
@@ -33,8 +33,9 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
   nearest one (between two, the lower). Several takes of one note alternate in turn, in
   file-name order (`C4_01`, `C4_02`, … then `C4_01` again), and a key filled from that note
   alternates them too. Takes that are only louder or softer stay takes. Velocity layers come
-  from dynamics words in the names (pp, mf, ff, soft, hard, …). Sessions saved before this keep
-  the sound they had.
+  from dynamics words in the names (pp, mf, ff, soft, hard, …). A file that holds several
+  separate plucks or hits is cut into one take per pluck ("Pluck #2", …). Sessions saved before
+  this keep the sound they had.
 - **ZONES** (the key on a multi-sample card, or **⋮ → Zones**) shows the result over the
   keyboard: each sample a bar over the keys it plays, its root a dot, one row per velocity layer
   (the hardest on top), takes of one note sharing a bar. Click a bar to hear it; drag its edges
@@ -42,7 +43,7 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
   automatic map; the first change (or **MANUAL**) makes the zones yours, and keys no zone covers
   are silent until **FILL GAPS** stretches the zones over them. **ROOT − / +** retunes the
   selected sample. Drop more files on ZONES (or **+ ADD SAMPLES**) to add them to the sound.
-  Everything is saved with the session.
+  Every change is one undo step (the arrows in ZONES, or Cmd/Ctrl+Z) and is saved with the session.
 - **⋮ → Add source…** does the same from a file browser: one file is one layer, several
   files are one multi-sample layer.
 - **Remove** a layer from its card's **⋮** menu (**Remove source**, at once; if a sound is still
@@ -51,7 +52,7 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
   source** brings it back.
 - Each card's **⋮** menu acts on that card's source only, and names it ("SOURCE B · file"):
   - **SOURCE:** Load / Replace audio…, Load example, Record audio…;
-  - **AUDIO:** OCTAVE, Root, Map notes… or Notes / Detect notes again / Play as one sample, Samples,
+  - **AUDIO:** OCTAVE, Root, Map notes… or Notes / Detect notes again / Play as one sample, Zones,
     Reveal source file (a set of samples: Reveal source files);
   - **MANAGEMENT:** Reset source settings, Remove source.
 

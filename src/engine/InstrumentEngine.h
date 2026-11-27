@@ -77,6 +77,10 @@ struct LayerSettings
         golden): it plays once. ANDOR OSP turns it on for every sound but those of sessions
         saved before it. */
     bool holdDecaying = false;
+    /** OCTAVE: every key reaches this layer this many semitones away (-24..24), as if played
+        there - the same member, loop and pitch a key there would give; the recording, its
+        root and its tuning are untouched. Keys shifted off the keyboard (0..127) are silent. */
+    int noteShift = 0;
     bool follow = true;           ///< FOLLOW: keep the recording's own loudness contour (off: flatten it)
     /** Heard in the mix (MUTE / SOLO). An unheard layer ramps to silence; its held notes
         wait for it to come back, released ones end (as at LEVEL -48). */

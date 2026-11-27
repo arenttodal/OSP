@@ -1128,19 +1128,15 @@ juce::PopupMenu OspAudioProcessorEditor::sourceMenu (int layer)
     {
         menu.addSeparator();
         menu.addSectionHeader ("AUDIO");
-        // OCTAVE: the detected note in another octave (the root, not a transposition).
-        if (loaded->atlas == nullptr && loaded->analysis.pitch.detected)
-        {
-            const double detected = loaded->analysisRootMidi;
-            menu.addCustomItem (SourceOctaveRow::itemId,
-                                std::make_unique<SourceOctaveRow> (SourceOctaveRow::octaveOf (ospProcessor.rootOverride (layer), detected),
-                                                                   palette::layer (InstrumentHost::shownLayer (layer)),
-                                                                   [safe, layer, detected] (int octave) {
-                                                                       if (safe != nullptr)
-                                                                           safe->ospProcessor.changeRootOverride (SourceOctaveRow::overrideFor (octave, detected), layer);
-                                                                   }),
-                                nullptr, "OCTAVE");
-        }
+        // OCTAVE: the keys reach the layer octaves away, as if played there (the recording, its
+        // root and tuning untouched).
+        menu.addCustomItem (SourceOctaveRow::itemId,
+                            std::make_unique<SourceOctaveRow> (ospProcessor.layerOctave (layer), palette::layer (InstrumentHost::shownLayer (layer)),
+                                                               [safe, layer] (int octave) {
+                                                                   if (safe != nullptr)
+                                                                       safe->ospProcessor.setLayerOctave (layer, octave);
+                                                               }),
+                            nullptr, "OCTAVE");
         {
             juce::PopupMenu root;
             const auto overrideMidi = ospProcessor.rootOverride (layer);

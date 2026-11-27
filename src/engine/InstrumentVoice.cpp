@@ -63,6 +63,7 @@ void InstrumentVoice::start (const InstrumentVoiceStart& params) noexcept
 
     cont = &layer->continuation;
     currentNote = params.note;
+    keyOffset = params.keyShift;
     // VEL and NOTE for this note's life: the sounding note, the raw velocity it was played at.
     modState.note = params.note;
     vibratoVoice.start();   // (each note's vibrato from its own start: DELAY, then RISE)

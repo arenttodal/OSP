@@ -52,6 +52,9 @@ struct InstrumentVoiceStart
     /** LOOP's HOLD: a decaying note with no loop of its own holds on its first Pedal Loop
         region while the key is down (LayerSettings::holdDecaying). */
     bool holdDecaying = false;
+    /** OCTAVE (the layer's note shift): `note` is the note the layer plays, this many semitones
+        from the key that was pressed; the key (InstrumentVoice::key) finds the voice again. */
+    int keyShift = 0;
     bool releaseGraft = true;
     int layerIndex = 0;                         ///< A/B layer (0 = A, 1 = B)
     SourceMode sourceMode = SourceMode::oneShot;
@@ -150,6 +153,10 @@ public:
     bool isHeldByPedal() const noexcept { return heldByPedal; }
     void setHeldByPedal (bool held) noexcept;
     int note() const noexcept { return currentNote; }
+    /** The key pressed for this note (note() less the layer's OCTAVE shift): note-off, mono and
+        key queries match on it. */
+    int key() const noexcept { return currentNote - keyOffset; }
+    int keyShift() const noexcept { return keyOffset; }
     int layerIndex() const noexcept { return voiceLayer; }
     /** Universal modulation-aware visual feedback: this note's own moves now (shares of the
         knobs' travel; 0: none) - grain POSITION and SPREAD as it plays them, START as it took it
@@ -301,6 +308,7 @@ private:
     bool released = false;
     bool heldByPedal = false;
     int currentNote = -1;
+    int keyOffset = 0;   ///< OCTAVE's shift of this note (semitones; key() = currentNote - keyOffset)
     int midiChannel = 1;
     std::uint64_t order = 0;
     float expressionGainDb = 0.0f, expressionBrightDb = 0.0f;

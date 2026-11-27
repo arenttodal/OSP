@@ -63,7 +63,7 @@ public:
     juce::Rectangle<float> zoneBounds (int index) const;
     juce::Rectangle<float> laneArea() const;
     float xForKey (int key) const;
-    /** "auto", "manual", "fill", "add", "root-", "root+", "root.auto", "close". False when the
+    /** "auto", "manual", "fill", "add", "root-", "root+", "root.auto", "undo", "redo", "close". False when the
         action is not offered now. */
     bool perform (const juce::String& action);
     juce::Rectangle<float> actionArea (const juce::String& action) const;
@@ -99,7 +99,7 @@ private:
     bool dropHover = false;
     std::unique_ptr<juce::FileChooser> chooser;
 
-    juce::Rectangle<float> titleArea, closeArea, autoArea, manualArea, fillArea, addArea, lanes, keyboard, side, rowLabels;
+    juce::Rectangle<float> titleArea, closeArea, undoArea, redoArea, autoArea, manualArea, fillArea, addArea, lanes, keyboard, side, rowLabels;
     juce::Rectangle<float> rootDown, rootUp, rootAuto;
 
     void rebuild();

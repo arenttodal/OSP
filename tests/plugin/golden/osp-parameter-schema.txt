@@ -890,3 +890,6 @@ arp.cardB.custom v36 bool "Arp Card B Custom" label="" range=0.0000..1.0000/1.00
 arp.cardC.custom v36 bool "Arp Card C Custom" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=Off|On|On
 sub.voices v37 choice "Sub Voices" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=1.0000 steps=2 texts=POLY|POLY|MONO [POLY|MONO]
 sub.priority v37 choice "Sub Mono Key" label="" range=0.0000..1.0000/1.0000 skew=1.00000 default=0.0000 steps=2 texts=LOWEST|LOWEST|LATEST [LOWEST|LATEST]
+layerA.octave v38 choice "Layer A Octave" label="" range=0.0000..4.0000/1.0000 skew=1.00000 default=2.0000 steps=5 texts=-2|0|+2 [-2|-1|0|+1|+2]
+layerB.octave v38 choice "Layer B Octave" label="" range=0.0000..4.0000/1.0000 skew=1.00000 default=2.0000 steps=5 texts=-2|0|+2 [-2|-1|0|+1|+2]
+layerC.octave v38 choice "Layer C Octave" label="" range=0.0000..4.0000/1.0000 skew=1.00000 default=2.0000 steps=5 texts=-2|0|+2 [-2|-1|0|+1|+2]

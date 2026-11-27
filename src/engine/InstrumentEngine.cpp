@@ -550,7 +550,7 @@ int InstrumentEngine::activeVoiceCount() const noexcept
 bool InstrumentEngine::isNoteActive (int note) const noexcept
 {
     for (const auto& voice : voices)
-        if (voice.isActive() && ! voice.isFading() && voice.note() == note)
+        if (voice.isActive() && ! voice.isFading() && voice.key() == note)
             return true;
     return false;
 }
@@ -747,9 +747,9 @@ void InstrumentEngine::monoNoteOn (int note, int velocity, int channel) noexcept
     bool legato = false;
     if (monoNote >= 0)
         for (auto& voice : voices)
-            if (voice.isActive() && ! voice.isReleased() && ! voice.isFading() && voice.note() == monoNote)
+            if (voice.isActive() && ! voice.isReleased() && ! voice.isFading() && voice.key() == monoNote)
             {
-                voice.glideTo (note, config.glideSeconds);
+                voice.glideTo (note + voice.keyShift(), config.glideSeconds);
                 legato = true;
             }
     if (! legato)
@@ -763,7 +763,7 @@ void InstrumentEngine::monoNoteOn (int note, int velocity, int channel) noexcept
         if (lastMonoNote >= 0 && lastMonoNote != note)
             for (auto& voice : voices)
                 if (voice.isActive() && ! voice.isFading() && voice.startOrder() == noteCounter - 1)
-                    voice.glideFrom (lastMonoNote, config.glideSeconds);
+                    voice.glideFrom (lastMonoNote + voice.keyShift(), config.glideSeconds);
     }
     monoNote = lastMonoNote = note;
 }
@@ -785,8 +785,8 @@ void InstrumentEngine::monoNoteOff (int note, int channel) noexcept
         // Back to the newest key still held, legato.
         const int previous = heldKeys[static_cast<std::size_t> (heldCount - 1)];
         for (auto& voice : voices)
-            if (voice.isActive() && ! voice.isReleased() && ! voice.isFading() && voice.note() == monoNote)
-                voice.glideTo (previous, config.glideSeconds);
+            if (voice.isActive() && ! voice.isReleased() && ! voice.isFading() && voice.key() == monoNote)
+                voice.glideTo (previous + voice.keyShift(), config.glideSeconds);
         monoNote = lastMonoNote = previous;
         return;
     }
@@ -794,9 +794,15 @@ void InstrumentEngine::monoNoteOff (int note, int channel) noexcept
     monoNote = -1;
 }
 
-void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int channel, std::uint64_t eventIndex) noexcept
+void InstrumentEngine::noteOnLayer (int layerNumber, int key, int velocity, int channel, std::uint64_t eventIndex) noexcept
 {
     context = layerIndex (layerNumber);
+    // OCTAVE: the layer plays the note its shift points to, as if that key were pressed (a
+    // note shifted off the keyboard is silent); voices remember the key for note-off.
+    const int shift = std::clamp (config.layer[context].noteShift, -48, 48);
+    const int note = key + shift;
+    if (note < 0 || note > 127)
+        return;
     const InstrumentModel* model = slots[context].model;
     const auto* set = slots[context].set;
     if (model == nullptr || ! model->isValid())
@@ -918,6 +924,7 @@ void InstrumentEngine::noteOnLayer (int layerNumber, int note, int velocity, int
     params.strategy = layerSettings.loop ? config.continuation : ContinuationStrategy::off;
     params.fallbackLoop = layerSettings.loop && layerSettings.fallbackLoop;
     params.holdDecaying = layerSettings.loop && layerSettings.holdDecaying;
+    params.keyShift = shift;
     params.releaseGraft = config.releaseGraft;
     params.layerIndex = layerNumber;
     params.sourceMode = config.sourceMode[context];
@@ -978,7 +985,7 @@ void InstrumentEngine::noteOff (int note, int channel) noexcept
 void InstrumentEngine::releaseNote (int note, int channel) noexcept
 {
     for (auto& voice : voices)
-        if (voice.isActive() && ! voice.isReleased() && voice.note() == note && (channel == 0 || (! mpe && ! cardRouting) || voice.channel() == channel))
+        if (voice.isActive() && ! voice.isReleased() && voice.key() == note && (channel == 0 || (! mpe && ! cardRouting) || voice.channel() == channel))
         {
             if (pedalDown)
                 voice.setHeldByPedal (true);

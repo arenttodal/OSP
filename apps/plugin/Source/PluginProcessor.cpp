@@ -170,6 +170,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout OspAudioProcessor::createLay
     addCustomPatternParameters (layout, {}, 36);
     // SUB's VOICES and MONO's key (version 37, after CUSTOM): POLY and LOWEST, every session as it was.
     addSubVoicingParameters (layout, 37, [] (const char* field) { return subFieldId (field); });
+    // OCTAVE per layer (version 38, after VOICES): 0, every session as it was.
+    addOctaveParameters (layout, 38);
     return layout;
 }
 
@@ -255,6 +257,43 @@ private:
 };
 
 /** Phase 5: a change of a layer's KEY DNA (the editor), its drawn curves included. */
+/** OCTAVE: a layer's note shift (its parameter), undoable both ways. */
+class OctaveChangeAction final : public juce::UndoableAction
+{
+public:
+    OctaveChangeAction (juce::RangedAudioParameter& p, int before, int after) : param (p), from (before), to (after) {}
+    bool perform() override { return apply (to); }
+    bool undo() override { return apply (from); }
+
+private:
+    bool apply (int octave)
+    {
+        param.beginChangeGesture();
+        param.setValueNotifyingHost (param.convertTo0to1 (static_cast<float> (std::clamp (octave, -2, 2) + 2)));
+        param.endChangeGesture();
+        return true;
+    }
+    juce::RangedAudioParameter& param;
+    int from, to;
+};
+
+/** ZONES: one edit of a set's corrections (keys, rows, roots), undoable both ways. */
+class SetAssignmentsAction final : public juce::UndoableAction
+{
+public:
+    SetAssignmentsAction (OspAudioProcessor& p, int l, std::vector<SetAssignment> beforeAssignments, std::vector<SetAssignment> afterAssignments)
+        : processor (p), layer (l), from (std::move (beforeAssignments)), to (std::move (afterAssignments))
+    {
+    }
+    bool perform() override { return processor.applySetAssignments (layer, to); }
+    bool undo() override { return processor.applySetAssignments (layer, from); }
+
+private:
+    OspAudioProcessor& processor;
+    int layer;
+    std::vector<SetAssignment> from, to;
+};
+
 class KeyDnaChangeAction final : public juce::UndoableAction
 {
 public:
@@ -450,6 +489,7 @@ OspAudioProcessor::OspAudioProcessor()
         lp.keyDnaAmount = liveParameter (layerParameterId (layer, "keyDna.amount"));
         lp.synthesize = liveParameter (layerParameterId (layer, "synthesize"));
         lp.pedalLoop = liveParameter (pedalLoopParameterId (layer));
+        lp.octave = liveParameter (octaveParameterId (layer));
         for (std::size_t i = 0; i < satelliteFields().size(); ++i)
             lp.satellite[i] = liveParameter (satelliteFieldId (layer, satelliteFields()[i]));
         for (int i = 0; i < synthParameterNames().size(); ++i)
@@ -905,11 +945,13 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
         const float pedalLoop = lp.pedalLoop != nullptr ? lp.pedalLoop->load() : 0.0f;
         const int loopFallback = layers[static_cast<std::size_t> (layer)].loopFallback.load() ? 1 : 0;
         const int loopHold = layers[static_cast<std::size_t> (layer)].loopHold.load() ? 1 : 0;
+        const int octave = lp.octave != nullptr ? static_cast<int> (std::lround (lp.octave->load())) - 2 : 0;
         if (force || controls != lp.lastControls || ! juce::exactlyEqual (ownReimagined, lp.lastReimagined) || modes != lp.lastModes
             || audible != lp.lastAudible || ! juce::exactlyEqual (pedalLoop, lp.lastPedalLoop) || loopFallback != lp.lastLoopFallback
-            || loopHold != lp.lastLoopHold)
+            || loopHold != lp.lastLoopHold || octave != lp.lastOctave)
         {
             lp.lastLoopHold = loopHold;
+            lp.lastOctave = octave;
             lp.lastPedalLoop = pedalLoop;
             lp.lastLoopFallback = loopFallback;
             lp.lastControls = controls;
@@ -925,6 +967,7 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
             ls.loop = controls[6] >= 0.5f;
             ls.fallbackLoop = loopFallback == 1;
             ls.holdDecaying = loopHold == 1;
+            ls.noteShift = 12 * std::clamp (octave, -2, 2);
             ls.follow = controls[7] >= 0.5f;
             ls.pedalLoop = static_cast<PedalLoopMode> (std::clamp (static_cast<int> (std::lround (pedalLoop)), 0, 2));
             ls.audible = audible;
@@ -2660,17 +2703,50 @@ void OspAudioProcessor::reassignSample (const std::string& filename, SampleRole 
     });
 }
 
+int OspAudioProcessor::layerOctave (int layer) const
+{
+    return static_cast<int> (std::lround (parameterValue (octaveParameterId (static_cast<int> (resolve (layer)))))) - 2;
+}
+
+void OspAudioProcessor::setLayerOctave (int layer, int octave)
+{
+    const int index = static_cast<int> (resolve (layer));
+    auto* param = parameters.getParameter (octaveParameterId (index));
+    const int before = layerOctave (index);
+    octave = std::clamp (octave, -2, 2);
+    if (param == nullptr || octave == before)
+        return;
+    undoManager.beginNewTransaction ("Octave " + layerName (index));
+    undoManager.perform (new OctaveChangeAction (*param, before, octave));
+}
+
 void OspAudioProcessor::setSetAssignments (int layer, std::vector<SetAssignment> assignments)
 {
     const int index = static_cast<int> (resolve (layer));
     const auto instrument = currentInstrument (index);
     if (instrument == nullptr || instrument->set == nullptr || instrument->atlas != nullptr)
         return;
+    // One undo step per edit (ZONES' arrows, the editor's Cmd-Z). An edit made while the one
+    // before is still being built starts from that one, not from the set still playing.
+    const auto& requested = requestedAssignments[static_cast<std::size_t> (index)];
+    auto before = requested.first == instrument->loadId && requested.first != 0 ? requested.second : instrument->assignments;
+    undoManager.beginNewTransaction ("Zones");
+    undoManager.perform (new SetAssignmentsAction (*this, index, std::move (before), std::move (assignments)));
+}
+
+bool OspAudioProcessor::applySetAssignments (int layer, std::vector<SetAssignment> assignments)
+{
+    const int index = static_cast<int> (resolve (layer));
+    const auto instrument = currentInstrument (index);
+    if (instrument == nullptr || instrument->set == nullptr || instrument->atlas != nullptr)
+        return false;
+    requestedAssignments[static_cast<std::size_t> (index)] = { instrument->loadId, assignments };
     ++pendingLoads;
     loaderPool.addJob ([this, instrument, assignments = std::move (assignments), generation = nextGeneration.fetch_add (1), index] {
         pushResult (reassignInstrumentSet (*instrument, assignments, generation), index);
         --pendingLoads;
     });
+    return true;
 }
 
 void OspAudioProcessor::auditionSetMember (int layer, int member)
@@ -3903,6 +3979,8 @@ juce::ValueTree OspAudioProcessor::instrumentTree (int layer)
             setTree.setProperty ("cycleTakes", true, nullptr);
         if (! instrument->set->loudnessLayers)
             setTree.setProperty ("loudnessLayers", false, nullptr);
+        if (instrument->set->splitTakes)
+            setTree.setProperty ("splitTakes", true, nullptr);   // (absent: a set saved before takes were cut)
         for (const auto& member : instrument->memberFiles)
         {
             juce::ValueTree m ("Member");
@@ -4328,6 +4406,7 @@ void OspAudioProcessor::recallInstrument (const juce::ValueTree& tree, int layer
         // No policy stored: a set saved before automatic mapping, which keeps its sound.
         request.policy.cycleTakes = static_cast<bool> (setTree.getProperty ("cycleTakes", false));
         request.policy.loudnessLayers = static_cast<bool> (setTree.getProperty ("loudnessLayers", true));
+        request.policy.splitTakes = static_cast<bool> (setTree.getProperty ("splitTakes", false));
         for (const auto& child : setTree)
         {
             if (child.hasType ("Member"))
@@ -4486,7 +4565,13 @@ bool OspAudioProcessor::savePreset (const juce::File& file)
     file.getParentDirectory().createDirectory();
     if (xml == nullptr || ! xml->writeTo (file))
         return false;
+    // The saved preset is the one the instrument is on now: its name in the preset bar (not
+    // the starting state it began from), SAVE's target, and the arrows walk presets from it.
     lastPresetFile = file;
+    lastStartingStateFile = juce::File();
+    presetNameOverride.clear();
+    presetIsProgram = false;
+    browsing.clear();
     libraryHub->presetSaved (file, library::AssetType::preset, soundHashesInState (*xml), slotCount(), stateVersion);
     return true;
 }

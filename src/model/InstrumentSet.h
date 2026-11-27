@@ -119,6 +119,8 @@ struct InstrumentSet
         file order). */
     bool cycleTakes = false;
     bool loudnessLayers = true;
+    /** Files of several attacks were cut into takes when imported (SetInferenceOptions::splitTakes). */
+    bool splitTakes = false;
     /** ZONES: some member has a key range of its own (SetMember::keyLow / keyHigh), so keys
         follow the ranges instead of the nearest pitch group (finaliseSampleSet sets it). */
     bool zoned = false;

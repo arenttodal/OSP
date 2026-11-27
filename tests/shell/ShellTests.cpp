@@ -301,6 +301,10 @@ TEST_CASE ("shell: the parameter schema is ANDOR OSP's, unchanged; the product's
         // ANDOR OSP's PEDAL LOOP (layerA.pedalLoop ..): its One Shot cards' sustain-pedal loop.
         if (line.startsWith ("layer") && line.upToFirstOccurrenceOf (" ", false, false).endsWith (".pedalLoop"))
             return true;
+        // ANDOR OSP's OCTAVE (layerA.octave ..): its source menu's key shift.
+        for (int l = 0; l < osp::plugin::InstrumentHost::numLayers; ++l)
+            if (line.upToFirstOccurrenceOf (" ", false, false) == osp::plugin::InstrumentHost::octaveParameterId (l))
+                return true;
         for (const auto& name : osp::plugin::InstrumentHost::imprintParameterNames())
             if (line.startsWith ("layer") && line.upToFirstOccurrenceOf (" ", false, false).endsWith (".synth." + name))
                 return true;

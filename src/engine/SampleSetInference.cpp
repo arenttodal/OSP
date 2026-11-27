@@ -96,6 +96,7 @@ InstrumentSet inferSampleSet (const std::vector<SetInput>& inputs, const std::ve
     InstrumentSet set;
     set.cycleTakes = options.cycleTakes;
     set.loudnessLayers = options.loudnessLayers;
+    set.splitTakes = options.splitTakes;
     for (const auto& in : inputs)
     {
         if (in.model == nullptr || ! in.model->isValid())
@@ -354,6 +355,97 @@ void finaliseSampleSet (InstrumentSet& set)
     for (int id : centre->members)
         if (set.members[static_cast<std::size_t> (id)].loudnessDb > set.members[static_cast<std::size_t> (set.primary)].loudnessDb)
             set.primary = id;
+}
+
+
+std::vector<std::pair<std::int64_t, std::int64_t>> splitIntoTakes (const AudioData& audio)
+{
+    std::vector<std::pair<std::int64_t, std::int64_t>> takes;
+    const auto frames = audio.numFrames();
+    if (audio.isEmpty() || frames < 2)
+        return takes;
+    const auto mono = audio.mixToMono();
+    const auto block = std::max<std::int64_t> (1, static_cast<std::int64_t> (0.01 * audio.sampleRate));   // 10 ms
+    std::vector<double> level;
+    for (std::int64_t b = 0; b + block <= frames; b += block)
+    {
+        double sum = 0.0;
+        for (std::int64_t i = b; i < b + block; ++i)
+            sum += static_cast<double> (mono[static_cast<std::size_t> (i)]) * mono[static_cast<std::size_t> (i)];
+        level.push_back (10.0 * std::log10 (std::max (1.0e-12, sum / static_cast<double> (block))));
+    }
+    if (level.size() < 4)
+        return takes;
+    const double loudest = *std::max_element (level.begin(), level.end());
+    const auto minGap = static_cast<std::size_t> (std::lround (0.3 * audio.sampleRate / static_cast<double> (block)));
+    const std::size_t lookBack = 30;   // 300 ms
+    std::vector<std::size_t> attacks;
+    // The first attack: where the recording first comes within 30 dB of its loudest.
+    for (std::size_t b = 0; b < level.size(); ++b)
+        if (level[b] >= loudest - 30.0)
+        {
+            attacks.push_back (b);
+            break;
+        }
+    if (attacks.empty())
+        return takes;
+    for (std::size_t b = attacks.front() + 2; b < level.size(); ++b)
+    {
+        if (b < attacks.back() + minGap || level[b] < loudest - 15.0 || level[b] - level[b - 2] < 10.0)
+            continue;
+        double floor = level[b - 1];
+        for (std::size_t k = b >= lookBack ? b - lookBack : 0; k < b; ++k)
+            floor = std::min (floor, level[k]);
+        if (level[b] - floor < 20.0)
+            continue;
+        // Back to where the rise began (the attack's first block).
+        std::size_t start = b;
+        while (start > attacks.back() + minGap / 2 && level[start - 1] < level[start] - 3.0 && level[start - 1] > floor + 1.0)
+            --start;
+        attacks.push_back (start);
+    }
+    if (attacks.size() < 2)
+        return takes;
+    const auto preRoll = static_cast<std::int64_t> (0.005 * audio.sampleRate);
+    const auto minTake = static_cast<std::int64_t> (0.3 * audio.sampleRate);
+    for (std::size_t i = 0; i < attacks.size(); ++i)
+    {
+        const auto start = i == 0 ? std::int64_t (0) : std::max<std::int64_t> (0, static_cast<std::int64_t> (attacks[i]) * block - preRoll);
+        const auto end = i + 1 < attacks.size() ? std::max<std::int64_t> (start, static_cast<std::int64_t> (attacks[i + 1]) * block - preRoll) : frames;
+        if (end - start < minTake)
+            return {};
+        takes.emplace_back (start, end);
+    }
+    return takes;
+}
+
+AudioData takeOf (const AudioData& audio, std::int64_t start, std::int64_t end)
+{
+    AudioData out;
+    out.sampleRate = audio.sampleRate;
+    start = std::clamp<std::int64_t> (start, 0, audio.numFrames());
+    end = std::clamp<std::int64_t> (end, start, audio.numFrames());
+    const auto length = end - start;
+    const auto fade = std::min<std::int64_t> (length / 4, static_cast<std::int64_t> (0.001 * audio.sampleRate));
+    for (const auto& channel : audio.channels)
+    {
+        std::vector<float> c (channel.begin() + start, channel.begin() + end);
+        for (std::int64_t i = 0; i < fade; ++i)
+        {
+            const float g = static_cast<float> (i) / static_cast<float> (fade);
+            c[static_cast<std::size_t> (i)] *= g;
+            c[c.size() - 1 - static_cast<std::size_t> (i)] *= g;
+        }
+        out.channels.push_back (std::move (c));
+    }
+    return out;
+}
+
+std::string takeName (const std::string& filename, int take)
+{
+    const auto dot = filename.find_last_of ('.');
+    const auto suffix = " #" + std::to_string (take);
+    return dot == std::string::npos ? filename + suffix : filename.substr (0, dot) + suffix + filename.substr (dot);
 }
 
 } // namespace osp

@@ -98,11 +98,12 @@ namespace
         std::string error;
         std::vector<std::string> warnings;
         std::string hash;
-        std::string filename;
+        std::string filename;      ///< the member's name (a take of a file: "Pluck #2.wav")
         std::string originalPath;
         std::string storedPath;
         AudioData audio;
         AnalysisData analysis;
+        std::string fileName;      ///< the file it came from, when that differs (a take)
     };
 
     Imported importAndAnalyse (const LoadRequest& request, SampleStore& store)
@@ -421,6 +422,42 @@ LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store,
             result.error = "none of the files could be loaded";
             return result;
         }
+        // Files imported together: one that holds several separate attacks (five plucks in one
+        // recording) becomes one take per attack, each analysed as a recording of its own.
+        if (request.policy.splitTakes && imported.size() >= 2)
+        {
+            std::vector<Imported> split;
+            for (auto& one : imported)
+            {
+                const auto takes = splitIntoTakes (one.audio);
+                if (takes.size() < 2)
+                {
+                    split.push_back (std::move (one));
+                    continue;
+                }
+                for (std::size_t t = 0; t < takes.size(); ++t)
+                {
+                    Imported take;
+                    take.ok = true;
+                    take.hash = one.hash;
+                    take.originalPath = one.originalPath;
+                    take.storedPath = one.storedPath;
+                    take.fileName = one.filename;
+                    take.filename = takeName (one.filename, static_cast<int> (t) + 1);
+                    take.audio = takeOf (one.audio, takes[t].first, takes[t].second);
+                    take.analysis = Analyzer::analyse (take.audio);
+                    take.analysis.source = one.analysis.source;
+                    take.analysis.source.filename = take.filename;
+                    take.analysis.source.durationSeconds = take.audio.durationSeconds();
+                    std::string error;
+                    if (auto roundTripped = io::analysisFromJson (io::analysisToJson (take.analysis), error))
+                        take.analysis = std::move (*roundTripped);   // (as a cached analysis reads: one result either way)
+                    split.push_back (std::move (take));
+                }
+                result.warnings.push_back (one.filename + ": " + std::to_string (takes.size()) + " plucks, used as " + std::to_string (takes.size()) + " takes");
+            }
+            imported = std::move (split);
+        }
         std::vector<instrument::SetSource> sources;
         for (const auto& one : imported)
             sources.push_back ({ &one.audio, &one.analysis, one.filename });
@@ -444,7 +481,12 @@ LoadResult loadInstrumentSet (const SetLoadRequest& request, SampleStore& store,
             for (const auto& one : imported)
                 if (one.filename == member.filename)
                 {
-                    instrument->memberFiles.push_back ({ io::contentId (one.hash), one.filename, one.originalPath });
+                    // Each file once (the takes of one file name it once: a session recalls the file
+                    // and cuts it again).
+                    const LoadedInstrument::MemberFile file { io::contentId (one.hash), one.fileName.empty() ? one.filename : one.fileName, one.originalPath };
+                    if (std::none_of (instrument->memberFiles.begin(), instrument->memberFiles.end(), [&file] (const LoadedInstrument::MemberFile& f) {
+                            return f.contentHash == file.contentHash && f.filename == file.filename; }))
+                        instrument->memberFiles.push_back (file);
                     break;
                 }
         const auto& primaryMember = set->members[static_cast<std::size_t> (set->primary)];

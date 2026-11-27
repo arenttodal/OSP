@@ -236,3 +236,55 @@ TEST_CASE ("sample set: groups with and without velocity layers play at the same
         CHECK (std::abs (level (48, velocity) - level (60, velocity)) < 2.0);
     }
 }
+
+namespace
+{
+    /** Plucks of 220 Hz (3 ms rise, 9 dB/s... fast decay) at the given times, silence between. */
+    osp::AudioData plucksAt (std::initializer_list<double> starts, double seconds)
+    {
+        osp::AudioData a;
+        a.sampleRate = 48000.0;
+        a.channels.assign (1, std::vector<float> (static_cast<std::size_t> (seconds * a.sampleRate), 0.0f));
+        for (const double s : starts)
+            for (std::size_t i = static_cast<std::size_t> (s * a.sampleRate); i < a.channels[0].size(); ++i)
+            {
+                const double t = (static_cast<double> (i) - s * a.sampleRate) / a.sampleRate;
+                const double env = std::min (1.0, t / 0.003) * std::exp (-t * 4.0);
+                a.channels[0][i] += static_cast<float> (0.5 * env * std::sin (2.0 * 3.141592653589793 * 220.0 * t));
+            }
+        return a;
+    }
+}
+
+TEST_CASE ("sample sets: a recording of several separate plucks is cut into one take per pluck; one pluck or a tremolo is not", "[unit][sample-set][takes]")
+{
+    using osp::splitIntoTakes;
+    const auto three = plucksAt ({ 0.0, 2.0, 4.5 }, 6.5);
+    const auto takes = splitIntoTakes (three);
+    REQUIRE (takes.size() == 3);
+    CHECK (takes[0].first == 0);
+    CHECK (std::abs (takes[1].first - static_cast<std::int64_t> (2.0 * 48000.0)) < 1000);   // just before the attack
+    CHECK (takes[1].first <= static_cast<std::int64_t> (2.0 * 48000.0));
+    CHECK (std::abs (takes[2].first - static_cast<std::int64_t> (4.5 * 48000.0)) < 1000);
+    CHECK (takes[2].second == three.numFrames());
+    CHECK (takes[0].second == takes[1].first);
+
+    CHECK (splitIntoTakes (plucksAt ({ 0.0 }, 3.0)).empty());
+    // A long tone with a deep, slow tremolo (12 dB) never counts as re-attacks.
+    osp::AudioData tremolo;
+    tremolo.sampleRate = 48000.0;
+    tremolo.channels.assign (1, std::vector<float> (static_cast<std::size_t> (4.0 * 48000.0)));
+    for (std::size_t i = 0; i < tremolo.channels[0].size(); ++i)
+    {
+        const double t = static_cast<double> (i) / 48000.0;
+        const double gain = std::pow (10.0, (-6.0 + 6.0 * std::sin (2.0 * 3.141592653589793 * 3.0 * t)) / 20.0);
+        tremolo.channels[0][i] = static_cast<float> (0.4 * gain * std::sin (2.0 * 3.141592653589793 * 220.0 * t));
+    }
+    CHECK (splitIntoTakes (tremolo).empty());
+    // Plucks closer than 0.3 s (a flam) are one take.
+    CHECK (splitIntoTakes (plucksAt ({ 0.0, 0.15 }, 2.0)).empty());
+
+    const auto take = osp::takeOf (three, takes[1].first, takes[1].second);
+    CHECK (take.numFrames() == takes[1].second - takes[1].first);
+    CHECK (osp::takeName ("Pluck Dry 5.wav", 2) == "Pluck Dry 5 #2.wav");
+}

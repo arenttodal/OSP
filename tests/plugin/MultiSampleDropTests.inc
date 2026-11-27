@@ -241,3 +241,76 @@ TEST_CASE ("multisample drop: the mapping is saved; a set saved before it keeps 
     CHECK (instrument->set->loudnessLayers);
     CHECK (memberOrder (legacy, 0) == order);
 }
+
+TEST_CASE ("multi-sample drop: a file of several separate plucks joins the set as one take per pluck; the session lists the file once and cuts it again", "[plugin][multisample][takes]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    auto plucks = [] (double hz, std::initializer_list<double> starts, double seconds) {
+        AudioData a;
+        a.sampleRate = 48000.0;
+        a.channels.assign (1, std::vector<float> (static_cast<std::size_t> (seconds * a.sampleRate), 0.0f));
+        for (const double s : starts)
+            for (std::size_t i = static_cast<std::size_t> (s * a.sampleRate); i < a.channels[0].size(); ++i)
+            {
+                const double t = (static_cast<double> (i) - s * a.sampleRate) / a.sampleRate;
+                a.channels[0][i] += static_cast<float> (0.5 * std::min (1.0, t / 0.003) * std::exp (-t * 4.0) * std::sin (2.0 * 3.141592653589793 * hz * t));
+            }
+        return a;
+    };
+    juce::Array<juce::File> files;
+    files.add (writeSource (tmp.dir, "Pluck 1.wav", plucks (220.0, { 0.0 }, 2.0)));
+    files.add (writeSource (tmp.dir, "Pluck 2.wav", plucks (220.0, { 0.0, 2.0, 4.5 }, 6.5)));
+    OspAudioProcessor p;
+    p.loadFiles (files);
+    REQUIRE (p.waitForLoads (60000));
+    p.pollLoads();
+    const auto loaded = p.currentInstrument();
+    REQUIRE (loaded != nullptr);
+    REQUIRE (loaded->set != nullptr);
+    CHECK (loaded->set->splitTakes);
+    REQUIRE (loaded->set->members.size() == 4);   // the single pluck and three takes of the other file
+    CHECK (loaded->memberFiles.size() == 2);       // two files
+    std::set<std::string> names;
+    for (const auto& m : loaded->set->members)
+    {
+        names.insert (m.filename);
+        CHECK (m.model->analysis.source.durationSeconds < 3.0);   // each take is one pluck
+    }
+    CHECK (names.count ("Pluck 2 #1.wav") == 1);
+    CHECK (names.count ("Pluck 2 #3.wav") == 1);
+    // One pitch: four round-robin takes.
+    CHECK (loaded->set->groups.size() == 1);
+
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (xml != nullptr);
+    int memberNodes = 0;
+    for (auto* e : xml->getChildIterator())
+        if (auto* set = e->getChildByName ("Set"))
+            for (auto* m : set->getChildIterator())
+                memberNodes += m->hasTagName ("Member") ? 1 : 0;
+    CHECK (memberNodes == 2);
+    OspAudioProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    REQUIRE (q.waitForLoads (60000));
+    q.pollLoads();
+    REQUIRE (q.currentInstrument() != nullptr);
+    REQUIRE (q.currentInstrument()->set != nullptr);
+    CHECK (q.currentInstrument()->set->members.size() == 4);
+
+    // A set saved before takes were cut (no splitTakes) keeps its two members.
+    for (auto* e : xml->getChildIterator())
+        if (auto* set = e->getChildByName ("Set"))
+            set->removeAttribute ("splitTakes");
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*xml, old);
+    OspAudioProcessor r;
+    r.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    REQUIRE (r.waitForLoads (60000));
+    r.pollLoads();
+    REQUIRE (r.currentInstrument() != nullptr);
+    REQUIRE (r.currentInstrument()->set != nullptr);
+    CHECK (r.currentInstrument()->set->members.size() == 2);
+}

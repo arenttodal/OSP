@@ -14,39 +14,17 @@ namespace osp::plugin
 {
 
 /**
-    The source menu's OCTAVE row (owner's request, 24-25 Nov): -2 -1 0 +1 +2, what the sound is
-    heard to do - for a recording whose note was found in the wrong octave. -1 plays it an
-    octave lower on every key (the root pinned an octave above the detected one), +1 an octave
-    higher; 0 is the detected root (Auto). Fine tuning kept. A choice applies at once (undoable,
-    as a root change from the list) and closes the menu. A root pinned by hand shows the octave
-    it sounds nearest to, if within a semitone of one; none lit otherwise.
+    The source menu's OCTAVE row (owner, 27 Nov): -2 -1 0 +1 +2 shifts the keys that reach the
+    layer (its `layerX.octave` parameter, InstrumentEngine's LayerSettings::noteShift): -1 plays
+    every key as the key an octave lower would - its own sample, note or zone, its own pitch -
+    with nothing about the recording changed (root, tuning, speed). A choice applies at once
+    (undoable) and closes the menu.
 */
 class SourceOctaveRow final : public juce::PopupMenu::CustomComponent
 {
 public:
     static constexpr int itemId = 0x0c7a0e;   ///< (unique in the source menu; the row acts itself)
     static constexpr std::array<int, 5> octaves { -2, -1, 0, 1, 2 };
-
-    /** The octave lit for a root override (nullopt: Auto) against the detected root: how far
-        the sound is heard to move (a root an octave up sounds an octave down: -1). */
-    static std::optional<int> octaveOf (std::optional<double> overrideMidi, double detectedMidi) noexcept
-    {
-        if (! overrideMidi)
-            return 0;
-        const double octaves = (detectedMidi - *overrideMidi) / 12.0;
-        const auto nearest = static_cast<int> (std::lround (octaves));
-        if (std::abs (octaves - nearest) * 12.0 > 1.0 || nearest < -2 || nearest > 2)
-            return std::nullopt;
-        return nearest;
-    }
-
-    /** The root override that makes the sound `octave` octaves higher (0: Auto). */
-    static std::optional<double> overrideFor (int octave, double detectedMidi) noexcept
-    {
-        if (octave == 0)
-            return std::nullopt;
-        return detectedMidi - 12.0 * octave;
-    }
 
     SourceOctaveRow (std::optional<int> lit, juce::Colour accentColour, std::function<void (int)> choose)
         : CustomComponent (false), current (lit), accent (accentColour), onChoose (std::move (choose))

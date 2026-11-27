@@ -56,6 +56,36 @@
 > - **Right-click SAVE (Ctrl-click on a Mac) is Save As** (`SavePresetButton::onSaveAs`); a click
 >   saves as before. The sister shell's SAVE already always asks for a file.
 >
+> **27 Nov 2026, owner's notes:**
+> - **OCTAVE shifts the keys, not the recording (owner):** the source menu's OCTAVE row moved the
+>   root, so the recording was transposed (and read slower or faster). Now it shifts the keys
+>   reaching the layer: -1 plays every key exactly as the key an octave lower would (its own
+>   sample, note or zone, its loop and pitch), with the recording, its root and tuning untouched
+>   (`LayerSettings::noteShift`; voices remember the pressed key, `InstrumentVoice::key`, so
+>   note-off, mono legato and key queries match it). Per layer `layerX.octave` (-2..+2, hint 38,
+>   appended; 0 by default so every session plays as before; schema golden +3 lines,
+>   intentional). One undo step (`setLayerOctave`). A root set from the menu's earlier OCTAVE row
+>   stays a root (Root -> Auto clears it). Tests: "[octave]".
+> - **A file of several plucks in a set becomes one take per pluck (owner's choice):** the owner's
+>   tagelharpa set (five files) "looped" even with LOOP off, every other press: one file (Dry 5)
+>   holds five plucks in 13 s, and as the second E4 take it played through on alternate presses
+>   (the longer-than-its-group rule needs three takes). No looping or playhead bug: the playhead
+>   walked through that file. Now files imported together are cut at clearly separate attacks
+>   (`splitIntoTakes`: a 20 dB jump within 20 ms from a floor of the 300 ms before, to within 15 dB
+>   of the loudest, >= 0.3 s apart; each take >= 0.3 s, 5 ms pre-roll, 1 ms fades) and each take
+>   is a member of its own ("Dry 5 #2.wav"), analysed on its own: Dry 5 -> five takes, files 1-4
+>   untouched. `SetInferenceOptions::splitTakes` / `InstrumentSet::splitTakes`, saved as
+>   `<Set splitTakes="1">`; a set saved before keeps its members. The session lists each file once
+>   (`memberFiles`: the set's files, each once) and cuts it again on load. Tests: "[takes]".
+> - **A saved preset is the one shown (fixed, owner):** saving while on a starting state (NATURAL)
+>   kept the state's name in the preset bar and the arrows on the states: `savePreset` recorded
+>   the file but left the built-in state current. Now the saved preset is current (its name in
+>   the bar, SAVE's target, the arrows walk presets from it). Tests: "[preset-bar]".
+> - **ZONES: undo / redo:** every zone edit (a drag, a row, FILL GAPS, AUTO / MANUAL, a root) is
+>   one step in the instrument's undo history (`SetAssignmentsAction`), with undo / redo arrows in
+>   ZONES' top row as in NOTES; an edit made while the one before is still being built starts from
+>   it (`requestedAssignments`). Tests: "[zones][undo]".
+>
 > **26 Nov 2026, owner's notes:**
 > - **ZONES: the multi-sample zone editor (owner approved the mockup):** a set of dropped files
 >   shows ZONES on its card (the NOTES key; the menu's Samples is now Zones and opens it). Each
@@ -71,8 +101,7 @@
 >   (`SetAssignment::keyLow / keyHigh`, `InstrumentHost::setSetAssignments`, `reassignInstrumentSet`;
 >   nothing is analysed again) and are saved as `<Assignment keyLow keyHigh>` (additive).
 >   `ZoneEditor` (shared/andor-ui), the old Samples panel removed; the multi-sample Learn lesson
->   points at ZONES. Not yet: undo of a zone edit (AUTO resets the map), editing velocity
->   boundaries other than by rows. Tests: "[zones]".
+>   points at ZONES. Not yet: editing velocity boundaries other than by rows. Tests: "[zones]".
 >
 > **25 Nov 2026, owner's notes (2):**
 > - **NOTES: a quieter step a semitone down was swallowed (fixed, owner's nyckelharpa take):** G#3

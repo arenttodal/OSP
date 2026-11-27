@@ -279,6 +279,17 @@ public:
     /** Samples inspector correction: pin one file's role/layer and rebuild the set. */
     void reassignSample (const std::string& filename, SampleRole role, int velocityLayer, std::optional<double> rootMidi = std::nullopt);
     void setSetAssignments (int layer, std::vector<SetAssignment> assignments) override;
+    /** OCTAVE (-2..+2): the keys reaching `layer` shifted by octaves, one undo step. */
+    void setLayerOctave (int layer, int octave);
+    int layerOctave (int layer) const;
+    /** Rebuilds the layer's set with these corrections at once (ZONES' undo / redo; edits go
+        through setSetAssignments, one undo step each). False when the layer holds no file set. */
+    bool applySetAssignments (int layer, std::vector<SetAssignment> assignments);
+private:
+    /** ZONES: the corrections last asked for per layer (with the load they belong to), the
+        "before" of an edit made while the previous one is still being built. Message thread. */
+    std::array<std::pair<std::uint64_t, std::vector<SetAssignment>>, numLayers> requestedAssignments {};
+public:
     void auditionSetMember (int layer, int member) override;
     void addSamplesToSet (int layer, const juce::Array<juce::File>& files) override;
     void loadExample (int layer = -1);
@@ -991,10 +1002,12 @@ private:
         LiveParam keyDnaAmount {};
         LiveParam synthesize {};   ///< SYNTHESIZE 0..100 % (hint 22)
         LiveParam pedalLoop {};    ///< PEDAL LOOP: 0 Normal, 1 Forward, 2 Ping-Pong (hint 29)
+        LiveParam octave {};       ///< OCTAVE: index 0..4 = -2..+2 octaves (hint 38)
         std::array<LiveParam, 10> satellite {};   ///< SATELLITE's fields (satelliteFields(), hint 32)
         float lastPedalLoop = -1.0f;
         int lastLoopFallback = -1;
         int lastLoopHold = -1;
+        int lastOctave = 99;
         std::array<LiveParam, 6> synth {};   ///< the SYNTH page (hint 23), synthParameterNames() order
         std::array<LiveParam, 3> imprint {};   ///< its spectral imprint (hint 28), imprintParameterNames() order
     };

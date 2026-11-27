@@ -118,6 +118,12 @@ public:
         Forward, Ping-Pong; Normal by default, so every session from before keeps its pedal.
         Appended after the imprint's (ANDOR OSP's layout; nothing before moves). */
     static void addPedalLoopParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout);
+    /** OCTAVE (a source menu's row): "layerA.octave" .. C, a choice of -2 .. +2 octaves (index 2 =
+        0) that shifts the keys reaching the layer (LayerSettings::noteShift), as if played that
+        much lower or higher; the recording, its root and tuning are untouched. 0 by default, so
+        every session from before plays as it did. */
+    static juce::String octaveParameterId (int layer);
+    static void addOctaveParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint);
     /** SATELLITE (each layer's own stereo motion; ANDOR ANALOG's ranges, defaults and texts):
         `layerX.satellite.<field>`, fields enabled, mode, sync, division, rate, depth, width, phase,
         offset, retrigger. Every layer off by default (and in every session from before). */

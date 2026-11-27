@@ -116,6 +116,18 @@ void InstrumentHost::addPedalLoopParameters (juce::AudioProcessorValueTreeState:
                                                                   juce::StringArray { "Normal", "Forward", "Ping-Pong" }, 0));
 }
 
+juce::String InstrumentHost::octaveParameterId (int layer)
+{
+    return layerParameterId (layer, "octave");
+}
+
+void InstrumentHost::addOctaveParameters (juce::AudioProcessorValueTreeState::ParameterLayout& layout, int versionHint)
+{
+    for (int layer = 0; layer < numLayers; ++layer)
+        layout.add (parameters::make<juce::AudioParameterChoice> (juce::ParameterID { octaveParameterId (layer), versionHint }, "Layer " + layerName (layer) + " Octave",
+                                                                  juce::StringArray { "-2", "-1", "0", "+1", "+2" }, 2));
+}
+
 juce::String InstrumentHost::satelliteFieldId (int layer, const char* field)
 {
     return layerParameterId (layer, juce::String ("satellite.") + field);
