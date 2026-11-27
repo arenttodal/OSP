@@ -197,6 +197,11 @@ void remapNotes (NoteAtlas& atlas)
     }
 }
 
+bool NoteAtlas::reviewFilterActive() const noexcept
+{
+    return mapping.approvedOnly && std::any_of (notes.begin(), notes.end(), [] (const NoteEvent& n) { return n.included && ! n.needsReview(); });
+}
+
 std::string groupOf (const NoteEvent& note)
 {
     // Round robins are per key and velocity layer unless the note names its own group.
@@ -209,7 +214,7 @@ std::array<std::vector<int>, 128> notesByKey (const NoteAtlas& atlas)
     for (std::size_t i = 0; i < atlas.notes.size(); ++i)
     {
         const auto& n = atlas.notes[i];
-        if (! n.included)
+        if (! atlas.plays (n))
             continue;
         const int key = n.playKey();
         if (key >= 0 && key < 128)

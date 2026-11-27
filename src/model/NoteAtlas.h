@@ -114,8 +114,9 @@ struct Corrections
     bool merged = false;      ///< made by merging regions
     bool velocity = false;    ///< velocity layer set by the user
     bool included = false;    ///< included or left out by the user (Phase 4)
+    bool approved = false;    ///< accepted as analysed: its doubts are answered (APPROVE in NOTES)
 
-    bool any() const noexcept { return pitch || boundaries || key || group || split || merged || velocity || included; }
+    bool any() const noexcept { return pitch || boundaries || key || group || split || merged || velocity || included || approved; }
     bool operator== (const Corrections&) const = default;
 };
 
@@ -166,6 +167,9 @@ struct NoteEvent
     std::optional<FrameRange> grainRegion;
 
     int playKey() const noexcept { return assignedKey >= 0 ? assignedKey : rootMidi; }
+    /** In review: included, the analysis doubts it, and the musician has neither corrected nor
+        approved it. */
+    bool needsReview() const noexcept { return included && diagnostics.any() && ! corrections.any(); }
     FrameRange playRange() const noexcept { return { attackStart, sourceEnd }; }
 };
 
@@ -215,6 +219,10 @@ struct Mapping
         only when not 0 (older files read as 0). */
     double fadeInMs = 0.0, fadeOutMs = 0.0;
     static constexpr double maxFadeInMs = 100.0, maxFadeOutMs = 500.0;
+    /** APPROVED ONLY: notes still in review (NoteEvent::needsReview) stay off the keyboard
+        until they are approved or corrected (FILL then reaches from the others). Written to
+        JSON only when on (older files read as off: every included note plays). */
+    bool approvedOnly = false;
     bool operator== (const Mapping&) const = default;
 };
 
@@ -230,6 +238,11 @@ struct NoteAtlas
 
     const SourceAsset* findSource (const std::string& assetId) const noexcept;
     const NoteEvent* findNote (const std::string& noteId) const noexcept;
+    /** Whether APPROVED ONLY leaves notes out now: it is on, and at least one included note is
+        not in review (with none, every included note plays: the layer never goes silent). */
+    bool reviewFilterActive() const noexcept;
+    /** Whether the note is on the keyboard: included, and (APPROVED ONLY) not in review. */
+    bool plays (const NoteEvent& n) const noexcept { return n.included && ! (n.needsReview() && reviewFilterActive()); }
     NoteEvent* findNote (const std::string& noteId) noexcept;
     int indexOf (const std::string& noteId) const noexcept;
     /** A new note id not used yet ("n0000", "n0001", ...): one past the highest in use. */

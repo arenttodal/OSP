@@ -310,3 +310,46 @@ TEST_CASE ("Note Atlas (schema 2): velocity layers, note origin, mapping and cor
     a.mapping.maxTransposeSemitones = -1.0;
     CHECK (validate (a).errors.size() >= 2);
 }
+
+TEST_CASE ("Note Atlas: APPROVE and APPROVED ONLY - notes in review wait, approved ones play, saved", "[unit][atlas][review]")
+{
+    auto a = sampleAtlas();
+    a.notes[0].diagnostics.uncertainPitch = true;   // in review: doubted, untouched
+    a.notes[2].diagnostics.uncertainBoundary = true; // doubted, but corrected (pitch): decided
+    CHECK (a.notes[0].needsReview());
+    CHECK_FALSE (a.notes[1].needsReview());
+    CHECK_FALSE (a.notes[2].needsReview());
+    // PLAY ALL (the default): every included note plays.
+    for (const auto& n : a.notes)
+        CHECK (a.plays (n));
+    // APPROVED ONLY: the note in review waits; the others play.
+    a.mapping.approvedOnly = true;
+    CHECK (a.reviewFilterActive());
+    CHECK_FALSE (a.plays (a.notes[0]));
+    CHECK (a.plays (a.notes[1]));
+    CHECK (a.plays (a.notes[2]));
+    CHECK (atlas::notesByKey (a)[static_cast<std::size_t> (a.notes[0].playKey())].empty());
+    // APPROVE answers the doubt: it plays again, and counts as the musician's decision.
+    a.notes[0].corrections.approved = true;
+    CHECK (a.notes[0].corrections.any());
+    CHECK_FALSE (a.notes[0].needsReview());
+    CHECK (a.plays (a.notes[0]));
+    // Saved: both fields round-trip; older files (without them) read as before.
+    std::string error;
+    const auto back = io::noteAtlasFromString (io::noteAtlasToString (a), error);
+    REQUIRE (back.has_value());
+    CHECK (back->mapping.approvedOnly);
+    CHECK (back->notes[0].corrections.approved);
+    CHECK (io::noteAtlasToString (sampleAtlas()).find ("approved") == std::string::npos);
+    // Nothing approved or undoubted: the layer never goes silent - every included note plays.
+    auto doubted = sampleAtlas();
+    doubted.mapping.approvedOnly = true;
+    for (auto& n : doubted.notes)
+    {
+        n.diagnostics.unvoiced = true;
+        n.corrections = {};
+    }
+    CHECK_FALSE (doubted.reviewFilterActive());
+    for (const auto& n : doubted.notes)
+        CHECK (doubted.plays (n));
+}

@@ -1097,7 +1097,7 @@ void SourceDisplay::paintNoteRegions (juce::Graphics& g, juce::Rectangle<float> 
         const auto r = noteRegionBounds (n, plot);
         if (r.getWidth() < 1.0f)
             continue;
-        const bool plays = n.included && std::find (leftOut.begin(), leftOut.end(), n.id) == leftOut.end();
+        const bool plays = atlas.plays (n) && std::find (leftOut.begin(), leftOut.end(), n.id) == leftOut.end();
         if (plays)
         {
             // Its pitch's colour, drawn once into the cached picture (no cost per frame).

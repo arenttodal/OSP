@@ -110,6 +110,8 @@ namespace
         json::set (c, "velocity", n.corrections.velocity);
         if (n.corrections.included)
             json::set (c, "included", true);   // Phase 4 (added field)
+        if (n.corrections.approved)
+            json::set (c, "approved", true);   // APPROVE (added field)
         json::set (o, "corrections", c);
         if (n.diagnostics.any())
         {
@@ -179,6 +181,7 @@ namespace
         n.corrections.merged = json::getBool (c, "merged", false);
         n.corrections.velocity = json::getBool (c, "velocity", false);
         n.corrections.included = json::getBool (c, "included", false);
+        n.corrections.approved = json::getBool (c, "approved", false);
         if (const auto* d = o["diagnostics"].getArray())
             for (const auto& v : *d)
             {
@@ -245,6 +248,8 @@ juce::var noteAtlasToJson (const atlas::NoteAtlas& a)
         json::set (mapping, "fadeInMs", a.mapping.fadeInMs);
     if (a.mapping.fadeOutMs != 0.0)
         json::set (mapping, "fadeOutMs", a.mapping.fadeOutMs);
+    if (a.mapping.approvedOnly)
+        json::set (mapping, "approvedOnly", true);
     json::set (root, "mapping", mapping);
 
     auto sources = json::array();
@@ -310,6 +315,7 @@ std::optional<atlas::NoteAtlas> noteAtlasFromJson (const juce::var& json, std::s
         a.mapping.speed = std::clamp (json::getDouble (m, "speed", 1.0), atlas::Mapping::minSpeed, atlas::Mapping::maxSpeed);
         a.mapping.fadeInMs = std::clamp (json::getDouble (m, "fadeInMs", 0.0), 0.0, atlas::Mapping::maxFadeInMs);
         a.mapping.fadeOutMs = std::clamp (json::getDouble (m, "fadeOutMs", 0.0), 0.0, atlas::Mapping::maxFadeOutMs);
+        a.mapping.approvedOnly = json::getBool (m, "approvedOnly", false);
     }
     if (const auto* list = json["sources"].getArray())
         for (const auto& s : *list)

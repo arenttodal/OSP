@@ -31,7 +31,7 @@ about 20 minutes. Each tab re-tests one change:
 4. **Old sessions.** Projects saved with the Phase 1 plugin open with neutral engine
    settings, so they keep sounding like the plain sampler.
 5. **MIDI mapping.**
-   - Mod wheel opens MOTION.
+   - Mod wheel plays VIBRATO (when on) and its routes; it no longer opens MOVEMENT.
    - Pressure adds level and brightness.
    - CC74 sets brightness.
    - CC 20–25 control the six macros.

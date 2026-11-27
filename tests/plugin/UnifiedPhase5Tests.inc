@@ -1022,3 +1022,77 @@ TEST_CASE ("plugin phase 5: SPEED under TUNING slows or speeds every note, one u
     settleEdits (p);
     CHECK (p.currentInstrument()->atlas->mapping.speed == Approx (1.0));
 }
+
+TEST_CASE ("plugin: NOTES' REVIEW - PLAY ALL | APPROVED ONLY, APPROVE a note; one undo step each, saved", "[plugin][phase5][notemap][review]")
+{
+    TempDir tmp;
+    const ScopedEnvironment storeDir ("OSP_SAMPLE_STORE", tmp.dir.getChildFile ("store").getFullPathName());
+    auto rec = phraseRecording (tmp.dir, "review.wav", { 64, 67, 71 });
+    for (auto& n : rec.atlas.notes)
+    {
+        n.diagnostics = {};
+        n.corrections = {};
+    }
+    rec.atlas.notes[1].diagnostics.uncertainPitch = true;   // n1 is in review
+    OspAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditorIfNeeded());
+    auto* ui = dynamic_cast<osp::plugin::OspAudioProcessorEditor*> (editor.get());
+    REQUIRE (ui != nullptr);
+    p.loadAtlas (rec.atlas);
+    settleEdits (p);
+    editor->setSize (1448, 1086);
+    ui->refreshNow();
+    auto& card = ui->engineCard (0);
+    card.onNotesToggle (0, true);
+    auto* map = card.noteMapComponent();
+    REQUIRE (map != nullptr);
+    map->refresh();
+    const auto id1 = rec.atlas.notes[1].id;
+    auto members = [&p] (const std::string& id) {
+        int count = 0;
+        for (const auto& m : p.currentInstrument()->set->members)
+            count += m.regionId == id ? 1 : 0;
+        return count;
+    };
+    CHECK (map->statusText() == "Needs review");
+    CHECK (members (id1) == 1);   // PLAY ALL: it plays
+    // Nothing selected: the REVIEW row. APPROVED ONLY holds n1 back.
+    REQUIRE (map->actions().contains ("review.approved"));
+    REQUIRE (map->perform ("review.approved"));
+    settleEdits (p);
+    map->refresh();
+    CHECK (p.currentInstrument()->atlas->mapping.approvedOnly);
+    CHECK (members (id1) == 0);
+    CHECK (members (rec.atlas.notes[0].id) == 1);
+    // One undo step, and back.
+    REQUIRE (p.undo().undo());
+    settleEdits (p);
+    CHECK_FALSE (p.currentInstrument()->atlas->mapping.approvedOnly);
+    CHECK (members (id1) == 1);
+    REQUIRE (p.undo().redo());
+    settleEdits (p);
+    map->refresh();
+    CHECK (members (id1) == 0);
+    // APPROVE on the doubted note: it plays, and the doubt is answered.
+    map->select ({ id1 });
+    REQUIRE (map->actions().contains ("approve"));
+    map->select ({ rec.atlas.notes[0].id });
+    CHECK_FALSE (map->actions().contains ("approve"));   // (an undoubted note has nothing to approve)
+    map->select ({ id1 });
+    REQUIRE (map->perform ("approve"));
+    settleEdits (p);
+    map->refresh();
+    CHECK (p.currentInstrument()->atlas->findNote (id1)->corrections.approved);
+    CHECK (members (id1) == 1);
+    CHECK (map->statusText() == "Ready");
+    // Saved with the session.
+    juce::MemoryBlock state;
+    p.getStateInformation (state);
+    OspAudioProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    settleEdits (q);
+    REQUIRE (q.currentInstrument() != nullptr);
+    REQUIRE (q.currentInstrument()->atlas != nullptr);
+    CHECK (q.currentInstrument()->atlas->mapping.approvedOnly);
+    CHECK (q.currentInstrument()->atlas->findNote (id1)->corrections.approved);
+}

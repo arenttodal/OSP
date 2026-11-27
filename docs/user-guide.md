@@ -58,6 +58,13 @@ OSP grows with what you give it, up to three sounds (layers **A**, **B**, **C**)
 
   Click a card to make it the **edited** layer (its letter is in colour). All layers stay
   visible and playable.
+- **NOTES** (a phrase mapped into notes) marks notes the analysis doubts with a dot and says
+  "Needs review". Select one and press **APPROVE** (REVIEW row) when it is right as it is; a
+  correction of your own answers the doubt too. With nothing selected, **REVIEW: PLAY ALL |
+  APPROVED ONLY** chooses whether notes still in review play: APPROVED ONLY keeps them off the
+  keyboard (dimmed, FILL reaches from the others) until you approve them. While nothing is
+  approved yet every note plays, so the layer never goes silent. Each is one undo step, saved
+  with the project.
 
 Every layer plays every note you play, through the same LIFE, DRIVE, CHARACTER,
 MOVEMENT, ECHO, SPACE, dynamics and envelope: one instrument, not three. Only how far each source departs
@@ -203,7 +210,7 @@ real round-robin set.
 | **LIFE** | How differently each note is performed. 0 = the identical recording every time; around 50 % = a believable player (calibrated on real repeated takes); 100 % = freer, related reinterpretations. Repeated fast notes alternate naturally. Popup: NATURAL / LOOSE / FRAY; CHARACTER (AUTO reads the sample; PLUCK, SYNTH, DRUM use round-robin models); TAKES (see below); PITCH, TONE, ATTACK. |
 | **DRIVE** | Saturation of the whole instrument (all layers together, before ECHO and SPACE): 0 = clean (off), 10-25 % a little harmonic richness, 25-50 % warmth and density, 50-75 % clear saturation with gentle compression, 75-100 % crunchy, still playable breakup. Popup: TUBE / TAPE / CRUNCH, TONE, BODY (see below). |
 | **CHARACTER** | The tonal shape: where the filter sits between its MIN and MAX (popup: type, resonance, drive, envelope). |
-| **MOVEMENT** | How the sound changes over time (popup: DRIFT, TAPE, CHORUS, PULSE, SHAPER). The mod wheel opens it further. |
+| **MOVEMENT** | How the sound changes over time (popup: DRIFT, TAPE, CHORUS, PULSE, SHAPER). |
 | **ECHO** | Repeats of the sound, in parallel with SPACE: how loud they are (0 = off). Popup: TAPE or BBD, FREE / SYNC, MONO / PING-PONG / WIDE, TIME, FEEDBACK, TONE, AGE (see below). |
 | **SPACE** | The room: how much of it you hear. Popup: ROOM, HALL, PLATE, SPRING; PRE-DELAY, SIZE, DECAY, DAMP, MOD, WIDTH and the room's EQ (LOW CUT, HIGH CUT; drag the two handles on the picture). |
 | **AMP ENVELOPE** (A D S R) | The instrument's one envelope, for every layer: a short attack and decay with low sustain makes a pluck, a slow attack a swell, full sustain a held tone. Drag the points or turn the knobs. A release of 0.2 s or more lets the recording's own ending play when you let go. |
@@ -375,8 +382,8 @@ There are five sources:
   sustain pedal) lets go.
 - **MOD WHEEL**: your controller's wheel (MIDI CC 1) or the on-screen one. Drag **MOD**
   (with its socket, under the wheel) onto a knob. Moving the wheel itself still just moves it.
-  Until the wheel is routed it opens MOVEMENT up, as it always did. Once you route it, it
-  does only what its routes say.
+  On its own the wheel plays VIBRATO when VIBRATO is on (MOD WHEEL's popover); anything else
+  it does is a route you made. It never moves MOVEMENT unless you route it there.
 
 To use one, **drag it onto a knob** and let go. The controls it can reach light up while you
 drag. Rest on CHARACTER for a moment and its settings open, so you can drop onto RES. Rest on
@@ -477,7 +484,7 @@ it back. Every edit is one undo step; the pattern is saved with the project and 
 | Note on/off, velocity | play (velocity → level and, with Dynamics, performance) |
 | Sustain pedal (CC 64) | hold |
 | Pitch bend | ± Bend range |
-| Mod wheel (CC 1) | opens MOTION |
+| Mod wheel (CC 1) | VIBRATO (when on), and whatever you route it to |
 | Channel pressure / aftertouch | intensity: louder and brighter while pressing |
 | CC 74 | brightness (MPE "slide") |
 | CC 20–27 | LIFE, Dynamics (amount), CHARACTER, MOTION, SPACE, A's REIMAGINED, ECHO, DRIVE |

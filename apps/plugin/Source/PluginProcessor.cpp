@@ -846,12 +846,10 @@ void OspAudioProcessor::applyParameters (bool force) noexcept
     macros.life = values[0];
     macros.dynamics = values[1];
     macros.character = values[2];
-    // The mod wheel opens MOTION up, unless it is routed as a modulation source: then it does
-    // what its routes say and nothing else (sessions without a wheel route are unchanged).
-    bool wheelRouted = false;
-    for (const auto& route : modSettings.routes)
-        wheelRouted = wheelRouted || (route.source == mod::Source::modWheel && route.dest != mod::Dest::none);
-    macros.motion = wheelRouted ? values[3] : values[3] + modWheel * (1.0 - values[3]);
+    // MOVEMENT is its knob. The mod wheel moves it only through a route the musician made
+    // (owner, 27 Nov 2026: every session, older ones included). Before, an unrouted wheel
+    // opened MOVEMENT up, which pinned the knob at 100 % with the wheel at the top.
+    macros.motion = values[3];
     macros.space = values[4];
     macros.reimagined = values[5];
     macros.echo = values[6];

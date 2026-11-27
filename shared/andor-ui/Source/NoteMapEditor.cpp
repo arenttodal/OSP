@@ -531,6 +531,22 @@ bool NoteMapEditor::perform (const juce::String& action)
             return changed;
         });
     }
+    else if (action == "approve" && first != nullptr)
+    {
+        // APPROVE: the note is right as analysed - its doubts are answered (and APPROVED ONLY
+        // plays it). Again on an approved note takes the approval back.
+        const bool approve = ! first->corrections.approved;
+        edit (approve ? "Approve note" : "Take back approval", [ids, approve] (atlas::NoteAtlas& a, const AudioData&) {
+            bool changed = false;
+            for (const auto& id : ids)
+                if (auto* n = a.findNote (id); n != nullptr && n->corrections.approved != approve && (n->diagnostics.any() || ! approve))
+                {
+                    n->corrections.approved = approve;
+                    changed = true;
+                }
+            return changed;
+        });
+    }
     else if (action == "audition")
         audition (notes);
     else if (action == "split" && first != nullptr)
@@ -591,7 +607,7 @@ bool NoteMapEditor::perform (const juce::String& action)
         host.mapNotes (layer, detection);
         refresh();
     }
-    else if (action == "fill" || action == "fill+" || action == "fill-" || action == "tuning"
+    else if (action == "fill" || action == "fill+" || action == "fill-" || action == "tuning" || action == "review.all" || action == "review.approved"
              || action == "speed-" || action == "speed+" || action == "speed.reset" || action.startsWith ("fadein") || action.startsWith ("fadeout"))
     {
         auto mapping = atlas->mapping;
@@ -609,6 +625,8 @@ bool NoteMapEditor::perform (const juce::String& action)
             mapping.speed = 1.0;
         else if (action == "fill")
             mapping.fill = ! mapping.fill;
+        else if (action == "review.all" || action == "review.approved")
+            mapping.approvedOnly = action == "review.approved";
         else if (action == "tuning")
             mapping.correctTuning = ! mapping.correctTuning;
         else
@@ -616,6 +634,7 @@ bool NoteMapEditor::perform (const juce::String& action)
         if (mapping == atlas->mapping)
             return false;
         const auto name = action == "tuning"              ? juce::String (mapping.correctTuning ? "Play in tune" : "Play as recorded")
+                        : action.startsWith ("review")    ? juce::String (mapping.approvedOnly ? "Play approved notes only" : "Play all notes")
                         : action.startsWith ("speed")     ? "Speed " + speedText (mapping.speed)
                         : action.startsWith ("fadein")    ? "Fade in " + fadeText (mapping.fadeInMs)
                         : action.startsWith ("fadeout")   ? "Fade out " + fadeText (mapping.fadeOutMs)
@@ -675,7 +694,7 @@ juce::String NoteMapEditor::statusOf (const InstrumentHost& host, int layer)
     const auto conflicts = host.atlasConflicts (layer);
     bool review = ! conflicts.empty() || atlas->analysis.suitability == "unsuitable";
     for (const auto& n : atlas->notes)
-        review = review || (n.included && n.diagnostics.any() && ! n.corrections.any());
+        review = review || n.needsReview();
     return review ? "Needs review" : "Ready";
 }
 
@@ -759,6 +778,8 @@ juce::String NoteMapEditor::sustainText (const atlas::NoteEvent& n) const
     // What the instrument does with the note when it is held (the existing policies, no new DSP).
     if (! n.included)
         return "Left out: not on the keyboard";
+    if (atlas != nullptr && ! atlas->plays (n))
+        return "In review: APPROVED ONLY keeps it off the keyboard until you approve it";
     if (! loopOn)
         return "LOOP is off: plays as recorded";
     if (host.parameterValue (InstrumentHost::layerParameterId (layer, "sourceMode")) >= 0.5f)
@@ -825,6 +846,8 @@ void NoteMapEditor::rebuildInspector()
         rows.push_back ({ narrow ? "VEL" : "VEL LAYER", { cell ("layer-", minus, false, n.velocityLayer > 0), valueCell (juce::String (n.velocityLayer + 1)),
                                                           cell ("layer+", "+", false, n.velocityLayer < 15) } });
         rows.push_back ({ {}, { cell ("include", n.included ? "Included" : "Left out", n.included), cell ("audition", "Audition") } });
+        if (n.diagnostics.any())
+            rows.push_back ({ "REVIEW", { cell ("approve", n.corrections.approved ? "Approved" : "Approve", n.corrections.approved) } });
         const auto it = std::find (all.begin(), all.end(), notes.front());
         rows.push_back ({ {}, { cell ("split", "Split"), cell ("merge", narrow ? "Merge" : juce::String::fromUTF8 ("Merge \xe2\x86\x92"), false, it != all.end() && it + 1 != all.end()) } });
         if (! repeatMarkers (n.id).empty())
@@ -843,6 +866,8 @@ void NoteMapEditor::rebuildInspector()
         const auto first = std::find (all.begin(), all.end(), notes.front()), last = std::find (all.begin(), all.end(), notes.back());
         const bool adjacent = static_cast<std::size_t> (std::distance (first, last)) + 1 == notes.size();
         rows.push_back ({ {}, { cell ("merge", "Merge", false, adjacent), cell ("layer+", "Louder"), cell ("layer-", "Softer") } });
+        if (std::any_of (notes.begin(), notes.end(), [] (const atlas::NoteEvent* x) { return x->diagnostics.any(); }))
+            rows.push_back ({ "REVIEW", { cell ("approve", n.corrections.approved ? "Approved" : "Approve all", n.corrections.approved) } });
         Row hint;
         hint.note = "PLAYS ON puts them on one key: its takes, in turn (round robin)";
         rows.push_back (hint);
@@ -855,6 +880,11 @@ void NoteMapEditor::rebuildInspector()
                                                              cell ("detect.normal", narrow ? "NORM" : "NORMAL", detection == phrase::Detection::normal, ! busy),
                                                              cell ("detect.more", "MORE", detection == phrase::Detection::more, ! busy) } });
         const auto& m = atlas->mapping;
+        // REVIEW: every included note plays, or only those not in review (approved, corrected
+        // or never doubted) - the others wait for APPROVE.
+        const bool anyReview = std::any_of (atlas->notes.begin(), atlas->notes.end(), [] (const atlas::NoteEvent& x) { return x.needsReview(); });
+        rows.push_back ({ "REVIEW", { cell ("review.all", narrow ? "ALL" : "PLAY ALL", ! m.approvedOnly, anyReview || m.approvedOnly),
+                                      cell ("review.approved", narrow ? "APPROVED" : "APPROVED ONLY", m.approvedOnly, anyReview || m.approvedOnly) } });
         rows.push_back ({ "FILL", { cell ("fill", m.fill ? "On" : "Off", m.fill), cell ("fill-", minus, false, m.fill),
                                     valueCell (juce::String::fromUTF8 ("\xc2\xb1") + juce::String (juce::roundToInt (m.maxTransposeSemitones)) + " st"),
                                     cell ("fill+", "+", false, m.fill) } });
@@ -897,6 +927,10 @@ void NoteMapEditor::rebuildInspector()
             verdict.note = "Nothing to map: the recording is (almost) silent";
         else if (instrument != nullptr && instrument->atlasStatus != nullptr && instrument->atlasStatus->partial)
             verdict.note = juce::String (static_cast<int> (instrument->atlasStatus->skippedNoteIds.size())) + " notes not loaded: the layer's memory is full";
+        else if (atlas->mapping.approvedOnly && ! atlas->reviewFilterActive())
+            verdict.note = "APPROVED ONLY: nothing approved yet, so every note plays";
+        else if (const auto held = std::count_if (atlas->notes.begin(), atlas->notes.end(), [this] (const atlas::NoteEvent& x) { return x.included && ! atlas->plays (x); }); held > 0)
+            verdict.note = juce::String (static_cast<int> (held)) + (held == 1 ? " note waits" : " notes wait") + " for review: select it and APPROVE";
         else if (report.isNotEmpty())
             verdict.note = report;
         else
@@ -980,7 +1014,7 @@ void NoteMapEditor::paintRegionFields (juce::Graphics& g, juce::Rectangle<float>
     for (const auto* n : shownNotes())
     {
         const auto r = regionBounds (n->id);
-        if (r.isEmpty() || ! n->included)
+        if (r.isEmpty() || ! atlas->plays (*n))   // (left out, or held back for review: no colour)
             continue;
         const bool isSelected = std::find (selected.begin(), selected.end(), n->id) != selected.end();
         const bool hot = hover.noteId == n->id;
@@ -1022,7 +1056,7 @@ void NoteMapEditor::paintWave (juce::Graphics& g, juce::Rectangle<float> graph)
         if (r.isEmpty())
             continue;
         const bool isSelected = std::find (selected.begin(), selected.end(), n->id) != selected.end();
-        spans.push_back ({ r.getX(), r.getRight(), ! n->included ? 0.2f : (isSelected ? 0.86f : (hover.noteId == n->id ? 0.52f : 0.4f)) });
+        spans.push_back ({ r.getX(), r.getRight(), ! atlas->plays (*n) ? 0.2f : (isSelected ? 0.86f : (hover.noteId == n->id ? 0.52f : 0.4f)) });
     }
     // Bone/ivory over the notes' colours (never a colour of its own, so every hue stays readable).
     const auto wave = colour::regionWave;
@@ -1147,7 +1181,7 @@ void NoteMapEditor::paintRegions (juce::Graphics& g, juce::Rectangle<float> grap
         const float tw = juce::GlyphArrangement::getStringWidth (font, label);
         if (tw <= text.getWidth())
         {
-            g.setColour (light.withAlpha (! n->included ? 0.35f : (isSelected ? 1.0f : (hot ? 0.85f : 0.62f))));
+            g.setColour (light.withAlpha (! atlas->plays (*n) ? 0.35f : (isSelected ? 1.0f : (hot ? 0.85f : 0.62f))));
             g.drawText (label, text, juce::Justification::topLeft, false);
             const bool doubtful = n->included && ((n->diagnostics.any() && ! n->corrections.any()) || isConflict (n->id));
             if (doubtful && text.getX() + tw + 10.0f < r.getRight())

@@ -230,10 +230,11 @@ namespace
 
     std::vector<const atlas::NoteEvent*> includedInMemberOrder (const atlas::NoteAtlas& atlas)
     {
-        // Included notes in key, layer and variation order: members, groups and takes follow it.
+        // The notes on the keyboard (included; APPROVED ONLY: not in review) in key, layer and
+        // variation order: members, groups and takes follow it.
         std::vector<const atlas::NoteEvent*> notes;
         for (const auto& n : atlas.notes)
-            if (n.included)
+            if (atlas.plays (n))
                 notes.push_back (&n);
         std::stable_sort (notes.begin(), notes.end(), [] (const atlas::NoteEvent* a, const atlas::NoteEvent* b) {
             return std::make_tuple (a->playKey(), a->velocityLayer, a->variationIndex, a->sourceStart)
@@ -275,7 +276,7 @@ StagedBuild buildPlayableSet (const atlas::NoteAtlas& atlas, const std::vector<S
     };
     for (const auto& src : atlas.sources)
     {
-        const bool used = std::any_of (atlas.notes.begin(), atlas.notes.end(), [&] (const auto& n) { return n.included && n.sourceId == src.assetId; });
+        const bool used = std::any_of (atlas.notes.begin(), atlas.notes.end(), [&] (const auto& n) { return atlas.plays (n) && n.sourceId == src.assetId; });
         if (! used)
             continue;
         const auto* audio = audioFor (src.assetId);

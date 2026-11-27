@@ -476,3 +476,48 @@ TEST_CASE ("plugin: a popover over the instrument hides the halos under it (and 
     for (const auto& id : ids)
         CHECK (overlay.haloCovers (id).empty());   // closed: every halo again
 }
+
+TEST_CASE ("plugin: the mod wheel moves MOVEMENT only through a route (owner, 27 Nov 2026)", "[plugin][mod][mod-final][wheel]")
+{
+    // An unrouted wheel used to open MOVEMENT up: with it at the top the knob did nothing
+    // (heard and shown). Now MOVEMENT is its knob, in every session, older ones included.
+    TempDir tmp;
+    const auto file = writeSource (tmp.dir, "tone.wav", testsignals::vowel (midiToHz (48), 4.0, 48000.0, 4, 0.5, 2));
+    auto render = [&file] (int wheel, float movement, bool routed) {
+        OspAudioProcessor p;
+        loadAndWait (p, file);
+        p.setParameterValue ("movement.mode", 4.0f);   // SHAPER: MOVEMENT is its depth
+        p.setParameterValue ("motion", movement);
+        if (routed)
+            CHECK (p.addModulationRoute (mod::Source::modWheel, mod::Dest::movement, 100.0f) >= 0);
+        p.prepareToPlay (48000.0, 256);
+        std::vector<float> out;
+        for (int i = 0; i < 360; ++i)
+        {
+            juce::MidiBuffer midi;
+            if (i == 0)
+            {
+                midi.addEvent (juce::MidiMessage::controllerEvent (1, 1, wheel), 0);
+                midi.addEvent (juce::MidiMessage::noteOn (1, 48, static_cast<juce::uint8> (100)), 0);
+            }
+            juce::AudioBuffer<float> buffer (2, 256);
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            for (int s = 0; s < 256; ++s)
+                out.push_back (buffer.getSample (0, s));
+        }
+        return out;
+    };
+    auto rms = [] (const std::vector<float>& x) {
+        double e = 0.0;
+        for (std::size_t i = x.size() / 4; i < x.size(); ++i)
+            e += static_cast<double> (x[i]) * x[i];
+        return std::sqrt (e / static_cast<double> (x.size() - x.size() / 4));
+    };
+    // The wheel at the top, no route: the knob is heard, and the wheel alone changes nothing.
+    const auto full = render (127, 100.0f, false), none = render (127, 0.0f, false);
+    CHECK (rms (none) > 1.3 * rms (full));
+    CHECK (render (0, 100.0f, false) == full);
+    // Routed to MOVEMENT, the wheel moves it (as any route does).
+    CHECK (rms (render (127, 0.0f, true)) < 0.9 * rms (none));
+}

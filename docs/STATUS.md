@@ -85,6 +85,19 @@
 >   one step in the instrument's undo history (`SetAssignmentsAction`), with undo / redo arrows in
 >   ZONES' top row as in NOTES; an edit made while the one before is still being built starts from
 >   it (`requestedAssignments`). Tests: "[zones][undo]".
+> - **The mod wheel no longer opens MOVEMENT (owner, every session including older ones):** an
+>   unrouted wheel used to push MOVEMENT toward 100 % on top of the knob (older behaviour, from
+>   before the wheel had VIBRATO). With the wheel up, the owner's Warm_Moog (SHAPER) did not
+>   follow MOVEMENT, heard or drawn (the display draws the value played). Now MOVEMENT is its
+>   knob; the wheel plays VIBRATO (when on) and its own routes, a route to MOVEMENT included.
+>   Sessions that used the wheel's boost sound without it (owner's decision). Tests: "[wheel]".
+> - **NOTES: APPROVE and APPROVED ONLY (owner's choice):** a doubted note gets REVIEW: APPROVE
+>   (`Corrections::approved`: a correction, so re-detection keeps it); nothing selected, REVIEW:
+>   PLAY ALL | APPROVED ONLY (`Mapping::approvedOnly`): notes in review (`NoteEvent::needsReview`)
+>   stay off the keyboard, drawn dimmed, until approved or corrected (`NoteAtlas::plays`, used by
+>   the set build, the key map and the card). Nothing approved yet: everything plays
+>   (`reviewFilterActive`). One undo step each, saved in the atlas (added JSON fields, schema 2).
+>   Tests: "[review]" (unit + plugin).
 >
 > **26 Nov 2026, owner's notes:**
 > - **ZONES: the multi-sample zone editor (owner approved the mockup):** a set of dropped files
