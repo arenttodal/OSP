@@ -51,9 +51,15 @@ body.room .nav .wrap { max-width: 1520px; padding-left: clamp(var(--gut), 6vw, 1
 .rh__ticks li { display: flex; align-items: center; gap: 8px } .rh__ticks li::before { content: ""; width: 12px; height: 7px; border-left: 1.5px solid var(--amber); border-bottom: 1.5px solid var(--amber); transform: rotate(-45deg) translateY(-2px) }
 /* the plugin: the real editor, lit by the room */
 .rh__plug { margin: 0; justify-self: end; width: 100%; max-width: 940px; perspective: 2200px }
-.rh__plug img { display: block; width: 100%; height: auto; border-radius: 1.1%; box-shadow: 0 0 0 1px rgba(255,236,210,.08), 0 2px 4px rgba(0,0,0,.25), 0 40px 80px -20px rgba(0,0,0,.6), 0 80px 160px -40px rgba(30,14,4,.7); transition: transform .8s var(--ease) }
-.rh[data-plug="angled"] .rh__plug img { transform: rotateY(-17deg) rotateX(5deg) rotateZ(.6deg) translateX(-1%); transform-origin: 70% 50% }
+.rh__plug .p2d { display: block; width: 100%; height: auto; border-radius: 1.1%; box-shadow: 0 0 0 1px rgba(255,236,210,.08), 0 2px 4px rgba(0,0,0,.25), 0 40px 80px -20px rgba(0,0,0,.6), 0 80px 160px -40px rgba(30,14,4,.7); transition: transform .8s var(--ease) }
+.rh[data-plug="angled"] .rh__plug .p2d { transform: rotateY(-17deg) rotateX(5deg) rotateZ(.6deg) translateX(-1%); transform-origin: 70% 50% }
 .rh__plug::after { content: ""; position: absolute; }
+.rh__plug .p3d { display: none; width: 100%; height: auto; max-width: none; filter: drop-shadow(0 30px 40px rgba(0,0,0,.45)) drop-shadow(0 70px 90px rgba(20,10,4,.5)) }
+.rh[data-plug="top"] .p2d, .rh[data-plug="slant"] .p2d, .rh[data-plug="threeq"] .p2d, .rh[data-plug="float"] .p2d, .rh[data-plug="corner"] .p2d { display: none }
+.rh[data-plug="top"] .p3d-top, .rh[data-plug="slant"] .p3d-slant, .rh[data-plug="threeq"] .p3d-threeq, .rh[data-plug="float"] .p3d-float, .rh[data-plug="corner"] .p3d-corner { display: block }
+.rh[data-plug="threeq"] .rh__plug { max-width: 1060px } .rh[data-plug="threeq"] .p3d-threeq { width: 112%; margin-left: -4% }
+.rh[data-plug="float"] .rh__plug { max-width: 1040px } .rh[data-plug="float"] .p3d-float { width: 108% }
+.rh[data-plug="corner"] .rh__plug { max-width: none; align-self: end } .rh[data-plug="corner"] .p3d-corner { width: 128%; margin-right: -30%; margin-bottom: -60px }
 /* review switch (not for the shipped page) */
 .rh__dev { position: absolute; z-index: 3; right: 16px; bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px; border-radius: 12px; background: rgba(10,7,5,.55); backdrop-filter: blur(10px); font-size: 12px; color: rgba(243,236,226,.7) }
 .rh__dev span { padding: 0 8px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; font-size: 10.5px } .rh__dev i { width: 1px; height: 18px; background: rgba(243,236,226,.2); margin: 0 4px }
@@ -173,13 +179,20 @@ body.room .nav .wrap { max-width: 1520px; padding-left: clamp(var(--gut), 6vw, 1
       </form>
       <ul class="rh__ticks"><li>macOS · AU, VST3, Standalone</li><li>Works offline</li><li>No account needed</li></ul>
     </div>
-    <figure class="rh__plug"><img src="../m/plugin-3L-1800.webp" srcset="../m/plugin-3L-1200.webp 1200w, ../m/plugin-3L-1800.webp 1800w, ../m/plugin-3L-2400.webp 2400w" sizes="(max-width: 900px) 92vw, 52vw" alt="The ANDOR OSP editor with three sounds loaded" width="2896" height="1972" decoding="async"></figure>
+    <figure class="rh__plug">
+      <img class="p2d" src="../m/plugin-3L-1800.webp" srcset="../m/plugin-3L-1200.webp 1200w, ../m/plugin-3L-1800.webp 1800w, ../m/plugin-3L-2400.webp 2400w" sizes="(max-width: 900px) 92vw, 52vw" alt="The ANDOR OSP editor with three sounds loaded" width="2896" height="1972" decoding="async">
+      <img class="p3d p3d-top" src="../m/p3d-top-1800.webp" srcset="../m/p3d-top-1200.webp 1200w, ../m/p3d-top-1800.webp 1800w, ../m/p3d-top-2400.webp 2400w" sizes="(max-width: 900px) 100vw, 60vw" alt="The ANDOR OSP instrument" loading="lazy" decoding="async">
+      <img class="p3d p3d-slant" src="../m/p3d-slant-1800.webp" srcset="../m/p3d-slant-1200.webp 1200w, ../m/p3d-slant-1800.webp 1800w, ../m/p3d-slant-2400.webp 2400w" sizes="(max-width: 900px) 100vw, 60vw" alt="The ANDOR OSP instrument" loading="lazy" decoding="async">
+      <img class="p3d p3d-threeq" src="../m/p3d-threeq-1800.webp" srcset="../m/p3d-threeq-1200.webp 1200w, ../m/p3d-threeq-1800.webp 1800w, ../m/p3d-threeq-2400.webp 2400w" sizes="(max-width: 900px) 100vw, 60vw" alt="The ANDOR OSP instrument" loading="lazy" decoding="async">
+      <img class="p3d p3d-float" src="../m/p3d-float-1800.webp" srcset="../m/p3d-float-1200.webp 1200w, ../m/p3d-float-1800.webp 1800w, ../m/p3d-float-2400.webp 2400w" sizes="(max-width: 900px) 100vw, 60vw" alt="The ANDOR OSP instrument" loading="lazy" decoding="async">
+      <img class="p3d p3d-corner" src="../m/p3d-corner-1800.webp" srcset="../m/p3d-corner-1200.webp 1200w, ../m/p3d-corner-1800.webp 1800w, ../m/p3d-corner-2400.webp 2400w" sizes="(max-width: 900px) 100vw, 60vw" alt="The ANDOR OSP instrument" loading="lazy" decoding="async">
+    </figure>
   </div>
   <div class="rh__dev" role="group" aria-label="Review options">
     <span>Review</span>
     <button data-k="bg" data-v="room">Room</button><button data-k="bg" data-v="soft">Soft</button>
     <i></i><button data-k="type" data-v="wide">Wide type</button><button data-k="type" data-v="tight">Tight type</button>
-    <i></i><button data-k="plug" data-v="flat">Flat</button><button data-k="plug" data-v="angled">Angled</button>
+    <i></i><button data-k="plug" data-v="flat">Flat</button><button data-k="plug" data-v="angled">Angled</button><i></i><span>3D</span><button data-k="plug" data-v="top">Top</button><button data-k="plug" data-v="slant">Slant</button><button data-k="plug" data-v="threeq">¾</button><button data-k="plug" data-v="float">Float</button><button data-k="plug" data-v="corner">Corner</button>
   </div>
 </section>
 

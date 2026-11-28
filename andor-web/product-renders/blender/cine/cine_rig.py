@@ -61,6 +61,7 @@ ap.add_argument("--textures", default=None, help="the interface texture director
 ap.add_argument("--device", default="CPU", choices=["CPU", "CUDA", "OPTIX", "HIP", "METAL", "ONEAPI"],
                 help="Cycles device (GPU benchmark: the machine's backend; falls back to CPU, and says so, if none is found)")
 ap.add_argument("--final", action="store_true", help="a final-quality render: refuse unless the textures match their FROZEN.json")
+ap.add_argument("--matte-denoise", action="store_true", help="denoise the matte pass (a still used as a cut-out product image, not as a mask)")
 ap.add_argument("--depth", default="auto", choices=["auto", "8", "16"], help="PNG bit depth; auto: 8 for draft sizes (< 1920 px), else 16")
 args = ap.parse_args(argv)
 spec = json.load(open(args.spec))
@@ -382,7 +383,7 @@ def look(o, target, roll_deg=0.0):
 env_objs = [o for o in bpy.data.objects if o.type == "MESH" and o not in product_objs and o not in [c[0] for c in cards]]
 if args.pass_ == "matte":
     scene.render.film_transparent = True
-    scene.cycles.use_denoising = False
+    scene.cycles.use_denoising = args.matte_denoise
     for o in env_objs:
         o.is_holdout = True
     scene.render.image_settings.color_mode = "RGBA"
