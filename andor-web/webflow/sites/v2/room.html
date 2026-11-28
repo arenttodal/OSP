@@ -23,6 +23,7 @@ body.room .nav { position: fixed; left: 0; right: 0; background: transparent; bo
 body.room .nav:not(.solid) { color: #f3ece2 } body.room .nav:not(.solid) nav a { color: rgba(243,236,226,.78) }
 body.room .nav:not(.solid) .btn { background: rgba(243,236,226,.12); color: #f3ece2; box-shadow: inset 0 0 0 1px rgba(243,236,226,.28) }
 body.room .nav.solid { background: rgba(246,243,238,.9); border-color: var(--line) }
+body.room .nav .wrap { max-width: 1520px; padding-left: clamp(var(--gut), 6vw, 110px); padding-right: var(--gut) }   /* the logo lines up with the headline */
 .rh { --cream: #f3ece2; --amber: #e2a467; position: relative; min-height: max(100svh, 700px); overflow: hidden; background: #1a120c; color: var(--cream); display: grid; align-items: center }
 .rh__bg, .rh__bg picture, .rh__shade { position: absolute; inset: 0 } .rh__bg img { width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 60% 50% }
 .rh .bg-soft { opacity: 0; transition: opacity .6s } .rh[data-bg="soft"] .bg-soft { opacity: 1 }
@@ -61,7 +62,9 @@ body.room .nav.solid { background: rgba(246,243,238,.9); border-color: var(--lin
   .rh { align-items: start } .rh__bg img { object-position: 50% 50% }
   .rh__shade { background: linear-gradient(180deg, rgba(16,11,7,.88) 0%, rgba(16,11,7,.7) 48%, rgba(16,11,7,.25) 72%, rgba(16,11,7,.45) 100%) }
   .rh__grid { grid-template-columns: minmax(0, 1fr); padding: 104px var(--gut) 88px; gap: 40px }
-  .rh__title { white-space: normal } .rh__plug { justify-self: stretch } .rh__dev { left: 12px; right: 12px; bottom: 12px; justify-content: center }
+  .rh__title { white-space: normal } .rh__plug { justify-self: stretch }
+  .rh__grid { gap: 0 } .rh__copy { display: contents }   /* phones: the editor right after the subtitle */
+  .rh__title { order: 1 } .rh__sub { order: 2 } .rh__plug { order: 3; margin-top: 30px } .rh__body { order: 4; margin-top: 30px } .rh__wl { order: 5 } .rh__ticks { order: 6 } .rh__dev { left: 12px; right: 12px; bottom: 12px; justify-content: center }
 }
 @media (max-width: 560px) { .rh__field { height: auto; flex-wrap: wrap; padding: 6px } .rh__field input[type=email] { height: 50px; flex-basis: 100% } .rh__field button { width: 100%; height: 50px; justify-content: center } }
 /* the original static hero (H01 plate, centred copy) */
