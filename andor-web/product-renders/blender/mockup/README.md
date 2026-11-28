@@ -26,3 +26,15 @@ python3 make_shots.py /tmp/caps /tmp/shots --python <venv with bpy>/bin/python
 **Captures.** Every open popover is also saved on its own (`<shot>-panel@3x.png`, transparent around it) for clean, uncropped panel images.
 
 **Versions.** Use the frozen release interface (0.9.0-beta.1, `32e0bee`). That commit has no web-capture test; copy `WebCaptureTests.inc` into a worktree of it. The test-only `captureWithoutCaps` switch is missing there, so define it locally; shot 10 is then unused.
+
+## Room plate (`room_bokeh.py`)
+
+A warm room that only has to read out of focus, for heroes where the GUI sits on top in HTML:
+sun through leaves onto plaster (through an off-frame opening, so it lands as a patch), a woven lamp,
+books, a frame, a dim window behind the copy side. Focus is set in front of everything (f/0.9 at
+0.85 m by default), so nothing is sharp. Fixed seed, so re-renders match.
+
+    python room_bokeh.py --out room-desktop.png --res 2560x1440 --samples 128
+    python room_bokeh.py --out room-phone.png --res 1080x1920 --samples 128 --portrait
+
+About 9 minutes for the desktop plate on 4 CPU cores.

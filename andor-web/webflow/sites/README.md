@@ -46,3 +46,10 @@ CLOUDFLARE_API_TOKEN=… python3 webflow/tools/deploy_r2.py <account> andor-medi
 
 **Live.** https://pub-8db6c5f98f17416f953fc3d0e0354144.r2.dev/osp/sites/index.html. R2 has no folder
 index, so links name `index.html`.
+
+**Room hero (`v2/room.html`).** Studio with a different opening: left-aligned copy, the real editor
+on the right, and a warm room far out of focus behind (`product-renders/blender/mockup/room_bokeh.py`).
+A review switch in the corner compares the room and a soft plate (the same render blurred to light
+only), wide type (Montserrat) and tight type (Inter Tight), and a flat or angled editor; `?bg=`,
+`?type=` and `?plug=` set them by link. The waitlist sits in the hero as one field with the action
+inside it. The rest of the page is a copy of `v2/index.html` at the time it was made.
